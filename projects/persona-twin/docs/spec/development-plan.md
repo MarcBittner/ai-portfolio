@@ -41,14 +41,14 @@ monorepo; portfolio-level spec lives at `docs/spec/spec.md` in the root).
 - [x] `tests/` scaffold + first config tests (offline defaults when no env)
 - [x] README stub: one-paragraph description + quickstart placeholder
 
-## Phase 2: Chunking module
+## Phase 2: Chunking module ✅
 
-- [ ] `chunking/` — `Chunker` protocol + provenance metadata model
-- [ ] Fixed-size chunker (size + overlap)
-- [ ] Semantic chunker (sentence/paragraph boundaries, size targets)
-- [ ] Content-aware chunker (markdown headings/lists/Q&A blocks)
-- [ ] Unit tests: boundaries, overlap, provenance spans, empty/edge inputs
-- [ ] `docs/chunking-tradeoffs.md` first draft (numbers added in Phase 8)
+- [x] `chunking/` — `Chunker` protocol + provenance metadata model
+- [x] Fixed-size chunker (size + overlap)
+- [x] Semantic chunker (sentence/paragraph boundaries, size targets)
+- [x] Content-aware chunker (markdown headings/lists/Q&A blocks)
+- [x] Unit tests: boundaries, overlap, provenance spans, empty/edge inputs
+- [x] `docs/chunking-tradeoffs.md` first draft (numbers added in Phase 7)
 
 ## Phase 3: Embeddings + vector store
 

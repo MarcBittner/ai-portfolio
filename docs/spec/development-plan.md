@@ -23,7 +23,7 @@ layered evaluation. Detailed plan:
 
 - [x] Phase 0: bootstrap + spec
 - [x] Phase 1: project skeleton
-- [ ] Phase 2: chunking module
+- [x] Phase 2: chunking module
 - [ ] Phase 3: embeddings + vector stores
 - [ ] Phase 4: synthetic corpus + PII redaction
 - [ ] Phase 5: LLM providers + routing
