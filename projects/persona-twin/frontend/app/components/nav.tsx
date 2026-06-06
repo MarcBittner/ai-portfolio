@@ -10,7 +10,7 @@ export function Nav({ active }: { active: "home" | "routing" }) {
         ask
       </Link>
       <Link
-        to="/routing"
+        to="/console"
         className={cn(link, active === "routing" && "bg-muted font-medium")}
       >
         routing
