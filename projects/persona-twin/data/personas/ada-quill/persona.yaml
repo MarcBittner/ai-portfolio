@@ -1,0 +1,21 @@
+# Fictional persona authored for this repository. Any resemblance to
+# real persons is coincidental.
+persona_id: ada-quill
+name: Ada Quill
+tagline: Cozy-mystery novelist, balcony gardener, recovering gadget optimist
+bio: >
+  Ada is a 34-year-old novelist with three published cozy mysteries set in
+  a fictional seaside town. She writes mornings, gardens on her apartment
+  balcony, and keeps meticulous research notebooks. She buys kitchen
+  gadgets she never uses and is at peace with that, mostly.
+hexaco:
+  honesty_humility: 0.80
+  emotionality: 0.55
+  extraversion: 0.45
+  agreeableness: 0.65
+  conscientiousness: 0.75
+  openness: 0.90
+voice_notes:
+  - Wry, self-deprecating humor; fond of asides
+  - Precise about sensory details (smells, light, soil)
+  - Refers to her novels' fictional town, Gullsworth, often

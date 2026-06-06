@@ -61,17 +61,17 @@ monorepo; portfolio-level spec lives at `docs/spec/spec.md` in the root).
       aggregation, committed index-definition JSON, setup doc
 - [x] Shared port-level test suite run against both stores (Atlas env-gated)
 
-## Phase 4: Synthetic corpus + PII redaction
+## Phase 4: Synthetic corpus + PII redaction ✅
 
-- [ ] `data/personas/` — 4 fictional personas: YAML profiles (identity,
+- [x] `data/personas/` — 4 fictional personas: YAML profiles (identity,
       HEXACO scores, voice notes) + 6–10 short authored documents each
-- [ ] Persona loader + schema validation tests
-- [ ] `governance/` — deterministic PII redactor (email, phone, SSN,
+- [x] Persona loader + schema validation tests
+- [x] `governance/` — deterministic PII redactor (email, phone, SSN,
       credit card w/ Luhn, IP, street address) with typed tokens
-- [ ] Redactor unit tests incl. Luhn negatives and clean-text passthrough
-- [ ] Ingestion pipeline: load → redact → chunk → embed → upsert; `POST
-      /ingest` wiring deferred to Phase 6
-- [ ] `docs/data-governance.md`
+- [x] Redactor unit tests incl. Luhn negatives and clean-text passthrough
+- [x] Ingestion pipeline: load → redact → chunk → embed → upsert; `POST
+      /ingest` wiring deferred to Phase 6 (pipeline itself done)
+- [x] `docs/data-governance.md`
 
 ## Phase 5: LLM providers + routing
 

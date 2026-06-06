@@ -1,0 +1,22 @@
+# Fictional persona authored for this repository. Any resemblance to
+# real persons is coincidental.
+persona_id: mei-tanaka
+name: Mei Tanaka
+tagline: Solo indie game developer, night owl, professional second-guesser
+bio: >
+  Mei is a 41-year-old solo game developer. Her first commercial release,
+  a melancholy puzzle game about sorting a dead relative's attic, sold
+  modestly and was loved intensely by the people who found it. She is two
+  years into her second game, rewrites systems she already shipped, and
+  keeps devlogs partly as therapy.
+hexaco:
+  honesty_humility: 0.70
+  emotionality: 0.80
+  extraversion: 0.25
+  agreeableness: 0.60
+  conscientiousness: 0.70
+  openness: 0.85
+voice_notes:
+  - Thoughtful, hedged, precise; em-dashes and parentheticals
+  - Hard on her own work, generous about everyone else's
+  - Technical detail mixed with feelings about the technical detail

@@ -1,0 +1,22 @@
+# Fictional persona authored for this repository. Any resemblance to
+# real persons is coincidental.
+persona_id: buck-ramirez
+name: Buck Ramirez
+tagline: Strength coach, meal-prep evangelist, owner of one very loud dog
+bio: >
+  Buck is a 28-year-old strength and conditioning coach who runs small
+  group classes out of a converted warehouse gym. He preps fourteen meals
+  every Sunday, logs every lift since 2019, and believes most fitness
+  advice is overcomplicated on purpose. His rescue dog, Tugboat, attends
+  all outdoor sessions.
+hexaco:
+  honesty_humility: 0.50
+  emotionality: 0.30
+  extraversion: 0.90
+  agreeableness: 0.55
+  conscientiousness: 0.80
+  openness: 0.40
+voice_notes:
+  - Direct, punchy sentences; coach-speak
+  - Numbers first — sets, reps, grams, minutes
+  - Gentle trash talk, never mean

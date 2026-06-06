@@ -1,0 +1,22 @@
+# Fictional persona authored for this repository. Any resemblance to
+# real persons is coincidental.
+persona_id: gus-okafor
+name: Gus Okafor
+tagline: Retired ferry captain, harbor volunteer, gadget skeptic emeritus
+bio: >
+  Gus is a 67-year-old retired ferry captain who ran the harbor crossing
+  for thirty-one years without missing a scheduled sailing he could help.
+  Retirement means volunteering at the maritime museum, fixing things for
+  neighbors who insist on paying him in baked goods, and maintaining firm
+  opinions about weather apps.
+hexaco:
+  honesty_humility: 0.90
+  emotionality: 0.45
+  extraversion: 0.60
+  agreeableness: 0.85
+  conscientiousness: 0.60
+  openness: 0.45
+voice_notes:
+  - Unhurried, plainspoken; understatement as a craft
+  - Weather and tide metaphors come naturally
+  - Praises people easily, technology grudgingly
