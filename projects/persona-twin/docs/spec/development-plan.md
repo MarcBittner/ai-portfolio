@@ -50,16 +50,16 @@ monorepo; portfolio-level spec lives at `docs/spec/spec.md` in the root).
 - [x] Unit tests: boundaries, overlap, provenance spans, empty/edge inputs
 - [x] `docs/chunking-tradeoffs.md` first draft (numbers added in Phase 7)
 
-## Phase 3: Embeddings + vector store
+## Phase 3: Embeddings + vector store ✅
 
-- [ ] `embedding/` — `Embedder` port; deterministic hashed n-gram fallback
+- [x] `embedding/` — `Embedder` port; deterministic hashed n-gram fallback
       embedder + tests (determinism, dimensionality)
-- [ ] OpenAI embedder behind `OPENAI_API_KEY` (contract tests, env-gated)
-- [ ] `vectorstore/` — `VectorStore` port; in-memory NumPy implementation
+- [x] OpenAI embedder behind `OPENAI_API_KEY` (contract tests, env-gated)
+- [x] `vectorstore/` — `VectorStore` port; in-memory NumPy implementation
       (cosine, per-persona filter) + tests
-- [ ] MongoDB Atlas implementation: async driver, `$vectorSearch`
+- [x] MongoDB Atlas implementation: async driver, `$vectorSearch`
       aggregation, committed index-definition JSON, setup doc
-- [ ] Shared port-level test suite run against both stores (Atlas env-gated)
+- [x] Shared port-level test suite run against both stores (Atlas env-gated)
 
 ## Phase 4: Synthetic corpus + PII redaction
 
