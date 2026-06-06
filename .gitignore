@@ -1,0 +1,41 @@
+# Secrets / environment — never commit
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+credentials*.json
+
+# Claude Code untracked files (session transcripts, local credentials)
+docs/spec/untracked/
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Node / frontend
+node_modules/
+.cache/
+frontend/build/
+frontend/dist/
+
+# Editors / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Docker / local data
+*.local
+data/local/
