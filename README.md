@@ -8,7 +8,7 @@ environment variables.
 
 ## Projects
 
-### [persona-twin](projects/persona-twin/) — in development
+### [persona-twin](projects/persona-twin/) — v0.1.0
 
 Query AI **digital twins** of synthetic personas, grounded in retrieved
 data with citations.

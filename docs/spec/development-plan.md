@@ -15,7 +15,7 @@ checkboxed plan at `projects/<name>/docs/spec/development-plan.md`.
 - [x] Portfolio spec + monorepo layout (`projects/` per-project)
 - [x] Root README portfolio index (grows as projects land)
 
-## Project 1: persona-twin 🔄
+## Project 1: persona-twin ✅ v0.1.0 (optional phases pending)
 
 Digital twins of synthetic HEXACO personas — RAG, multi-provider routing,
 layered evaluation. Detailed plan:
@@ -29,7 +29,7 @@ layered evaluation. Detailed plan:
 - [x] Phase 5: LLM providers + routing
 - [x] Phase 6: persona twins + FastAPI service
 - [x] Phase 7: evaluation harness
-- [ ] Phase 8: polish + v0.1.0
+- [x] Phase 8: polish + v0.1.0
 - [ ] Phase 9 (optional): frontend
 - [ ] Phase 10 (optional): deployment
 

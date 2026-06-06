@@ -115,14 +115,14 @@ monorepo; portfolio-level spec lives at `docs/spec/spec.md` in the root).
 - [x] `docs/evaluation.md` — "why one fidelity % hides what matters"
 - [x] Back-fill measured numbers into `docs/chunking-tradeoffs.md`
 
-## Phase 8: Polish
+## Phase 8: Polish ✅
 
-- [ ] README: architecture diagram, quickstart, component docs links,
+- [x] README: architecture diagram, quickstart, component docs links,
       limitations
-- [ ] `ruff` + type-check clean; prune dead code and TODOs
-- [ ] Fresh-clone verification: `make setup && make demo && make test &&
+- [x] `ruff` + type-check clean; prune dead code and TODOs
+- [x] Fresh-clone verification: `make setup && make demo && make test &&
       make eval` with no `.env`
-- [ ] Tag `v0.1.0`
+- [x] Tag `v0.1.0`
 
 ## Phase 9 (optional): Frontend
 

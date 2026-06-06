@@ -37,7 +37,7 @@ variables are present.
 ```
                           ┌──────────────────────────────────────────┐
                           │  FastAPI service (async, Pydantic)       │
-                          │  /personas  /ask  /ingest  /eval  /health│
+                          │  /personas  /ask  /ingest  /health      │
                           └───────┬──────────────────────────────────┘
                                   │
         ┌─────────────┬───────────┴──────────┬──────────────────┐
