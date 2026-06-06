@@ -1,0 +1,79 @@
+# Local Kubernetes deployment (tested on kind). The image is loaded
+# directly into the node (`kind load docker-image persona-twin:v0.2.0`
+# or `docker save | ctr images import`), hence imagePullPolicy: Never.
+#
+#   kubectl apply -f deploy/k8s/persona-twin.yaml
+#   curl http://<node-ip>:30080/health
+#
+# Offline by default; add real backends as a Secret and uncomment the
+# envFrom block.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: persona-twin
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: persona-twin
+  namespace: persona-twin
+  labels:
+    app: persona-twin
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: persona-twin
+  template:
+    metadata:
+      labels:
+        app: persona-twin
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+      containers:
+        - name: api
+          image: persona-twin:v0.2.0
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8080
+          env:
+            - name: PERSONA_TWIN_ROUTE_OBJECTIVE
+              value: cost
+          # envFrom:
+          #   - secretRef:
+          #       name: persona-twin-providers   # ANTHROPIC_API_KEY etc.
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: persona-twin
+  namespace: persona-twin
+spec:
+  type: NodePort
+  selector:
+    app: persona-twin
+  ports:
+    - port: 80
+      targetPort: 8080
+      nodePort: 30080

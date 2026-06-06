@@ -25,6 +25,29 @@ docker run --rm -p 8080:8080 \
 > The image installs the base (offline) dependencies. To bake in
 > provider extras: `RUN pip install --no-cache-dir ".[anthropic,openai,mongo,redis]"`.
 
+## Local Kubernetes (kind)
+
+Tested against a local [kind](https://kind.sigs.k8s.io/) cluster:
+
+```sh
+cd projects/persona-twin
+docker build -t persona-twin:v0.2.0 .
+kind load docker-image persona-twin:v0.2.0 --name YOUR_CLUSTER
+# (equivalent without the kind CLI:
+#  docker save persona-twin:v0.2.0 | docker exec -i YOUR_CLUSTER-control-plane \
+#    ctr --namespace=k8s.io images import -)
+kubectl apply -f deploy/k8s/persona-twin.yaml
+kubectl -n persona-twin rollout status deployment/persona-twin
+kubectl -n persona-twin port-forward svc/persona-twin 8080:80
+# UI at http://localhost:8080/ · API at /health, /api/ask
+```
+
+The manifest (`deploy/k8s/persona-twin.yaml`) runs non-root with
+readiness/liveness probes on `/health`, a NodePort (30080) for
+node-level access, and `imagePullPolicy: Never` since the image is
+side-loaded. Real backends go in a Secret (`envFrom` block is stubbed
+in the manifest) — never literal env values.
+
 ## Cloud Run
 
 ```sh

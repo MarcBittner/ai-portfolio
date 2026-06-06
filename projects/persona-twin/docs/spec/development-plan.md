@@ -132,9 +132,12 @@ monorepo; portfolio-level spec lives at `docs/spec/spec.md` in the root).
 
 ## Phase 10 (optional): Deployment ✅
 
-- [x] Multi-stage Dockerfile (non-root) + `make docker` — note:
-      image build not yet run (no docker CLI in the dev container)
+- [x] Multi-stage Dockerfile (non-root) + `make docker` — build verified
+      via docker socket; image smoke-tested (API + UI from one container)
 - [x] GCP Cloud Run service YAML + deploy doc (placeholder project ids)
+- [x] Local k8s manifest (deploy/k8s/) — verified on a kind cluster:
+      image built + side-loaded, rollout green, /health + /api/ask
+      smoke-tested through the Service
 - [x] Redis cache for embeddings/answers behind `REDIS_URL`; hit/miss
       metrics in debug payload
 
