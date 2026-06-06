@@ -12,16 +12,23 @@ import {
 import { Nav } from "~/components/nav";
 import {
   getBenchmark,
+  getBenchmarkHistory,
+  getBenchmarkRun,
   getRouting,
   postBenchmark,
+  stopBenchmark,
   type BenchmarkRun,
-  type RoutingView,
+  type RunSummary,
   type TaskResult,
 } from "~/lib/api";
 
 export async function clientLoader() {
-  const [routing, benchmark] = await Promise.all([getRouting(), getBenchmark()]);
-  return { routing, benchmark };
+  const [routing, benchmark, history] = await Promise.all([
+    getRouting(),
+    getBenchmark(),
+    getBenchmarkHistory(),
+  ]);
+  return { routing, benchmark, history };
 }
 
 const HEADLINE: Record<string, { metric: string; label: string }> = {
@@ -46,6 +53,7 @@ export default function Analytics({ loaderData }: Route.ComponentProps) {
   const [selectedTasks, setSelectedTasks] = useState<string[]>(routing.tasks);
   const [itemsLimit, setItemsLimit] = useState(6);
   const [run, setRun] = useState<BenchmarkRun>(loaderData.benchmark);
+  const [history, setHistory] = useState<RunSummary[]>(loaderData.history);
   const [error, setError] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -57,6 +65,7 @@ export default function Analytics({ loaderData }: Route.ComponentProps) {
         if (latest.status !== "running" && timer.current) {
           clearInterval(timer.current);
           timer.current = null;
+          setHistory(await getBenchmarkHistory());
         }
       }, 1500);
     }
@@ -78,6 +87,14 @@ export default function Analytics({ loaderData }: Route.ComponentProps) {
           items_limit: itemsLimit,
         }),
       );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function stop() {
+    try {
+      await stopBenchmark();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -164,9 +181,17 @@ export default function Analytics({ loaderData }: Route.ComponentProps) {
               {run.status === "running" ? "running…" : "Run benchmark"}
             </Button>
             {run.status === "running" && (
-              <span className="text-xs text-muted-foreground">
-                {run.progress_done}/{run.progress_total} · {run.current}
-              </span>
+              <>
+                <Button variant="outline" onClick={() => void stop()}>
+                  Stop
+                </Button>
+                <span className="text-xs text-muted-foreground">
+                  {run.progress_done}/{run.progress_total} · {run.current}
+                </span>
+              </>
+            )}
+            {run.status === "stopped" && (
+              <Badge variant="muted">stopped — partial results kept</Badge>
             )}
             {run.status === "failed" && (
               <Badge variant="destructive">failed: {run.error}</Badge>
@@ -192,6 +217,36 @@ export default function Analytics({ loaderData }: Route.ComponentProps) {
 
       {run.status === "completed" && byTask.size === 0 && (
         <p className="text-sm text-muted-foreground">no results.</p>
+      )}
+
+      {history.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Previous runs</CardTitle>
+            <CardDescription>
+              Persisted server-side (PVC in k8s) — survive pod restarts.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-1">
+            {history.map((h) => (
+              <div key={h.run_id} className="flex items-center gap-2 text-xs">
+                <Button
+                  variant="ghost"
+                  className="h-6 px-2 font-mono text-xs"
+                  onClick={async () => setRun(await getBenchmarkRun(h.run_id))}
+                >
+                  {h.run_id}
+                </Button>
+                <Badge variant={h.status === "completed" ? "accent" : "muted"}>
+                  {h.status}
+                </Badge>
+                <span className="text-muted-foreground">
+                  {h.models.length} models · {h.tasks.join(", ")} · n={h.items_limit}
+                </span>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
       )}
     </main>
   );

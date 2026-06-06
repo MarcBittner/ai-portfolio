@@ -148,3 +148,68 @@ class TestBenchmarkAPI:
             "/benchmark", json={"models": ["anthropic:claude-9000"]}
         )
         assert response.status_code == 422
+
+
+class TestStopAndPersistence:
+    async def test_stop_running_benchmark_keeps_partials(self, client, tmp_path):
+        from persona_twin.eval.bench_store import BenchmarkStore
+
+        state = app.state.twin
+        state.bench_store = BenchmarkStore(tmp_path)
+
+        class SlowProvider:
+            name = "anthropic"
+
+            async def complete(self, request, spec):
+                await asyncio.sleep(30)
+                raise AssertionError("should have been cancelled")
+
+        state.router.providers["anthropic"] = SlowProvider()
+        started = await client.post(
+            "/benchmark",
+            json={
+                # mock first (finishes instantly), then the slow model
+                "models": ["mock:mock-extractive-1", "anthropic:claude-opus-4-8"],
+                "tasks": ["twin_answer"],
+                "items_limit": 2,
+            },
+        )
+        assert started.status_code == 202
+        await asyncio.sleep(0.3)  # mock result lands; slow model in flight
+
+        stopped = await client.post("/benchmark/stop")
+        assert stopped.status_code == 200
+        for _ in range(50):
+            body = (await client.get("/benchmark")).json()
+            if body["status"] == "stopped":
+                break
+            await asyncio.sleep(0.1)
+        assert body["status"] == "stopped"
+        assert any(r["provider"] == "mock" for r in body["results"])  # partials kept
+        # persisted with partial results
+        history = (await client.get("/benchmark/history")).json()
+        assert history and history[0]["status"] == "stopped"
+        del state.router.providers["anthropic"]
+
+    async def test_stop_when_idle_409(self, client):
+        assert (await client.post("/benchmark/stop")).status_code == 409
+
+    async def test_history_roundtrip(self, client, tmp_path):
+        from persona_twin.eval.bench_store import BenchmarkStore
+
+        app.state.twin.bench_store = BenchmarkStore(tmp_path)
+        await client.post("/benchmark", json={"items_limit": 2, "tasks": ["eval_judge"]})
+        for _ in range(100):
+            body = (await client.get("/benchmark")).json()
+            if body["status"] == "completed":
+                break
+            await asyncio.sleep(0.1)
+        history = (await client.get("/benchmark/history")).json()
+        assert len(history) == 1
+        run_id = history[0]["run_id"]
+        assert history[0]["tasks"] == ["eval_judge"]
+        full = (await client.get(f"/benchmark/history/{run_id}")).json()
+        assert full["run_id"] == run_id
+        assert full["results"]
+        assert (await client.get("/benchmark/history/nope")).status_code == 404
+        assert (await client.get("/benchmark/history/..%2Fetc")).status_code == 404

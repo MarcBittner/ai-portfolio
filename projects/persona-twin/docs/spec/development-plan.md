@@ -167,3 +167,10 @@ monorepo; portfolio-level spec lives at `docs/spec/spec.md` in the root).
       per-task comparison tables with metric bars
 - [x] Offline tests: mock benchmark end-to-end, isolation, 409 guard
 - [x] v0.5.0 rollout via Argo, gateway-verified with a live Ollama run
+
+## Phase 13: Benchmark stop + persistence ✅
+
+- [x] Cancellable benchmark task; `stopped` status keeps partial results
+- [x] `BenchmarkStore`: JSON per run, traversal-safe ids, read-only-fs safe
+- [x] History endpoints + previous-runs browser in `/analytics`
+- [x] PVC (`fsGroup` for non-root write) so results survive pod restarts

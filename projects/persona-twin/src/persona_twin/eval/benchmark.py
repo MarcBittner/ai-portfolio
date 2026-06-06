@@ -61,7 +61,10 @@ class TaskResult(BaseModel):
 
 
 class BenchmarkRun(BaseModel):
-    status: Literal["idle", "running", "completed", "failed"] = "idle"
+    status: Literal["idle", "running", "completed", "failed", "stopped"] = "idle"
+    run_id: str | None = None
+    started_at: str | None = None
+    finished_at: str | None = None
     progress_done: int = 0
     progress_total: int = 0
     current: str | None = None

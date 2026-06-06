@@ -40,3 +40,6 @@ frontend/dist/
 # Docker / local data
 *.local
 data/local/
+
+# Benchmark results (generated; persisted via PVC in k8s)
+benchmarks/

@@ -119,8 +119,22 @@ export interface TaskResult {
   total_cost_usd: number;
 }
 
+export interface RunSummary {
+  run_id: string;
+  status: string;
+  started_at: string | null;
+  finished_at: string | null;
+  items_limit: number;
+  tasks: string[];
+  models: string[];
+  results_count: number;
+}
+
 export interface BenchmarkRun {
-  status: "idle" | "running" | "completed" | "failed";
+  run_id: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  status: "idle" | "running" | "completed" | "failed" | "stopped";
   progress_done: number;
   progress_total: number;
   current: string | null;
@@ -145,6 +159,18 @@ export function postBenchmark(body: BenchmarkRequest): Promise<BenchmarkRun> {
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
   });
+}
+
+export function stopBenchmark(): Promise<BenchmarkRun> {
+  return request<BenchmarkRun>("/benchmark/stop", { method: "POST" });
+}
+
+export function getBenchmarkHistory(): Promise<RunSummary[]> {
+  return request<RunSummary[]>("/benchmark/history");
+}
+
+export function getBenchmarkRun(runId: string): Promise<BenchmarkRun> {
+  return request<BenchmarkRun>(`/benchmark/history/${runId}`);
 }
 
 export function getRouting(): Promise<RoutingView> {

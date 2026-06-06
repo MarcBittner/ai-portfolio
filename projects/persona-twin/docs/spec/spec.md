@@ -235,6 +235,11 @@ throwaway test stubs — they are the documented offline mode.
 - **FR-14.4** Frontend `/analytics` tab: pick models/tasks/sample size,
   run, watch progress, compare results per task with headline-metric
   bars, latency, and cost
+- **FR-14.5** Runs are stoppable (`POST /benchmark/stop`) — partial
+  results are kept, marked `stopped`, and persisted
+- **FR-14.6** Results persist as JSON per run (`PERSONA_TWIN_BENCH_DIR`;
+  a PVC in k8s) with history endpoints + a previous-runs browser in the
+  analytics tab
 
 ### FR-10: Developer Experience
 

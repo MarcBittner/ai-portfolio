@@ -29,6 +29,7 @@ from persona_twin.corpus import PersonaRecord, load_personas
 from persona_twin.embedding import get_embedder
 from persona_twin.embedding.base import Embedder
 from persona_twin.embedding.cached import CachedEmbedder
+from persona_twin.eval.bench_store import BenchmarkStore, RunSummary
 from persona_twin.eval.benchmark import (
     BENCH_TASKS,
     BenchmarkContext,
@@ -59,6 +60,7 @@ class AppState:
     cache_stats: CacheStats = field(default_factory=CacheStats)
     benchmark: BenchmarkRun = field(default_factory=BenchmarkRun)
     benchmark_task: asyncio.Task | None = None
+    bench_store: BenchmarkStore = field(default_factory=BenchmarkStore)
 
     @property
     def personas(self) -> dict[str, Persona]:
@@ -252,11 +254,55 @@ async def post_benchmark(request: BenchmarkRequest) -> BenchmarkRun:
         store=state.store,
         providers=state.router.providers,
     )
-    state.benchmark = BenchmarkRun(status="running")
+    from datetime import UTC, datetime
+
+    now = datetime.now(UTC)
+    state.benchmark = BenchmarkRun(
+        status="running",
+        run_id=now.strftime("%Y%m%d-%H%M%S"),
+        started_at=now.isoformat(timespec="seconds"),
+    )
     state.benchmark_task = asyncio.create_task(
-        run_benchmark(ctx, state.benchmark, specs, request.tasks, request.items_limit)
+        _run_and_persist(state, ctx, specs, request.tasks, request.items_limit)
     )
     return state.benchmark
+
+
+async def _run_and_persist(state: AppState, ctx, specs, tasks, items_limit) -> None:
+    from datetime import UTC, datetime
+
+    run = state.benchmark
+    try:
+        await run_benchmark(ctx, run, specs, tasks, items_limit)
+    except asyncio.CancelledError:
+        run.status = "stopped"  # partial results retained
+        run.current = None
+    finally:
+        run.finished_at = datetime.now(UTC).isoformat(timespec="seconds")
+        if run.results:
+            state.bench_store.save(run)
+
+
+@router.post("/benchmark/stop", response_model=BenchmarkRun)
+async def stop_benchmark() -> BenchmarkRun:
+    state = _state()
+    if state.benchmark.status != "running" or state.benchmark_task is None:
+        raise HTTPException(status_code=409, detail="no benchmark is running")
+    state.benchmark_task.cancel()
+    return state.benchmark  # client keeps polling until status == "stopped"
+
+
+@router.get("/benchmark/history", response_model=list[RunSummary])
+async def benchmark_history() -> list[RunSummary]:
+    return _state().bench_store.list_runs()
+
+
+@router.get("/benchmark/history/{run_id}", response_model=BenchmarkRun)
+async def benchmark_history_run(run_id: str) -> BenchmarkRun:
+    run = _state().bench_store.load(run_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail=f"unknown run: {run_id}")
+    return run
 
 
 @router.post("/ask", response_model=AskResponse)
