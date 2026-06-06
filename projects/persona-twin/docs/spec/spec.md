@@ -220,6 +220,22 @@ throwaway test stubs — they are the documented offline mode.
 - **FR-13.5** LLM reranker uses the `rerank` task route; the routing
   decision in every debug payload names the task it routed for
 
+### FR-14: Model Benchmarks + Analytics
+
+- **FR-14.1** Per-model × per-task benchmark harness over the committed
+  eval dataset: `twin_answer` (fact presence, token F1, citation
+  precision, refusal behavior), `rerank` (hit-rate@5, MRR vs lexical and
+  no-rerank baselines), `eval_judge` (verdict accuracy on synthesized
+  supported/unsupported pairs)
+- **FR-14.2** Benchmarks pin each candidate model with **no fallback** —
+  a failing model records errors rather than silently measuring the
+  fallback; latency and cost recorded per run
+- **FR-14.3** `POST /benchmark` starts an async run (409 if one is
+  active); `GET /benchmark` reports progress and results
+- **FR-14.4** Frontend `/analytics` tab: pick models/tasks/sample size,
+  run, watch progress, compare results per task with headline-metric
+  bars, latency, and cost
+
 ### FR-10: Developer Experience
 
 - **FR-10.1** `Makefile`: `setup` (venv + install), `demo` (ingest + sample

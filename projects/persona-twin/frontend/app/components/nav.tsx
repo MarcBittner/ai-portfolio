@@ -1,7 +1,7 @@
 import { Link } from "react-router";
 import { cn } from "~/lib/utils";
 
-export function Nav({ active }: { active: "home" | "routing" }) {
+export function Nav({ active }: { active: "home" | "routing" | "analytics" }) {
   const link = "rounded-md px-2 py-1 text-sm hover:bg-muted";
   return (
     <nav className="flex items-center gap-2 border-b border-border pb-3">
@@ -14,6 +14,12 @@ export function Nav({ active }: { active: "home" | "routing" }) {
         className={cn(link, active === "routing" && "bg-muted font-medium")}
       >
         routing
+      </Link>
+      <Link
+        to="/analytics"
+        className={cn(link, active === "analytics" && "bg-muted font-medium")}
+      >
+        analytics
       </Link>
     </nav>
   );

@@ -157,3 +157,13 @@ monorepo; portfolio-level spec lives at `docs/spec/spec.md` in the root).
       preview, registry pricing table
 - [x] v0.3.0: image rebuilt, loaded into kind, manifest bumped — Argo
       syncs the rollout from the repo
+
+## Phase 12: Benchmarks + analytics ✅
+
+- [x] `eval/benchmark.py`: task-specific runners with pinned-model
+      isolation (no-fallback routers), judge ground-truth synthesis
+- [x] `POST /benchmark` (async, single-flight) + `GET /benchmark`
+- [x] `/analytics` page: model/task selection, progress polling,
+      per-task comparison tables with metric bars
+- [x] Offline tests: mock benchmark end-to-end, isolation, 409 guard
+- [x] v0.5.0 rollout via Argo, gateway-verified with a live Ollama run

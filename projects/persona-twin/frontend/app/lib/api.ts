@@ -108,6 +108,45 @@ export function ask(
   });
 }
 
+export interface TaskResult {
+  task: string;
+  provider: string;
+  model: string;
+  n: number;
+  errors: number;
+  metrics: Record<string, number>;
+  mean_latency_ms: number;
+  total_cost_usd: number;
+}
+
+export interface BenchmarkRun {
+  status: "idle" | "running" | "completed" | "failed";
+  progress_done: number;
+  progress_total: number;
+  current: string | null;
+  items_limit: number;
+  results: TaskResult[];
+  error: string | null;
+}
+
+export interface BenchmarkRequest {
+  models: string[];
+  tasks: string[];
+  items_limit: number;
+}
+
+export function getBenchmark(): Promise<BenchmarkRun> {
+  return request<BenchmarkRun>("/benchmark");
+}
+
+export function postBenchmark(body: BenchmarkRequest): Promise<BenchmarkRun> {
+  return request<BenchmarkRun>("/benchmark", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
 export function getRouting(): Promise<RoutingView> {
   return request<RoutingView>("/routing");
 }

@@ -10,6 +10,7 @@ and the API from one origin. Answers for non-debug requests are cached
 (in-process LRU, or Redis when ``REDIS_URL`` is set).
 """
 
+import asyncio
 import os
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
@@ -18,7 +19,7 @@ from pathlib import Path
 from fastapi import APIRouter, FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from persona_twin import __version__
 from persona_twin.cache import DEFAULT_TTL_SECONDS, Cache, CacheStats, cache_key, get_cache
@@ -28,6 +29,13 @@ from persona_twin.corpus import PersonaRecord, load_personas
 from persona_twin.embedding import get_embedder
 from persona_twin.embedding.base import Embedder
 from persona_twin.embedding.cached import CachedEmbedder
+from persona_twin.eval.benchmark import (
+    BENCH_TASKS,
+    BenchmarkContext,
+    BenchmarkRun,
+    run_benchmark,
+)
+from persona_twin.eval.dataset import load_eval_dataset
 from persona_twin.llm import TASKS, LLMRouter, ModelSpec, RoutingPolicy, get_router
 from persona_twin.log import configure, new_request_id
 from persona_twin.models import AskRequest, AskResponse, ChunkStrategy, Persona
@@ -49,6 +57,8 @@ class AppState:
     records: list[PersonaRecord]
     cache: Cache
     cache_stats: CacheStats = field(default_factory=CacheStats)
+    benchmark: BenchmarkRun = field(default_factory=BenchmarkRun)
+    benchmark_task: asyncio.Task | None = None
 
     @property
     def personas(self) -> dict[str, Persona]:
@@ -199,6 +209,54 @@ async def put_routing(policy: RoutingPolicy) -> RoutingView:
             )
     state.router.policy = policy
     return _routing_view(state)
+
+
+class BenchmarkRequest(BaseModel):
+    models: list[str] | None = None  # "provider:model_id"; default: all available
+    tasks: list[str] = Field(default_factory=lambda: list(BENCH_TASKS))
+    items_limit: int = Field(default=6, ge=1, le=28)
+
+
+@router.get("/benchmark", response_model=BenchmarkRun)
+async def get_benchmark() -> BenchmarkRun:
+    return _state().benchmark
+
+
+@router.post("/benchmark", response_model=BenchmarkRun, status_code=202)
+async def post_benchmark(request: BenchmarkRequest) -> BenchmarkRun:
+    state = _state()
+    if state.benchmark.status == "running":
+        raise HTTPException(status_code=409, detail="a benchmark is already running")
+    unknown_tasks = set(request.tasks) - set(BENCH_TASKS)
+    if unknown_tasks:
+        raise HTTPException(status_code=422, detail=f"unknown tasks: {sorted(unknown_tasks)}")
+
+    available = {
+        f"{s.provider}:{s.id}": s
+        for s in state.router.registry.specs
+        if s.provider in state.router.providers
+    }
+    if request.models is None:
+        specs = list(available.values())
+    else:
+        missing = [m for m in request.models if m not in available]
+        if missing:
+            raise HTTPException(status_code=422, detail=f"unknown models: {missing}")
+        specs = [available[m] for m in request.models]
+
+    ctx = BenchmarkContext(
+        personas=state.personas,
+        records=state.records,
+        items=load_eval_dataset(),
+        embedder=state.embedder,
+        store=state.store,
+        providers=state.router.providers,
+    )
+    state.benchmark = BenchmarkRun(status="running")
+    state.benchmark_task = asyncio.create_task(
+        run_benchmark(ctx, state.benchmark, specs, request.tasks, request.items_limit)
+    )
+    return state.benchmark
 
 
 @router.post("/ask", response_model=AskResponse)
