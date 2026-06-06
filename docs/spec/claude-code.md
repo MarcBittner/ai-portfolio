@@ -4,8 +4,13 @@
 
 ### Standing rules (apply to every session)
 
-- Work phase-by-phase against `docs/spec/development-plan.md`; update its
-  checkboxes as tasks complete.
+- This is a monorepo: portfolio-level spec/plan live in `docs/spec/`;
+  each project is self-contained under `projects/<name>/` with its own
+  `docs/spec/spec.md` + `development-plan.md`.
+- Work phase-by-phase against the active project's development plan
+  (currently `projects/persona-twin/docs/spec/development-plan.md`);
+  update its checkboxes — and the portfolio plan's phase list — as tasks
+  complete.
 - Commit style: `(task) description` — e.g. `(chunking) fixed-size chunker
   with overlap and provenance`. Commit per coherent unit.
 - **Before every commit:** scan the staged diff for secret-shaped strings
@@ -18,9 +23,10 @@
 ### Next task prompt
 
 ```
-Continue persona-twin. Read docs/spec/spec.md and
-docs/spec/development-plan.md, find the first unchecked task, and
-implement it following the standing rules. Keep `make test` green.
+Continue persona-twin. Read projects/persona-twin/docs/spec/spec.md and
+projects/persona-twin/docs/spec/development-plan.md, find the first
+unchecked task, and implement it following the standing rules. Keep
+`make test` green.
 ```
 
 ---

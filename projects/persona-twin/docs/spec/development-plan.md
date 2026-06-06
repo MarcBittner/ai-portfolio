@@ -1,0 +1,142 @@
+# persona-twin — Development Plan
+
+## Overview
+
+Ordered, atomic, checkable tasks. Each phase ends in a coherent commit (or
+small series) using `(task) description` commit style; the repo must be
+green (`make test`) at every phase boundary from Phase 2 onward.
+
+All paths are relative to `projects/persona-twin/` (this repo is a
+monorepo; portfolio-level spec lives at `docs/spec/spec.md` in the root).
+
+**Workflow rules (every commit):**
+- Scan the staged diff for secret-shaped strings before committing
+- No personal data; synthetic fixtures only
+- Update checkboxes here as tasks complete
+
+**Legend:** `[x]` completed ✅ · `[>]` in progress 🔄 · `[ ]` pending ⏳
+
+---
+
+## Phase 0: Repository bootstrap ✅
+
+- [x] `git init`, MIT `LICENSE`, `.gitignore` (repo root), `.env.example`
+      as first commit
+- [x] `docs/spec/spec.md` — product specification
+- [x] `docs/spec/development-plan.md` — this plan
+- [x] Monorepo layout: project moved to `projects/persona-twin/`
+
+---
+
+## Phase 1: Project skeleton
+
+- [ ] `pyproject.toml` — package `persona_twin`, pinned deps (fastapi,
+      uvicorn, pydantic, pydantic-settings, numpy, pytest, httpx, ruff;
+      extras: `mongo`, `openai`, `anthropic`, `redis`)
+- [ ] `src/persona_twin/` package layout: `config.py` (pydantic-settings,
+      env-driven backend selection), `models.py` (core Pydantic types:
+      Chunk, Persona, Citation, AskRequest/Response), `logging.py`
+- [ ] `Makefile`: `setup`, `test`, `lint`, `serve`, `demo`, `eval` targets
+      (demo/eval may stub until later phases)
+- [ ] `tests/` scaffold + first config tests (offline defaults when no env)
+- [ ] README stub: one-paragraph description + quickstart placeholder
+
+## Phase 2: Chunking module
+
+- [ ] `chunking/` — `Chunker` protocol + provenance metadata model
+- [ ] Fixed-size chunker (size + overlap)
+- [ ] Semantic chunker (sentence/paragraph boundaries, size targets)
+- [ ] Content-aware chunker (markdown headings/lists/Q&A blocks)
+- [ ] Unit tests: boundaries, overlap, provenance spans, empty/edge inputs
+- [ ] `docs/chunking-tradeoffs.md` first draft (numbers added in Phase 8)
+
+## Phase 3: Embeddings + vector store
+
+- [ ] `embedding/` — `Embedder` port; deterministic hashed n-gram fallback
+      embedder + tests (determinism, dimensionality)
+- [ ] OpenAI embedder behind `OPENAI_API_KEY` (contract tests, env-gated)
+- [ ] `vectorstore/` — `VectorStore` port; in-memory NumPy implementation
+      (cosine, per-persona filter) + tests
+- [ ] MongoDB Atlas implementation: async driver, `$vectorSearch`
+      aggregation, committed index-definition JSON, setup doc
+- [ ] Shared port-level test suite run against both stores (Atlas env-gated)
+
+## Phase 4: Synthetic corpus + PII redaction
+
+- [ ] `data/personas/` — 4 fictional personas: YAML profiles (identity,
+      HEXACO scores, voice notes) + 6–10 short authored documents each
+- [ ] Persona loader + schema validation tests
+- [ ] `governance/` — deterministic PII redactor (email, phone, SSN,
+      credit card w/ Luhn, IP, street address) with typed tokens
+- [ ] Redactor unit tests incl. Luhn negatives and clean-text passthrough
+- [ ] Ingestion pipeline: load → redact → chunk → embed → upsert; `POST
+      /ingest` wiring deferred to Phase 6
+- [ ] `docs/data-governance.md`
+
+## Phase 5: LLM providers + routing
+
+- [ ] Verify current OpenAI model ids/pricing; author `models.yaml`
+      registry (Anthropic ids already verified: claude-opus-4-8,
+      claude-sonnet-4-6, claude-haiku-4-5)
+- [ ] `llm/` — `LLMProvider` port; `LLMResponse` with usage/latency/cost
+- [ ] Mock provider: deterministic, context-grounded, structured-output
+      capable + tests
+- [ ] Anthropic provider: Messages API, structured outputs
+      (`output_config.format` / `messages.parse()`), streaming-safe timeouts
+- [ ] OpenAI provider: chat completions + structured outputs
+- [ ] Router: objective-based selection (`cost`/`latency`/`quality`) from
+      registry; fallback chain with reason logging + tests (mock-only)
+- [ ] Structured-output validation retry path + tests
+
+## Phase 6: Persona twins + FastAPI service
+
+- [ ] `persona/` — HEXACO → system-prompt mapping + `docs/personas.md`
+- [ ] Retrieval pipeline assembly: embed query → vector search (persona
+      filter) → rerank → context window packing
+- [ ] `reranking/` — lexical reranker (default) + LLM reranker (gated);
+      `docs/reranking.md`
+- [ ] Grounded answer generation with citations; refusal path for
+      unsupported questions
+- [ ] FastAPI app: `/ask`, `/personas`, `/personas/{id}`, `/ingest`,
+      `/health`; debug payload (routing decision, rerank deltas, timings)
+- [ ] Integration tests offline: ingest → ask → citations present →
+      refusal on unanswerable
+- [ ] `make demo` end-to-end offline; `make serve`
+
+## Phase 7: Evaluation harness
+
+- [ ] `eval/` dataset: 25–40 Q/A/source triples incl. unanswerables
+- [ ] Retrieval metrics: hit-rate@k, MRR — per chunking strategy,
+      with/without rerank
+- [ ] Grounding metrics: citation precision, claim support (LLM-judge with
+      structured output + heuristic fallback for mock mode), refusal rate
+- [ ] Answer quality metrics: correctness vs reference, voice consistency
+- [ ] `make eval` → markdown report (separate metrics, no single score)
+- [ ] `docs/evaluation.md` — "why one fidelity % hides what matters"
+- [ ] Back-fill measured numbers into `docs/chunking-tradeoffs.md`
+
+## Phase 8: Polish
+
+- [ ] README: architecture diagram, quickstart, component docs links,
+      limitations
+- [ ] `ruff` + type-check clean; prune dead code and TODOs
+- [ ] Fresh-clone verification: `make setup && make demo && make test &&
+      make eval` with no `.env`
+- [ ] Tag `v0.1.0`
+
+## Phase 9 (optional): Frontend
+
+- [ ] React Router 7 + Tailwind + shadcn/ui app in `frontend/`
+- [ ] Persona picker, ask box, answer + citations + debug panel
+- [ ] `make frontend` target + README section
+
+## Phase 10 (optional): Deployment
+
+- [ ] Multi-stage Dockerfile (non-root) + `make docker`
+- [ ] GCP Cloud Run service YAML + deploy doc (placeholder project ids)
+- [ ] Redis cache for embeddings/answers behind `REDIS_URL`; hit/miss
+      metrics in debug payload
+
+---
+
+**Last Updated:** 2026-06-06
