@@ -78,7 +78,8 @@ class MockProvider:
         )
 
     def _extract_answer(self, chunk_text: str, q_words: set[str]) -> str:
-        sentences = re.split(r"(?<=[.!?])\s+", chunk_text)
+        cleaned = re.sub(r"#+\s*", "", chunk_text)  # drop markdown heading marks
+        sentences = re.split(r"(?<=[.!?])\s+", cleaned)
         relevant = [s for s in sentences if q_words & _content_words(s)]
         return " ".join(relevant[:2]) if relevant else sentences[0]
 

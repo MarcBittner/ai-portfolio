@@ -88,20 +88,20 @@ monorepo; portfolio-level spec lives at `docs/spec/spec.md` in the root).
       registry; fallback chain with reason logging + tests (mock-only)
 - [x] Structured-output validation retry path + tests
 
-## Phase 6: Persona twins + FastAPI service
+## Phase 6: Persona twins + FastAPI service ✅
 
-- [ ] `persona/` — HEXACO → system-prompt mapping + `docs/personas.md`
-- [ ] Retrieval pipeline assembly: embed query → vector search (persona
+- [x] `persona/` — HEXACO → system-prompt mapping + `docs/personas.md`
+- [x] Retrieval pipeline assembly: embed query → vector search (persona
       filter) → rerank → context window packing
-- [ ] `reranking/` — lexical reranker (default) + LLM reranker (gated);
+- [x] `reranking/` — lexical reranker (default) + LLM reranker (gated);
       `docs/reranking.md`
-- [ ] Grounded answer generation with citations; refusal path for
+- [x] Grounded answer generation with citations; refusal path for
       unsupported questions
-- [ ] FastAPI app: `/ask`, `/personas`, `/personas/{id}`, `/ingest`,
+- [x] FastAPI app: `/ask`, `/personas`, `/personas/{id}`, `/ingest`,
       `/health`; debug payload (routing decision, rerank deltas, timings)
-- [ ] Integration tests offline: ingest → ask → citations present →
+- [x] Integration tests offline: ingest → ask → citations present →
       refusal on unanswerable
-- [ ] `make demo` end-to-end offline; `make serve`
+- [x] `make demo` end-to-end offline; `make serve`
 
 ## Phase 7: Evaluation harness
 
