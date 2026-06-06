@@ -20,6 +20,7 @@ make setup && make demo    # fully offline — no API keys, no database
 | Multi-provider routing | Anthropic + OpenAI + deterministic mock behind one port; cost/latency/quality objectives from a declarative model registry; fallback chains with recorded reasons; schema-validated structured outputs with retry | `src/persona_twin/llm/` |
 | **Evaluation** | retrieval / grounding / answer-quality measured **separately** over a committed dataset; deliberately no composite score | [docs/evaluation.md](docs/evaluation.md) |
 | Data governance | deterministic PII redaction as a mandatory ingest gate; synthetic data only | [docs/data-governance.md](docs/data-governance.md) |
+| Caching & deployment | answer/embedding cache port (LRU → Redis) with observable hit/miss counters; multi-stage Docker image; Cloud Run config | [docs/deployment.md](docs/deployment.md) |
 
 ## Architecture
 
@@ -79,6 +80,7 @@ Copy `.env.example` → `.env` and set any of:
 | `ANTHROPIC_API_KEY` | Anthropic provider in the router | `pip install -e ".[anthropic]"` |
 | `OPENAI_API_KEY` | OpenAI provider + OpenAI embeddings | `pip install -e ".[openai]"` |
 | `MONGODB_URI` | Atlas `$vectorSearch` store ([setup](docs/atlas-setup.md)) | `pip install -e ".[mongo]"` |
+| `REDIS_URL` | Redis answer/embedding cache (otherwise in-process LRU) | `pip install -e ".[redis]"` |
 | `PERSONA_TWIN_ROUTE_OBJECTIVE` | `cost` (default) / `latency` / `quality` | — |
 
 Backends are selected purely by environment — no code changes, and

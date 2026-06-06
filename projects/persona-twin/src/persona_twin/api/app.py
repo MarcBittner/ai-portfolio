@@ -3,20 +3,30 @@
 Backends assemble from the environment (see config.py); with no
 configuration the whole stack is offline. The corpus is ingested at
 startup if the store is empty; ``POST /ingest`` rebuilds on demand.
+
+Routes are registered twice — bare (``/ask``) and under ``/api``
+(``/api/ask``) — so the container image can serve the built frontend
+and the API from one origin. Answers for non-debug requests are cached
+(in-process LRU, or Redis when ``REDIS_URL`` is set).
 """
 
+import os
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import APIRouter, FastAPI, HTTPException
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from persona_twin import __version__
+from persona_twin.cache import DEFAULT_TTL_SECONDS, Cache, CacheStats, cache_key, get_cache
 from persona_twin.chunking import get_chunker
 from persona_twin.config import Settings, get_settings
 from persona_twin.corpus import PersonaRecord, load_personas
 from persona_twin.embedding import get_embedder
 from persona_twin.embedding.base import Embedder
+from persona_twin.embedding.cached import CachedEmbedder
 from persona_twin.llm import LLMRouter, get_router
 from persona_twin.log import configure, new_request_id
 from persona_twin.models import AskRequest, AskResponse, ChunkStrategy, Persona
@@ -26,6 +36,7 @@ from persona_twin.vectorstore import get_vector_store
 from persona_twin.vectorstore.base import VectorStore
 
 DEFAULT_STRATEGY: ChunkStrategy = "content_aware"
+STATIC_DIR = os.environ.get("PERSONA_TWIN_STATIC_DIR", "")
 
 
 @dataclass
@@ -35,6 +46,8 @@ class AppState:
     store: VectorStore
     router: LLMRouter
     records: list[PersonaRecord]
+    cache: Cache
+    cache_stats: CacheStats = field(default_factory=CacheStats)
 
     @property
     def personas(self) -> dict[str, Persona]:
@@ -43,13 +56,17 @@ class AppState:
 
 def build_state(settings: Settings | None = None) -> AppState:
     settings = settings or get_settings()
-    embedder = get_embedder(settings)
+    cache = get_cache(settings)
+    stats = CacheStats()
+    embedder = CachedEmbedder(get_embedder(settings), cache, stats)
     return AppState(
         settings=settings,
         embedder=embedder,
         store=get_vector_store(settings, dimensions=embedder.dimensions),
         router=get_router(settings),
         records=load_personas(),
+        cache=cache,
+        cache_stats=stats,
     )
 
 
@@ -72,6 +89,7 @@ app = FastAPI(
     description="Query RAG-grounded digital twins of synthetic personas.",
     lifespan=lifespan,
 )
+router = APIRouter()
 
 
 def _state() -> AppState:
@@ -85,6 +103,8 @@ class HealthResponse(BaseModel):
     embedding_backend: str
     llm_backends: list[str]
     route_objective: str
+    cache_backend: str
+    cache_stats: dict[str, dict[str, int]]
     chunks_indexed: int
     personas: int
 
@@ -93,7 +113,7 @@ class IngestRequest(BaseModel):
     strategy: ChunkStrategy = DEFAULT_STRATEGY
 
 
-@app.get("/health", response_model=HealthResponse)
+@router.get("/health", response_model=HealthResponse)
 async def health() -> HealthResponse:
     state = _state()
     return HealthResponse(
@@ -103,17 +123,19 @@ async def health() -> HealthResponse:
         embedding_backend=state.settings.embedding_backend,
         llm_backends=state.settings.llm_backends,
         route_objective=state.settings.route_objective,
+        cache_backend=state.cache.name,
+        cache_stats=state.cache_stats.as_dict(),
         chunks_indexed=await state.store.count(),
         personas=len(state.records),
     )
 
 
-@app.get("/personas", response_model=list[Persona])
+@router.get("/personas", response_model=list[Persona])
 async def list_personas() -> list[Persona]:
     return [r.persona for r in _state().records]
 
 
-@app.get("/personas/{persona_id}", response_model=Persona)
+@router.get("/personas/{persona_id}", response_model=Persona)
 async def get_persona(persona_id: str) -> Persona:
     persona = _state().personas.get(persona_id)
     if persona is None:
@@ -121,7 +143,7 @@ async def get_persona(persona_id: str) -> Persona:
     return persona
 
 
-@app.post("/ingest", response_model=IngestReport)
+@router.post("/ingest", response_model=IngestReport)
 async def ingest(request: IngestRequest) -> IngestReport:
     state = _state()
     await state.store.drop()
@@ -131,7 +153,7 @@ async def ingest(request: IngestRequest) -> IngestReport:
     )
 
 
-@app.post("/ask", response_model=AskResponse)
+@router.post("/ask", response_model=AskResponse)
 async def ask(request: AskRequest) -> AskResponse:
     new_request_id()
     state = _state()
@@ -140,7 +162,23 @@ async def ask(request: AskRequest) -> AskResponse:
         raise HTTPException(
             status_code=404, detail=f"unknown persona: {request.persona_id}"
         )
-    return await ask_twin(
+
+    # Answer cache: non-debug requests only (debug recomputes and shows work)
+    key = cache_key(
+        "ask",
+        request.persona_id,
+        str(request.k),
+        request.question,
+        ",".join(state.settings.llm_backends),
+    )
+    if not request.debug:
+        cached = await state.cache.get(key)
+        if cached is not None:
+            state.cache_stats.hit("answer")
+            return AskResponse.model_validate_json(cached)
+        state.cache_stats.miss("answer")
+
+    response = await ask_twin(
         persona,
         request.question,
         embedder=state.embedder,
@@ -149,3 +187,22 @@ async def ask(request: AskRequest) -> AskResponse:
         k=request.k,
         debug=request.debug,
     )
+    if not request.debug:
+        await state.cache.set(key, response.model_dump_json(), ttl=DEFAULT_TTL_SECONDS)
+    elif response.debug is not None:
+        response.debug.cache = {
+            "backend": state.cache.name,
+            **{
+                f"{kind}_hits": str(n)
+                for kind, n in state.cache_stats.hits.items()
+            },
+        }
+    return response
+
+
+app.include_router(router)
+app.include_router(router, prefix="/api", include_in_schema=False)
+
+# Serve the built frontend when present (container image / PERSONA_TWIN_STATIC_DIR)
+if STATIC_DIR and Path(STATIC_DIR).is_dir():  # pragma: no cover - container path
+    app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="ui")

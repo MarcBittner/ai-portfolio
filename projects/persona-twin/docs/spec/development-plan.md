@@ -130,11 +130,12 @@ monorepo; portfolio-level spec lives at `docs/spec/spec.md` in the root).
 - [x] Persona picker, ask box, answer + citations + debug panel
 - [x] `make frontend` / `make frontend-build` targets + README section
 
-## Phase 10 (optional): Deployment
+## Phase 10 (optional): Deployment ✅
 
-- [ ] Multi-stage Dockerfile (non-root) + `make docker`
-- [ ] GCP Cloud Run service YAML + deploy doc (placeholder project ids)
-- [ ] Redis cache for embeddings/answers behind `REDIS_URL`; hit/miss
+- [x] Multi-stage Dockerfile (non-root) + `make docker` — note:
+      image build not yet run (no docker CLI in the dev container)
+- [x] GCP Cloud Run service YAML + deploy doc (placeholder project ids)
+- [x] Redis cache for embeddings/answers behind `REDIS_URL`; hit/miss
       metrics in debug payload
 
 ---

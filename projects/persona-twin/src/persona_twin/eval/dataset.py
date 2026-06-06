@@ -1,12 +1,20 @@
 """Committed eval dataset loader."""
 
+import os
 from pathlib import Path
 
 import yaml
 from pydantic import BaseModel, model_validator
 
+# Repo layout by default; PERSONA_TWIN_DATA_ROOT overrides (container image)
 DEFAULT_DATASET_PATH = (
-    Path(__file__).resolve().parents[3] / "data" / "eval" / "questions.yaml"
+    Path(
+        os.environ.get(
+            "PERSONA_TWIN_DATA_ROOT", Path(__file__).resolve().parents[3] / "data"
+        )
+    )
+    / "eval"
+    / "questions.yaml"
 )
 
 

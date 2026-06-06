@@ -2,7 +2,7 @@ VENV := .venv
 PY := $(VENV)/bin/python
 PIP := $(VENV)/bin/pip
 
-.PHONY: setup test lint serve demo eval frontend frontend-build clean
+.PHONY: setup test lint serve demo eval frontend frontend-build docker clean
 
 setup:
 	python3 -m venv $(VENV)
@@ -31,6 +31,9 @@ frontend:
 
 frontend-build:
 	cd frontend && npm install && npm run build && npm run typecheck
+
+docker:
+	docker build -t persona-twin .
 
 clean:
 	rm -rf $(VENV) .pytest_cache .ruff_cache src/*.egg-info

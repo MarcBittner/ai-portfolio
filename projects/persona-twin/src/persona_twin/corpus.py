@@ -5,6 +5,7 @@ profile plus a ``docs/`` directory of markdown documents. All content
 is fictional and authored for this repository (spec SEC-2).
 """
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -12,7 +13,13 @@ import yaml
 
 from persona_twin.models import HexacoProfile, Persona
 
-DEFAULT_CORPUS_ROOT = Path(__file__).resolve().parents[2] / "data" / "personas"
+# Repo layout by default; PERSONA_TWIN_DATA_ROOT overrides (container image)
+_DATA_ROOT = Path(
+    os.environ.get(
+        "PERSONA_TWIN_DATA_ROOT", Path(__file__).resolve().parents[2] / "data"
+    )
+)
+DEFAULT_CORPUS_ROOT = _DATA_ROOT / "personas"
 
 
 @dataclass
