@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     openai_api_key: str | None = None
     openrouter_api_key: str | None = None
 
+    # Ollama (local models; e.g. http://localhost:11434)
+    ollama_base_url: str | None = None
+
     # MongoDB Atlas (vector store)
     mongodb_uri: str | None = None
     mongodb_db: str = "persona_twin"
@@ -49,6 +52,8 @@ class Settings(BaseSettings):
             backends.append("openai")
         if self.openrouter_api_key:
             backends.append("openrouter")
+        if self.ollama_base_url:
+            backends.append("ollama")
         backends.append("mock")
         return backends
 

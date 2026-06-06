@@ -16,8 +16,8 @@ WORKDIR /app
 
 COPY pyproject.toml README.md ./
 COPY src/ src/
-# Offline-capable by default; add extras as build args if desired
-RUN pip install --no-cache-dir .
+# All provider extras baked in: backends still activate purely via env vars
+RUN pip install --no-cache-dir ".[openai,anthropic,mongo,redis]"
 
 COPY data/ data/
 COPY --from=frontend /ui/build/client static/

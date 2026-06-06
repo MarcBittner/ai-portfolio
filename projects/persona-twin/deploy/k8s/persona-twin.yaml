@@ -1,5 +1,5 @@
 # Local Kubernetes deployment (tested on kind). The image is loaded
-# directly into the node (`kind load docker-image persona-twin:v0.3.1`
+# directly into the node (`kind load docker-image persona-twin:v0.4.0`
 # or `docker save | ctr images import`), hence imagePullPolicy: Never.
 #
 #   kubectl apply -f deploy/k8s/persona-twin.yaml
@@ -34,13 +34,17 @@ spec:
         runAsUser: 1001
       containers:
         - name: api
-          image: persona-twin:v0.3.1
+          image: persona-twin:v0.4.0
           imagePullPolicy: Never
           ports:
             - containerPort: 8080
           env:
             - name: PERSONA_TWIN_ROUTE_OBJECTIVE
               value: cost
+            # Local Ollama on the host (Docker Desktop host gateway).
+            # Remove if no Ollama is running; discovery fails safe.
+            - name: OLLAMA_BASE_URL
+              value: http://192.168.65.254:11434
           # envFrom:
           #   - secretRef:
           #       name: persona-twin-providers   # ANTHROPIC_API_KEY etc.

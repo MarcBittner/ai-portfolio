@@ -48,9 +48,18 @@ def get_router(settings: Settings) -> LLMRouter:
             providers["openrouter"] = OpenRouterProvider(
                 api_key=settings.openrouter_api_key
             )
+        elif backend == "ollama":
+            from persona_twin.llm.ollama_llm import OllamaProvider
+
+            providers["ollama"] = OllamaProvider(base_url=settings.ollama_base_url)
         else:
             providers["mock"] = MockProvider()
     providers.setdefault("mock", MockProvider())
+    specs = ModelRegistry.from_yaml().specs
+    if "ollama" in providers:
+        from persona_twin.llm.ollama_llm import discover_ollama_models
+
+        specs = specs + discover_ollama_models(settings.ollama_base_url)
     return LLMRouter(
-        ModelRegistry.from_yaml(), providers, objective=settings.route_objective
+        ModelRegistry(specs), providers, objective=settings.route_objective
     )
