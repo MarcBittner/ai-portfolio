@@ -27,6 +27,7 @@ htmlcov/
 # Node / frontend
 node_modules/
 .cache/
+.react-router/
 frontend/build/
 frontend/dist/
 

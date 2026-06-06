@@ -30,7 +30,7 @@ layered evaluation. Detailed plan:
 - [x] Phase 6: persona twins + FastAPI service
 - [x] Phase 7: evaluation harness
 - [x] Phase 8: polish + v0.1.0
-- [ ] Phase 9 (optional): frontend
+- [x] Phase 9 (optional): frontend
 - [ ] Phase 10 (optional): deployment
 
 ## Project 2+ (future)

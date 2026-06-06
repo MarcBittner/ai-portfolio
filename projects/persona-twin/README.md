@@ -57,6 +57,11 @@ make eval     # regenerate eval-report.md (three tables, no composite)
 make serve    # uvicorn on :8000 — then POST /ask
 ```
 
+Optional web UI (React Router 7 + Tailwind + shadcn-style components;
+needs Node 20+): run `make serve` in one terminal and `make frontend`
+in another, then open <http://localhost:5173> — persona picker with
+HEXACO bars, citations, and a routing/timings debug panel.
+
 ```sh
 curl -s localhost:8000/ask -H 'content-type: application/json' -d '{
   "persona_id": "ada-quill",

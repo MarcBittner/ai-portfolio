@@ -124,11 +124,11 @@ monorepo; portfolio-level spec lives at `docs/spec/spec.md` in the root).
       make eval` with no `.env`
 - [x] Tag `v0.1.0`
 
-## Phase 9 (optional): Frontend
+## Phase 9 (optional): Frontend ✅
 
-- [ ] React Router 7 + Tailwind + shadcn/ui app in `frontend/`
-- [ ] Persona picker, ask box, answer + citations + debug panel
-- [ ] `make frontend` target + README section
+- [x] React Router 7 + Tailwind + shadcn/ui app in `frontend/`
+- [x] Persona picker, ask box, answer + citations + debug panel
+- [x] `make frontend` / `make frontend-build` targets + README section
 
 ## Phase 10 (optional): Deployment
 
