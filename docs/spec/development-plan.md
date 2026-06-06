@@ -26,7 +26,7 @@ layered evaluation. Detailed plan:
 - [x] Phase 2: chunking module
 - [x] Phase 3: embeddings + vector stores
 - [x] Phase 4: synthetic corpus + PII redaction
-- [ ] Phase 5: LLM providers + routing
+- [x] Phase 5: LLM providers + routing
 - [ ] Phase 6: persona twins + FastAPI service
 - [ ] Phase 7: evaluation harness
 - [ ] Phase 8: polish + v0.1.0

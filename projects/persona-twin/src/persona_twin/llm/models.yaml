@@ -1,0 +1,53 @@
+# Declarative model registry — model turnover is a data change, not a
+# code change. Pricing is USD per 1M tokens.
+#
+# quality / speed are 1-10 relative ranks used by the router's
+# objective ordering; they are editorial, not benchmarks.
+#
+# Verified 2026-06-06:
+#   anthropic — platform.claude.com model docs
+#   openai    — developers.openai.com/api/docs/pricing
+providers:
+  anthropic:
+    models:
+      - id: claude-opus-4-8
+        input_per_mtok: 5.00
+        output_per_mtok: 25.00
+        quality: 10
+        speed: 4
+        adaptive_thinking: true
+      - id: claude-sonnet-4-6
+        input_per_mtok: 3.00
+        output_per_mtok: 15.00
+        quality: 8
+        speed: 7
+        adaptive_thinking: true
+      - id: claude-haiku-4-5
+        input_per_mtok: 1.00
+        output_per_mtok: 5.00
+        quality: 6
+        speed: 9
+  openai:
+    models:
+      - id: gpt-5.5
+        input_per_mtok: 5.00
+        output_per_mtok: 30.00
+        quality: 10
+        speed: 4
+      - id: gpt-5.4
+        input_per_mtok: 2.50
+        output_per_mtok: 15.00
+        quality: 8
+        speed: 7
+      - id: gpt-5.4-nano
+        input_per_mtok: 0.20
+        output_per_mtok: 1.25
+        quality: 5
+        speed: 10
+  mock:
+    models:
+      - id: mock-extractive-1
+        input_per_mtok: 0.0
+        output_per_mtok: 0.0
+        quality: 1
+        speed: 10

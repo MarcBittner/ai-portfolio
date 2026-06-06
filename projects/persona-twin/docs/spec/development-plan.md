@@ -73,20 +73,20 @@ monorepo; portfolio-level spec lives at `docs/spec/spec.md` in the root).
       /ingest` wiring deferred to Phase 6 (pipeline itself done)
 - [x] `docs/data-governance.md`
 
-## Phase 5: LLM providers + routing
+## Phase 5: LLM providers + routing ✅
 
-- [ ] Verify current OpenAI model ids/pricing; author `models.yaml`
+- [x] Verify current OpenAI model ids/pricing; author `models.yaml`
       registry (Anthropic ids already verified: claude-opus-4-8,
       claude-sonnet-4-6, claude-haiku-4-5)
-- [ ] `llm/` — `LLMProvider` port; `LLMResponse` with usage/latency/cost
-- [ ] Mock provider: deterministic, context-grounded, structured-output
+- [x] `llm/` — `LLMProvider` port; `LLMResponse` with usage/latency/cost
+- [x] Mock provider: deterministic, context-grounded, structured-output
       capable + tests
-- [ ] Anthropic provider: Messages API, structured outputs
+- [x] Anthropic provider: Messages API, structured outputs
       (`output_config.format` / `messages.parse()`), streaming-safe timeouts
-- [ ] OpenAI provider: chat completions + structured outputs
-- [ ] Router: objective-based selection (`cost`/`latency`/`quality`) from
+- [x] OpenAI provider: chat completions + structured outputs
+- [x] Router: objective-based selection (`cost`/`latency`/`quality`) from
       registry; fallback chain with reason logging + tests (mock-only)
-- [ ] Structured-output validation retry path + tests
+- [x] Structured-output validation retry path + tests
 
 ## Phase 6: Persona twins + FastAPI service
 
