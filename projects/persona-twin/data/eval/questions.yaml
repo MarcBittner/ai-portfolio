@@ -1,0 +1,204 @@
+# Committed eval dataset: question / reference / gold source docs.
+# All content references the synthetic corpus only. Unanswerable items
+# (answerable: false) MUST be refused — that's a measured behavior, not
+# an error case.
+items:
+  # ---- ada-quill ----
+  - id: ada-tomato
+    persona_id: ada-quill
+    question: What tomato variety are you growing this year?
+    reference: Black Krim
+    source_docs: [ada-quill/garden-journal]
+    answerable: true
+  - id: ada-writing-hours
+    persona_id: ada-quill
+    question: What hours do you write in the morning?
+    reference: 6:30 to 10:00
+    source_docs: [ada-quill/writing-routine]
+    answerable: true
+  - id: ada-murder-weapon
+    persona_id: ada-quill
+    question: What was the murder weapon in The Lighthouse Ledger?
+    reference: a jar of pickled damsons
+    source_docs: [ada-quill/writing-routine]
+    answerable: true
+  - id: ada-loved-gadget
+    persona_id: ada-quill
+    question: Which kitchen gadget do you actually love?
+    reference: the thermometer for proofing yeast
+    source_docs: [ada-quill/gadget-confessions]
+    answerable: true
+  - id: ada-book-four-title
+    persona_id: ada-quill
+    question: What is the working title of Gullsworth book four?
+    reference: A Tide of Small Lies
+    source_docs: [ada-quill/gullsworth-research, ada-quill/newsletter-faq]
+    answerable: true
+  - id: ada-books-per-year
+    persona_id: ada-quill
+    question: About how many books do you read a year?
+    reference: about sixty
+    source_docs: [ada-quill/reading-life]
+    answerable: true
+  - id: ada-book-club
+    persona_id: ada-quill
+    question: When does the library book club meet?
+    reference: the second Tuesday of every month
+    source_docs: [ada-quill/reading-life]
+    answerable: true
+  - id: ada-marathon
+    persona_id: ada-quill
+    question: What is your marathon personal best time?
+    reference: null
+    source_docs: []
+    answerable: false
+
+  # ---- buck-ramirez ----
+  - id: buck-deadlift
+    persona_id: buck-ramirez
+    question: What is your current deadlift number?
+    reference: 465 lbs
+    source_docs: [buck-ramirez/training-log]
+    answerable: true
+  - id: buck-meal-count
+    persona_id: buck-ramirez
+    question: How many meals do you prep every Sunday?
+    reference: fourteen meals
+    source_docs: [buck-ramirez/meal-prep]
+    answerable: true
+  - id: buck-supplements
+    persona_id: buck-ramirez
+    question: Which supplements do you recommend to clients?
+    reference: creatine, five grams a day, plus protein powder if needed
+    source_docs: [buck-ramirez/client-faq]
+    answerable: true
+  - id: buck-gym-size
+    persona_id: buck-ramirez
+    question: How big is your warehouse gym in square feet?
+    reference: 3,200 square feet
+    source_docs: [buck-ramirez/gym-philosophy]
+    answerable: true
+  - id: buck-injury
+    persona_id: buck-ramirez
+    question: What injury did you have surgery for?
+    reference: a torn labrum in the shoulder
+    source_docs: [buck-ramirez/injury-comeback]
+    answerable: true
+  - id: buck-cheat-meal
+    persona_id: buck-ramirez
+    question: What is your Friday cheat meal?
+    reference: birria tacos from the truck on 5th
+    source_docs: [buck-ramirez/meal-prep]
+    answerable: true
+  - id: buck-drywall
+    persona_id: buck-ramirez
+    question: How much did Tugboat's drywall incident cost?
+    reference: $340 in patching
+    source_docs: [buck-ramirez/tugboat]
+    answerable: true
+  - id: buck-opera
+    persona_id: buck-ramirez
+    question: What is your favorite opera?
+    reference: null
+    source_docs: []
+    answerable: false
+
+  # ---- mei-tanaka ----
+  - id: mei-sales
+    persona_id: mei-tanaka
+    question: How many copies did Attic Light sell in its first year?
+    reference: about 18,000 copies
+    source_docs: [mei-tanaka/devlog-attic]
+    answerable: true
+  - id: mei-title
+    persona_id: mei-tanaka
+    question: What is the working title of your new lighthouse game?
+    reference: Foghouse
+    source_docs: [mei-tanaka/devlog-current]
+    answerable: true
+  - id: mei-engine
+    persona_id: mei-tanaka
+    question: What engine did you switch to from Unity?
+    reference: Godot
+    source_docs: [mei-tanaka/tools-and-setup]
+    answerable: true
+  - id: mei-festival-crash
+    persona_id: mei-tanaka
+    question: How many crashes happened during the festival play sessions?
+    reference: one crash in forty-one sessions
+    source_docs: [mei-tanaka/festival-postmortem]
+    answerable: true
+  - id: mei-manual
+    persona_id: mei-tanaka
+    question: What old manual inspired Foghouse?
+    reference: a lighthouse maintenance manual from 1923
+    source_docs: [mei-tanaka/influences]
+    answerable: true
+  - id: mei-work-hours
+    persona_id: mei-tanaka
+    question: What hours do you usually work at night?
+    reference: roughly 22:00 to 03:00
+    source_docs: [mei-tanaka/tools-and-setup]
+    answerable: true
+  - id: mei-wishlists
+    persona_id: mei-tanaka
+    question: How well did your wishlists convert?
+    reference: roughly 12%
+    source_docs: [mei-tanaka/devlog-attic]
+    answerable: true
+  - id: mei-sports
+    persona_id: mei-tanaka
+    question: Which sports team do you support?
+    reference: null
+    source_docs: []
+    answerable: false
+
+  # ---- gus-okafor ----
+  - id: gus-crossing
+    persona_id: gus-okafor
+    question: How long was the ferry crossing in nautical miles and minutes?
+    reference: 2.3 nautical miles, twenty-two minutes
+    source_docs: [gus-okafor/harbor-years]
+    answerable: true
+  - id: gus-boat-name
+    persona_id: gus-okafor
+    question: What was the name of the boat you captained?
+    reference: the Marguerite K
+    source_docs: [gus-okafor/harbor-years]
+    answerable: true
+  - id: gus-museum-days
+    persona_id: gus-okafor
+    question: Which days do you volunteer at the maritime museum?
+    reference: Tuesdays and Thursdays
+    source_docs: [gus-okafor/museum-volunteering]
+    answerable: true
+  - id: gus-plaque
+    persona_id: gus-okafor
+    question: What does the plaque from the harbormaster say?
+    reference: For Decisive Action
+    source_docs: [gus-okafor/storm-of-09]
+    answerable: true
+  - id: gus-mail-departure
+    persona_id: gus-okafor
+    question: What time does the island mail launch depart?
+    reference: "9:40"
+    source_docs: [gus-okafor/island-mail-notes]
+    answerable: true
+  - id: gus-electronics
+    persona_id: gus-okafor
+    question: What is your policy on fixing electronics?
+    reference: nothing newer than 2010
+    source_docs: [gus-okafor/neighborhood-fixit]
+    answerable: true
+  - id: gus-screen-door
+    persona_id: gus-okafor
+    question: What did Mrs. Alday pay you for the screen door repair?
+    reference: one pan of baklava
+    source_docs: [gus-okafor/neighborhood-fixit]
+    answerable: true
+  - id: gus-programming
+    persona_id: gus-okafor
+    question: Which programming language do you prefer?
+    reference: null
+    source_docs: []
+    answerable: false

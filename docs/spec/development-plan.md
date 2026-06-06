@@ -28,7 +28,7 @@ layered evaluation. Detailed plan:
 - [x] Phase 4: synthetic corpus + PII redaction
 - [x] Phase 5: LLM providers + routing
 - [x] Phase 6: persona twins + FastAPI service
-- [ ] Phase 7: evaluation harness
+- [x] Phase 7: evaluation harness
 - [ ] Phase 8: polish + v0.1.0
 - [ ] Phase 9 (optional): frontend
 - [ ] Phase 10 (optional): deployment

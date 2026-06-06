@@ -73,10 +73,30 @@ oversized blocks fall back to sentence packing.
    chunk time and make citations, dedup, and debugging tractable forever
    after.
 
-## Measured results (Phase 7)
+## Measured results
+
+Offline backends (hash embedder, in-memory store), 28 answerable eval
+items, `make eval` — deterministic, reproduce with one command:
 
 | Strategy | hit-rate@5 | MRR | + rerank hit-rate@5 | + rerank MRR |
 |---|---|---|---|---|
-| fixed | _tbd_ | _tbd_ | _tbd_ | _tbd_ |
-| semantic | _tbd_ | _tbd_ | _tbd_ | _tbd_ |
-| content_aware | _tbd_ | _tbd_ | _tbd_ | _tbd_ |
+| fixed | 0.929 | 0.763 | 1.000 | 0.940 |
+| semantic | 0.929 | 0.744 | 1.000 | 0.940 |
+| content_aware | 0.964 | 0.727 | 1.000 | 0.929 |
+
+Two readings worth making explicit:
+
+1. **Reranking dominates chunking choice on this corpus** — every
+   strategy lands at hit-rate 1.0 / MRR ≈ 0.93 once reranked, while
+   un-reranked MRR spreads only ~0.04 across strategies. With a small,
+   well-structured corpus and persona-scoped search, recall is easy and
+   *ordering* is the contested ground (see docs/reranking.md).
+2. **content_aware wins raw hit-rate but trails raw MRR** — its chunks
+   are bigger (heading + body travel together), so the right chunk is
+   *present* more often but competes worse for rank 1 until the
+   reranker corrects ordering. Exactly the chunk-size ↔ k ↔ rerank
+   interaction described above.
+
+Re-run against real embeddings (`OPENAI_API_KEY` set) before
+generalizing — the hash embedder is lexical at heart, which flatters
+lexical reranking.

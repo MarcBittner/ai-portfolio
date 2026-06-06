@@ -103,17 +103,17 @@ monorepo; portfolio-level spec lives at `docs/spec/spec.md` in the root).
       refusal on unanswerable
 - [x] `make demo` end-to-end offline; `make serve`
 
-## Phase 7: Evaluation harness
+## Phase 7: Evaluation harness ✅
 
-- [ ] `eval/` dataset: 25–40 Q/A/source triples incl. unanswerables
-- [ ] Retrieval metrics: hit-rate@k, MRR — per chunking strategy,
+- [x] `eval/` dataset: 25–40 Q/A/source triples incl. unanswerables
+- [x] Retrieval metrics: hit-rate@k, MRR — per chunking strategy,
       with/without rerank
-- [ ] Grounding metrics: citation precision, claim support (LLM-judge with
+- [x] Grounding metrics: citation precision, claim support (LLM-judge with
       structured output + heuristic fallback for mock mode), refusal rate
-- [ ] Answer quality metrics: correctness vs reference, voice consistency
-- [ ] `make eval` → markdown report (separate metrics, no single score)
-- [ ] `docs/evaluation.md` — "why one fidelity % hides what matters"
-- [ ] Back-fill measured numbers into `docs/chunking-tradeoffs.md`
+- [x] Answer quality metrics: correctness vs reference, voice consistency
+- [x] `make eval` → markdown report (separate metrics, no single score)
+- [x] `docs/evaluation.md` — "why one fidelity % hides what matters"
+- [x] Back-fill measured numbers into `docs/chunking-tradeoffs.md`
 
 ## Phase 8: Polish
 
