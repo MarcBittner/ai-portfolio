@@ -13,7 +13,7 @@ checkboxed plan at `projects/<name>/docs/spec/development-plan.md`.
 
 - [x] Bootstrap: MIT LICENSE, .gitignore, first commit
 - [x] Portfolio spec + monorepo layout (`projects/` per-project)
-- [ ] Root README portfolio index (grows as projects land)
+- [x] Root README portfolio index (grows as projects land)
 
 ## Project 1: persona-twin 🔄
 
@@ -22,7 +22,7 @@ layered evaluation. Detailed plan:
 [projects/persona-twin/docs/spec/development-plan.md](../../projects/persona-twin/docs/spec/development-plan.md)
 
 - [x] Phase 0: bootstrap + spec
-- [ ] Phase 1: project skeleton
+- [x] Phase 1: project skeleton
 - [ ] Phase 2: chunking module
 - [ ] Phase 3: embeddings + vector stores
 - [ ] Phase 4: synthetic corpus + PII redaction

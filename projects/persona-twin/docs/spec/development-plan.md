@@ -28,18 +28,18 @@ monorepo; portfolio-level spec lives at `docs/spec/spec.md` in the root).
 
 ---
 
-## Phase 1: Project skeleton
+## Phase 1: Project skeleton ✅
 
-- [ ] `pyproject.toml` — package `persona_twin`, pinned deps (fastapi,
+- [x] `pyproject.toml` — package `persona_twin`, pinned deps (fastapi,
       uvicorn, pydantic, pydantic-settings, numpy, pytest, httpx, ruff;
       extras: `mongo`, `openai`, `anthropic`, `redis`)
-- [ ] `src/persona_twin/` package layout: `config.py` (pydantic-settings,
+- [x] `src/persona_twin/` package layout: `config.py` (pydantic-settings,
       env-driven backend selection), `models.py` (core Pydantic types:
-      Chunk, Persona, Citation, AskRequest/Response), `logging.py`
-- [ ] `Makefile`: `setup`, `test`, `lint`, `serve`, `demo`, `eval` targets
+      Chunk, Persona, Citation, AskRequest/Response), `log.py`
+- [x] `Makefile`: `setup`, `test`, `lint`, `serve`, `demo`, `eval` targets
       (demo/eval may stub until later phases)
-- [ ] `tests/` scaffold + first config tests (offline defaults when no env)
-- [ ] README stub: one-paragraph description + quickstart placeholder
+- [x] `tests/` scaffold + first config tests (offline defaults when no env)
+- [x] README stub: one-paragraph description + quickstart placeholder
 
 ## Phase 2: Chunking module
 

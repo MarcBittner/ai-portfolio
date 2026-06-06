@@ -1,0 +1,69 @@
+"""Environment-driven configuration.
+
+Backend selection is purely environmental: with no configuration at all,
+every backend resolves to its offline default (in-memory vector store,
+deterministic mock LLM, hash embedder, in-process cache). Setting the
+relevant environment variable switches a backend on — no code changes.
+"""
+
+from functools import lru_cache
+from typing import Literal
+
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+RouteObjective = Literal["cost", "latency", "quality"]
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    # LLM providers
+    anthropic_api_key: str | None = None
+    openai_api_key: str | None = None
+
+    # MongoDB Atlas (vector store)
+    mongodb_uri: str | None = None
+    mongodb_db: str = "persona_twin"
+    mongodb_vector_index: str = "persona_chunks_index"
+
+    # Redis cache
+    redis_url: str | None = None
+
+    # Behavior overrides
+    mock_mode: bool = Field(default=False, validation_alias="PERSONA_TWIN_MOCK")
+    route_objective: RouteObjective = Field(
+        default="cost", validation_alias="PERSONA_TWIN_ROUTE_OBJECTIVE"
+    )
+
+    @property
+    def llm_backends(self) -> list[str]:
+        """Configured LLM providers, in registry order. Always ends with mock."""
+        if self.mock_mode:
+            return ["mock"]
+        backends = []
+        if self.anthropic_api_key:
+            backends.append("anthropic")
+        if self.openai_api_key:
+            backends.append("openai")
+        backends.append("mock")
+        return backends
+
+    @property
+    def vector_backend(self) -> Literal["atlas", "memory"]:
+        return "atlas" if self.mongodb_uri else "memory"
+
+    @property
+    def embedding_backend(self) -> Literal["openai", "hash"]:
+        if self.mock_mode or not self.openai_api_key:
+            return "hash"
+        return "openai"
+
+    @property
+    def cache_backend(self) -> Literal["redis", "memory"]:
+        return "redis" if self.redis_url else "memory"
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()
