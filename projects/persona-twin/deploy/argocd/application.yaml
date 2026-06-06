@@ -1,0 +1,27 @@
+# Argo CD Application: persona-twin synced straight from the public
+# repo — the repository is the source of truth, the cluster follows.
+#
+#   kubectl apply -f deploy/argocd/application.yaml
+#
+# Assumes the image (persona-twin:v0.2.0) is already loaded into the
+# node (see docs/deployment.md → Local Kubernetes).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: persona-twin
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/MarcBittner/ai-portfolio.git
+    targetRevision: main
+    path: projects/persona-twin/deploy/k8s
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: persona-twin
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
