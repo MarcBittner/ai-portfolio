@@ -41,6 +41,6 @@ async def judge_support(
         max_tokens=512,
     )
     verdict, _, _ = await router.complete_structured(
-        request, SupportVerdict, objective="cost"
+        request, SupportVerdict, task="eval_judge"
     )
     return verdict.supported, "llm-judge"

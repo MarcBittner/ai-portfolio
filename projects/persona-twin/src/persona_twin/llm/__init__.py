@@ -9,6 +9,7 @@ from persona_twin.llm.base import (
     ModelSpec,
 )
 from persona_twin.llm.mock import MockProvider
+from persona_twin.llm.policy import TASKS, RoutingPolicy, TaskRoute
 from persona_twin.llm.registry import ModelRegistry
 from persona_twin.llm.router import AllProvidersFailedError, LLMRouter, schema_for
 
@@ -22,6 +23,9 @@ __all__ = [
     "MockProvider",
     "ModelRegistry",
     "ModelSpec",
+    "RoutingPolicy",
+    "TASKS",
+    "TaskRoute",
     "get_router",
     "schema_for",
 ]
@@ -38,6 +42,12 @@ def get_router(settings: Settings) -> LLMRouter:
             from persona_twin.llm.openai_llm import OpenAIProvider
 
             providers["openai"] = OpenAIProvider(api_key=settings.openai_api_key)
+        elif backend == "openrouter":
+            from persona_twin.llm.openrouter_llm import OpenRouterProvider
+
+            providers["openrouter"] = OpenRouterProvider(
+                api_key=settings.openrouter_api_key
+            )
         else:
             providers["mock"] = MockProvider()
     providers.setdefault("mock", MockProvider())

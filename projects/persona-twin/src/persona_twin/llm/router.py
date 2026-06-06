@@ -14,6 +14,7 @@ from pydantic import BaseModel, ValidationError
 
 from persona_twin.config import RouteObjective
 from persona_twin.llm.base import LLMProvider, LLMRequest, LLMResponse, ModelSpec
+from persona_twin.llm.policy import RoutingPolicy
 from persona_twin.llm.registry import ModelRegistry
 from persona_twin.log import get_logger, kv
 from persona_twin.models import RoutingDecision
@@ -50,22 +51,38 @@ class LLMRouter:
         registry: ModelRegistry,
         providers: dict[str, LLMProvider],
         objective: RouteObjective = "cost",
+        policy: RoutingPolicy | None = None,
     ) -> None:
         self.registry = registry
         self.providers = providers
-        self.objective = objective
+        self.policy = policy or RoutingPolicy(default_objective=objective)
 
-    def plan(self, objective: RouteObjective | None = None) -> list[ModelSpec]:
-        return self.registry.candidates(
-            list(self.providers.keys()), objective or self.objective
-        )
+    @property
+    def objective(self) -> RouteObjective:
+        return self.policy.default_objective
+
+    def plan(
+        self, objective: RouteObjective | None = None, task: str | None = None
+    ) -> list[ModelSpec]:
+        resolved = objective or self.policy.resolve_objective(task)
+        candidates = self.registry.candidates(list(self.providers.keys()), resolved)
+        pin = self.policy.resolve_pin(task)
+        if pin:
+            pinned = [s for s in candidates if (s.provider, s.id) == pin]
+            if pinned:
+                # pinned model first; the fallback chain stays behind it
+                candidates = pinned + [s for s in candidates if s is not pinned[0]]
+        return candidates
 
     async def complete(
-        self, request: LLMRequest, objective: RouteObjective | None = None
+        self,
+        request: LLMRequest,
+        objective: RouteObjective | None = None,
+        task: str | None = None,
     ) -> tuple[LLMResponse, RoutingDecision]:
-        objective = objective or self.objective
+        objective = objective or self.policy.resolve_objective(task)
         fallbacks: list[str] = []
-        for spec in self.plan(objective):
+        for spec in self.plan(objective, task):
             provider = self.providers[spec.provider]
             try:
                 response = await provider.complete(request, spec)
@@ -78,6 +95,7 @@ class LLMRouter:
                 provider=spec.provider,
                 model=spec.id,
                 objective=objective,
+                task=task,
                 fallbacks_taken=fallbacks,
                 estimated_cost_usd=response.cost_usd,
                 latency_ms=response.latency_ms,
@@ -90,6 +108,7 @@ class LLMRouter:
         request: LLMRequest,
         output_model: type[BaseModel],
         objective: RouteObjective | None = None,
+        task: str | None = None,
     ) -> tuple[BaseModel, LLMResponse, RoutingDecision]:
         """Structured completion validated into ``output_model``, with one
         retry-on-validation-failure before failing over."""
@@ -101,7 +120,7 @@ class LLMRouter:
         )
         last_error: Exception | None = None
         for attempt in range(2):
-            response, decision = await self.complete(request, objective)
+            response, decision = await self.complete(request, objective, task)
             try:
                 parsed = output_model.model_validate(json.loads(response.text))
                 return parsed, response, decision

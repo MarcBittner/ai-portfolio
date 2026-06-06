@@ -201,6 +201,25 @@ throwaway test stubs — they are the documented offline mode.
   what the redaction layer does and does not catch, and where an NER-based
   layer would slot in for production use
 
+### FR-13: Routing Console
+
+- **FR-13.1** Per-task routing policy: each call type (`twin_answer`,
+  `rerank`, `eval_judge`) routes independently — by objective
+  (`cost`/`latency`/`quality`) or pinned to an explicit
+  `provider:model`, with the fallback chain preserved either way
+- **FR-13.2** `GET /routing` — current policy, the model registry
+  (pricing/quality/speed), active providers, and the resolved candidate
+  plan per task; `PUT /routing` — validated live update (in-memory;
+  persistence is the deployment's concern, e.g. a ConfigMap)
+- **FR-13.3** Frontend `/routing` page: provider status, default
+  objective, per-task objective/pin selectors, live plan preview,
+  registry table with pricing
+- **FR-13.4** OpenRouter as an optional aggregation provider
+  (`OPENROUTER_API_KEY`) behind the same port — policy stays first-party,
+  aggregation is rented
+- **FR-13.5** LLM reranker uses the `rerank` task route; the routing
+  decision in every debug payload names the task it routed for
+
 ### FR-10: Developer Experience
 
 - **FR-10.1** `Makefile`: `setup` (venv + install), `demo` (ingest + sample

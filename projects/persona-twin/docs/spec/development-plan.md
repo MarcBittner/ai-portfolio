@@ -144,3 +144,16 @@ monorepo; portfolio-level spec lives at `docs/spec/spec.md` in the root).
 ---
 
 **Last Updated:** 2026-06-06
+
+## Phase 11: Routing console ✅
+
+- [x] Task-aware router: per-task objective/pin policy (`RoutingPolicy`),
+      resolution order pin → task objective → default objective
+- [x] OpenRouter provider (OpenAI-compatible, `OPENROUTER_API_KEY`) +
+      registry entries (indicative pricing, marked for verification)
+- [x] LLM reranker (`rerank` task route) with order-preserving fallback
+- [x] `GET /routing` / `PUT /routing` endpoints + tests
+- [x] Frontend `/routing` page: providers, objectives, pins, plan
+      preview, registry pricing table
+- [x] v0.3.0: image rebuilt, loaded into kind, manifest bumped — Argo
+      syncs the rollout from the repo

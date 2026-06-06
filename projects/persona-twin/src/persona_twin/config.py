@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     # LLM providers
     anthropic_api_key: str | None = None
     openai_api_key: str | None = None
+    openrouter_api_key: str | None = None
 
     # MongoDB Atlas (vector store)
     mongodb_uri: str | None = None
@@ -46,6 +47,8 @@ class Settings(BaseSettings):
             backends.append("anthropic")
         if self.openai_api_key:
             backends.append("openai")
+        if self.openrouter_api_key:
+            backends.append("openrouter")
         backends.append("mock")
         return backends
 

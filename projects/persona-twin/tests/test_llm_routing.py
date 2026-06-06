@@ -72,7 +72,7 @@ class InvalidJSONOnceProvider:
 class TestRegistry:
     def test_loads_all_providers(self):
         providers = {s.provider for s in REGISTRY.specs}
-        assert providers == {"anthropic", "openai", "mock"}
+        assert providers == {"anthropic", "openai", "openrouter", "mock"}
 
     def test_anthropic_pricing_current(self):
         by_id = {s.id: s for s in REGISTRY.specs}

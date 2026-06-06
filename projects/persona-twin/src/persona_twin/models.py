@@ -65,6 +65,7 @@ class RoutingDecision(BaseModel):
     provider: str
     model: str
     objective: str
+    task: str | None = None
     fallbacks_taken: list[str] = []
     estimated_cost_usd: float | None = None
     latency_ms: float | None = None

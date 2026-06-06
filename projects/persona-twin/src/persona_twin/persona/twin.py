@@ -73,7 +73,9 @@ async def ask_twin(
         max_tokens=1024,
     )
     t0 = time.perf_counter()
-    parsed, _response, decision = await router.complete_structured(request, TwinAnswer)
+    parsed, _response, decision = await router.complete_structured(
+        request, TwinAnswer, task="twin_answer"
+    )
     timings["generate"] = _ms_since(t0)
 
     retrieved_by_id = {sc.chunk.chunk_id: sc for sc in reranked}

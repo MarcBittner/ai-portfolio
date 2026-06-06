@@ -31,9 +31,40 @@ export interface RoutingDecision {
   provider: string;
   model: string;
   objective: string;
+  task: string | null;
   fallbacks_taken: string[];
   estimated_cost_usd: number | null;
   latency_ms: number | null;
+}
+
+export type RouteObjective = "cost" | "latency" | "quality";
+
+export interface TaskRoute {
+  objective: RouteObjective | null;
+  pin: string | null; // "provider:model_id"
+}
+
+export interface RoutingPolicy {
+  default_objective: RouteObjective;
+  tasks: Record<string, TaskRoute>;
+}
+
+export interface ModelSpec {
+  provider: string;
+  id: string;
+  input_per_mtok: number;
+  output_per_mtok: number;
+  quality: number;
+  speed: number;
+  adaptive_thinking: boolean;
+}
+
+export interface RoutingView {
+  policy: RoutingPolicy;
+  tasks: string[];
+  providers: Record<string, boolean>;
+  registry: ModelSpec[];
+  plans: Record<string, string[]>;
 }
 
 export interface DebugInfo {
@@ -74,6 +105,18 @@ export function ask(
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ persona_id: personaId, question, debug }),
+  });
+}
+
+export function getRouting(): Promise<RoutingView> {
+  return request<RoutingView>("/routing");
+}
+
+export function putRouting(policy: RoutingPolicy): Promise<RoutingView> {
+  return request<RoutingView>("/routing", {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(policy),
   });
 }
 

@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from fastapi import APIRouter, FastAPI, HTTPException
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -27,7 +28,7 @@ from persona_twin.corpus import PersonaRecord, load_personas
 from persona_twin.embedding import get_embedder
 from persona_twin.embedding.base import Embedder
 from persona_twin.embedding.cached import CachedEmbedder
-from persona_twin.llm import LLMRouter, get_router
+from persona_twin.llm import TASKS, LLMRouter, ModelSpec, RoutingPolicy, get_router
 from persona_twin.log import configure, new_request_id
 from persona_twin.models import AskRequest, AskResponse, ChunkStrategy, Persona
 from persona_twin.persona.twin import ask_twin
@@ -153,6 +154,53 @@ async def ingest(request: IngestRequest) -> IngestReport:
     )
 
 
+class RoutingView(BaseModel):
+    """Routing console payload: policy + everything needed to edit it."""
+
+    policy: RoutingPolicy
+    tasks: list[str]
+    providers: dict[str, bool]  # provider -> configured (mock always true)
+    registry: list[ModelSpec]
+    plans: dict[str, list[str]]  # task -> ordered "provider:model" candidates
+
+
+def _routing_view(state: AppState) -> RoutingView:
+    llm = state.router
+    available = set(llm.providers)
+    return RoutingView(
+        policy=llm.policy,
+        tasks=list(TASKS),
+        providers={
+            spec_provider: spec_provider in available
+            for spec_provider in sorted({s.provider for s in llm.registry.specs})
+        },
+        registry=llm.registry.specs,
+        plans={
+            task: [f"{s.provider}:{s.id}" for s in llm.plan(task=task)]
+            for task in TASKS
+        },
+    )
+
+
+@router.get("/routing", response_model=RoutingView)
+async def get_routing() -> RoutingView:
+    return _routing_view(_state())
+
+
+@router.put("/routing", response_model=RoutingView)
+async def put_routing(policy: RoutingPolicy) -> RoutingView:
+    state = _state()
+    known = {f"{s.provider}:{s.id}" for s in state.router.registry.specs}
+    for task, route in policy.tasks.items():
+        if route.pin is not None and route.pin not in known:
+            raise HTTPException(
+                status_code=422,
+                detail=f"unknown pin for {task}: {route.pin}",
+            )
+    state.router.policy = policy
+    return _routing_view(state)
+
+
 @router.post("/ask", response_model=AskResponse)
 async def ask(request: AskRequest) -> AskResponse:
     new_request_id()
@@ -203,6 +251,16 @@ async def ask(request: AskRequest) -> AskResponse:
 app.include_router(router)
 app.include_router(router, prefix="/api", include_in_schema=False)
 
-# Serve the built frontend when present (container image / PERSONA_TWIN_STATIC_DIR)
+# Serve the built frontend when present (container image / PERSONA_TWIN_STATIC_DIR).
+# SPA fallback: unknown GET paths return index.html so client-side routes
+# (/routing) deep-link correctly; API routes above always win the match.
 if STATIC_DIR and Path(STATIC_DIR).is_dir():  # pragma: no cover - container path
-    app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="ui")
+    _static_root = Path(STATIC_DIR)
+    app.mount("/assets", StaticFiles(directory=_static_root / "assets"), name="assets")
+
+    @app.get("/{path:path}", include_in_schema=False)
+    async def spa(path: str) -> FileResponse:
+        candidate = _static_root / path
+        if path and candidate.is_file():
+            return FileResponse(candidate)
+        return FileResponse(_static_root / "index.html")

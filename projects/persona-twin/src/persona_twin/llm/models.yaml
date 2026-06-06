@@ -44,6 +44,21 @@ providers:
         output_per_mtok: 1.25
         quality: 5
         speed: 10
+  # OpenRouter: rented aggregation behind first-party policy. Prices
+  # float per upstream provider — these are indicative; verify at
+  # openrouter.ai/models before relying on cost routing across them.
+  openrouter:
+    models:
+      - id: meta-llama/llama-3.3-70b-instruct
+        input_per_mtok: 0.30
+        output_per_mtok: 0.40
+        quality: 6
+        speed: 7
+      - id: deepseek/deepseek-chat
+        input_per_mtok: 0.30
+        output_per_mtok: 0.90
+        quality: 7
+        speed: 6
   mock:
     models:
       - id: mock-extractive-1

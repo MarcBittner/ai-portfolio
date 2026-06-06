@@ -19,6 +19,7 @@ import {
   type Persona,
 } from "~/lib/api";
 import { cn } from "~/lib/utils";
+import { Nav } from "~/components/nav";
 
 export async function clientLoader() {
   return { personas: await listPersonas() };
@@ -47,6 +48,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
 
   return (
     <main className="mx-auto max-w-3xl space-y-6 p-6 md:p-10">
+      <Nav active="home" />
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">persona-twin</h1>
         <p className="text-sm text-muted-foreground">
