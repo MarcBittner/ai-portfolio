@@ -34,6 +34,7 @@ from persona_twin.eval.benchmark import (
     BENCH_TASKS,
     BenchmarkContext,
     BenchmarkRun,
+    available_embedders,
     job_key,
     run_benchmark,
 )
@@ -43,6 +44,7 @@ from persona_twin.log import configure, new_request_id
 from persona_twin.models import AskRequest, AskResponse, ChunkStrategy, Persona
 from persona_twin.persona.twin import ask_twin
 from persona_twin.pipeline import IngestReport, ingest_corpus
+from persona_twin.retrieval.bm25 import BM25Index
 from persona_twin.vectorstore import get_vector_store
 from persona_twin.vectorstore.base import VectorStore
 
@@ -59,6 +61,7 @@ class AppState:
     records: list[PersonaRecord]
     cache: Cache
     cache_stats: CacheStats = field(default_factory=CacheStats)
+    bm25: BM25Index = field(default_factory=BM25Index)
     benchmark: BenchmarkRun = field(default_factory=BenchmarkRun)
     benchmark_task: asyncio.Task | None = None
     bench_store: BenchmarkStore = field(default_factory=BenchmarkStore)
@@ -94,6 +97,8 @@ async def lifespan(app: FastAPI):
             get_chunker(DEFAULT_STRATEGY), state.embedder, state.store,
             records=state.records,
         )
+    if state.settings.hybrid_retrieval:
+        state.bm25.build(await state.store.all_chunks())
     yield
 
 
@@ -161,10 +166,13 @@ async def get_persona(persona_id: str) -> Persona:
 async def ingest(request: IngestRequest) -> IngestReport:
     state = _state()
     await state.store.drop()
-    return await ingest_corpus(
+    report = await ingest_corpus(
         get_chunker(request.strategy), state.embedder, state.store,
         records=state.records,
     )
+    if state.settings.hybrid_retrieval:
+        state.bm25.build(await state.store.all_chunks())
+    return report
 
 
 class RoutingView(BaseModel):
@@ -176,6 +184,7 @@ class RoutingView(BaseModel):
     registry: list[ModelSpec]
     plans: dict[str, list[str]]  # task -> ordered "provider:model" candidates
     cooling_down: dict[str, float]  # provider:model -> seconds remaining
+    bench_tasks: list[str]  # benchmarkable tasks (routed tasks + "embedding")
 
 
 def _routing_view(state: AppState) -> RoutingView:
@@ -194,6 +203,7 @@ def _routing_view(state: AppState) -> RoutingView:
             for task in TASKS
         },
         cooling_down=llm.breaker.cooling_down(),
+        bench_tasks=list(BENCH_TASKS),
     )
 
 
@@ -259,7 +269,16 @@ async def post_benchmark(request: BenchmarkRequest) -> BenchmarkRun:
         embedder=state.embedder,
         store=state.store,
         providers=state.router.providers,
+        settings=state.settings,
     )
+    llm_tasks = [t for t in request.tasks if t != "embedding"]
+    embedding_combos: list[str] = []
+    if "embedding" in request.tasks:
+        embedding_combos = [
+            f"embedding|{name}:{mode}"
+            for name in available_embedders(state.settings)
+            for mode in ("vector", "hybrid")
+        ]
     skip: set[str] = set()
     if not request.force:
         existing = {
@@ -267,11 +286,17 @@ async def post_benchmark(request: BenchmarkRequest) -> BenchmarkRun:
         }
         skip = {
             job_key(t, s)
-            for t in request.tasks
+            for t in llm_tasks
             for s in specs
             if (t, s.provider, s.id) in existing
         }
-        if len(skip) == len(request.tasks) * len(specs):
+        skip |= {
+            combo
+            for combo in embedding_combos
+            if ("embedding", *combo.split("|")[1].rsplit(":", 1)) in existing
+        }
+        total = len(llm_tasks) * len(specs) + len(embedding_combos)
+        if total and len(skip) == total:
             raise HTTPException(
                 status_code=409,
                 detail="all selected task×model combos already have results — "
@@ -368,6 +393,7 @@ async def ask(request: AskRequest) -> AskResponse:
         embedder=state.embedder,
         store=state.store,
         router=state.router,
+        bm25=state.bm25 if state.settings.hybrid_retrieval else None,
         k=request.k,
         debug=request.debug,
     )

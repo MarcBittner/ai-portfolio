@@ -66,6 +66,7 @@ export interface RoutingView {
   registry: ModelSpec[];
   plans: Record<string, string[]>;
   cooling_down: Record<string, number>;
+  bench_tasks: string[];
 }
 
 export interface DebugInfo {

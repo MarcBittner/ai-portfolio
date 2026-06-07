@@ -30,6 +30,8 @@ from persona_twin.models import AskResponse, ChunkStrategy
 from persona_twin.persona.twin import ask_twin
 from persona_twin.pipeline import ingest_corpus
 from persona_twin.reranking import LexicalReranker
+from persona_twin.retrieval.bm25 import BM25Index
+from persona_twin.retrieval.fusion import reciprocal_rank_fusion
 from persona_twin.vectorstore import MemoryVectorStore
 
 K = 5
@@ -64,17 +66,28 @@ class QualityReport(BaseModel):
 
 
 async def evaluate_retrieval(
-    items: list[EvalItem], embedder, records, strategy: ChunkStrategy, reranked: bool
+    items: list[EvalItem],
+    embedder,
+    records,
+    strategy: ChunkStrategy,
+    reranked: bool,
+    hybrid: bool = False,
 ) -> RetrievalRow:
     store = MemoryVectorStore(dimensions=embedder.dimensions)
     await ingest_corpus(get_chunker(strategy), embedder, store, records=records)
     reranker = LexicalReranker()
+    bm25 = BM25Index()
+    if hybrid:
+        bm25.build(await store.all_chunks())
 
     answerable = [i for i in items if i.answerable]
     hits, rr_sum = 0, 0.0
     for item in answerable:
         qv = await embedder.embed_query(item.question)
         results = await store.search(qv, k=N_CANDIDATES, persona_id=item.persona_id)
+        if hybrid:
+            keyword = bm25.search(item.question, k=N_CANDIDATES, persona_id=item.persona_id)
+            results = reciprocal_rank_fusion([results, keyword], k=N_CANDIDATES)
         if reranked:
             results = reranker.rerank(item.question, results)
         results = results[:K]
@@ -91,7 +104,7 @@ async def evaluate_retrieval(
             rr_sum += 1.0 / rank
     n = len(answerable)
     return RetrievalRow(
-        strategy=strategy,
+        strategy=f"{strategy}+hybrid" if hybrid else strategy,
         reranked=reranked,
         hit_rate=round(hits / n, 3),
         mrr=round(rr_sum / n, 3),
@@ -230,6 +243,13 @@ async def main() -> None:
     retrieval_rows = [
         await evaluate_retrieval(items, state.embedder, records, strategy, reranked)
         for strategy in STRATEGIES
+        for reranked in (False, True)
+    ]
+    # hybrid (vector + BM25, RRF) on the default strategy
+    retrieval_rows += [
+        await evaluate_retrieval(
+            items, state.embedder, records, "content_aware", reranked, hybrid=True
+        )
         for reranked in (False, True)
     ]
 

@@ -14,6 +14,8 @@ Three layers, three tables. **No composite score** — see [docs/evaluation.md](
 | semantic | yes | 1.000 | 0.940 | 28 |
 | content_aware | no | 0.964 | 0.727 | 28 |
 | content_aware | yes | 1.000 | 0.929 | 28 |
+| content_aware+hybrid | no | 1.000 | 0.815 | 28 |
+| content_aware+hybrid | yes | 1.000 | 0.929 | 28 |
 
 ## 2. Grounding / faithfulness
 

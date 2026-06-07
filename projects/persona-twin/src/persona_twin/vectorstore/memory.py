@@ -52,6 +52,9 @@ class MemoryVectorStore:
     async def count(self) -> int:
         return len(self._chunks)
 
+    async def all_chunks(self) -> list[Chunk]:
+        return list(self._chunks.values())
+
     async def drop(self) -> None:
         self._chunks.clear()
         self._vectors.clear()

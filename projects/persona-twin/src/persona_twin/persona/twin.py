@@ -23,6 +23,8 @@ from persona_twin.models import (
 )
 from persona_twin.persona.prompting import build_system_prompt, build_user_prompt
 from persona_twin.reranking.lexical import LexicalReranker
+from persona_twin.retrieval.bm25 import BM25Index
+from persona_twin.retrieval.fusion import reciprocal_rank_fusion
 from persona_twin.vectorstore.base import VectorStore
 
 logger = get_logger("persona.twin")
@@ -47,6 +49,7 @@ async def ask_twin(
     store: VectorStore,
     router: LLMRouter,
     reranker: LexicalReranker | None = None,
+    bm25: BM25Index | None = None,
     k: int = 5,
     debug: bool = False,
 ) -> AskResponse:
@@ -62,6 +65,12 @@ async def ask_twin(
         query_vector, k=N_CANDIDATES, persona_id=persona.persona_id
     )
     timings["vector_search"] = _ms_since(t0)
+
+    if bm25 is not None and len(bm25):
+        t0 = time.perf_counter()
+        keyword = bm25.search(question, k=N_CANDIDATES, persona_id=persona.persona_id)
+        candidates = reciprocal_rank_fusion([candidates, keyword], k=N_CANDIDATES)
+        timings["bm25_fuse"] = _ms_since(t0)
 
     t0 = time.perf_counter()
     reranked = reranker.rerank(question, candidates)[:k]

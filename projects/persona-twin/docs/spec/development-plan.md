@@ -202,3 +202,12 @@ monorepo; portfolio-level spec lives at `docs/spec/spec.md` in the root).
 - [x] Router integration: skips recorded on decisions; console shows
       cooling-down chips
 - [x] atlas-setup dims table updated for nomic-embed-text (768)
+
+## Phase 17: Hybrid retrieval + embedder benchmarks + CI ✅
+
+- [x] BM25 (pure-Python Okapi) + reciprocal-rank fusion in the ask path
+- [x] `all_chunks()` on the VectorStore port (memory + Atlas)
+- [x] eval report: content_aware+hybrid rows (hit 0.964→1.0 un-reranked)
+- [x] analytics `embedding` task: embedder × vector/hybrid scorecards
+- [x] GitHub Actions: lint/test/eval with MRR≥0.9 regression gate +
+      frontend build/typecheck (deployment untouched — Argo stays)

@@ -255,11 +255,25 @@ throwaway test stubs — they are the documented offline mode.
 - **FR-14.6** Results persist as JSON per run (`PERSONA_TWIN_BENCH_DIR`;
   a PVC in k8s) with history endpoints + a previous-runs browser in the
   analytics tab
+- **FR-14.8** `embedding` benchmark task: every available embedder ×
+  (vector | hybrid) scored on hit-rate/MRR/latency into the same
+  aggregate scoreboard (model selection does not apply to it)
 - **FR-14.7** Results **aggregate** across runs (latest wins per
   task×model, `GET /benchmark/aggregate`); a new run skips combos that
   already have results unless `force=true` — the UI offers "Run missing"
   and "Rerun selected" so models can be benchmarked one at a time into
   one scoreboard
+
+### FR-15: Hybrid Retrieval
+
+- **FR-15.1** Dependency-free BM25 index over ingested chunks, rebuilt
+  at ingest; `all_chunks()` on the VectorStore port feeds it from any
+  backend
+- **FR-15.2** Reciprocal-rank fusion of vector + BM25 candidates ahead
+  of reranking (`PERSONA_TWIN_HYBRID`, default on); fusion time appears
+  in stage timings
+- **FR-15.3** Measured: eval report carries `content_aware+hybrid` rows;
+  the analytics `embedding` task compares vector vs hybrid per embedder
 
 ### FR-10: Developer Experience
 

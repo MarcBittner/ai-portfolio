@@ -38,12 +38,14 @@ const HEADLINE: Record<string, { metric: string; label: string }> = {
   twin_answer: { metric: "fact_presence", label: "fact presence" },
   rerank: { metric: "mrr", label: "MRR" },
   eval_judge: { metric: "accuracy", label: "verdict accuracy" },
+  embedding: { metric: "mrr", label: "retrieval MRR" },
 };
 
 const TASK_TITLES: Record<string, string> = {
   twin_answer: "Twin answers",
   rerank: "Reranking (vs baselines)",
   eval_judge: "Eval judge",
+  embedding: "Embedding retrieval (embedder × vector/hybrid)",
 };
 
 export default function Analytics({ loaderData }: Route.ComponentProps) {
@@ -53,7 +55,7 @@ export default function Analytics({ loaderData }: Route.ComponentProps) {
     .map((m) => `${m.provider}:${m.id}`);
 
   const [selectedModels, setSelectedModels] = useState<string[]>(availableModels);
-  const [selectedTasks, setSelectedTasks] = useState<string[]>(routing.tasks);
+  const [selectedTasks, setSelectedTasks] = useState<string[]>(routing.bench_tasks);
   const [itemsLimit, setItemsLimit] = useState(6);
   const [run, setRun] = useState<BenchmarkRun>(loaderData.benchmark);
   const [history, setHistory] = useState<RunSummary[]>(loaderData.history);
@@ -111,11 +113,14 @@ export default function Analytics({ loaderData }: Route.ComponentProps) {
   }
 
   const done = new Set(aggregate.map((e) => `${e.task}|${e.provider}:${e.model}`));
-  const missingCount = selectedTasks.reduce(
-    (acc, t) =>
-      acc + selectedModels.filter((m) => !done.has(`${t}|${m}`)).length,
-    0,
-  );
+  // "embedding" benchmarks embedders, not LLM models — its combos are
+  // server-determined, so count it as one job if not yet measured
+  const missingCount = selectedTasks.reduce((acc, t) => {
+    if (t === "embedding") {
+      return acc + ([...done].some((d) => d.startsWith("embedding|")) ? 0 : 1);
+    }
+    return acc + selectedModels.filter((m) => !done.has(`${t}|${m}`)).length;
+  }, 0);
 
   // Scoreboard shows the AGGREGATE (latest result per task×model across
   // all runs), overlaid with anything the live run has produced so far.
@@ -146,7 +151,8 @@ export default function Analytics({ loaderData }: Route.ComponentProps) {
           <CardTitle className="text-base">Run a benchmark</CardTitle>
           <CardDescription>
             {itemsLimit} eval items per task (plus unanswerables). Local models
-            take seconds per call — start small.
+            take seconds per call — start small. The embedding task measures
+            available embedders (vector vs hybrid) and ignores model selection.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -165,7 +171,7 @@ export default function Analytics({ loaderData }: Route.ComponentProps) {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <span className="w-16 text-xs text-muted-foreground">tasks</span>
-            {routing.tasks.map((t) => (
+            {routing.bench_tasks.map((t) => (
               <Button
                 key={t}
                 variant={selectedTasks.includes(t) ? "default" : "outline"}

@@ -1,0 +1,44 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run: { working-directory: projects/persona-twin }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: make setup
+      - run: make lint
+      - run: make test
+      - name: eval with regression gate
+        run: |
+          make eval
+          python - <<'PY'
+          import re, sys
+          text = open("eval-report.md").read()
+          rows = re.findall(r"\| (\S+) \| (yes|no) \| ([\d.]+) \| ([\d.]+) \|", text)
+          reranked_mrr = {s: float(m) for s, r, h, m in rows if r == "yes"}
+          assert reranked_mrr, "no reranked rows parsed from eval-report.md"
+          failing = {s: m for s, m in reranked_mrr.items() if m < 0.9}
+          if failing:
+              sys.exit(f"retrieval regression — reranked MRR below 0.9: {failing}")
+          print("eval gate ok:", reranked_mrr)
+          PY
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run: { working-directory: projects/persona-twin/frontend }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - run: npm ci
+      - run: npm run build
+      - run: npm run typecheck

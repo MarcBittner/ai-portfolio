@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     extra_providers: str | None = Field(
         default=None, validation_alias="PERSONA_TWIN_EXTRA_PROVIDERS"
     )
+    # Hybrid retrieval (vector + BM25 with reciprocal-rank fusion)
+    hybrid_retrieval: bool = Field(
+        default=True, validation_alias="PERSONA_TWIN_HYBRID"
+    )
     # Discover OpenRouter's $0 models at startup (needs OPENROUTER_API_KEY)
     openrouter_free_discovery: bool = Field(
         default=True, validation_alias="PERSONA_TWIN_OPENROUTER_FREE"

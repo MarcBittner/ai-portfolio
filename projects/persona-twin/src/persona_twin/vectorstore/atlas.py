@@ -113,5 +113,20 @@ class AtlasVectorStore:
     async def count(self) -> int:
         return await self._col.count_documents({})
 
+    async def all_chunks(self) -> list[Chunk]:
+        chunks: list[Chunk] = []
+        async for doc in self._col.find({}, {"embedding": 0}):
+            chunks.append(
+                Chunk(
+                    chunk_id=doc["_id"],
+                    doc_id=doc["doc_id"],
+                    persona_id=doc["persona_id"],
+                    text=doc["text"],
+                    strategy=doc["strategy"],
+                    char_span=tuple(doc["char_span"]),
+                )
+            )
+        return chunks
+
     async def drop(self) -> None:
         await self._col.delete_many({})

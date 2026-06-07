@@ -23,6 +23,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from persona_twin.config import Settings
 from persona_twin.corpus import PersonaRecord
 from persona_twin.embedding.base import Embedder
 from persona_twin.eval.dataset import EvalItem
@@ -40,11 +41,13 @@ from persona_twin.models import Persona, ScoredChunk
 from persona_twin.persona.twin import ask_twin
 from persona_twin.reranking import LexicalReranker
 from persona_twin.reranking.llm_rerank import LLMReranker
+from persona_twin.retrieval.bm25 import BM25Index
+from persona_twin.retrieval.fusion import reciprocal_rank_fusion
 from persona_twin.vectorstore.base import VectorStore
 
 logger = get_logger("eval.benchmark")
 
-BENCH_TASKS = ("twin_answer", "rerank", "eval_judge")
+BENCH_TASKS = ("twin_answer", "rerank", "eval_judge", "embedding")
 K = 5
 N_CANDIDATES = 25
 
@@ -82,6 +85,7 @@ class BenchmarkContext(BaseModel):
     embedder: Embedder
     store: VectorStore
     providers: dict[str, LLMProvider]
+    settings: Settings | None = None
 
 
 def _pinned_router(spec: ModelSpec, providers: dict[str, LLMProvider]) -> LLMRouter:
@@ -99,6 +103,32 @@ def job_key(task: str, spec: ModelSpec) -> str:
     return f"{task}|{spec.provider}:{spec.id}"
 
 
+def available_embedders(settings: Settings | None) -> dict[str, object]:
+    """Embedders the embedding task can measure (probe failures skip)."""
+    from persona_twin.embedding.hashed import HashEmbedder
+
+    out: dict[str, object] = {"hash": HashEmbedder()}
+    if settings is None:
+        return out
+    if settings.openai_api_key and not settings.mock_mode:
+        try:
+            from persona_twin.embedding.openai_embed import OpenAIEmbedder
+
+            out["openai"] = OpenAIEmbedder(api_key=settings.openai_api_key)
+        except Exception:  # noqa: BLE001
+            pass
+    if settings.ollama_base_url and not settings.mock_mode:
+        try:
+            from persona_twin.embedding.ollama_embed import OllamaEmbedder
+
+            out["ollama"] = OllamaEmbedder(
+                settings.ollama_base_url, model=settings.ollama_embed_model
+            )
+        except Exception:  # noqa: BLE001
+            pass
+    return out
+
+
 async def run_benchmark(
     ctx: BenchmarkContext,
     run: BenchmarkRun,
@@ -114,11 +144,20 @@ async def run_benchmark(
     """
     skip = skip or set()
     sample = _sample(ctx.items, items_limit)
-    jobs = [(t, s) for t in tasks for s in specs if job_key(t, s) not in skip]
+    llm_tasks = [t for t in tasks if t != "embedding"]
+    jobs = [(t, s) for t in llm_tasks for s in specs if job_key(t, s) not in skip]
     has_rerank = any(t == "rerank" for t, _ in jobs)
+    emb_jobs: list[tuple[str, object, str]] = []
+    if "embedding" in tasks:
+        emb_jobs = [
+            (name, embedder, mode)
+            for name, embedder in available_embedders(ctx.settings).items()
+            for mode in ("vector", "hybrid")
+            if f"embedding|{name}:{mode}" not in skip
+        ]
     run.status = "running"
     run.items_limit = items_limit
-    run.progress_total = len(jobs) + (2 if has_rerank else 0)
+    run.progress_total = len(jobs) + (2 if has_rerank else 0) + len(emb_jobs)
     run.progress_done = 0
     run.results = []
     run.error = None
@@ -128,6 +167,10 @@ async def run_benchmark(
                 run.current = f"rerank/baseline:{baseline}"
                 run.results.append(await _bench_rerank_baseline(ctx, sample, baseline))
                 run.progress_done += 1
+        for name, embedder, mode in emb_jobs:
+            run.current = f"embedding/{name}:{mode}"
+            run.results.append(await _bench_embedding(ctx, sample, name, embedder, mode))
+            run.progress_done += 1
         for task, spec in jobs:
             run.current = f"{task}/{spec.provider}:{spec.id}"
             logger.info("benchmark %s", kv(task=task, model=spec.id))
@@ -348,3 +391,51 @@ async def _bench_judge(
 
 def _mean(xs: list[float]) -> float:
     return sum(xs) / len(xs) if xs else 0.0
+
+
+async def _bench_embedding(
+    ctx: BenchmarkContext, sample: list[EvalItem], name: str, embedder, mode: str
+) -> TaskResult:
+    """Retrieval quality for one embedder × mode (vector | hybrid)."""
+    from persona_twin.chunking import get_chunker
+    from persona_twin.pipeline import ingest_corpus
+    from persona_twin.vectorstore.memory import MemoryVectorStore
+
+    store = MemoryVectorStore(dimensions=embedder.dimensions)
+    t0 = time.perf_counter()
+    await ingest_corpus(
+        get_chunker("content_aware"), embedder, store, records=ctx.records
+    )
+    ingest_s = time.perf_counter() - t0
+    bm25 = BM25Index()
+    if mode == "hybrid":
+        bm25.build(await store.all_chunks())
+
+    answerable = [i for i in sample if i.answerable]
+    hits = 0
+    rrs: list[float] = []
+    latencies: list[float] = []
+    for item in answerable:
+        t0 = time.perf_counter()
+        qv = await embedder.embed_query(item.question)
+        results = await store.search(qv, k=N_CANDIDATES, persona_id=item.persona_id)
+        if mode == "hybrid":
+            keyword = bm25.search(item.question, k=N_CANDIDATES, persona_id=item.persona_id)
+            results = reciprocal_rank_fusion([results, keyword], k=N_CANDIDATES)
+        latencies.append((time.perf_counter() - t0) * 1000)
+        hit, rr = _rank_metrics(results, item)
+        hits += hit
+        rrs.append(rr)
+    n = len(answerable)
+    return TaskResult(
+        task="embedding",
+        provider=name,
+        model=mode,
+        n=n,
+        metrics={
+            "hit_rate": round(hits / n, 3) if n else 0.0,
+            "mrr": round(_mean(rrs), 3),
+            "ingest_seconds": round(ingest_s, 2),
+        },
+        mean_latency_ms=round(_mean(latencies), 1),
+    )
