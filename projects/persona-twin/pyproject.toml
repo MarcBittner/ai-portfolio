@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "persona-twin"
-version = "0.8.1"
+version = "0.8.2"
 description = "Query AI digital twins of synthetic HEXACO personas, grounded in retrieved data with citations"
 readme = "README.md"
 license = "MIT"

@@ -323,12 +323,15 @@ function TaskCard({
             );
           })}
         </div>
-        <table className="w-full text-left text-xs">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
           <thead className="text-muted-foreground">
             <tr>
               <th className="py-1 pr-2">model</th>
               {metricKeys.map((k) => (
-                <th key={k} className="py-1 pr-2">{k}</th>
+                <th key={k} className="whitespace-nowrap py-1 pr-2">
+                  {k.replaceAll("_", " ")}
+                </th>
               ))}
               <th className="py-1 pr-2">errors</th>
               <th className="py-1 pr-2">latency</th>
@@ -339,9 +342,14 @@ function TaskCard({
           <tbody>
             {sorted.map((r) => (
               <tr key={`${r.provider}:${r.model}`} className="border-t border-border">
-                <td className="py-1 pr-2 font-mono">{r.provider}:{r.model}</td>
+                <td
+                  className="max-w-48 truncate py-1 pr-2 font-mono"
+                  title={`${r.provider}:${r.model}`}
+                >
+                  {r.provider}:{r.model}
+                </td>
                 {metricKeys.map((k) => (
-                  <td key={k} className="py-1 pr-2">
+                  <td key={k} className="whitespace-nowrap py-1 pr-2">
                     {r.metrics[k] !== undefined ? r.metrics[k].toFixed(3) : "—"}
                   </td>
                 ))}
@@ -358,7 +366,8 @@ function TaskCard({
               </tr>
             ))}
           </tbody>
-        </table>
+          </table>
+        </div>
       </CardContent>
     </Card>
   );
