@@ -240,6 +240,11 @@ throwaway test stubs — they are the documented offline mode.
 - **FR-14.6** Results persist as JSON per run (`PERSONA_TWIN_BENCH_DIR`;
   a PVC in k8s) with history endpoints + a previous-runs browser in the
   analytics tab
+- **FR-14.7** Results **aggregate** across runs (latest wins per
+  task×model, `GET /benchmark/aggregate`); a new run skips combos that
+  already have results unless `force=true` — the UI offers "Run missing"
+  and "Rerun selected" so models can be benchmarked one at a time into
+  one scoreboard
 
 ### FR-10: Developer Experience
 

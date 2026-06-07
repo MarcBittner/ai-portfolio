@@ -95,24 +95,35 @@ def _sample(items: list[EvalItem], limit: int) -> list[EvalItem]:
     return answerable + unanswerable
 
 
+def job_key(task: str, spec: ModelSpec) -> str:
+    return f"{task}|{spec.provider}:{spec.id}"
+
+
 async def run_benchmark(
     ctx: BenchmarkContext,
     run: BenchmarkRun,
     specs: list[ModelSpec],
     tasks: list[str],
     items_limit: int,
+    skip: set[str] | None = None,
 ) -> None:
-    """Mutates ``run`` in place as progress; appends results as they land."""
+    """Mutates ``run`` in place as progress; appends results as they land.
+
+    ``skip`` holds ``job_key`` strings for (task, model) combos that
+    already have aggregated results and should not be rerun.
+    """
+    skip = skip or set()
     sample = _sample(ctx.items, items_limit)
-    jobs = [(t, s) for t in tasks for s in specs]
+    jobs = [(t, s) for t in tasks for s in specs if job_key(t, s) not in skip]
+    has_rerank = any(t == "rerank" for t, _ in jobs)
     run.status = "running"
     run.items_limit = items_limit
-    run.progress_total = len(jobs) + (1 if "rerank" in tasks else 0) * 2
+    run.progress_total = len(jobs) + (2 if has_rerank else 0)
     run.progress_done = 0
     run.results = []
     run.error = None
     try:
-        if "rerank" in tasks:
+        if has_rerank:
             for baseline in ("none", "lexical"):
                 run.current = f"rerank/baseline:{baseline}"
                 run.results.append(await _bench_rerank_baseline(ctx, sample, baseline))

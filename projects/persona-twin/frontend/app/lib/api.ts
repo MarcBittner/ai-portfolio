@@ -147,6 +147,16 @@ export interface BenchmarkRequest {
   models: string[];
   tasks: string[];
   items_limit: number;
+  force: boolean;
+}
+
+export interface AggregateEntry extends TaskResult {
+  run_id: string;
+  finished_at: string | null;
+}
+
+export function getBenchmarkAggregate(): Promise<AggregateEntry[]> {
+  return request<AggregateEntry[]>("/benchmark/aggregate");
 }
 
 export function getBenchmark(): Promise<BenchmarkRun> {

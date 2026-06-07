@@ -29,11 +29,12 @@ from persona_twin.corpus import PersonaRecord, load_personas
 from persona_twin.embedding import get_embedder
 from persona_twin.embedding.base import Embedder
 from persona_twin.embedding.cached import CachedEmbedder
-from persona_twin.eval.bench_store import BenchmarkStore, RunSummary
+from persona_twin.eval.bench_store import AggregateEntry, BenchmarkStore, RunSummary
 from persona_twin.eval.benchmark import (
     BENCH_TASKS,
     BenchmarkContext,
     BenchmarkRun,
+    job_key,
     run_benchmark,
 )
 from persona_twin.eval.dataset import load_eval_dataset
@@ -217,6 +218,9 @@ class BenchmarkRequest(BaseModel):
     models: list[str] | None = None  # "provider:model_id"; default: all available
     tasks: list[str] = Field(default_factory=lambda: list(BENCH_TASKS))
     items_limit: int = Field(default=6, ge=1, le=28)
+    # False (default): skip combos that already have aggregated results.
+    # True ("rerun selected"): measure everything selected again.
+    force: bool = False
 
 
 @router.get("/benchmark", response_model=BenchmarkRun)
@@ -254,26 +258,52 @@ async def post_benchmark(request: BenchmarkRequest) -> BenchmarkRun:
         store=state.store,
         providers=state.router.providers,
     )
+    skip: set[str] = set()
+    if not request.force:
+        existing = {
+            (e.task, e.provider, e.model) for e in state.bench_store.aggregate()
+        }
+        skip = {
+            job_key(t, s)
+            for t in request.tasks
+            for s in specs
+            if (t, s.provider, s.id) in existing
+        }
+        if len(skip) == len(request.tasks) * len(specs):
+            raise HTTPException(
+                status_code=409,
+                detail="all selected task×model combos already have results — "
+                "use force=true (Rerun selected) to measure them again",
+            )
+
     from datetime import UTC, datetime
+    from uuid import uuid4
 
     now = datetime.now(UTC)
     state.benchmark = BenchmarkRun(
         status="running",
-        run_id=now.strftime("%Y%m%d-%H%M%S"),
+        # uuid suffix: runs started within the same second must not collide
+        run_id=f"{now.strftime('%Y%m%d-%H%M%S')}-{uuid4().hex[:4]}",
         started_at=now.isoformat(timespec="seconds"),
     )
     state.benchmark_task = asyncio.create_task(
-        _run_and_persist(state, ctx, specs, request.tasks, request.items_limit)
+        _run_and_persist(state, ctx, specs, request.tasks, request.items_limit, skip)
     )
     return state.benchmark
 
 
-async def _run_and_persist(state: AppState, ctx, specs, tasks, items_limit) -> None:
+@router.get("/benchmark/aggregate", response_model=list[AggregateEntry])
+async def benchmark_aggregate() -> list[AggregateEntry]:
+    state = _state()
+    return state.bench_store.aggregate(current=state.benchmark)
+
+
+async def _run_and_persist(state: AppState, ctx, specs, tasks, items_limit, skip) -> None:
     from datetime import UTC, datetime
 
     run = state.benchmark
     try:
-        await run_benchmark(ctx, run, specs, tasks, items_limit)
+        await run_benchmark(ctx, run, specs, tasks, items_limit, skip=skip)
     except asyncio.CancelledError:
         run.status = "stopped"  # partial results retained
         run.current = None

@@ -12,23 +12,26 @@ import {
 import { Nav } from "~/components/nav";
 import {
   getBenchmark,
+  getBenchmarkAggregate,
   getBenchmarkHistory,
   getBenchmarkRun,
   getRouting,
   postBenchmark,
   stopBenchmark,
+  type AggregateEntry,
   type BenchmarkRun,
   type RunSummary,
   type TaskResult,
 } from "~/lib/api";
 
 export async function clientLoader() {
-  const [routing, benchmark, history] = await Promise.all([
+  const [routing, benchmark, history, aggregate] = await Promise.all([
     getRouting(),
     getBenchmark(),
     getBenchmarkHistory(),
+    getBenchmarkAggregate(),
   ]);
-  return { routing, benchmark, history };
+  return { routing, benchmark, history, aggregate };
 }
 
 const HEADLINE: Record<string, { metric: string; label: string }> = {
@@ -54,6 +57,7 @@ export default function Analytics({ loaderData }: Route.ComponentProps) {
   const [itemsLimit, setItemsLimit] = useState(6);
   const [run, setRun] = useState<BenchmarkRun>(loaderData.benchmark);
   const [history, setHistory] = useState<RunSummary[]>(loaderData.history);
+  const [aggregate, setAggregate] = useState<AggregateEntry[]>(loaderData.aggregate);
   const [error, setError] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -66,6 +70,7 @@ export default function Analytics({ loaderData }: Route.ComponentProps) {
           clearInterval(timer.current);
           timer.current = null;
           setHistory(await getBenchmarkHistory());
+          setAggregate(await getBenchmarkAggregate());
         }
       }, 1500);
     }
@@ -77,7 +82,7 @@ export default function Analytics({ loaderData }: Route.ComponentProps) {
     };
   }, [run.status]);
 
-  async function start() {
+  async function start(force: boolean) {
     setError(null);
     try {
       setRun(
@@ -85,6 +90,7 @@ export default function Analytics({ loaderData }: Route.ComponentProps) {
           models: selectedModels,
           tasks: selectedTasks,
           items_limit: itemsLimit,
+          force,
         }),
       );
     } catch (e) {
@@ -104,8 +110,21 @@ export default function Analytics({ loaderData }: Route.ComponentProps) {
     setList(list.includes(item) ? list.filter((x) => x !== item) : [...list, item]);
   }
 
-  const byTask = new Map<string, TaskResult[]>();
-  for (const r of run.results ?? []) {
+  const done = new Set(aggregate.map((e) => `${e.task}|${e.provider}:${e.model}`));
+  const missingCount = selectedTasks.reduce(
+    (acc, t) =>
+      acc + selectedModels.filter((m) => !done.has(`${t}|${m}`)).length,
+    0,
+  );
+
+  // Scoreboard shows the AGGREGATE (latest result per task×model across
+  // all runs), overlaid with anything the live run has produced so far.
+  const merged = new Map<string, TaskResult & { run_id?: string }>();
+  for (const e of aggregate) merged.set(`${e.task}|${e.provider}:${e.model}`, e);
+  for (const r of run.results ?? [])
+    merged.set(`${r.task}|${r.provider}:${r.model}`, { ...r, run_id: "live" });
+  const byTask = new Map<string, (TaskResult & { run_id?: string })[]>();
+  for (const r of merged.values()) {
     byTask.set(r.task, [...(byTask.get(r.task) ?? []), r]);
   }
 
@@ -116,8 +135,9 @@ export default function Analytics({ loaderData }: Route.ComponentProps) {
         <h1 className="text-2xl font-semibold tracking-tight">Model analytics</h1>
         <p className="text-sm text-muted-foreground">
           Benchmark every model at every assignable task over the committed eval
-          set. Models are pinned with no fallback — failures count as errors,
-          not as someone else's score.
+          set. Results aggregate across runs — already-benchmarked combos are
+          skipped unless you Rerun selected. Models are pinned with no
+          fallback: failures count as errors, not as someone else's score.
         </p>
       </header>
 
@@ -171,14 +191,23 @@ export default function Analytics({ loaderData }: Route.ComponentProps) {
           </div>
           <div className="flex items-center gap-3">
             <Button
-              onClick={() => void start()}
+              onClick={() => void start(false)}
+              disabled={run.status === "running" || missingCount === 0}
+            >
+              {run.status === "running"
+                ? "running…"
+                : `Run missing (${missingCount})`}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => void start(true)}
               disabled={
                 run.status === "running" ||
                 selectedModels.length === 0 ||
                 selectedTasks.length === 0
               }
             >
-              {run.status === "running" ? "running…" : "Run benchmark"}
+              Rerun selected
             </Button>
             {run.status === "running" && (
               <>
@@ -252,7 +281,13 @@ export default function Analytics({ loaderData }: Route.ComponentProps) {
   );
 }
 
-function TaskCard({ task, results }: { task: string; results: TaskResult[] }) {
+function TaskCard({
+  task,
+  results,
+}: {
+  task: string;
+  results: (TaskResult & { run_id?: string })[];
+}) {
   const headline = HEADLINE[task];
   const metricKeys = [...new Set(results.flatMap((r) => Object.keys(r.metrics)))];
   const sorted = [...results].sort(
@@ -298,6 +333,7 @@ function TaskCard({ task, results }: { task: string; results: TaskResult[] }) {
               <th className="py-1 pr-2">errors</th>
               <th className="py-1 pr-2">latency</th>
               <th className="py-1 pr-2">cost</th>
+              <th className="py-1 pr-2">run</th>
             </tr>
           </thead>
           <tbody>
@@ -315,6 +351,9 @@ function TaskCard({ task, results }: { task: string; results: TaskResult[] }) {
                 </td>
                 <td className="py-1 pr-2">
                   {r.total_cost_usd ? `$${r.total_cost_usd.toFixed(4)}` : "$0"}
+                </td>
+                <td className="py-1 pr-2 font-mono text-muted-foreground">
+                  {r.run_id ?? "—"}
                 </td>
               </tr>
             ))}

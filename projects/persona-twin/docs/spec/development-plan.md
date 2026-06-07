@@ -174,3 +174,12 @@ monorepo; portfolio-level spec lives at `docs/spec/spec.md` in the root).
 - [x] `BenchmarkStore`: JSON per run, traversal-safe ids, read-only-fs safe
 - [x] History endpoints + previous-runs browser in `/analytics`
 - [x] PVC (`fsGroup` for non-root write) so results survive pod restarts
+
+## Phase 14: Incremental benchmark aggregation ✅
+
+- [x] Aggregate view: latest result per task×model across persisted runs
+- [x] POST /benchmark skips already-measured combos; `force` reruns;
+      409 when nothing is missing
+- [x] Unique run ids (second + uuid suffix); test store isolation
+- [x] UI: aggregate scoreboard with per-row run source, "Run missing (N)"
+      + "Rerun selected" buttons

@@ -102,12 +102,15 @@ class TestRunBenchmark:
 
 
 @pytest.fixture
-async def client():
+async def client(tmp_path):
+    from persona_twin.eval.bench_store import BenchmarkStore
+
     app.state.twin = build_state(Settings(_env_file=None))
     from persona_twin.chunking import get_chunker
     from persona_twin.pipeline import ingest_corpus
 
     state = app.state.twin
+    state.bench_store = BenchmarkStore(tmp_path)  # never touch ./benchmarks
     await ingest_corpus(
         get_chunker("content_aware"), state.embedder, state.store, records=state.records
     )
@@ -213,3 +216,52 @@ class TestStopAndPersistence:
         assert full["results"]
         assert (await client.get("/benchmark/history/nope")).status_code == 404
         assert (await client.get("/benchmark/history/..%2Fetc")).status_code == 404
+
+
+class TestIncrementalAggregate:
+    async def test_skip_existing_and_force_rerun(self, client, tmp_path):
+        from persona_twin.eval.bench_store import BenchmarkStore
+
+        app.state.twin.bench_store = BenchmarkStore(tmp_path)
+
+        async def run_and_wait(payload):
+            response = await client.post("/benchmark", json=payload)
+            if response.status_code != 202:
+                return response, None
+            for _ in range(100):
+                body = (await client.get("/benchmark")).json()
+                if body["status"] in ("completed", "failed"):
+                    return response, body
+                await asyncio.sleep(0.1)
+            raise AssertionError("benchmark did not finish")
+
+        # first run populates the aggregate
+        _, body = await run_and_wait({"tasks": ["eval_judge"], "items_limit": 2})
+        assert body["status"] == "completed"
+        first_run_id = body["run_id"]
+
+        agg = (await client.get("/benchmark/aggregate")).json()
+        assert [(e["task"], e["provider"]) for e in agg] == [("eval_judge", "mock")]
+
+        # same selection again without force -> nothing to run
+        response = await client.post(
+            "/benchmark", json={"tasks": ["eval_judge"], "items_limit": 2}
+        )
+        assert response.status_code == 409
+
+        # widening the selection runs ONLY the missing combos
+        _, body = await run_and_wait(
+            {"tasks": ["eval_judge", "twin_answer"], "items_limit": 2}
+        )
+        assert body["status"] == "completed"
+        assert {r["task"] for r in body["results"]} == {"twin_answer"}  # judge skipped
+
+        # force reruns and the aggregate points at the newest run
+        _, body = await run_and_wait(
+            {"tasks": ["eval_judge"], "items_limit": 2, "force": True}
+        )
+        assert body["status"] == "completed"
+        agg = (await client.get("/benchmark/aggregate")).json()
+        judge = next(e for e in agg if e["task"] == "eval_judge")
+        assert judge["run_id"] == body["run_id"] != first_run_id
+        assert len(agg) == 2  # latest-wins, no duplicates
