@@ -219,6 +219,12 @@ throwaway test stubs — they are the documented offline mode.
   aggregation is rented
 - **FR-13.5** LLM reranker uses the `rerank` task route; the routing
   decision in every debug payload names the task it routed for
+- **FR-13.6** Any OpenAI-compatible service declares as configuration
+  (`PERSONA_TWIN_EXTRA_PROVIDERS` JSON: name, base_url, key env var,
+  models) — no per-service code; keys never appear in the JSON
+- **FR-13.7** OpenRouter free-tier models ($0/$0 pricing) are discovered
+  at startup and merged into the registry (capped, opt-out via
+  `PERSONA_TWIN_OPENROUTER_FREE=0`) — see docs/free-models.md
 
 ### FR-14: Model Benchmarks + Analytics
 

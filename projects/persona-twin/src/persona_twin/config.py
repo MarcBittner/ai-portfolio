@@ -16,7 +16,9 @@ RouteObjective = Literal["cost", "latency", "quality"]
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env", extra="ignore", populate_by_name=True
+    )
 
     # LLM providers
     anthropic_api_key: str | None = None
@@ -25,6 +27,15 @@ class Settings(BaseSettings):
 
     # Ollama (local models; e.g. http://localhost:11434)
     ollama_base_url: str | None = None
+
+    # Custom OpenAI-compatible providers (JSON; see docs/free-models.md)
+    extra_providers: str | None = Field(
+        default=None, validation_alias="PERSONA_TWIN_EXTRA_PROVIDERS"
+    )
+    # Discover OpenRouter's $0 models at startup (needs OPENROUTER_API_KEY)
+    openrouter_free_discovery: bool = Field(
+        default=True, validation_alias="PERSONA_TWIN_OPENROUTER_FREE"
+    )
 
     # MongoDB Atlas (vector store)
     mongodb_uri: str | None = None
@@ -54,6 +65,9 @@ class Settings(BaseSettings):
             backends.append("openrouter")
         if self.ollama_base_url:
             backends.append("ollama")
+        from persona_twin.llm.custom import parse_extra_providers
+
+        backends.extend(p.name for p in parse_extra_providers(self.extra_providers))
         backends.append("mock")
         return backends
 

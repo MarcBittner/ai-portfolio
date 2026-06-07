@@ -183,3 +183,12 @@ monorepo; portfolio-level spec lives at `docs/spec/spec.md` in the root).
 - [x] Unique run ids (second + uuid suffix); test store isolation
 - [x] UI: aggregate scoreboard with per-row run source, "Run missing (N)"
       + "Rerun selected" buttons
+
+## Phase 15: Free-model wiring ✅
+
+- [x] Generic `CustomOpenAIProvider` from `PERSONA_TWIN_EXTRA_PROVIDERS`
+      (reserved-name guard; keys via named env vars only)
+- [x] OpenRouter $0-priced model discovery at startup (capped, opt-out)
+- [x] docs/free-models.md: Groq / Gemini / Cerebras / Mistral / GitHub
+      Models recipes + free-tier privacy caveats
+- [x] Live-verified: real generation through a config-declared provider

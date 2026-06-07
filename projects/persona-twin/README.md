@@ -20,6 +20,7 @@ make setup && make demo    # fully offline — no API keys, no database
 | Multi-provider routing | Anthropic + OpenAI + deterministic mock behind one port; cost/latency/quality objectives from a declarative model registry; fallback chains with recorded reasons; schema-validated structured outputs with retry | `src/persona_twin/llm/` |
 | **Evaluation** | retrieval / grounding / answer-quality measured **separately** over a committed dataset; deliberately no composite score | [docs/evaluation.md](docs/evaluation.md) |
 | Data governance | deterministic PII redaction as a mandatory ingest gate; synthetic data only | [docs/data-governance.md](docs/data-governance.md) |
+| Free-model wiring | local Ollama auto-discovery, OpenRouter $0-model discovery, any OpenAI-compatible free tier as pure config | [docs/free-models.md](docs/free-models.md) |
 | Caching & deployment | answer/embedding cache port (LRU → Redis) with observable hit/miss counters; multi-stage Docker image; Cloud Run config | [docs/deployment.md](docs/deployment.md) |
 
 ## Architecture
