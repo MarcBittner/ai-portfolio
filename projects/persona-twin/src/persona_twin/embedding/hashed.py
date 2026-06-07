@@ -18,6 +18,8 @@ _TOKEN = re.compile(r"[a-z0-9]+")
 
 
 class HashEmbedder:
+    name = "hash"
+
     def __init__(self, dimensions: int = 256) -> None:
         self.dimensions = dimensions
 

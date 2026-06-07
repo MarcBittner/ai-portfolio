@@ -192,3 +192,13 @@ monorepo; portfolio-level spec lives at `docs/spec/spec.md` in the root).
 - [x] docs/free-models.md: Groq / Gemini / Cerebras / Mistral / GitHub
       Models recipes + free-tier privacy caveats
 - [x] Live-verified: real generation through a config-declared provider
+
+## Phase 16: Ollama embeddings + circuit breaker ✅
+
+- [x] `OllamaEmbedder` (probe-at-startup dims, hash fallback, truthful
+      /health reporting); local Ollama beats hash whenever available
+- [x] `CircuitBreaker`: 429 fast-open w/ longer cooldown, consecutive-
+      failure threshold, half-open trials, all-open degraded pass
+- [x] Router integration: skips recorded on decisions; console shows
+      cooling-down chips
+- [x] atlas-setup dims table updated for nomic-embed-text (768)

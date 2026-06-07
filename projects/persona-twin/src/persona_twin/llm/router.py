@@ -14,6 +14,7 @@ from pydantic import BaseModel, ValidationError
 
 from persona_twin.config import RouteObjective
 from persona_twin.llm.base import LLMProvider, LLMRequest, LLMResponse, ModelSpec
+from persona_twin.llm.breaker import CircuitBreaker, is_rate_limit
 from persona_twin.llm.policy import RoutingPolicy
 from persona_twin.llm.registry import ModelRegistry
 from persona_twin.log import get_logger, kv
@@ -52,10 +53,12 @@ class LLMRouter:
         providers: dict[str, LLMProvider],
         objective: RouteObjective = "cost",
         policy: RoutingPolicy | None = None,
+        breaker: CircuitBreaker | None = None,
     ) -> None:
         self.registry = registry
         self.providers = providers
         self.policy = policy or RoutingPolicy(default_objective=objective)
+        self.breaker = breaker or CircuitBreaker()
 
     @property
     def objective(self) -> RouteObjective:
@@ -81,27 +84,47 @@ class LLMRouter:
         task: str | None = None,
     ) -> tuple[LLMResponse, RoutingDecision]:
         objective = objective or self.policy.resolve_objective(task)
+        plan = self.plan(objective, task)
         fallbacks: list[str] = []
-        for spec in self.plan(objective, task):
-            provider = self.providers[spec.provider]
-            try:
-                response = await provider.complete(request, spec)
-            except Exception as exc:  # noqa: BLE001 — any provider error -> failover
-                reason = f"{spec.provider}:{spec.id}: {type(exc).__name__}"
-                fallbacks.append(reason)
-                logger.warning("failover %s", kv(reason=reason, objective=objective))
-                continue
-            decision = RoutingDecision(
-                provider=spec.provider,
-                model=spec.id,
-                objective=objective,
-                task=task,
-                fallbacks_taken=fallbacks,
-                estimated_cost_usd=response.cost_usd,
-                latency_ms=response.latency_ms,
-            )
-            return response, decision
-        raise AllProvidersFailedError(f"all candidates failed: {fallbacks}")
+        skipped: list[str] = []
+        # pass 1: skip circuits that are cooling down
+        # pass 2 (only if pass 1 found nothing): try them anyway —
+        # degraded beats dead
+        for attempt_skipped in (False, True):
+            for spec in plan:
+                key = f"{spec.provider}:{spec.id}"
+                if not attempt_skipped:
+                    if self.breaker.is_open(key):
+                        skipped.append(key)
+                        continue
+                elif key not in skipped:
+                    continue
+                provider = self.providers[spec.provider]
+                try:
+                    response = await provider.complete(request, spec)
+                except Exception as exc:  # noqa: BLE001 — provider error -> failover
+                    self.breaker.record_failure(key, rate_limited=is_rate_limit(exc))
+                    reason = f"{key}: {type(exc).__name__}"
+                    fallbacks.append(reason)
+                    logger.warning("failover %s", kv(reason=reason, objective=objective))
+                    continue
+                self.breaker.record_success(key)
+                decision = RoutingDecision(
+                    provider=spec.provider,
+                    model=spec.id,
+                    objective=objective,
+                    task=task,
+                    fallbacks_taken=fallbacks,
+                    skipped_cooldown=skipped,
+                    estimated_cost_usd=response.cost_usd,
+                    latency_ms=response.latency_ms,
+                )
+                return response, decision
+            if not skipped:
+                break
+        raise AllProvidersFailedError(
+            f"all candidates failed: {fallbacks} (cooling down: {skipped})"
+        )
 
     async def complete_structured(
         self,

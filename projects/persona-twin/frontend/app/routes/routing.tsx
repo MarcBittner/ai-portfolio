@@ -84,6 +84,11 @@ export default function Routing({ loaderData }: Route.ComponentProps) {
             {name}: {up ? "configured" : "not configured"}
           </Badge>
         ))}
+        {Object.entries(view.cooling_down).map(([key, secs]) => (
+          <Badge key={key} variant="destructive" title="circuit open after failures">
+            ⏸ {key} cooling {Math.round(secs)}s
+          </Badge>
+        ))}
       </section>
 
       <Card>

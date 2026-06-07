@@ -134,7 +134,7 @@ async def health() -> HealthResponse:
         status="ok",
         version=__version__,
         vector_backend=state.settings.vector_backend,
-        embedding_backend=state.settings.embedding_backend,
+        embedding_backend=getattr(state.embedder, "name", "unknown"),
         llm_backends=state.settings.llm_backends,
         route_objective=state.settings.route_objective,
         cache_backend=state.cache.name,
@@ -175,6 +175,7 @@ class RoutingView(BaseModel):
     providers: dict[str, bool]  # provider -> configured (mock always true)
     registry: list[ModelSpec]
     plans: dict[str, list[str]]  # task -> ordered "provider:model" candidates
+    cooling_down: dict[str, float]  # provider:model -> seconds remaining
 
 
 def _routing_view(state: AppState) -> RoutingView:
@@ -192,6 +193,7 @@ def _routing_view(state: AppState) -> RoutingView:
             task: [f"{s.provider}:{s.id}" for s in llm.plan(task=task)]
             for task in TASKS
         },
+        cooling_down=llm.breaker.cooling_down(),
     )
 
 

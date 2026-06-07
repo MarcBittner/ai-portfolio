@@ -8,6 +8,8 @@ DEFAULT_DIMENSIONS = 1536
 
 
 class OpenAIEmbedder:
+    name = "openai"
+
     def __init__(
         self,
         api_key: str | None = None,

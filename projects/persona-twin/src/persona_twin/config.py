@@ -27,6 +27,7 @@ class Settings(BaseSettings):
 
     # Ollama (local models; e.g. http://localhost:11434)
     ollama_base_url: str | None = None
+    ollama_embed_model: str = "nomic-embed-text"
 
     # Custom OpenAI-compatible providers (JSON; see docs/free-models.md)
     extra_providers: str | None = Field(
@@ -76,10 +77,14 @@ class Settings(BaseSettings):
         return "atlas" if self.mongodb_uri else "memory"
 
     @property
-    def embedding_backend(self) -> Literal["openai", "hash"]:
-        if self.mock_mode or not self.openai_api_key:
+    def embedding_backend(self) -> Literal["openai", "ollama", "hash"]:
+        if self.mock_mode:
             return "hash"
-        return "openai"
+        if self.openai_api_key:
+            return "openai"
+        if self.ollama_base_url:
+            return "ollama"
+        return "hash"
 
     @property
     def cache_backend(self) -> Literal["redis", "memory"]:

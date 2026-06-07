@@ -111,6 +111,10 @@ throwaway test stubs — they are the documented offline mode.
 - **FR-4.1** `Embedder` port: `embed_documents(texts)`, `embed_query(text)`,
   `dimensions`
 - **FR-4.2** Provider implementation (OpenAI embeddings) when configured
+- **FR-4.5** Ollama embeddings (`nomic-embed-text` by default) when
+  `OLLAMA_BASE_URL` is set and no OpenAI key takes precedence — startup
+  probe learns dimensionality and falls back to hash on failure;
+  `/health` reports the embedder that actually constructed
 - **FR-4.3** Deterministic local fallback (hashed n-gram projection) —
   stable across runs, zero dependencies, adequate for the demo corpus
 - **FR-4.4** Embedding dimensionality is carried into the Atlas index
@@ -164,6 +168,11 @@ throwaway test stubs — they are the documented offline mode.
   time.
 - **FR-7.6** Fallback chain: provider error / timeout / rate limit →
   next provider; all failovers logged with reason
+- **FR-7.8** Circuit breaker per provider:model — 429 opens immediately
+  (longer cooldown), other errors after consecutive failures; open
+  circuits are skipped (recorded on the routing decision) with one
+  half-open trial after cooldown; if everything is cooling the router
+  tries anyway. Cooldowns surface in the console
 - **FR-7.7** Per-request routing decision (provider, model, objective,
   fallbacks taken, cost) returned in the response debug payload
 

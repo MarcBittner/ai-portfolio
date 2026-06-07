@@ -67,6 +67,7 @@ class RoutingDecision(BaseModel):
     objective: str
     task: str | None = None
     fallbacks_taken: list[str] = []
+    skipped_cooldown: list[str] = []  # circuits open at routing time
     estimated_cost_usd: float | None = None
     latency_ms: float | None = None
 

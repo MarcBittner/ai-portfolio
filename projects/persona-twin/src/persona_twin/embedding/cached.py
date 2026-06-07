@@ -17,6 +17,7 @@ class CachedEmbedder:
         self._cache = cache
         self._stats = stats
         self.dimensions = inner.dimensions
+        self.name = getattr(inner, "name", type(inner).__name__)
 
     async def embed_documents(self, texts: list[str]) -> list[list[float]]:
         return await self._inner.embed_documents(texts)

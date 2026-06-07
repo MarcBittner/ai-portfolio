@@ -25,7 +25,8 @@ Atlas Vector Search instead:
 | Embedder | Active when | Dimensions |
 |---|---|---|
 | OpenAI `text-embedding-3-small` | `OPENAI_API_KEY` set | **1536** (committed default) |
-| Hash embedder (offline) | no OpenAI key | **256** |
+| Ollama `nomic-embed-text` | `OLLAMA_BASE_URL` set, no OpenAI key | **768** |
+| Hash embedder (offline) | neither configured | **256** |
 
 The committed index JSON assumes the OpenAI embedder. If you run Atlas
 with the hash embedder, change `numDimensions` to 256. The store
