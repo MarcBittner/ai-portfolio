@@ -65,7 +65,10 @@ def discover_free_models(cap: int = FREE_MODEL_CAP) -> list[ModelSpec]:
             id=m["id"],
             input_per_mtok=0.0,
             output_per_mtok=0.0,
-            quality=5,
+            # rank-tied with local Ollama models so cost-objective ties
+            # resolve to local (insertion order): rate-limited remote
+            # must be an explicit choice, not a silent default
+            quality=4,
             speed=5,
         )
         for m in free[:cap]

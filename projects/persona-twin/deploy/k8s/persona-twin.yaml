@@ -1,5 +1,5 @@
 # Local Kubernetes deployment (tested on kind). The image is loaded
-# directly into the node (`kind load docker-image persona-twin:v0.8.0`
+# directly into the node (`kind load docker-image persona-twin:v0.8.1`
 # or `docker save | ctr images import`), hence imagePullPolicy: Never.
 #
 #   kubectl apply -f deploy/k8s/persona-twin.yaml
@@ -46,7 +46,7 @@ spec:
         fsGroup: 1001  # PVC mounts group-writable for the app user
       containers:
         - name: api
-          image: persona-twin:v0.8.0
+          image: persona-twin:v0.8.1
           imagePullPolicy: Never
           ports:
             - containerPort: 8080
@@ -57,6 +57,16 @@ spec:
             # Remove if no Ollama is running; discovery fails safe.
             - name: OLLAMA_BASE_URL
               value: http://192.168.65.254:11434
+            # OpenRouter (free-model discovery at startup). The Secret is
+            # created out-of-band — never committed:
+            #   kubectl -n persona-twin create secret generic \
+            #     persona-twin-providers --from-literal=OPENROUTER_API_KEY=...
+            - name: OPENROUTER_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: persona-twin-providers
+                  key: OPENROUTER_API_KEY
+                  optional: true   # pods start fine without it
             # Benchmark results persist across pod restarts (PVC below)
             - name: PERSONA_TWIN_BENCH_DIR
               value: /benchmarks
