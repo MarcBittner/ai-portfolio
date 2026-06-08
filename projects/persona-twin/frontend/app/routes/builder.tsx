@@ -102,6 +102,27 @@ export default function Builder() {
   function setDoc(i: number, patch: Partial<DocDraft>) {
     setDocs((prev) => prev.map((d, j) => (j === i ? { ...d, ...patch } : d)));
   }
+  async function uploadFiles(files: FileList | null) {
+    if (!files?.length) return;
+    const read = await Promise.all(
+      Array.from(files).map(
+        (f) =>
+          new Promise<DocDraft>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () =>
+              resolve({
+                name: f.name.replace(/\.[^.]+$/, ""),
+                text: String(reader.result ?? ""),
+              });
+            reader.readAsText(f);
+          }),
+      ),
+    );
+    setDocs((prev) => {
+      const kept = prev.filter((d) => d.text.trim()); // drop empty placeholders
+      return [...kept, ...read];
+    });
+  }
   function setVoice(i: number, value: string) {
     setVoiceNotes((prev) => prev.map((v, j) => (j === i ? value : v)));
   }
@@ -330,12 +351,24 @@ export default function Builder() {
             </CardContent>
           </Card>
         ))}
-        <Button
-          variant="ghost"
-          onClick={() => setDocs((p) => [...p, { name: "", text: "" }])}
-        >
-          + document
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            onClick={() => setDocs((p) => [...p, { name: "", text: "" }])}
+          >
+            + document
+          </Button>
+          <label className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">
+            or upload .txt / .md
+            <input
+              type="file"
+              multiple
+              accept=".txt,.md,.markdown,text/plain,text/markdown"
+              className="hidden"
+              onChange={(e) => void uploadFiles(e.target.files)}
+            />
+          </label>
+        </div>
       </section>
 
       {error && (
