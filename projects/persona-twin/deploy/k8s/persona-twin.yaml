@@ -1,5 +1,5 @@
 # Local Kubernetes deployment (tested on kind). The image is loaded
-# directly into the node (`kind load docker-image persona-twin:v0.11.0`
+# directly into the node (`kind load docker-image persona-twin:v0.12.0`
 # or `docker save | ctr images import`), hence imagePullPolicy: Never.
 #
 #   kubectl apply -f deploy/k8s/persona-twin.yaml
@@ -16,6 +16,17 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: persona-twin-benchmarks
+  namespace: persona-twin
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: persona-twin-personas
   namespace: persona-twin
 spec:
   accessModes: [ReadWriteOnce]
@@ -46,7 +57,7 @@ spec:
         fsGroup: 1001  # PVC mounts group-writable for the app user
       containers:
         - name: api
-          image: persona-twin:v0.11.0
+          image: persona-twin:v0.12.0
           imagePullPolicy: Never
           ports:
             - containerPort: 8080
@@ -70,6 +81,9 @@ spec:
             # Benchmark results persist across pod restarts (PVC below)
             - name: PERSONA_TWIN_BENCH_DIR
               value: /benchmarks
+            # Browser-created twins persist across pod restarts (PVC below)
+            - name: PERSONA_TWIN_USER_PERSONAS_DIR
+              value: /user-personas
           # envFrom:
           #   - secretRef:
           #       name: persona-twin-providers   # ANTHROPIC_API_KEY etc.
@@ -83,6 +97,8 @@ spec:
           volumeMounts:
             - name: benchmarks
               mountPath: /benchmarks
+            - name: personas
+              mountPath: /user-personas
           readinessProbe:
             httpGet:
               path: /health
@@ -99,6 +115,9 @@ spec:
         - name: benchmarks
           persistentVolumeClaim:
             claimName: persona-twin-benchmarks
+        - name: personas
+          persistentVolumeClaim:
+            claimName: persona-twin-personas
 ---
 apiVersion: v1
 kind: Service

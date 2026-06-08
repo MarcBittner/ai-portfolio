@@ -1,3 +1,3 @@
 """persona-twin: RAG-grounded digital twins of synthetic HEXACO personas."""
 
-__version__ = "0.11.0"
+__version__ = "0.12.0"

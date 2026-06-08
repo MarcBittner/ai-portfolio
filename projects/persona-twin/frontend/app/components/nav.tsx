@@ -4,7 +4,7 @@ import { cn } from "~/lib/utils";
 export function Nav({
   active,
 }: {
-  active: "home" | "chat" | "routing" | "analytics";
+  active: "home" | "chat" | "build" | "routing" | "analytics";
 }) {
   const link = "rounded-md px-2 py-1 text-sm hover:bg-muted";
   return (
@@ -15,6 +15,12 @@ export function Nav({
       </Link>
       <Link to="/chat" className={cn(link, active === "chat" && "bg-muted font-medium")}>
         chat
+      </Link>
+      <Link
+        to="/builder"
+        className={cn(link, active === "build" && "bg-muted font-medium")}
+      >
+        build
       </Link>
       <Link
         to="/console"

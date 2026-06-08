@@ -40,9 +40,16 @@ from persona_twin.eval.benchmark import (
     run_benchmark,
 )
 from persona_twin.eval.dataset import load_eval_dataset
+from persona_twin.governance import Redactor
 from persona_twin.llm import TASKS, LLMRouter, ModelSpec, RoutingPolicy, get_router
-from persona_twin.log import configure, new_request_id
-from persona_twin.models import AskRequest, AskResponse, ChunkStrategy, Persona
+from persona_twin.log import configure, get_logger, kv, new_request_id
+from persona_twin.models import (
+    AskRequest,
+    AskResponse,
+    ChunkStrategy,
+    HexacoProfile,
+    Persona,
+)
 from persona_twin.persona.chat import (
     ChatSessionStore,
     ChatTurn,
@@ -50,6 +57,13 @@ from persona_twin.persona.chat import (
     DoneEvent,
     TokenEvent,
     chat_twin,
+)
+from persona_twin.persona.store import (
+    PersonaStore,
+    StoredDoc,
+    StoredPersona,
+    slugify,
+    valid_persona_id,
 )
 from persona_twin.persona.twin import ask_twin
 from persona_twin.pipeline import IngestReport, ingest_corpus
@@ -59,6 +73,8 @@ from persona_twin.vectorstore.base import VectorStore
 
 DEFAULT_STRATEGY: ChunkStrategy = "content_aware"
 STATIC_DIR = os.environ.get("PERSONA_TWIN_STATIC_DIR", "")
+
+logger = get_logger("api")
 
 
 @dataclass
@@ -75,10 +91,26 @@ class AppState:
     benchmark_task: asyncio.Task | None = None
     bench_store: BenchmarkStore = field(default_factory=BenchmarkStore)
     sessions: ChatSessionStore = field(default_factory=ChatSessionStore)
+    persona_store: PersonaStore = field(default_factory=PersonaStore)
 
     @property
     def personas(self) -> dict[str, Persona]:
         return {r.persona.persona_id: r.persona for r in self.records}
+
+
+def _load_records(persona_store: PersonaStore) -> list[PersonaRecord]:
+    """Baked-in corpus plus persisted browser-created twins; on an id
+    collision the baked-in persona wins and the stored one is skipped."""
+    records = load_personas()
+    known = {r.persona.persona_id for r in records}
+    for stored in persona_store.load_all():
+        if stored.persona_id in known:
+            logger.warning("stored persona shadows baked-in; skipping %s",
+                           kv(persona=stored.persona_id))
+            continue
+        known.add(stored.persona_id)
+        records.append(stored.to_record())
+    return records
 
 
 def build_state(settings: Settings | None = None) -> AppState:
@@ -86,14 +118,16 @@ def build_state(settings: Settings | None = None) -> AppState:
     cache = get_cache(settings)
     stats = CacheStats()
     embedder = CachedEmbedder(get_embedder(settings), cache, stats)
+    persona_store = PersonaStore()
     return AppState(
         settings=settings,
         embedder=embedder,
         store=get_vector_store(settings, dimensions=embedder.dimensions),
         router=get_router(settings),
-        records=load_personas(),
+        records=_load_records(persona_store),
         cache=cache,
         cache_stats=stats,
+        persona_store=persona_store,
     )
 
 
@@ -172,6 +206,152 @@ async def get_persona(persona_id: str) -> Persona:
     return persona
 
 
+async def _rebuild_bm25(state: AppState) -> None:
+    if state.settings.hybrid_retrieval:
+        state.bm25.build(await state.store.all_chunks())
+
+
+# ---- Persona builder: live redaction preview + create/delete -------------
+
+class DocumentInput(BaseModel):
+    name: str = ""
+    text: str = Field(min_length=1, max_length=20000)
+
+
+class RedactionPreviewRequest(BaseModel):
+    documents: list[DocumentInput] = Field(min_length=1, max_length=20)
+
+
+class DocRedaction(BaseModel):
+    name: str
+    counts: dict[str, int]  # PII type -> count; values are never returned
+    redacted: str
+
+
+class RedactionPreview(BaseModel):
+    documents: list[DocRedaction]
+    total_counts: dict[str, int]
+    total: int
+
+
+@router.post("/redaction/preview", response_model=RedactionPreview)
+async def preview_redaction(request: RedactionPreviewRequest) -> RedactionPreview:
+    """Show what the mandatory ingest-time redactor would remove — counts by
+    type and the tokenized text. Stateless; redacted *values* never leave."""
+    redactor = Redactor()
+    docs: list[DocRedaction] = []
+    totals: dict[str, int] = {}
+    for doc in request.documents:
+        result = redactor.redact(doc.text)
+        docs.append(
+            DocRedaction(
+                name=doc.name.strip() or "document",
+                counts=result.counts,
+                redacted=result.text,
+            )
+        )
+        for pii_type, n in result.counts.items():
+            totals[pii_type] = totals.get(pii_type, 0) + n
+    return RedactionPreview(documents=docs, total_counts=totals, total=sum(totals.values()))
+
+
+class PersonaCreate(BaseModel):
+    persona_id: str | None = None  # slug; derived from name when omitted
+    name: str = Field(min_length=1, max_length=80)
+    tagline: str = Field(min_length=1, max_length=160)
+    bio: str = Field(min_length=1, max_length=2000)
+    hexaco: HexacoProfile
+    voice_notes: list[str] = Field(default_factory=list, max_length=12)
+    documents: list[DocumentInput] = Field(min_length=1, max_length=20)
+
+
+class PersonaCreated(BaseModel):
+    persona: Persona
+    chunks: int
+    redactions: dict[str, int]  # PII removed before anything was stored/embedded
+
+
+def _redacted_docs(documents: list[DocumentInput]) -> tuple[list[StoredDoc], dict]:
+    """Redact each document (the mandatory gate) and assign unique slug names.
+    Returns the stored (redacted) docs and the redaction totals."""
+    redactor = Redactor()
+    used: set[str] = set()
+    stored: list[StoredDoc] = []
+    totals: dict[str, int] = {}
+    for i, doc in enumerate(documents):
+        name = slugify(doc.name, fallback=f"document-{i + 1}")
+        while name in used:
+            name = f"{name}-{i + 1}"
+        used.add(name)
+        result = redactor.redact(doc.text)
+        stored.append(StoredDoc(name=name, text=result.text))
+        for pii_type, n in result.counts.items():
+            totals[pii_type] = totals.get(pii_type, 0) + n
+    return stored, totals
+
+
+@router.post("/personas", response_model=PersonaCreated, status_code=201)
+async def create_persona(request: PersonaCreate) -> PersonaCreated:
+    """Create a twin from the browser: redact its documents, persist it,
+    ingest it incrementally, and make it immediately queryable."""
+    state = _state()
+    persona_id = request.persona_id or slugify(request.name, fallback="")
+    if not valid_persona_id(persona_id):
+        raise HTTPException(
+            status_code=422,
+            detail="persona_id must be a slug: lowercase letters, digits, hyphens",
+        )
+    if persona_id in state.personas:
+        raise HTTPException(status_code=409, detail=f"persona exists: {persona_id}")
+
+    stored_docs, redactions = _redacted_docs(request.documents)
+    stored = StoredPersona(
+        persona_id=persona_id,
+        name=request.name.strip(),
+        tagline=request.tagline.strip(),
+        bio=request.bio.strip(),
+        hexaco=request.hexaco,
+        voice_notes=[v.strip() for v in request.voice_notes if v.strip()],
+        documents=stored_docs,
+    )
+    record = stored.to_record()
+
+    state.persona_store.save(stored)
+    state.records.append(record)
+    # incremental ingest: append this twin's chunks without dropping the rest
+    report = await ingest_corpus(
+        get_chunker(DEFAULT_STRATEGY), state.embedder, state.store, records=[record]
+    )
+    await _rebuild_bm25(state)
+    logger.info(
+        "persona created %s",
+        kv(persona=persona_id, chunks=report.chunks, redacted=sum(redactions.values())),
+    )
+    return PersonaCreated(
+        persona=record.persona, chunks=report.chunks, redactions=redactions
+    )
+
+
+@router.delete("/personas/{persona_id}", status_code=200)
+async def delete_persona(persona_id: str) -> dict[str, str]:
+    """Delete a browser-created twin (baked-in personas are not deletable).
+    Rebuilds the index from the remaining corpus."""
+    state = _state()
+    if not state.persona_store.exists(persona_id):
+        raise HTTPException(
+            status_code=404, detail=f"no user-created persona: {persona_id}"
+        )
+    state.persona_store.delete(persona_id)
+    state.records = [r for r in state.records if r.persona.persona_id != persona_id]
+    await state.store.drop()
+    await ingest_corpus(
+        get_chunker(DEFAULT_STRATEGY), state.embedder, state.store, records=state.records
+    )
+    await _rebuild_bm25(state)
+    logger.info("persona deleted %s", kv(persona=persona_id))
+    return {"deleted": persona_id}
+
+
 @router.post("/ingest", response_model=IngestReport)
 async def ingest(request: IngestRequest) -> IngestReport:
     state = _state()
@@ -180,8 +360,7 @@ async def ingest(request: IngestRequest) -> IngestReport:
         get_chunker(request.strategy), state.embedder, state.store,
         records=state.records,
     )
-    if state.settings.hybrid_retrieval:
-        state.bm25.build(await state.store.all_chunks())
+    await _rebuild_bm25(state)
     return report
 
 

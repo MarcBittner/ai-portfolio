@@ -43,3 +43,6 @@ data/local/
 
 # Benchmark results (generated; persisted via PVC in k8s)
 benchmarks/
+
+# Browser-created twins (generated; persisted via PVC in k8s)
+user-personas/

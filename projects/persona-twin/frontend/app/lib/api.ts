@@ -98,6 +98,67 @@ export function listPersonas(): Promise<Persona[]> {
   return request<Persona[]>("/personas");
 }
 
+// ---- Persona builder ----
+
+export interface DocumentInput {
+  name: string;
+  text: string;
+}
+
+export interface DocRedaction {
+  name: string;
+  counts: Record<string, number>;
+  redacted: string;
+}
+
+export interface RedactionPreview {
+  documents: DocRedaction[];
+  total_counts: Record<string, number>;
+  total: number;
+}
+
+export interface PersonaCreate {
+  persona_id?: string;
+  name: string;
+  tagline: string;
+  bio: string;
+  hexaco: HexacoProfile;
+  voice_notes: string[];
+  documents: DocumentInput[];
+}
+
+export interface PersonaCreated {
+  persona: Persona;
+  chunks: number;
+  redactions: Record<string, number>;
+}
+
+export function previewRedaction(
+  documents: DocumentInput[],
+  signal?: AbortSignal,
+): Promise<RedactionPreview> {
+  return request<RedactionPreview>("/redaction/preview", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ documents }),
+    signal,
+  });
+}
+
+export function createPersona(spec: PersonaCreate): Promise<PersonaCreated> {
+  return request<PersonaCreated>("/personas", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(spec),
+  });
+}
+
+export function deletePersona(personaId: string): Promise<{ deleted: string }> {
+  return request<{ deleted: string }>(`/personas/${personaId}`, {
+    method: "DELETE",
+  });
+}
+
 export function ask(
   personaId: string,
   question: string,
