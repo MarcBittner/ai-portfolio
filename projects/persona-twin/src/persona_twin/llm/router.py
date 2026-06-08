@@ -21,6 +21,7 @@ from persona_twin.llm.policy import RoutingPolicy
 from persona_twin.llm.registry import ModelRegistry
 from persona_twin.log import get_logger, kv
 from persona_twin.models import RoutingDecision
+from persona_twin.observability.metrics import observe_llm
 
 logger = get_logger("llm.router")
 
@@ -140,6 +141,7 @@ class LLMRouter:
                     logger.warning("failover %s", kv(reason=reason, objective=objective))
                     continue
                 self.breaker.record_success(key)
+                observe_llm(spec.provider, spec.id, task, response.latency_ms)
                 decision = RoutingDecision(
                     provider=spec.provider,
                     model=spec.id,
@@ -204,6 +206,8 @@ class LLMRouter:
                         raise
                     continue
                 self.breaker.record_success(key)
+                observe_llm(spec.provider, spec.id, task, round(
+                    (time.perf_counter() - started) * 1000, 1))
                 text = "".join(parts)
                 usage = LLMUsage(
                     input_tokens=len(request.system + request.user) // 4,

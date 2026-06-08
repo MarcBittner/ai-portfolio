@@ -19,6 +19,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from persona_twin.log import get_logger, kv
+from persona_twin.observability.metrics import CIRCUIT_OPENS
 
 logger = get_logger("llm.breaker")
 
@@ -48,18 +49,23 @@ class CircuitBreaker:
 
     def record_failure(self, key: str, rate_limited: bool = False) -> None:
         self._failures[key] = self._failures.get(key, 0) + 1
+        was_open = self.is_open(key)
         if rate_limited:
             self._open_until[key] = self.clock() + self.rate_limit_cooldown_s
             logger.warning(
                 "circuit open (429) %s",
                 kv(key=key, cooldown=self.rate_limit_cooldown_s),
             )
+            if not was_open:
+                CIRCUIT_OPENS.inc(key)
         elif self._failures[key] >= self.failure_threshold:
             self._open_until[key] = self.clock() + self.cooldown_s
             logger.warning(
                 "circuit open %s",
                 kv(key=key, failures=self._failures[key], cooldown=self.cooldown_s),
             )
+            if not was_open:
+                CIRCUIT_OPENS.inc(key)
 
     def is_open(self, key: str) -> bool:
         until = self._open_until.get(key)

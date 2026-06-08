@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from fastapi import APIRouter, FastAPI, HTTPException
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, PlainTextResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -50,6 +50,8 @@ from persona_twin.models import (
     HexacoProfile,
     Persona,
 )
+from persona_twin.observability import REQUESTS
+from persona_twin.observability import render as render_metrics
 from persona_twin.persona.chat import (
     ChatSessionStore,
     ChatTurn,
@@ -193,6 +195,39 @@ async def health() -> HealthResponse:
     )
 
 
+@router.get("/metrics")
+async def metrics() -> PlainTextResponse:
+    """Prometheus exposition. Accumulated metrics (request/LLM/circuit) plus
+    pull-style gauges sampled from current state at scrape time."""
+    state = _state()
+    extra: list[str] = [
+        "# HELP persona_twin_build_info Build metadata",
+        "# TYPE persona_twin_build_info gauge",
+        f'persona_twin_build_info{{version="{__version__}"}} 1',
+        "# HELP persona_twin_chunks_indexed Chunks currently in the vector store",
+        "# TYPE persona_twin_chunks_indexed gauge",
+        f"persona_twin_chunks_indexed {await state.store.count()}",
+        "# HELP persona_twin_personas Personas currently loaded",
+        "# TYPE persona_twin_personas gauge",
+        f"persona_twin_personas {len(state.records)}",
+        "# HELP persona_twin_cache_events_total Cache lookups by kind and result",
+        "# TYPE persona_twin_cache_events_total counter",
+    ]
+    for kind, n in sorted(state.cache_stats.hits.items()):
+        extra.append(f'persona_twin_cache_events_total{{kind="{kind}",result="hit"}} {n}')
+    for kind, n in sorted(state.cache_stats.misses.items()):
+        extra.append(f'persona_twin_cache_events_total{{kind="{kind}",result="miss"}} {n}')
+    cooling = state.router.breaker.cooling_down()
+    extra.append("# HELP persona_twin_circuit_cooldown_seconds Seconds until a circuit half-opens")
+    extra.append("# TYPE persona_twin_circuit_cooldown_seconds gauge")
+    for target, secs in sorted(cooling.items()):
+        safe = target.replace("\\", "\\\\").replace('"', '\\"')
+        extra.append(f'persona_twin_circuit_cooldown_seconds{{target="{safe}"}} {secs:g}')
+    return PlainTextResponse(
+        render_metrics(extra), media_type="text/plain; version=0.0.4; charset=utf-8"
+    )
+
+
 @router.get("/personas", response_model=list[Persona])
 async def list_personas() -> list[Persona]:
     return [r.persona for r in _state().records]
@@ -323,6 +358,7 @@ async def create_persona(request: PersonaCreate) -> PersonaCreated:
         get_chunker(DEFAULT_STRATEGY), state.embedder, state.store, records=[record]
     )
     await _rebuild_bm25(state)
+    REQUESTS.inc("personas", "created")
     logger.info(
         "persona created %s",
         kv(persona=persona_id, chunks=report.chunks, redacted=sum(redactions.values())),
@@ -618,6 +654,7 @@ async def chat(request: ChatRequest) -> StreamingResponse:
             session_id, ChatTurn(role="assistant", content="".join(answer_parts))
         )
 
+    REQUESTS.inc("chat", "started")
     return StreamingResponse(
         events(),
         media_type="text/event-stream",
@@ -651,6 +688,7 @@ async def ask(request: AskRequest) -> AskResponse:
         cached = await state.cache.get(key)
         if cached is not None:
             state.cache_stats.hit("answer")
+            REQUESTS.inc("ask", "cache_hit")
             return AskResponse.model_validate_json(cached)
         state.cache_stats.miss("answer")
 
@@ -674,6 +712,7 @@ async def ask(request: AskRequest) -> AskResponse:
                 for kind, n in state.cache_stats.hits.items()
             },
         }
+    REQUESTS.inc("ask", "answered" if response.answered else "refused")
     return response
 
 
