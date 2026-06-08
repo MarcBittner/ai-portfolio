@@ -297,6 +297,25 @@ throwaway test stubs — they are the documented offline mode.
   token-by-token, citation tail per answer, persona switcher, session
   continuity; talks only to the FastAPI service
 
+### FR-17: Persona Builder
+
+- **FR-17.1** `POST /personas` creates a twin at runtime from a profile
+  (name, tagline, bio, HEXACO, voice notes) plus documents; it is
+  redacted, persisted, incrementally ingested, and immediately queryable
+  via `/ask` and `/chat` — no restart, no redeploy
+- **FR-17.2** Redaction is a mandatory gate at creation: documents are
+  stored and embedded **already redacted**, so no raw PII reaches disk or
+  the vector store. `POST /redaction/preview` returns counts by type and
+  tokenized text (never values) for the live preview
+- **FR-17.3** Created twins persist as one JSON each
+  (`PERSONA_TWIN_USER_PERSONAS_DIR`; a PVC in k8s) and load at startup
+  alongside the baked-in corpus; a baked-in id wins on collision
+- **FR-17.4** `DELETE /personas/{id}` removes a user-created twin (baked-in
+  personas are not deletable) and rebuilds the index from the remainder
+- **FR-17.5** Frontend `/builder` tab: HEXACO sliders with band hints,
+  voice-note and multi-document editors, debounced live redaction badges
+  (counts by type), and a created-summary linking straight into chat
+
 ### FR-10: Developer Experience
 
 - **FR-10.1** `Makefile`: `setup` (venv + install), `demo` (ingest + sample

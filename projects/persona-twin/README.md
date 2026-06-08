@@ -21,6 +21,7 @@ make setup && make demo    # fully offline — no API keys, no database
 | Streaming chat | token-by-token SSE conversation with per-session memory; grounded prose streamed live, then a citation tail validated against retrieval exactly like `/ask` | `src/persona_twin/persona/chat.py` |
 | **Evaluation** | retrieval / grounding / answer-quality measured **separately** over a committed dataset; deliberately no composite score | [docs/evaluation.md](docs/evaluation.md) |
 | Data governance | deterministic PII redaction as a mandatory ingest gate; synthetic data only | [docs/data-governance.md](docs/data-governance.md) |
+| Persona builder | create a twin in the browser — HEXACO sliders, paste documents, live redaction preview (counts by type), then it's ingested and queryable; PII redacted before anything is stored | `src/persona_twin/persona/store.py` |
 | Free-model wiring | local Ollama auto-discovery, OpenRouter $0-model discovery, any OpenAI-compatible free tier as pure config | [docs/free-models.md](docs/free-models.md) |
 | Caching & deployment | answer/embedding cache port (LRU → Redis) with observable hit/miss counters; multi-stage Docker image; Cloud Run config | [docs/deployment.md](docs/deployment.md) |
 
@@ -63,8 +64,9 @@ make serve    # uvicorn on :8000 — then POST /ask
 Optional web UI (React Router 7 + Tailwind + shadcn-style components;
 needs Node 20+): run `make serve` in one terminal and `make frontend`
 in another, then open <http://localhost:5173> — persona picker with
-HEXACO bars, citations, and a routing/timings debug panel, plus a
-**chat** tab that streams a multi-turn conversation token-by-token.
+HEXACO bars, citations, and a routing/timings debug panel, a **chat**
+tab that streams a multi-turn conversation token-by-token, and a
+**build** tab that creates a new twin with live PII-redaction preview.
 
 ```sh
 curl -s localhost:8000/ask -H 'content-type: application/json' -d '{

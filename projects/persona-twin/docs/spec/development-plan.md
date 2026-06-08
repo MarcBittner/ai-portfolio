@@ -229,30 +229,45 @@ monorepo; portfolio-level spec lives at `docs/spec/spec.md` in the root).
 - [x] Offline tests: provider/router streaming, chat grounding + refusal,
       session store, `/chat` SSE end-to-end with memory
 
+## Phase 19: Persona builder UI ✅
+
+- [x] `PersonaStore`: one JSON per browser-created twin, traversal-safe
+      ids, read-only-fs safe; documents stored already-redacted; loaded at
+      startup alongside the baked-in corpus (baked-in wins on id collision)
+- [x] `POST /redaction/preview`: counts by PII type + tokenized text, no
+      values returned — powers the live preview
+- [x] `POST /personas`: validate → redact (mandatory gate) → persist →
+      incremental ingest (append chunks, rebuild BM25) → immediately
+      queryable; `DELETE /personas/{id}` for user-created twins only
+- [x] Frontend `/builder` route: HEXACO sliders with band hints, voice
+      notes, multi-document editor with debounced live redaction badges,
+      created-summary with a link straight into chat
+- [x] PVC `persona-twin-personas` (+ `PERSONA_TWIN_USER_PERSONAS_DIR`) so
+      created twins survive pod restarts
+- [x] Offline tests: redaction preview (no value leak), create →
+      queryable with PII redacted at rest, duplicate 409, validation 422,
+      delete user vs baked-in, store roundtrip + startup merge
+
 ---
 
-## Roadmap (post-v0.11.0 — next session picks one)
+## Roadmap (post-v0.12.0 — next session picks one)
 
 Ordered by recommendation. All build on the live system; "go" means
 implement, ship via Argo (build image → `docker save | ctr import` into
 the kind node → bump manifest → push → Argo syncs → bounce gateway), and
 verify through the gateway before reporting done.
 
-1. **Persona builder UI** *(recommended)* — browser-create a persona:
-   HEXACO sliders, paste/upload documents, live PII-redaction preview
-   (counts by type) before ingest, then query it immediately. Makes the
-   governance layer visceral; frontend-heavy, pairs well with the new chat UI.
-2. **Observability** — `/metrics` in Prometheus format (provider latency
+1. **Observability** *(recommended)* — `/metrics` in Prometheus format (provider latency
    histograms, cache hit ratios, circuit-breaker opens, benchmark
    durations) + Prometheus & Grafana deployed next to Argo on the kind
    cluster, with a committed dashboard.
-3. **Eval refinements** — (a) voice-consistency LLM judge in twin
+2. **Eval refinements** — (a) voice-consistency LLM judge in twin
    benchmarks (replace the heuristic with a judged "sounds like Ada"
    score per model); (b) query rewriting / multi-query expansion as a
    fourth routed task, benchmarked like the others.
-4. **Twin-vs-twin** — one twin interviews another; both answers grounded
+3. **Twin-vs-twin** — one twin interviews another; both answers grounded
    in their own corpora with citations on each side.
-5. **History-aware chat retrieval** — condense the conversation into a
+4. **History-aware chat retrieval** — condense the conversation into a
    standalone query before retrieval (chat currently retrieves on the
    latest message only); benchmark vs the single-message baseline.
 
