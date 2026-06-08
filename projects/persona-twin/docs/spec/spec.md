@@ -316,6 +316,22 @@ throwaway test stubs — they are the documented offline mode.
   voice-note and multi-document editors, debounced live redaction badges
   (counts by type), and a created-summary linking straight into chat
 
+### FR-18: Observability
+
+- **FR-18.1** `GET /metrics` exposes Prometheus text format (0.0.4) from a
+  dependency-free in-process metrics layer (hand-rolled counter / gauge /
+  histogram) — no client library
+- **FR-18.2** Coverage: LLM latency histogram and request count by
+  provider/model/task, circuit-breaker opens, API request counts, and
+  scrape-time gauges for cache hit/miss, chunks indexed, persona count,
+  circuit cooldowns, and build version
+- **FR-18.3** Prometheus and Grafana deploy to the cluster via the same
+  Argo Application; Prometheus scrapes `/metrics`, Grafana auto-provisions
+  the Prometheus datasource and a committed dashboard (LLM latency/rate,
+  cache hit ratio, circuit opens, index size)
+- **FR-18.4** Demo-grade by default: emptyDir storage (history resets on
+  restart), Grafana anonymous viewer access, images side-loaded into kind
+
 ### FR-10: Developer Experience
 
 - **FR-10.1** `Makefile`: `setup` (venv + install), `demo` (ingest + sample

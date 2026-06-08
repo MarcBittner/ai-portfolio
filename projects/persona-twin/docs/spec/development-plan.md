@@ -248,26 +248,38 @@ monorepo; portfolio-level spec lives at `docs/spec/spec.md` in the root).
       queryable with PII redacted at rest, duplicate 409, validation 422,
       delete user vs baked-in, store roundtrip + startup merge
 
+## Phase 20: Observability ✅
+
+- [x] Dependency-free metrics layer (`observability/metrics.py`):
+      hand-rolled Counter/Gauge/Histogram + Prometheus text exposition
+      (0.0.4), in the spirit of the rest of the repo
+- [x] Instrumentation: router records LLM latency histogram + request
+      counter per provider/model/task; breaker counts circuit opens
+- [x] `GET /metrics`: accumulated metrics + scrape-time pull gauges
+      (build_info, chunks_indexed, personas, cache events, circuit cooldowns)
+- [x] `deploy/k8s/observability.yaml`: Prometheus (scrapes `/metrics`) +
+      Grafana (anonymous viewer) with provisioned datasource and a
+      committed dashboard (LLM latency/rate, cache ratio, circuit opens,
+      index size); emptyDir storage, Argo-synced, images side-loaded
+- [x] Offline tests: counter/gauge/histogram render + cumulative buckets,
+      label escaping, `/metrics` exposition end-to-end
+
 ---
 
-## Roadmap (post-v0.12.0 — next session picks one)
+## Roadmap (post-v0.13.0 — next session picks one)
 
 Ordered by recommendation. All build on the live system; "go" means
 implement, ship via Argo (build image → `docker save | ctr import` into
 the kind node → bump manifest → push → Argo syncs → bounce gateway), and
 verify through the gateway before reporting done.
 
-1. **Observability** *(recommended)* — `/metrics` in Prometheus format (provider latency
-   histograms, cache hit ratios, circuit-breaker opens, benchmark
-   durations) + Prometheus & Grafana deployed next to Argo on the kind
-   cluster, with a committed dashboard.
-2. **Eval refinements** — (a) voice-consistency LLM judge in twin
+1. **Eval refinements** *(recommended)* — (a) voice-consistency LLM judge in twin
    benchmarks (replace the heuristic with a judged "sounds like Ada"
    score per model); (b) query rewriting / multi-query expansion as a
    fourth routed task, benchmarked like the others.
-3. **Twin-vs-twin** — one twin interviews another; both answers grounded
+2. **Twin-vs-twin** — one twin interviews another; both answers grounded
    in their own corpora with citations on each side.
-4. **History-aware chat retrieval** — condense the conversation into a
+3. **History-aware chat retrieval** — condense the conversation into a
    standalone query before retrieval (chat currently retrieves on the
    latest message only); benchmark vs the single-message baseline.
 

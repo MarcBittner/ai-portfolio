@@ -57,9 +57,8 @@ memory): `GIT_SSH_COMMAND="ssh -i docs/spec/untracked/ghostlocalhost.pem
 ```
 Continue persona-twin. Read projects/persona-twin/docs/spec/spec.md and
 projects/persona-twin/docs/spec/development-plan.md (the Roadmap section
-at the bottom lists the next candidate features — Observability
-(/metrics + Grafana) is recommended). Pick one, implement it following
-the standing rules, ship
+at the bottom lists the next candidate features — Eval refinements is
+recommended). Pick one, implement it following the standing rules, ship
 it via the live deployment loop in claude-code.md §1, and verify through
 the gateway. Keep `make test` green.
 ```
@@ -70,20 +69,21 @@ the gateway. Keep `make test` green.
 
 **Last Updated:** 2026-06-08
 
-**Project Status:** persona-twin **v0.12.0**, live on the local
-kind/Argo cluster. Phases 0–19 complete (RAG → twins → eval → frontend →
+**Project Status:** persona-twin **v0.13.0**, live on the local
+kind/Argo cluster. Phases 0–20 complete (RAG → twins → eval → frontend →
 deploy → routing console → benchmarks/analytics → persistence → aggregate
 scoreboard → free-model wiring → Ollama embeddings + circuit breaker →
 hybrid retrieval + CI → streaming + conversational twins → persona
-builder). GitHub Actions CI is green (lint/test/eval gate + frontend
-build). **Next:** pick a feature from the Roadmap section in the project
-plan — *Observability (/metrics + Grafana)* is recommended.
+builder → observability). GitHub Actions CI is green (lint/test/eval gate
++ frontend build). **Next:** pick a feature from the Roadmap section in
+the project plan — *Eval refinements* is recommended.
 
-v0.12.0 adds the **persona builder**: create a twin in the browser
-(`/builder`) with HEXACO sliders + live PII-redaction preview; it's
-redacted, persisted (PVC), ingested, and immediately queryable. Created
-twins survive restarts. v0.11.0's streamed `/chat` (token-by-token,
-validated citation tail, multi-turn memory) remains live.
+v0.13.0 adds **observability**: a dependency-free `/metrics` (Prometheus
+format) plus Prometheus + Grafana on the cluster with a committed
+dashboard (LLM latency/rate, cache ratio, circuit opens). Grafana is at
+**localhost:9082**, Prometheus at **9083** (via the gateway relay).
+v0.12.0's persona builder (`/builder`) and v0.11.0's streamed `/chat`
+remain live.
 
 Active config worth knowing: Ollama is the live embedder
 (`nomic-embed-text`, 768d) and provides local LLM models; OpenRouter free
@@ -95,18 +95,19 @@ untracked credentials), so free-model discovery is on; hybrid retrieval
 
 You are resuming work on **persona-twin** — a public, MIT-licensed
 reference implementation of RAG, HEXACO persona twins, multi-provider LLM
-routing, layered evaluation, model benchmarking, hybrid retrieval, and
-streamed conversational twins, and a browser persona builder. It is
-**v0.12.0, deployed live** on a local kind cluster under Argo CD.
+routing, layered evaluation, model benchmarking, hybrid retrieval,
+streamed conversational twins, a browser persona builder, and
+observability. It is **v0.13.0, deployed live** on a local kind cluster
+under Argo CD.
 
 1. Read `projects/persona-twin/docs/spec/spec.md` (requirements, FR-1…
-   FR-17) and `.../development-plan.md` — the **Roadmap** section at the
+   FR-18) and `.../development-plan.md` — the **Roadmap** section at the
    bottom lists the next candidate features
 2. Read `docs/spec/claude-code.md` §1 for the standing rules **and the
    live deployment / ship loop** (build → side-load into kind → bump
    manifest → push → Argo sync → bounce gateway → verify via gateway)
 3. Credentials live in `docs/spec/untracked/credentials.md` (gitignored:
    OpenRouter key, Argo admin password, GitHub SSH key). Never commit.
-4. Pick the next roadmap feature (Observability — /metrics + Grafana —
-   recommended), implement it, ship via the loop, verify through the
+4. Pick the next roadmap feature (Eval refinements recommended),
+   implement it, ship via the loop, verify through the
    gateway at http://localhost:9081, keep `make test` green.
