@@ -78,9 +78,10 @@ CI is green (lint/test/eval gate + frontend build). **Next:** pick a
 feature from the Roadmap section in the project plan — *Persona builder
 UI* is recommended.
 
-Note: v0.11.0 code is committed locally but **not yet deployed** — the
-ship loop (build image → side-load into kind → push → Argo sync → bounce
-gateway) must run on the Mac, where docker/kubectl live.
+v0.11.0 is **deployed and verified live** (gateway at localhost:9081):
+streamed `/chat` SSE confirmed end-to-end — token-by-token output, a
+validated citation tail, and multi-turn session memory — on
+ollama/gemma3:12b.
 
 Active config worth knowing: Ollama is the live embedder
 (`nomic-embed-text`, 768d) and provides local LLM models; OpenRouter free
@@ -93,8 +94,8 @@ untracked credentials), so free-model discovery is on; hybrid retrieval
 You are resuming work on **persona-twin** — a public, MIT-licensed
 reference implementation of RAG, HEXACO persona twins, multi-provider LLM
 routing, layered evaluation, model benchmarking, hybrid retrieval, and
-streamed conversational twins. It is **v0.11.0** (code committed; deploy
-the v0.11.0 image from the Mac) on a local kind cluster under Argo CD.
+streamed conversational twins. It is **v0.11.0, deployed live** on a
+local kind cluster under Argo CD.
 
 1. Read `projects/persona-twin/docs/spec/spec.md` (requirements, FR-1…
    FR-16) and `.../development-plan.md` — the **Roadmap** section at the
@@ -106,5 +107,4 @@ the v0.11.0 image from the Mac) on a local kind cluster under Argo CD.
    OpenRouter key, Argo admin password, GitHub SSH key). Never commit.
 4. Pick the next roadmap feature (Persona builder UI recommended),
    implement it, ship via the loop, verify through the gateway at
-   http://localhost:9081, keep `make test` green. (First: deploy the
-   already-committed v0.11.0 chat feature if it hasn't shipped yet.)
+   http://localhost:9081, keep `make test` green.
