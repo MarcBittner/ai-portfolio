@@ -8,6 +8,7 @@ Requires the ``anthropic`` extra: ``pip install "persona-twin[anthropic]"``.
 """
 
 import time
+from collections.abc import AsyncIterator
 
 from persona_twin.llm.base import LLMRequest, LLMResponse, LLMUsage, ModelSpec
 
@@ -56,3 +57,23 @@ class AnthropicProvider:
             latency_ms=round(latency_ms, 1),
             cost_usd=spec.cost_usd(usage.input_tokens, usage.output_tokens),
         )
+
+    async def stream(
+        self, request: LLMRequest, spec: ModelSpec
+    ) -> AsyncIterator[str]:
+        """Yield prose text deltas (Messages streaming API).
+
+        The chat path streams prose only; the validated citation tail is a
+        separate structured call, so no ``output_config`` here."""
+        kwargs: dict = {
+            "model": spec.id,
+            "max_tokens": request.max_tokens,
+            "system": request.system,
+            "messages": [{"role": "user", "content": request.user}],
+        }
+        if spec.adaptive_thinking:
+            kwargs["thinking"] = {"type": "adaptive"}
+        async with self._client.messages.stream(**kwargs) as stream:
+            async for text in stream.text_stream:
+                if text:
+                    yield text

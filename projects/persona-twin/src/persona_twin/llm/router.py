@@ -9,11 +9,13 @@ with an empty hand.
 """
 
 import json
+from collections.abc import AsyncIterator
+from dataclasses import dataclass
 
 from pydantic import BaseModel, ValidationError
 
 from persona_twin.config import RouteObjective
-from persona_twin.llm.base import LLMProvider, LLMRequest, LLMResponse, ModelSpec
+from persona_twin.llm.base import LLMProvider, LLMRequest, LLMResponse, LLMUsage, ModelSpec
 from persona_twin.llm.breaker import CircuitBreaker, is_rate_limit
 from persona_twin.llm.policy import RoutingPolicy
 from persona_twin.llm.registry import ModelRegistry
@@ -25,6 +27,21 @@ logger = get_logger("llm.router")
 
 class AllProvidersFailedError(RuntimeError):
     pass
+
+
+@dataclass
+class StreamEvent:
+    """One item from ``stream_complete``: a prose ``delta`` while generating,
+    then a single terminal event carrying the accumulated ``response`` and the
+    ``decision``. ``done`` distinguishes the terminal event."""
+
+    delta: str = ""
+    response: LLMResponse | None = None
+    decision: RoutingDecision | None = None
+
+    @property
+    def done(self) -> bool:
+        return self.decision is not None
 
 
 def schema_for(model_cls: type[BaseModel]) -> dict:
@@ -44,6 +61,20 @@ def schema_for(model_cls: type[BaseModel]) -> dict:
     schema = model_cls.model_json_schema()
     tighten(schema)
     return schema
+
+
+async def _provider_stream(
+    provider: LLMProvider, request: LLMRequest, spec: ModelSpec
+) -> AsyncIterator[str]:
+    """Adapt any provider to a text-delta stream. Providers exposing a native
+    ``stream`` use it; the rest degrade to a single delta from ``complete``."""
+    streamer = getattr(provider, "stream", None)
+    if streamer is not None:
+        async for delta in streamer(request, spec):
+            yield delta
+    else:
+        response = await provider.complete(request, spec)
+        yield response.text
 
 
 class LLMRouter:
@@ -124,6 +155,84 @@ class LLMRouter:
                 break
         raise AllProvidersFailedError(
             f"all candidates failed: {fallbacks} (cooling down: {skipped})"
+        )
+
+    async def stream_complete(
+        self,
+        request: LLMRequest,
+        objective: RouteObjective | None = None,
+        task: str | None = None,
+    ) -> AsyncIterator[StreamEvent]:
+        """Stream prose deltas from the first healthy candidate, then emit a
+        terminal event with the accumulated response and routing decision.
+
+        Failover only happens *before the first token* — once prose has
+        reached the caller it cannot be unsent, so a mid-stream provider
+        failure ends the stream (and trips the breaker) rather than retrying.
+        Providers lacking ``stream`` degrade to a single-delta ``complete``.
+        Usage/cost on the terminal response are estimated (the measured path
+        is stateless ``/ask``)."""
+        import time
+
+        objective = objective or self.policy.resolve_objective(task)
+        plan = self.plan(objective, task)
+        fallbacks: list[str] = []
+        skipped: list[str] = []
+        for attempt_skipped in (False, True):
+            for spec in plan:
+                key = f"{spec.provider}:{spec.id}"
+                if not attempt_skipped:
+                    if self.breaker.is_open(key):
+                        skipped.append(key)
+                        continue
+                elif key not in skipped:
+                    continue
+                provider = self.providers[spec.provider]
+                started = time.perf_counter()
+                parts: list[str] = []
+                try:
+                    async for delta in _provider_stream(provider, request, spec):
+                        parts.append(delta)
+                        yield StreamEvent(delta=delta)
+                except Exception as exc:  # noqa: BLE001 — provider error
+                    self.breaker.record_failure(key, rate_limited=is_rate_limit(exc))
+                    reason = f"{key}: {type(exc).__name__}"
+                    fallbacks.append(reason)
+                    logger.warning("stream failover %s", kv(reason=reason))
+                    if parts:
+                        # tokens already delivered — cannot fail over cleanly
+                        raise
+                    continue
+                self.breaker.record_success(key)
+                text = "".join(parts)
+                usage = LLMUsage(
+                    input_tokens=len(request.system + request.user) // 4,
+                    output_tokens=len(text) // 4,
+                )
+                response = LLMResponse(
+                    text=text,
+                    provider=spec.provider,
+                    model=spec.id,
+                    usage=usage,
+                    latency_ms=round((time.perf_counter() - started) * 1000, 1),
+                    cost_usd=spec.cost_usd(usage.input_tokens, usage.output_tokens),
+                )
+                decision = RoutingDecision(
+                    provider=spec.provider,
+                    model=spec.id,
+                    objective=objective,
+                    task=task,
+                    fallbacks_taken=fallbacks,
+                    skipped_cooldown=skipped,
+                    estimated_cost_usd=response.cost_usd,
+                    latency_ms=response.latency_ms,
+                )
+                yield StreamEvent(response=response, decision=decision)
+                return
+            if not skipped:
+                break
+        raise AllProvidersFailedError(
+            f"all candidates failed to stream: {fallbacks} (cooling down: {skipped})"
         )
 
     async def complete_structured(

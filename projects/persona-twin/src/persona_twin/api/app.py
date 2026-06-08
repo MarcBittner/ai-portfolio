@@ -11,13 +11,14 @@ and the API from one origin. Answers for non-debug requests are cached
 """
 
 import asyncio
+import json
 import os
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from fastapi import APIRouter, FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -42,6 +43,14 @@ from persona_twin.eval.dataset import load_eval_dataset
 from persona_twin.llm import TASKS, LLMRouter, ModelSpec, RoutingPolicy, get_router
 from persona_twin.log import configure, new_request_id
 from persona_twin.models import AskRequest, AskResponse, ChunkStrategy, Persona
+from persona_twin.persona.chat import (
+    ChatSessionStore,
+    ChatTurn,
+    CitationsEvent,
+    DoneEvent,
+    TokenEvent,
+    chat_twin,
+)
 from persona_twin.persona.twin import ask_twin
 from persona_twin.pipeline import IngestReport, ingest_corpus
 from persona_twin.retrieval.bm25 import BM25Index
@@ -65,6 +74,7 @@ class AppState:
     benchmark: BenchmarkRun = field(default_factory=BenchmarkRun)
     benchmark_task: asyncio.Task | None = None
     bench_store: BenchmarkStore = field(default_factory=BenchmarkStore)
+    sessions: ChatSessionStore = field(default_factory=ChatSessionStore)
 
     @property
     def personas(self) -> dict[str, Persona]:
@@ -360,6 +370,84 @@ async def benchmark_history_run(run_id: str) -> BenchmarkRun:
     if run is None:
         raise HTTPException(status_code=404, detail=f"unknown run: {run_id}")
     return run
+
+
+class ChatRequest(BaseModel):
+    persona_id: str
+    message: str = Field(min_length=1, max_length=2000)
+    session_id: str | None = None  # omit to start a new conversation
+    k: int = Field(default=5, ge=1, le=20)
+
+
+def _sse(event: str, data: dict) -> str:
+    return f"event: {event}\ndata: {json.dumps(data)}\n\n"
+
+
+@router.post("/chat")
+async def chat(request: ChatRequest) -> StreamingResponse:
+    """Streamed conversational twin (Server-Sent Events).
+
+    Events: ``meta`` (session_id) → ``token`` (prose deltas) → ``citations``
+    (validated tail) → ``done`` (routing); ``error`` on failure. Conversation
+    memory is keyed by ``session_id`` (generated when omitted). The stateless
+    ``/ask`` path is untouched — it remains the measured/eval path."""
+    new_request_id()
+    state = _state()
+    persona = state.personas.get(request.persona_id)
+    if persona is None:
+        raise HTTPException(
+            status_code=404, detail=f"unknown persona: {request.persona_id}"
+        )
+
+    from uuid import uuid4
+
+    session_id = request.session_id or uuid4().hex[:12]
+    history = state.sessions.history(session_id)  # turns before this message
+    state.sessions.append(session_id, ChatTurn(role="user", content=request.message))
+
+    async def events():
+        yield _sse("meta", {"session_id": session_id})
+        answer_parts: list[str] = []
+        try:
+            async for ev in chat_twin(
+                persona,
+                request.message,
+                history,
+                embedder=state.embedder,
+                store=state.store,
+                router=state.router,
+                bm25=state.bm25 if state.settings.hybrid_retrieval else None,
+                k=request.k,
+            ):
+                if isinstance(ev, TokenEvent):
+                    answer_parts.append(ev.text)
+                    yield _sse("token", {"text": ev.text})
+                elif isinstance(ev, CitationsEvent):
+                    yield _sse(
+                        "citations",
+                        {
+                            "answered": ev.answered,
+                            "citations": [c.model_dump() for c in ev.citations],
+                        },
+                    )
+                elif isinstance(ev, DoneEvent):
+                    yield _sse("done", {"routing": ev.routing.model_dump()})
+        except Exception as exc:  # noqa: BLE001 — surface as a stream error event
+            yield _sse("error", {"detail": f"{type(exc).__name__}: {exc}"})
+            return
+        state.sessions.append(
+            session_id, ChatTurn(role="assistant", content="".join(answer_parts))
+        )
+
+    return StreamingResponse(
+        events(),
+        media_type="text/event-stream",
+        headers={
+            "cache-control": "no-cache",
+            "connection": "keep-alive",
+            "x-accel-buffering": "no",  # don't let a proxy buffer the stream
+        },
+    )
 
 
 @router.post("/ask", response_model=AskResponse)

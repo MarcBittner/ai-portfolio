@@ -11,7 +11,12 @@ from persona_twin.llm.base import (
 from persona_twin.llm.mock import MockProvider
 from persona_twin.llm.policy import TASKS, RoutingPolicy, TaskRoute
 from persona_twin.llm.registry import ModelRegistry
-from persona_twin.llm.router import AllProvidersFailedError, LLMRouter, schema_for
+from persona_twin.llm.router import (
+    AllProvidersFailedError,
+    LLMRouter,
+    StreamEvent,
+    schema_for,
+)
 
 __all__ = [
     "AllProvidersFailedError",
@@ -24,6 +29,7 @@ __all__ = [
     "ModelRegistry",
     "ModelSpec",
     "RoutingPolicy",
+    "StreamEvent",
     "TASKS",
     "TaskRoute",
     "get_router",

@@ -6,6 +6,7 @@ Requires the ``openai`` extra: ``pip install "persona-twin[openai]"``.
 """
 
 import time
+from collections.abc import AsyncIterator
 
 from persona_twin.llm.base import LLMRequest, LLMResponse, LLMUsage, ModelSpec
 
@@ -58,3 +59,27 @@ class OpenAIProvider:
             latency_ms=round(latency_ms, 1),
             cost_usd=spec.cost_usd(usage.input_tokens, usage.output_tokens),
         )
+
+    async def stream(
+        self, request: LLMRequest, spec: ModelSpec
+    ) -> AsyncIterator[str]:
+        """Yield prose text deltas (Chat Completions ``stream=True``).
+
+        Streaming is the chat path — prose only, no structured schema; the
+        validated citation tail is a separate structured call. Inherited by
+        the Ollama / OpenRouter / custom providers (all OpenAI-compatible)."""
+        stream = await self._client.chat.completions.create(
+            model=spec.id,
+            max_completion_tokens=request.max_tokens,
+            messages=[
+                {"role": "system", "content": request.system},
+                {"role": "user", "content": request.user},
+            ],
+            stream=True,
+        )
+        async for chunk in stream:
+            if not chunk.choices:
+                continue
+            delta = chunk.choices[0].delta.content
+            if delta:
+                yield delta

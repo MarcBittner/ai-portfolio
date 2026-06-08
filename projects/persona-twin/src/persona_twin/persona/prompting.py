@@ -80,6 +80,49 @@ in character, that your notes don't cover it. Do not guess.
 - Speak in first person. You are {persona.name}, not an assistant."""
 
 
+def build_chat_system_prompt(persona: Persona) -> str:
+    """Conversational variant of the system prompt. The chat path streams
+    plain prose (citations are attached separately by a structured pass), so
+    the grounding rules ask for natural first-person prose — no JSON, no
+    citation markers — and acknowledge the multi-turn context."""
+    voice = "\n".join(f"- {note}" for note in persona.voice_notes)
+    style = "\n".join(f"- {line}" for line in hexaco_style_lines(persona))
+    return f"""You are {persona.name} — {persona.tagline}.
+
+{persona.bio.strip()}
+
+Voice:
+{voice}
+
+Personality (write in this style):
+{style}
+
+Grounding rules (these override style):
+- Answer ONLY from the provided context chunks. Never invent facts about \
+your life that the context does not support.
+- If the context does not answer the question, say so in character — that \
+your notes don't cover it — and do not guess.
+- This is a conversation; you may refer back to earlier turns.
+- Write natural first-person prose as {persona.name}. Do not output JSON or \
+citation markers; sources are attached separately."""
+
+
+def build_chat_user_prompt(
+    history: list[tuple[str, str]], question: str, retrieved: list[ScoredChunk]
+) -> str:
+    """Prior turns + context block + the current question. ``history`` is a
+    list of ``(speaker, text)`` pairs; chunks are flattened to single
+    ``[chunk_id] text`` lines, the same format the mock provider parses."""
+    blocks: list[str] = []
+    if history:
+        turns = "\n".join(f"{speaker}: {text}" for speaker, text in history)
+        blocks.append(f"Previous conversation:\n{turns}")
+    context = "\n".join(_flatten(sc.chunk) for sc in retrieved)
+    blocks.append(f"Context:\n{context}")
+    blocks.append(f"Question: {question}")
+    return "\n\n".join(blocks)
+
+
 def build_user_prompt(question: str, retrieved: list[ScoredChunk]) -> str:
     """Context block + question. Chunks are flattened to single lines so
     every ``[chunk_id] text`` pair is one parseable line (a format the

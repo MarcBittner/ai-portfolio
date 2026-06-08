@@ -110,6 +110,67 @@ export function ask(
   });
 }
 
+export interface ChatCitations {
+  answered: boolean;
+  citations: Citation[];
+}
+
+export interface ChatHandlers {
+  onMeta?: (sessionId: string) => void;
+  onToken?: (text: string) => void;
+  onCitations?: (c: ChatCitations) => void;
+  onDone?: (routing: RoutingDecision) => void;
+  onError?: (detail: string) => void;
+}
+
+// Streamed conversational twin. Reads the Server-Sent Events body off the
+// POST /chat response and dispatches each event to the handlers; resolves
+// when the stream closes.
+export async function streamChat(
+  body: { persona_id: string; message: string; session_id?: string },
+  handlers: ChatHandlers,
+  signal?: AbortSignal,
+): Promise<void> {
+  const response = await fetch(`${BASE}/chat`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+    signal,
+  });
+  if (!response.ok || !response.body) {
+    throw new Error(`${response.status}: ${await response.text().catch(() => "")}`);
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let idx: number;
+    while ((idx = buffer.indexOf("\n\n")) !== -1) {
+      dispatchSse(buffer.slice(0, idx), handlers);
+      buffer = buffer.slice(idx + 2);
+    }
+  }
+}
+
+function dispatchSse(block: string, h: ChatHandlers): void {
+  let event = "";
+  let data = "";
+  for (const line of block.split("\n")) {
+    if (line.startsWith("event: ")) event = line.slice(7);
+    else if (line.startsWith("data: ")) data = line.slice(6);
+  }
+  if (!event || !data) return;
+  const parsed = JSON.parse(data);
+  if (event === "meta") h.onMeta?.(parsed.session_id);
+  else if (event === "token") h.onToken?.(parsed.text);
+  else if (event === "citations") h.onCitations?.(parsed as ChatCitations);
+  else if (event === "done") h.onDone?.(parsed.routing as RoutingDecision);
+  else if (event === "error") h.onError?.(parsed.detail);
+}
+
 export interface TaskResult {
   task: string;
   provider: string;

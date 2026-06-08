@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from persona_twin.config import RouteObjective
 
-TASKS = ("twin_answer", "rerank", "eval_judge")
+TASKS = ("twin_answer", "twin_chat", "rerank", "eval_judge")
 
 
 class TaskRoute(BaseModel):

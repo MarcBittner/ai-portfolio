@@ -12,9 +12,11 @@ Deterministic by construction, so integration tests and the offline
 demo assert exact behavior.
 """
 
+import asyncio
 import json
 import re
 import time
+from collections.abc import AsyncIterator
 
 from persona_twin.llm.base import LLMRequest, LLMResponse, LLMUsage, ModelSpec
 
@@ -37,8 +39,9 @@ def _content_words(text: str) -> set[str]:
 class MockProvider:
     name = "mock"
 
-    async def complete(self, request: LLMRequest, spec: ModelSpec) -> LLMResponse:
-        started = time.perf_counter()
+    def _answer(self, request: LLMRequest) -> tuple[str, bool, list[str]]:
+        """Extractive answer, answered flag, and cited ids for a request —
+        shared by ``complete`` (structured or plain) and ``stream``."""
         chunks = _CHUNK_LINE.findall(request.user)
         q_match = _QUESTION.search(request.user)
         question = q_match.group(1) if q_match else request.user
@@ -58,6 +61,11 @@ class MockProvider:
         else:
             answer = "My notes don't cover that, so I won't guess."
             citations = []
+        return answer, answered, citations
+
+    async def complete(self, request: LLMRequest, spec: ModelSpec) -> LLMResponse:
+        started = time.perf_counter()
+        answer, answered, citations = self._answer(request)
 
         if request.json_schema is not None:
             text = json.dumps(
@@ -76,6 +84,18 @@ class MockProvider:
             latency_ms=round((time.perf_counter() - started) * 1000, 3),
             cost_usd=0.0,
         )
+
+    async def stream(
+        self, request: LLMRequest, spec: ModelSpec
+    ) -> AsyncIterator[str]:
+        """Yield the extractive prose answer word-by-word — the deterministic
+        offline streaming path. Structured citations are produced separately
+        via ``complete`` (json_schema set), so this ignores any schema."""
+        answer, _answered, _citations = self._answer(request)
+        words = answer.split(" ")
+        for i, word in enumerate(words):
+            await asyncio.sleep(0)  # yield control so the stream is cooperative
+            yield word if i == 0 else f" {word}"
 
     def _extract_answer(self, chunk_text: str, q_words: set[str]) -> str:
         cleaned = re.sub(r"#+\s*", "", chunk_text)  # drop markdown heading marks

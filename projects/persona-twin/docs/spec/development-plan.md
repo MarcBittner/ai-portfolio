@@ -143,8 +143,6 @@ monorepo; portfolio-level spec lives at `docs/spec/spec.md` in the root).
 
 ---
 
-**Last Updated:** 2026-06-06
-
 ## Phase 11: Routing console ✅
 
 - [x] Task-aware router: per-task objective/pin policy (`RoutingPolicy`),
@@ -212,38 +210,58 @@ monorepo; portfolio-level spec lives at `docs/spec/spec.md` in the root).
 - [x] GitHub Actions: lint/test/eval with MRR≥0.9 regression gate +
       frontend build/typecheck (deployment untouched — Argo stays)
 
+## Phase 18: Streaming + conversational twins ✅
+
+- [x] Provider `stream()` (text deltas): mock (deterministic, offline),
+      OpenAI-compatible (covers Ollama/OpenRouter/custom), Anthropic;
+      router-level single-delta fallback for any non-streaming provider
+- [x] `LLMRouter.stream_complete` + `StreamEvent`: fail over only before
+      the first token, breaker integration, estimated usage on the tail
+- [x] `chat_twin`: retrieve (vector+hybrid+rerank) → stream prose →
+      separate structured citation pass validated against retrieved set;
+      new `twin_chat` routed task
+- [x] In-process `ChatSessionStore` (per-session turn cap + LRU eviction);
+      conversation history fed back into the prompt
+- [x] `POST /chat` Server-Sent Events (meta/token/citations/done/error);
+      stateless `/ask` untouched as the measured eval path
+- [x] Frontend `/chat` route: streamed conversation, citations tail,
+      session memory, persona switcher (`streamChat` over fetch + SSE)
+- [x] Offline tests: provider/router streaming, chat grounding + refusal,
+      session store, `/chat` SSE end-to-end with memory
+
 ---
 
-## Roadmap (post-v0.10.0 — next session picks one)
+## Roadmap (post-v0.11.0 — next session picks one)
 
 Ordered by recommendation. All build on the live system; "go" means
 implement, ship via Argo (build image → `docker save | ctr import` into
 the kind node → bump manifest → push → Argo syncs → bounce gateway), and
 verify through the gateway before reporting done.
 
-1. **Streaming + conversational twins** *(recommended)* — SSE token
-   streaming from the router through FastAPI into the React UI; a `/chat`
-   endpoint with per-session conversation memory so twins hold a
-   multi-turn conversation. Hard part: stream the prose while still
-   producing validated citations (stream text, attach the structured
-   citation tail). Keep stateless `/ask` untouched as the eval path.
-2. **Persona builder UI** — browser-create a persona: HEXACO sliders,
-   paste/upload documents, live PII-redaction preview (counts by type)
-   before ingest, then query it immediately. Makes the governance layer
-   visceral. Pairs well right after #1 (both frontend-heavy).
-3. **Observability** — `/metrics` in Prometheus format (provider latency
+1. **Persona builder UI** *(recommended)* — browser-create a persona:
+   HEXACO sliders, paste/upload documents, live PII-redaction preview
+   (counts by type) before ingest, then query it immediately. Makes the
+   governance layer visceral; frontend-heavy, pairs well with the new chat UI.
+2. **Observability** — `/metrics` in Prometheus format (provider latency
    histograms, cache hit ratios, circuit-breaker opens, benchmark
    durations) + Prometheus & Grafana deployed next to Argo on the kind
    cluster, with a committed dashboard.
-4. **Eval refinements** — (a) voice-consistency LLM judge in twin
+3. **Eval refinements** — (a) voice-consistency LLM judge in twin
    benchmarks (replace the heuristic with a judged "sounds like Ada"
    score per model); (b) query rewriting / multi-query expansion as a
    fourth routed task, benchmarked like the others.
-5. **Twin-vs-twin** — one twin interviews another; both answers grounded
+4. **Twin-vs-twin** — one twin interviews another; both answers grounded
    in their own corpora with citations on each side.
+5. **History-aware chat retrieval** — condense the conversation into a
+   standalone query before retrieval (chat currently retrieves on the
+   latest message only); benchmark vs the single-message baseline.
 
 ### Parked / deferred
 - **ghcr image push + CD** — user chose to stay on Argo with side-loaded
   images; the one remaining manual deploy step is the `ctr import`.
 - **Run the full 6-model benchmark matrix** via `/analytics` "Run
   missing" — mostly unrun; would make routing decisions data-backed.
+
+---
+
+**Last Updated:** 2026-06-08
