@@ -8,7 +8,7 @@ environment variables.
 
 ## Projects
 
-### [persona-twin](projects/persona-twin/) — v0.1.0
+### [persona-twin](projects/persona-twin/) — v0.13.0
 
 Query AI **digital twins** of synthetic personas, grounded in retrieved
 data with citations.
@@ -32,6 +32,25 @@ cd projects/persona-twin
 make setup && make demo   # runs fully offline, no .env required
 ```
 
+### [tanglement-showcase](projects/tanglement-showcase/) — work showcase
+
+Curated public showcase of **Tanglement.ai** — a decentralized, peer-to-peer,
+multi-provider **LLM routing network** (founding-engineer work by Marc
+Bittner). Client-side routing picks the best provider per request and calls it
+directly with the user's own keys (no proxy, no stored credentials); nodes
+share routing intelligence over a Chord DHT + gossip mesh.
+
+- **`docs/spec/`** — the multi-section technical specification (architecture,
+  routing, security, protocols, DHT/NAT-traversal, ops, dev plan)
+- **`demo-site/`** — the public teaser site (Next.js)
+- **`code/git-encrypt/`** — a self-contained, stdlib-only Go CLI sample
+  (transparent git file encryption, ECDH/ECDSA)
+- **Pitch deck** — PDF (viewable) + PPTX source
+
+> ⚠️ **Proprietary — not MIT.** This directory is published for viewing only
+> and carries its own [LICENSE](projects/tanglement-showcase/LICENSE)
+> (all rights reserved). The production backend is private.
+
 ## Repository conventions
 
 - One directory per project under `projects/`, each with its own spec
@@ -42,4 +61,6 @@ make setup && make demo   # runs fully offline, no .env required
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE) covers the repository **except** `projects/tanglement-showcase/`,
+which is proprietary and carries its
+[own LICENSE](projects/tanglement-showcase/LICENSE) (all rights reserved).

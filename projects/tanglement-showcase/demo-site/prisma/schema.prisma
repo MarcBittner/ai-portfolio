@@ -1,0 +1,71 @@
+// This is your Prisma schema file
+// Learn more: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL") // Will use dummy URL in CI if not set
+  // Fallback for CI/CD where DATABASE_URL might not be set
+  // url      = "postgresql://user:password@localhost:5432/db?schema=public"
+}
+
+// ============================================
+// Waitlist Model
+// ============================================
+// Stores email addresses of users interested in the platform
+
+model WaitlistEntry {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Optional fields for analytics
+  source    String?  // Where did they sign up from (e.g., "hero", "footer", "modal")
+  referrer  String?  // HTTP referrer if available
+  userAgent String?  // Browser/device information
+
+  // Email marketing integration
+  convertKitSubscriberId String? // ConvertKit subscriber ID if synced
+  emailVerified          Boolean @default(false)
+  emailVerifiedAt        DateTime?
+
+  // Metadata
+  metadata  Json?    // Flexible field for additional data
+
+  @@index([email])
+  @@index([createdAt])
+  @@map("waitlist_entries")
+}
+
+// ============================================
+// Future Models (Placeholders)
+// ============================================
+
+// Uncomment when ready to implement
+
+// model User {
+//   id            String    @id @default(cuid())
+//   email         String    @unique
+//   name          String?
+//   emailVerified DateTime?
+//   image         String?
+//   createdAt     DateTime  @default(now())
+//   updatedAt     DateTime  @updatedAt
+//
+//   @@map("users")
+// }
+
+// model FeedbackSubmission {
+//   id        String   @id @default(cuid())
+//   email     String
+//   message   String
+//   category  String?  // e.g., "feature-request", "bug", "general"
+//   createdAt DateTime @default(now())
+//
+//   @@index([createdAt])
+//   @@map("feedback_submissions")
+// }

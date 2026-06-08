@@ -1,0 +1,36 @@
+[Unit]
+Description=Tanglement.ai Teaser Site Deployment Poller
+Documentation=https://github.com/tanglement-ai/tanglement.ai
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=simple
+User=root
+Group=docker
+
+# Environment
+Environment="DEPLOYMENT_ENVIRONMENT=production"
+Environment="POLL_INTERVAL=60"
+EnvironmentFile=-/etc/tanglement/deployment.env
+
+# Paths
+WorkingDirectory=/opt/tanglement/teaser-site
+ExecStart=/opt/tanglement/teaser-site/scripts/deploy-poll.sh
+
+# Restart policy
+Restart=always
+RestartSec=10
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=tanglement-deploy
+
+[Install]
+WantedBy=multi-user.target

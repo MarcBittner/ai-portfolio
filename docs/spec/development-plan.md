@@ -61,7 +61,20 @@ persona builder with live PII-redaction preview, and observability
 - [ ] Run the full 6-model benchmark matrix via the `/analytics` "Run
       missing" button so routing decisions are data-backed (mostly unrun)
 
-## Project 2+ (future)
+## Project 2: tanglement-showcase ✅ (imported)
+
+Curated public work showcase of **Tanglement.ai** (decentralized P2P,
+client-side, multi-provider LLM routing — Chord DHT + gossip, WireGuard mesh):
+technical spec, Next.js demo site, a stdlib-only Go code sample, and the pitch
+deck. Imported as a snapshot from `MarcBittner/tanglement-showcase`.
+
+- [x] Snapshot imported under `projects/tanglement-showcase/`
+- [x] **Proprietary**, all-rights-reserved (own LICENSE) — exempt from the
+      portfolio's MIT license and CONV-1/CONV-3; sanitized (CONV-2 holds)
+- [ ] Optional follow-ups: trim the 12 MB `.pptx` (keep the PDF) or move
+      binaries to Git LFS; light README polish for portfolio consistency
+
+## Project 3+ (future)
 
 - [ ] To be specified — candidates: agent orchestration patterns, eval
       tooling extracted as a library, streaming inference service

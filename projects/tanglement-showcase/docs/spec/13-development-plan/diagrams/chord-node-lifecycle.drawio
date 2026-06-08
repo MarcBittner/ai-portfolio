@@ -1,0 +1,156 @@
+<mxfile host="65bd71144e">
+    <diagram name="Node Lifecycle States" id="chord-node-lifecycle">
+        <mxGraphModel dx="737" dy="1209" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="850" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="trans-10" value="healed" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.75;entryDx=0;entryDy=0;fontSize=12;fontColor=#000000;strokeColor=#00CC00;strokeWidth=2;" parent="1" source="state-partition" target="state-active" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="450" y="530"/>
+                            <mxPoint x="450" y="425"/>
+                        </Array>
+                        <mxPoint x="520" y="530" as="sourcePoint"/>
+                        <mxPoint x="520" y="440" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="state-offline-1" value="Offline" style="ellipse;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;fontSize=14;fontStyle=1" parent="1" vertex="1">
+                    <mxGeometry x="490" y="40" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="state-booting" value="Booting" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;fontStyle=1" parent="1" vertex="1">
+                    <mxGeometry x="490" y="150" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="state-joining" value="Joining" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=14;fontStyle=1" parent="1" vertex="1">
+                    <mxGeometry x="490" y="260" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="state-isolated" value="Isolated" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=14;fontStyle=1" parent="1" vertex="1">
+                    <mxGeometry x="720" y="260" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="state-active" value="Active&#xa;(stable)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;fontStyle=1" parent="1" vertex="1">
+                    <mxGeometry x="490" y="380" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="maintenance-box" value="&lt;div&gt;&lt;br&gt;&lt;/div&gt;Periodic Maintenance:&lt;br&gt;• Stabilize()&lt;br&gt;• FixFingers()&lt;br&gt;• CheckPredecessor()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1f5e1;strokeColor=#82b366;fontSize=11;align=left;verticalAlign=top;dashed=1;dashPattern=3 3;" vertex="1" parent="1">
+                    <mxGeometry x="270" y="350" width="120" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="state-partition" value="Partition&#xa;Healing" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=14;fontStyle=1" parent="1" vertex="1">
+                    <mxGeometry x="490" y="500" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="state-leaving" value="Leaving" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=14;fontStyle=1" parent="1" vertex="1">
+                    <mxGeometry x="490" y="620" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="state-offline-2" value="Offline" style="ellipse;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;fontSize=14;fontStyle=1" parent="1" vertex="1">
+                    <mxGeometry x="370" y="730" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="state-crashed" value="Crashed" style="ellipse;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=14;fontStyle=1" parent="1" vertex="1">
+                    <mxGeometry x="610" y="730" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="trans-1" value="Start()" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontSize=12;fontColor=#000000;" parent="1" source="state-offline-1" target="state-booting" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="trans-2" value="Initialize()" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontSize=12;fontColor=#000000;" parent="1" source="state-booting" target="state-joining" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="trans-3" value="timeout" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;fontSize=12;fontColor=#000000;" parent="1" source="state-joining" target="state-isolated" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="trans-4" value="join success" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontSize=12;fontColor=#000000;strokeColor=#00CC00;strokeWidth=2;" parent="1" source="state-joining" target="state-active" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="trans-5" value="reconnect" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;fontSize=12;fontColor=#000000;entryX=1;entryY=0.25;entryDx=0;entryDy=0;" parent="1" source="state-isolated" target="state-active" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="780" y="395"/>
+                        </Array>
+                        <mxPoint x="610" y="390" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="trans-maintenance" value="continuous" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=1;entryY=0.5;entryDx=0;entryDy=0;fontSize=11;fontColor=#4d4d4d;strokeColor=#82b366;strokeWidth=2;dashed=1;dashPattern=3 3;startArrow=classic;startFill=1;endArrow=classic;endFill=1;exitX=0;exitY=0.25;exitDx=0;exitDy=0;" edge="1" parent="1" source="state-active" target="maintenance-box">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="490" y="410" as="sourcePoint"/>
+                        <Array as="points">
+                            <mxPoint x="400" y="395"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="trans-9" value="partition detected" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontSize=12;fontColor=#000000;" parent="1" source="state-active" target="state-partition" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="trans-11" value="Shutdown()" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.75;exitDx=0;exitDy=0;entryX=1;entryY=0.25;entryDx=0;entryDy=0;fontSize=12;fontColor=#000000;dashed=1;" parent="1" source="state-active" target="state-leaving" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="690" y="425"/>
+                            <mxPoint x="690" y="635"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="trans-12" value="failed" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontSize=12;fontColor=#CC0000;strokeColor=#CC0000;strokeWidth=2;" parent="1" source="state-partition" target="state-leaving" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="trans-13" value="graceful exit" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontSize=12;fontColor=#000000;" parent="1" source="state-leaving" target="state-offline-2" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="550" y="700"/>
+                            <mxPoint x="430" y="700"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="trans-14" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontSize=12;fontColor=#CC0000;strokeColor=#CC0000;strokeWidth=2;" parent="1" source="state-leaving" target="state-crashed" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="550" y="700"/>
+                            <mxPoint x="670" y="700"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="title" value="Chord Node Lifecycle States" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=20;fontStyle=1" parent="1" vertex="1">
+                    <mxGeometry x="400" y="10" width="300" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="legend-box" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#666666;dashed=1;" parent="1" vertex="1">
+                    <mxGeometry x="870" y="40" width="200" height="340" as="geometry"/>
+                </mxCell>
+                <mxCell id="legend-title" value="Legend" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=16;fontStyle=1" parent="1" vertex="1">
+                    <mxGeometry x="920" y="50" width="100" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="legend-init" value="Initial/Final" style="ellipse;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="890" y="90" width="80" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="legend-boot" value="Booting" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="890" y="140" width="80" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="legend-join" value="Joining" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="890" y="180" width="80" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="legend-active" value="Active" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="890" y="220" width="80" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="legend-error" value="Error" style="ellipse;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="890" y="260" width="80" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="legend-init-text" value="Start/End states" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;" parent="1" vertex="1">
+                    <mxGeometry x="980" y="95" width="80" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="legend-boot-text" value="Initializing" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;" parent="1" vertex="1">
+                    <mxGeometry x="980" y="140" width="80" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="legend-join-text" value="Connecting" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;" parent="1" vertex="1">
+                    <mxGeometry x="980" y="180" width="80" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="legend-active-text" value="Normal operation" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;" parent="1" vertex="1">
+                    <mxGeometry x="980" y="220" width="80" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="legend-error-text" value="Failure states" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;" parent="1" vertex="1">
+                    <mxGeometry x="980" y="265" width="80" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="legend-maint" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1f5e1;strokeColor=#82b366;fontSize=12;dashed=1;dashPattern=3 3;" vertex="1" parent="1">
+                    <mxGeometry x="890" y="310" width="80" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="legend-maint-text" value="Ongoing operations" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;" vertex="1" parent="1">
+                    <mxGeometry x="980" y="310" width="80" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="legend-note" value="Note: Dashed arrows indicate&#xa;continuous/periodic operations" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=9;fontStyle=2" vertex="1" parent="1">
+                    <mxGeometry x="880" y="350" width="180" height="25" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

@@ -1,0 +1,96 @@
+version: '3.8'
+
+# TrueNAS Scale optimized docker-compose configuration
+# This file is specifically designed for TrueNAS Scale Custom App deployment
+
+services:
+  teaser-site:
+    image: ghcr.io/tanglement-ai/teaser-site:latest
+    container_name: tanglement-teaser-site
+    restart: unless-stopped
+
+    # Network configuration
+    network_mode: bridge
+    ports:
+      - "3000:3000"
+
+    # Environment variables
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_SITE_URL=${SITE_URL:-https://tanglement.ai}
+      - DATABASE_URL=${DATABASE_URL}
+      - SENDGRID_API_KEY=${SENDGRID_API_KEY}
+      - SENDGRID_FROM_EMAIL=${SENDGRID_FROM_EMAIL:-hello@tanglement.ai}
+      - CONVERTKIT_API_KEY=${CONVERTKIT_API_KEY}
+      - CONVERTKIT_FORM_ID=${CONVERTKIT_FORM_ID}
+      - NEXT_PUBLIC_PLAUSIBLE_DOMAIN=${PLAUSIBLE_DOMAIN:-tanglement.ai}
+      - SENTRY_DSN=${SENTRY_DSN}
+      - NEXT_PUBLIC_SENTRY_DSN=${NEXT_PUBLIC_SENTRY_DSN}
+
+    # Volume mounts (configure these in TrueNAS Scale GUI)
+    volumes:
+      # Host path -> Container path
+      # Configure in TrueNAS: Dataset -> /mnt/pool/apps/tanglement/logs
+      - type: bind
+        source: /mnt/pool/apps/tanglement/logs
+        target: /app/logs
+
+    # Resource limits (adjust based on your TrueNAS resources)
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 40s
+
+    # Labels
+    labels:
+      - "com.tanglement.service=teaser-site"
+      - "com.tanglement.version=1.0.0"
+      - "com.tanglement.deployment=truenas-scale"
+
+  # PostgreSQL (optional - use TrueNAS built-in postgres if available)
+  postgres:
+    image: postgres:16-alpine
+    container_name: tanglement-postgres
+    restart: unless-stopped
+
+    environment:
+      - POSTGRES_DB=tanglement
+      - POSTGRES_USER=${POSTGRES_USER:-tanglement}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - PGDATA=/var/lib/postgresql/data/pgdata
+
+    volumes:
+      # TrueNAS dataset for persistent data
+      - type: bind
+        source: /mnt/pool/apps/tanglement/postgres
+        target: /var/lib/postgresql/data
+
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tanglement}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+# Note: TrueNAS Scale manages networks differently
+# The bridge network is created automatically

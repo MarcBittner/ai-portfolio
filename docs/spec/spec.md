@@ -29,6 +29,13 @@ ai-portfolio/
 | Project | Status | Summary |
 |---|---|---|
 | [persona-twin](../../projects/persona-twin/) | In development | Query AI digital twins of synthetic HEXACO personas, grounded in retrieved data with citations — RAG pipeline (chunking/embedding/vector search/reranking), multi-provider LLM routing (OpenAI + Anthropic), layered evaluation harness, PII redaction. |
+| [tanglement-showcase](../../projects/tanglement-showcase/) | Work showcase | Curated public showcase of Tanglement.ai — a decentralized P2P, client-side, multi-provider LLM routing network (Chord DHT + gossip, WireGuard mesh). Technical spec, Next.js demo site, a stdlib-only Go code sample, and the pitch deck. |
+
+> **Showcase exception.** `tanglement-showcase` is a *work showcase* (design
+> docs, a demo site, and a code sample), not a runnable reference project. It is
+> **proprietary, all-rights-reserved** (its own LICENSE) and is exempt from the
+> MIT license and from CONV-1/CONV-3 below. CONV-2 (no secrets) still applies —
+> it was sanitized for public release.
 
 ## Shared Conventions (all projects)
 
