@@ -700,6 +700,7 @@ async def ask(request: AskRequest) -> AskResponse:
         router=state.router,
         bm25=state.bm25 if state.settings.hybrid_retrieval else None,
         k=request.k,
+        rewrite=state.settings.query_rewrite,
         debug=request.debug,
     )
     if not request.debug:

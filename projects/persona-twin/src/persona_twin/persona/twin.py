@@ -25,6 +25,7 @@ from persona_twin.persona.prompting import build_system_prompt, build_user_promp
 from persona_twin.reranking.lexical import LexicalReranker
 from persona_twin.retrieval.bm25 import BM25Index
 from persona_twin.retrieval.fusion import reciprocal_rank_fusion
+from persona_twin.retrieval.rewrite import multi_query_candidates, rewrite_query
 from persona_twin.vectorstore.base import VectorStore
 
 logger = get_logger("persona.twin")
@@ -51,26 +52,39 @@ async def ask_twin(
     reranker: LexicalReranker | None = None,
     bm25: BM25Index | None = None,
     k: int = 5,
+    rewrite: bool = False,
     debug: bool = False,
 ) -> AskResponse:
     reranker = reranker or LexicalReranker()
     timings: dict[str, float] = {}
 
-    t0 = time.perf_counter()
-    query_vector = await embedder.embed_query(question)
-    timings["embed_query"] = _ms_since(t0)
-
-    t0 = time.perf_counter()
-    candidates = await store.search(
-        query_vector, k=N_CANDIDATES, persona_id=persona.persona_id
-    )
-    timings["vector_search"] = _ms_since(t0)
-
-    if bm25 is not None and len(bm25):
+    if rewrite:
+        # multi-query: expand the question, retrieve each, fuse (see rewrite.py)
         t0 = time.perf_counter()
-        keyword = bm25.search(question, k=N_CANDIDATES, persona_id=persona.persona_id)
-        candidates = reciprocal_rank_fusion([candidates, keyword], k=N_CANDIDATES)
-        timings["bm25_fuse"] = _ms_since(t0)
+        queries = await rewrite_query(question, router)
+        timings["rewrite"] = _ms_since(t0)
+        t0 = time.perf_counter()
+        candidates = await multi_query_candidates(
+            queries, embedder=embedder, store=store,
+            persona_id=persona.persona_id, bm25=bm25, k=N_CANDIDATES,
+        )
+        timings["multi_query_retrieve"] = _ms_since(t0)
+    else:
+        t0 = time.perf_counter()
+        query_vector = await embedder.embed_query(question)
+        timings["embed_query"] = _ms_since(t0)
+
+        t0 = time.perf_counter()
+        candidates = await store.search(
+            query_vector, k=N_CANDIDATES, persona_id=persona.persona_id
+        )
+        timings["vector_search"] = _ms_since(t0)
+
+        if bm25 is not None and len(bm25):
+            t0 = time.perf_counter()
+            keyword = bm25.search(question, k=N_CANDIDATES, persona_id=persona.persona_id)
+            candidates = reciprocal_rank_fusion([candidates, keyword], k=N_CANDIDATES)
+            timings["bm25_fuse"] = _ms_since(t0)
 
     t0 = time.perf_counter()
     reranked = reranker.rerank(question, candidates)[:k]

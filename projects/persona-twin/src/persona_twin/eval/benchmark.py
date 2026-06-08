@@ -43,11 +43,12 @@ from persona_twin.reranking import LexicalReranker
 from persona_twin.reranking.llm_rerank import LLMReranker
 from persona_twin.retrieval.bm25 import BM25Index
 from persona_twin.retrieval.fusion import reciprocal_rank_fusion
+from persona_twin.retrieval.rewrite import multi_query_candidates, rewrite_query
 from persona_twin.vectorstore.base import VectorStore
 
 logger = get_logger("eval.benchmark")
 
-BENCH_TASKS = ("twin_answer", "rerank", "eval_judge", "embedding")
+BENCH_TASKS = ("twin_answer", "query_rewrite", "rerank", "eval_judge", "embedding")
 K = 5
 N_CANDIDATES = 25
 
@@ -176,6 +177,7 @@ async def run_benchmark(
             logger.info("benchmark %s", kv(task=task, model=spec.id))
             bench = {
                 "twin_answer": _bench_twin,
+                "query_rewrite": _bench_query_rewrite,
                 "rerank": _bench_rerank,
                 "eval_judge": _bench_judge,
             }[task]
@@ -331,6 +333,50 @@ async def _bench_rerank(
         model=spec.id,
         n=n,
         metrics={"hit_rate": round(hits / n, 3) if n else 0.0, "mrr": round(_mean(rrs), 3)},
+        mean_latency_ms=round(_mean(latencies), 1),
+    )
+
+
+async def _bench_query_rewrite(
+    ctx: BenchmarkContext, sample: list[EvalItem], spec: ModelSpec
+) -> TaskResult:
+    """Measure multi-query expansion's effect on retrieval: rewrite each
+    question with the pinned model, fuse the per-query candidates, then rank.
+    Compare hit_rate/MRR against the single-query rerank baselines in the same
+    run. Offline the rewrite is a no-op ([question]), so this matches lexical."""
+    router = _pinned_router(spec, ctx.providers)
+    reranker = LexicalReranker()
+    hits = errors = 0
+    rrs: list[float] = []
+    latencies: list[float] = []
+    answerable = [i for i in sample if i.answerable]
+    for item in answerable:
+        started = time.perf_counter()
+        try:
+            queries = await rewrite_query(item.question, router)
+        except AllProvidersFailedError:
+            errors += 1
+            continue
+        candidates = await multi_query_candidates(
+            queries, embedder=ctx.embedder, store=ctx.store,
+            persona_id=item.persona_id, bm25=None, k=N_CANDIDATES,
+        )
+        ordered = reranker.rerank(item.question, candidates)
+        latencies.append((time.perf_counter() - started) * 1000)
+        hit, rr = _rank_metrics(ordered, item)
+        hits += hit
+        rrs.append(rr)
+    judged = len(answerable) - errors
+    return TaskResult(
+        task="query_rewrite",
+        provider=spec.provider,
+        model=spec.id,
+        n=len(answerable),
+        errors=errors,
+        metrics={
+            "hit_rate": round(hits / judged, 3) if judged else 0.0,
+            "mrr": round(_mean(rrs), 3),
+        },
         mean_latency_ms=round(_mean(latencies), 1),
     )
 

@@ -139,7 +139,7 @@ class TestBenchmarkAPI:
         assert body["status"] == "completed"
         assert body["results"]
         assert {r["task"] for r in body["results"]} == {
-            "twin_answer", "rerank", "eval_judge", "embedding",
+            "twin_answer", "query_rewrite", "rerank", "eval_judge", "embedding",
         }
         emb = [r for r in body["results"] if r["task"] == "embedding"]
         assert {(r["provider"], r["model"]) for r in emb} == {

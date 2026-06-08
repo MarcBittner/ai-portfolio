@@ -37,6 +37,11 @@ class Settings(BaseSettings):
     hybrid_retrieval: bool = Field(
         default=True, validation_alias="PERSONA_TWIN_HYBRID"
     )
+    # Multi-query expansion before retrieval (LLM rewrite; off by default so
+    # the measured /ask baseline stays stable — the benchmark measures it)
+    query_rewrite: bool = Field(
+        default=False, validation_alias="PERSONA_TWIN_QUERY_REWRITE"
+    )
     # Discover OpenRouter's $0 models at startup (needs OPENROUTER_API_KEY)
     openrouter_free_discovery: bool = Field(
         default=True, validation_alias="PERSONA_TWIN_OPENROUTER_FREE"
