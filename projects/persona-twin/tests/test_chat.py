@@ -196,3 +196,37 @@ async def test_chat_endpoint_streams_events_and_remembers(client):
 async def test_chat_endpoint_unknown_persona_404(client):
     r = await client.post("/chat", json={"persona_id": "nobody", "message": "hi"})
     assert r.status_code == 404
+
+
+# ---- history-aware retrieval (condense) ----
+
+from persona_twin.retrieval.rewrite import condense_query  # noqa: E402
+
+
+async def test_condense_query_no_history_returns_message():
+    router = get_router(Settings(_env_file=None))
+    assert await condense_query([], "what went wrong?", router) == "what went wrong?"
+
+
+async def test_condense_query_offline_degrades_to_message():
+    router = get_router(Settings(_env_file=None))
+    pairs = [("User", "Tell me about your tomatoes"), ("Ada", "I grow Black Krim")]
+    # mock yields no condensed query -> falls back to the raw message
+    assert await condense_query(pairs, "what went wrong with them?", router) == \
+        "what went wrong with them?"
+
+
+async def test_chat_twin_condense_degrades_gracefully_offline(state):
+    persona = state.personas["ada-quill"]
+    history = [
+        ChatTurn(role="user", content="What tomato variety are you growing?"),
+        ChatTurn(role="assistant", content="Black Krim, from seedlings."),
+    ]
+    answer, cites, done = await _collect(chat_twin(
+        persona, "What tomato variety are you growing this year?", history,
+        embedder=state.embedder, store=state.store, router=state.router,
+        bm25=state.bm25, condense=True))
+    # offline condense is a no-op, so retrieval still grounds the answer
+    assert "Black Krim" in answer
+    assert cites.answered is True and cites.citations
+    assert done.routing.task == "twin_chat"

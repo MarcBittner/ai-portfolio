@@ -633,6 +633,7 @@ async def chat(request: ChatRequest) -> StreamingResponse:
                 router=state.router,
                 bm25=state.bm25 if state.settings.hybrid_retrieval else None,
                 k=request.k,
+                condense=state.settings.chat_condense,
             ):
                 if isinstance(ev, TokenEvent):
                     answer_parts.append(ev.text)

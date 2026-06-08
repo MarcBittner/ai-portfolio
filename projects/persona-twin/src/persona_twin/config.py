@@ -42,6 +42,12 @@ class Settings(BaseSettings):
     query_rewrite: bool = Field(
         default=False, validation_alias="PERSONA_TWIN_QUERY_REWRITE"
     )
+    # History-aware chat retrieval: condense the conversation into a standalone
+    # query before retrieving (chat only; on by default — degrades to the raw
+    # message offline). Stateless /ask is unaffected.
+    chat_condense: bool = Field(
+        default=True, validation_alias="PERSONA_TWIN_CHAT_CONDENSE"
+    )
     # Discover OpenRouter's $0 models at startup (needs OPENROUTER_API_KEY)
     openrouter_free_discovery: bool = Field(
         default=True, validation_alias="PERSONA_TWIN_OPENROUTER_FREE"

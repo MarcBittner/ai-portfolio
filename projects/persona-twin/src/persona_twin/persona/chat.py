@@ -34,6 +34,7 @@ from persona_twin.persona.twin import N_CANDIDATES, _to_citation
 from persona_twin.reranking.lexical import LexicalReranker
 from persona_twin.retrieval.bm25 import BM25Index
 from persona_twin.retrieval.fusion import reciprocal_rank_fusion
+from persona_twin.retrieval.rewrite import condense_query
 from persona_twin.vectorstore.base import VectorStore
 
 logger = get_logger("persona.chat")
@@ -123,28 +124,39 @@ async def chat_twin(
     reranker: LexicalReranker | None = None,
     bm25: BM25Index | None = None,
     k: int = 5,
+    condense: bool = False,
 ) -> AsyncIterator[ChatEvent]:
     """Stream a grounded conversational answer, then a validated citation tail.
 
     Yields ``TokenEvent`` deltas while generating, then one ``CitationsEvent``
     and one ``DoneEvent``. Retrieval mirrors ``ask_twin``; the citation tail
-    is a separate structured call so the visible prose stays clean."""
-    reranker = reranker or LexicalReranker()
+    is a separate structured call so the visible prose stays clean.
 
-    query_vector = await embedder.embed_query(message)
+    With ``condense`` and prior turns, the follow-up message is first folded
+    into a standalone retrieval query (resolving "them"/"it") so retrieval is
+    history-aware, not just the latest message. Generation always sees the
+    full history regardless."""
+    reranker = reranker or LexicalReranker()
+    pairs = _history_pairs(persona, history)
+
+    retrieval_query = message
+    if condense and history:
+        retrieval_query = await condense_query(pairs, message, router)
+
+    query_vector = await embedder.embed_query(retrieval_query)
     candidates = await store.search(
         query_vector, k=N_CANDIDATES, persona_id=persona.persona_id
     )
     if bm25 is not None and len(bm25):
-        keyword = bm25.search(message, k=N_CANDIDATES, persona_id=persona.persona_id)
+        keyword = bm25.search(
+            retrieval_query, k=N_CANDIDATES, persona_id=persona.persona_id
+        )
         candidates = reciprocal_rank_fusion([candidates, keyword], k=N_CANDIDATES)
-    reranked = reranker.rerank(message, candidates)[:k]
+    reranked = reranker.rerank(retrieval_query, candidates)[:k]
 
     prose_request = LLMRequest(
         system=build_chat_system_prompt(persona),
-        user=build_chat_user_prompt(
-            _history_pairs(persona, history), message, reranked
-        ),
+        user=build_chat_user_prompt(pairs, message, reranked),
         max_tokens=1024,
     )
     parts: list[str] = []

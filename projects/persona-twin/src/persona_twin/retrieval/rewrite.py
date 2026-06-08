@@ -57,6 +57,38 @@ async def rewrite_query(
     return out[:n]
 
 
+CONDENSE_SYSTEM = """Rewrite the user's latest message into a standalone search
+query, resolving pronouns and references ("them", "that", "it") using the prior
+conversation. Output only the query text — no answer, no explanation."""
+
+
+class CondensedQuery(BaseModel):
+    query: str = ""
+
+
+async def condense_query(
+    history: list[tuple[str, str]], message: str, router: LLMRouter
+) -> str:
+    """Fold a follow-up message + prior turns into a standalone retrieval
+    query (resolving "them"/"it"/"that"). Degrades to the raw message when
+    there is no history, offline (mock returns nothing), or on failure."""
+    if not history:
+        return message
+    convo = "\n".join(f"{speaker}: {text}" for speaker, text in history)
+    try:
+        request = LLMRequest(
+            system=CONDENSE_SYSTEM,
+            user=f"Conversation:\n{convo}\n\nLatest message: {message}",
+            max_tokens=128,
+        )
+        parsed, _, _ = await router.complete_structured(
+            request, CondensedQuery, task="query_rewrite"
+        )
+    except AllProvidersFailedError:
+        return message
+    return parsed.query.strip() or message
+
+
 async def multi_query_candidates(
     queries: list[str],
     *,
