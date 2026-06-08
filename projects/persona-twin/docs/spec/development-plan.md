@@ -211,3 +211,39 @@ monorepo; portfolio-level spec lives at `docs/spec/spec.md` in the root).
 - [x] analytics `embedding` task: embedder × vector/hybrid scorecards
 - [x] GitHub Actions: lint/test/eval with MRR≥0.9 regression gate +
       frontend build/typecheck (deployment untouched — Argo stays)
+
+---
+
+## Roadmap (post-v0.10.0 — next session picks one)
+
+Ordered by recommendation. All build on the live system; "go" means
+implement, ship via Argo (build image → `docker save | ctr import` into
+the kind node → bump manifest → push → Argo syncs → bounce gateway), and
+verify through the gateway before reporting done.
+
+1. **Streaming + conversational twins** *(recommended)* — SSE token
+   streaming from the router through FastAPI into the React UI; a `/chat`
+   endpoint with per-session conversation memory so twins hold a
+   multi-turn conversation. Hard part: stream the prose while still
+   producing validated citations (stream text, attach the structured
+   citation tail). Keep stateless `/ask` untouched as the eval path.
+2. **Persona builder UI** — browser-create a persona: HEXACO sliders,
+   paste/upload documents, live PII-redaction preview (counts by type)
+   before ingest, then query it immediately. Makes the governance layer
+   visceral. Pairs well right after #1 (both frontend-heavy).
+3. **Observability** — `/metrics` in Prometheus format (provider latency
+   histograms, cache hit ratios, circuit-breaker opens, benchmark
+   durations) + Prometheus & Grafana deployed next to Argo on the kind
+   cluster, with a committed dashboard.
+4. **Eval refinements** — (a) voice-consistency LLM judge in twin
+   benchmarks (replace the heuristic with a judged "sounds like Ada"
+   score per model); (b) query rewriting / multi-query expansion as a
+   fourth routed task, benchmarked like the others.
+5. **Twin-vs-twin** — one twin interviews another; both answers grounded
+   in their own corpora with citations on each side.
+
+### Parked / deferred
+- **ghcr image push + CD** — user chose to stay on Argo with side-loaded
+  images; the one remaining manual deploy step is the `ctr import`.
+- **Run the full 6-model benchmark matrix** via `/analytics` "Run
+  missing" — mostly unrun; would make routing decisions data-backed.

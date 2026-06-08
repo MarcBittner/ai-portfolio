@@ -20,33 +20,84 @@
 - The offline path (mock LLM, hash embedder, in-memory store) is a
   first-class mode — every feature must work without a `.env`.
 
+### Live deployment + ship loop (post-v0.1.0)
+
+The app runs on a **local kind cluster** (`kind-argo-demo`) under
+**Argo CD** (Application synced from this repo's `main`). The full
+ship loop for each feature:
+
+1. Build code; keep `make test` + `make lint` green and bump the version
+   in `pyproject.toml`, `src/persona_twin/__init__.py`, and
+   `deploy/k8s/persona-twin.yaml` (image tag) together
+2. `docker build -t persona-twin:vX.Y.Z .` then
+   `docker save persona-twin:vX.Y.Z | docker exec -i argo-demo-control-plane ctr -n k8s.io images import -`
+   (kind can't pull local images — they're side-loaded; manifest uses
+   `imagePullPolicy: Never`)
+3. Commit `(task) …`, tag `vX.Y.Z`, push (the secret-scan pre-commit
+   hook gates it)
+4. `kubectl annotate application -n argocd persona-twin
+   argocd.argoproj.io/refresh=normal --overwrite` to pull the sync, wait
+   for the revision to match HEAD, then
+   `kubectl -n persona-twin rollout status deployment/persona-twin`
+5. **`docker restart persona-twin-gateway`** — the relay container's
+   port-forwards pin to the old pod; bounce it after every rollout
+6. **Verify through the gateway** (`http://host.docker.internal:9081`)
+   before reporting done — port-forwards to NodePort don't reach this
+   container, in-cluster/gateway paths do
+
+User-facing URLs (Mac browser, via the `persona-twin-gateway` relay
+container publishing to localhost): **demo http://localhost:9081**,
+**Argo http://localhost:9080**. Git pushes use the SSH key at
+`docs/spec/untracked/ghostlocalhost.pem` (see [[github-push-key-location]]
+memory): `GIT_SSH_COMMAND="ssh -i docs/spec/untracked/ghostlocalhost.pem
+-o IdentitiesOnly=yes" git push`.
+
 ### Next task prompt
 
 ```
 Continue persona-twin. Read projects/persona-twin/docs/spec/spec.md and
-projects/persona-twin/docs/spec/development-plan.md, find the first
-unchecked task, and implement it following the standing rules. Keep
-`make test` green.
+projects/persona-twin/docs/spec/development-plan.md (the Roadmap section
+at the bottom lists the next candidate features — Streaming +
+conversational twins is recommended). Pick one, implement it following
+the standing rules, ship it via the live deployment loop in claude-code.md
+§1, and verify through the gateway. Keep `make test` green.
 ```
 
 ---
 
 ## Section 2: State Transfer Prompts
 
-**Last Updated:** 2026-06-06
+**Last Updated:** 2026-06-08
 
-**Project Status:** Phase 0 complete (bootstrap + spec docs). Next: Phase 1
-(project skeleton — pyproject, package layout, Makefile, test scaffold).
+**Project Status:** persona-twin **v0.10.0**, live on the local
+kind/Argo cluster. Phases 0–17 complete (RAG → twins → eval → frontend →
+deploy → routing console → benchmarks/analytics → persistence → aggregate
+scoreboard → free-model wiring → Ollama embeddings + circuit breaker →
+hybrid retrieval + CI). GitHub Actions CI is green (lint/test/eval gate +
+frontend build). **Next:** pick a feature from the Roadmap section in the
+project plan — *Streaming + conversational twins* is recommended.
+
+Active config worth knowing: Ollama is the live embedder
+(`nomic-embed-text`, 768d) and provides local LLM models; OpenRouter free
+key is set (cluster Secret `persona-twin-providers`, value also in
+untracked credentials), so free-model discovery is on; hybrid retrieval
+(BM25+RRF) is on by default.
 
 ### Resume Prompt for Next Session
 
 You are resuming work on **persona-twin** — a public, MIT-licensed
 reference implementation of RAG, HEXACO persona twins, multi-provider LLM
-routing, and layered LLM evaluation, runnable offline with zero paid
-accounts.
+routing, layered evaluation, model benchmarking, and hybrid retrieval.
+It is **v0.10.0, deployed live** on a local kind cluster under Argo CD.
 
-1. Read `docs/spec/spec.md` (requirements) and
-   `docs/spec/development-plan.md` (task list with checkboxes)
-2. Credentials, if any, live in `docs/spec/untracked/credentials.md`
-   (gitignored — never commit)
-3. Implement the next unchecked task; follow the standing rules in §1
+1. Read `projects/persona-twin/docs/spec/spec.md` (requirements, FR-1…
+   FR-15) and `.../development-plan.md` — the **Roadmap** section at the
+   bottom lists the next candidate features
+2. Read `docs/spec/claude-code.md` §1 for the standing rules **and the
+   live deployment / ship loop** (build → side-load into kind → bump
+   manifest → push → Argo sync → bounce gateway → verify via gateway)
+3. Credentials live in `docs/spec/untracked/credentials.md` (gitignored:
+   OpenRouter key, Argo admin password, GitHub SSH key). Never commit.
+4. Pick the next roadmap feature (Streaming + conversational twins
+   recommended), implement it, ship via the loop, verify through the
+   gateway at http://localhost:9081, keep `make test` green.
