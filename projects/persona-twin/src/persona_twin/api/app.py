@@ -60,6 +60,7 @@ from persona_twin.persona.chat import (
     TokenEvent,
     chat_twin,
 )
+from persona_twin.persona.interview import InterviewTranscript, interview
 from persona_twin.persona.store import (
     PersonaStore,
     StoredDoc,
@@ -665,6 +666,40 @@ async def chat(request: ChatRequest) -> StreamingResponse:
             "x-accel-buffering": "no",  # don't let a proxy buffer the stream
         },
     )
+
+
+class InterviewRequest(BaseModel):
+    interviewer_id: str
+    subject_id: str
+    rounds: int = Field(default=3, ge=1, le=6)
+
+
+@router.post("/interview", response_model=InterviewTranscript)
+async def run_interview(request: InterviewRequest) -> InterviewTranscript:
+    """Twin-vs-twin: one twin interviews another. The subject answers grounded
+    in its own corpus with validated citations (the answer side is ask_twin)."""
+    new_request_id()
+    state = _state()
+    if request.interviewer_id == request.subject_id:
+        raise HTTPException(
+            status_code=422, detail="interviewer and subject must differ"
+        )
+    interviewer = state.personas.get(request.interviewer_id)
+    subject = state.personas.get(request.subject_id)
+    for label, persona, pid in (
+        ("interviewer", interviewer, request.interviewer_id),
+        ("subject", subject, request.subject_id),
+    ):
+        if persona is None:
+            raise HTTPException(status_code=404, detail=f"unknown {label}: {pid}")
+    transcript = await interview(
+        interviewer, subject,
+        embedder=state.embedder, store=state.store, router=state.router,
+        bm25=state.bm25 if state.settings.hybrid_retrieval else None,
+        rounds=request.rounds,
+    )
+    REQUESTS.inc("interview", "ok")
+    return transcript
 
 
 @router.post("/ask", response_model=AskResponse)

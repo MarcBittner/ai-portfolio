@@ -98,6 +98,37 @@ export function listPersonas(): Promise<Persona[]> {
   return request<Persona[]>("/personas");
 }
 
+// ---- Twin-vs-twin interview ----
+
+export interface InterviewRound {
+  question: string;
+  answer: string;
+  answered: boolean;
+  citations: Citation[];
+}
+
+export interface InterviewTranscript {
+  interviewer_id: string;
+  subject_id: string;
+  rounds: InterviewRound[];
+}
+
+export function runInterview(
+  interviewerId: string,
+  subjectId: string,
+  rounds: number,
+): Promise<InterviewTranscript> {
+  return request<InterviewTranscript>("/interview", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      interviewer_id: interviewerId,
+      subject_id: subjectId,
+      rounds,
+    }),
+  });
+}
+
 // ---- Persona builder ----
 
 export interface DocumentInput {
