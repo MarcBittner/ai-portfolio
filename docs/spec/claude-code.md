@@ -57,10 +57,10 @@ memory): `GIT_SSH_COMMAND="ssh -i docs/spec/untracked/ghostlocalhost.pem
 ```
 Continue persona-twin. Read projects/persona-twin/docs/spec/spec.md and
 projects/persona-twin/docs/spec/development-plan.md (the Roadmap section
-at the bottom lists the next candidate features — Streaming +
-conversational twins is recommended). Pick one, implement it following
-the standing rules, ship it via the live deployment loop in claude-code.md
-§1, and verify through the gateway. Keep `make test` green.
+at the bottom lists the next candidate features — Persona builder UI is
+recommended). Pick one, implement it following the standing rules, ship
+it via the live deployment loop in claude-code.md §1, and verify through
+the gateway. Keep `make test` green.
 ```
 
 ---
@@ -69,13 +69,18 @@ the standing rules, ship it via the live deployment loop in claude-code.md
 
 **Last Updated:** 2026-06-08
 
-**Project Status:** persona-twin **v0.10.0**, live on the local
-kind/Argo cluster. Phases 0–17 complete (RAG → twins → eval → frontend →
+**Project Status:** persona-twin **v0.11.0**, live on the local
+kind/Argo cluster. Phases 0–18 complete (RAG → twins → eval → frontend →
 deploy → routing console → benchmarks/analytics → persistence → aggregate
 scoreboard → free-model wiring → Ollama embeddings + circuit breaker →
-hybrid retrieval + CI). GitHub Actions CI is green (lint/test/eval gate +
-frontend build). **Next:** pick a feature from the Roadmap section in the
-project plan — *Streaming + conversational twins* is recommended.
+hybrid retrieval + CI → streaming + conversational twins). GitHub Actions
+CI is green (lint/test/eval gate + frontend build). **Next:** pick a
+feature from the Roadmap section in the project plan — *Persona builder
+UI* is recommended.
+
+Note: v0.11.0 code is committed locally but **not yet deployed** — the
+ship loop (build image → side-load into kind → push → Argo sync → bounce
+gateway) must run on the Mac, where docker/kubectl live.
 
 Active config worth knowing: Ollama is the live embedder
 (`nomic-embed-text`, 768d) and provides local LLM models; OpenRouter free
@@ -87,17 +92,19 @@ untracked credentials), so free-model discovery is on; hybrid retrieval
 
 You are resuming work on **persona-twin** — a public, MIT-licensed
 reference implementation of RAG, HEXACO persona twins, multi-provider LLM
-routing, layered evaluation, model benchmarking, and hybrid retrieval.
-It is **v0.10.0, deployed live** on a local kind cluster under Argo CD.
+routing, layered evaluation, model benchmarking, hybrid retrieval, and
+streamed conversational twins. It is **v0.11.0** (code committed; deploy
+the v0.11.0 image from the Mac) on a local kind cluster under Argo CD.
 
 1. Read `projects/persona-twin/docs/spec/spec.md` (requirements, FR-1…
-   FR-15) and `.../development-plan.md` — the **Roadmap** section at the
+   FR-16) and `.../development-plan.md` — the **Roadmap** section at the
    bottom lists the next candidate features
 2. Read `docs/spec/claude-code.md` §1 for the standing rules **and the
    live deployment / ship loop** (build → side-load into kind → bump
    manifest → push → Argo sync → bounce gateway → verify via gateway)
 3. Credentials live in `docs/spec/untracked/credentials.md` (gitignored:
    OpenRouter key, Argo admin password, GitHub SSH key). Never commit.
-4. Pick the next roadmap feature (Streaming + conversational twins
-   recommended), implement it, ship via the loop, verify through the
-   gateway at http://localhost:9081, keep `make test` green.
+4. Pick the next roadmap feature (Persona builder UI recommended),
+   implement it, ship via the loop, verify through the gateway at
+   http://localhost:9081, keep `make test` green. (First: deploy the
+   already-committed v0.11.0 chat feature if it hasn't shipped yet.)

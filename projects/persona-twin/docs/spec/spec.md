@@ -275,6 +275,28 @@ throwaway test stubs — they are the documented offline mode.
 - **FR-15.3** Measured: eval report carries `content_aware+hybrid` rows;
   the analytics `embedding` task compares vector vs hybrid per embedder
 
+### FR-16: Streaming + Conversational Twins
+
+- **FR-16.1** `POST /chat` streams a grounded answer over Server-Sent
+  Events: `meta` (session id) → `token` deltas → `citations` (validated
+  tail) → `done` (routing); `error` on failure. The stateless `/ask` path
+  is untouched and remains the measured/eval path
+- **FR-16.2** Provider-level streaming behind the existing port (mock,
+  OpenAI-compatible incl. Ollama/OpenRouter/custom, Anthropic);
+  `LLMRouter.stream_complete` fails over only before the first token, is
+  circuit-breaker aware, and routes the new `twin_chat` task
+- **FR-16.3** Citations are produced by a separate structured pass and
+  validated against what was actually retrieved — a cited id absent from
+  the retrieved set is dropped, exactly as in `/ask`; the displayed prose
+  carries no citation markers
+- **FR-16.4** Per-session conversation memory (in-process, turn-capped,
+  LRU across sessions): prior turns are fed back into the prompt so twins
+  hold a multi-turn conversation. Memory is the deployment's concern at
+  scale (single-replica for the demo); retrieval uses the latest message
+- **FR-16.5** Frontend `/chat` tab: streamed conversation rendered
+  token-by-token, citation tail per answer, persona switcher, session
+  continuity; talks only to the FastAPI service
+
 ### FR-10: Developer Experience
 
 - **FR-10.1** `Makefile`: `setup` (venv + install), `demo` (ingest + sample

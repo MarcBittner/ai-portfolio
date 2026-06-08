@@ -15,17 +15,18 @@ checkboxed plan at `projects/<name>/docs/spec/development-plan.md`.
 - [x] Portfolio spec + monorepo layout (`projects/` per-project)
 - [x] Root README portfolio index (grows as projects land)
 
-## Project 1: persona-twin 🔄 v0.10.0 (live on local Argo/kind)
+## Project 1: persona-twin 🔄 v0.11.0 (live on local Argo/kind)
 
 Digital twins of synthetic HEXACO personas — RAG, multi-provider routing,
 layered evaluation, model benchmarking. Detailed plan:
 [projects/persona-twin/docs/spec/development-plan.md](../../projects/persona-twin/docs/spec/development-plan.md)
 
-Phases 0–17 complete (see the project plan). Highlights since v0.1.0:
+Phases 0–18 complete (see the project plan). Highlights since v0.1.0:
 multi-provider routing console, model benchmarking + analytics tab,
 incremental aggregate scoreboard, Ollama local models + embeddings,
 OpenRouter/free-model wiring, circuit-breaker routing, hybrid (BM25+RRF)
-retrieval, and GitHub Actions CI with an eval-regression gate.
+retrieval, GitHub Actions CI with an eval-regression gate, and streamed
+conversational twins (SSE `/chat` with per-session memory).
 
 - [x] Phases 0–10: core build → v0.1.0 (RAG, twins, eval, frontend, deploy)
 - [x] Phase 11: routing console (per-task policy, OpenRouter) — v0.3.0
@@ -35,19 +36,22 @@ retrieval, and GitHub Actions CI with an eval-regression gate.
 - [x] Phase 15: generic free-model wiring + OpenRouter discovery — v0.8.0
 - [x] Phase 16: Ollama embeddings + circuit-breaker routing — v0.9.0
 - [x] Phase 17: hybrid retrieval + embedder benchmarks + CI — v0.10.0
+- [x] Phase 18: streaming + conversational twins (SSE `/chat`, session
+      memory, validated citation tail) — v0.11.0
 
 ### Roadmap (next session — pick from these)
 
-- [ ] **Streaming + conversational twins** (recommended next): SSE token
-      streaming through the router into the UI; `/chat` with per-session
-      memory; keep stateless `/ask` as the measured path
-- [ ] Persona builder UI: HEXACO sliders + paste docs → live PII
-      redaction preview → ingest → query (governance showcase)
+- [ ] **Persona builder UI** (recommended next): HEXACO sliders + paste
+      docs → live PII redaction preview → ingest → query (governance
+      showcase); frontend-heavy, pairs with the new chat UI
 - [ ] Observability: `/metrics` (Prometheus) + Grafana on the cluster —
       provider latency, cache ratios, circuit-breaker opens, bench durations
 - [ ] Eval refinements: voice-consistency LLM judge; query-rewriting as a
       routed task
 - [ ] Twin-vs-twin (one twin interviews another, both grounded)
+- [ ] History-aware chat retrieval: condense the conversation into a
+      standalone query before retrieving (chat currently uses the latest
+      message only)
 - [ ] **Parked by user:** ghcr image push + CD (staying on Argo with
       side-loaded images for now)
 

@@ -18,6 +18,7 @@ make setup && make demo    # fully offline — no API keys, no database
 | Reranking | retrieve wide (k=25) → IDF-weighted lexical rerank → top 5; measured, not assumed | [docs/reranking.md](docs/reranking.md) |
 | Persona twins | HEXACO profiles → concrete style instructions; style never overrides grounding; citations validated against what was retrieved | [docs/personas.md](docs/personas.md) |
 | Multi-provider routing | Anthropic + OpenAI + deterministic mock behind one port; cost/latency/quality objectives from a declarative model registry; fallback chains with recorded reasons; schema-validated structured outputs with retry | `src/persona_twin/llm/` |
+| Streaming chat | token-by-token SSE conversation with per-session memory; grounded prose streamed live, then a citation tail validated against retrieval exactly like `/ask` | `src/persona_twin/persona/chat.py` |
 | **Evaluation** | retrieval / grounding / answer-quality measured **separately** over a committed dataset; deliberately no composite score | [docs/evaluation.md](docs/evaluation.md) |
 | Data governance | deterministic PII redaction as a mandatory ingest gate; synthetic data only | [docs/data-governance.md](docs/data-governance.md) |
 | Free-model wiring | local Ollama auto-discovery, OpenRouter $0-model discovery, any OpenAI-compatible free tier as pure config | [docs/free-models.md](docs/free-models.md) |
@@ -28,7 +29,7 @@ make setup && make demo    # fully offline — no API keys, no database
 ```
                   ┌─────────────────────────────────────────┐
                   │ FastAPI (async, Pydantic)               │
-                  │ /personas  /ask  /ingest  /health       │
+                  │ /personas /ask /chat /ingest /health     │
                   └──────┬──────────────────────────────────┘
                          │
    ┌──────────────┬──────┴────────────┬───────────────────┐
@@ -62,13 +63,26 @@ make serve    # uvicorn on :8000 — then POST /ask
 Optional web UI (React Router 7 + Tailwind + shadcn-style components;
 needs Node 20+): run `make serve` in one terminal and `make frontend`
 in another, then open <http://localhost:5173> — persona picker with
-HEXACO bars, citations, and a routing/timings debug panel.
+HEXACO bars, citations, and a routing/timings debug panel, plus a
+**chat** tab that streams a multi-turn conversation token-by-token.
 
 ```sh
 curl -s localhost:8000/ask -H 'content-type: application/json' -d '{
   "persona_id": "ada-quill",
   "question": "What tomato variety are you growing this year?",
   "debug": true
+}'
+```
+
+`/ask` is the stateless, measured eval path. For a streamed multi-turn
+conversation, `POST /chat` returns Server-Sent Events (`meta` → `token`
+deltas → validated `citations` tail → `done`); omit `session_id` to start
+a thread, then pass it back to continue:
+
+```sh
+curl -N localhost:8000/chat -H 'content-type: application/json' -d '{
+  "persona_id": "ada-quill",
+  "message": "What tomato variety are you growing this year?"
 }'
 ```
 
