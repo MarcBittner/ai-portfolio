@@ -3,13 +3,18 @@
 from persona_twin.corpus import load_personas
 from persona_twin.embedding import HashEmbedder
 from persona_twin.eval.dataset import load_eval_dataset
+from persona_twin.eval.judge import judge_voice
 from persona_twin.eval.metrics import (
     contains_reference,
     lexical_support,
     token_f1,
+    voice_heuristic,
     voice_violations,
 )
 from persona_twin.eval.run import evaluate_retrieval
+from persona_twin.llm import MockProvider
+from persona_twin.llm.registry import ModelRegistry
+from persona_twin.llm.router import LLMRouter
 
 
 class TestDataset:
@@ -65,3 +70,21 @@ class TestRetrievalEval:
         assert plain.n == reranked.n >= 25
         assert reranked.mrr >= plain.mrr
         assert reranked.hit_rate >= 0.8  # offline floor; report shows actuals
+
+
+class TestVoiceJudge:
+    def test_voice_heuristic_rewards_in_character_prose(self):
+        # clean first-person, no assistant-isms → full marks
+        assert voice_heuristic("I grow Black Krim tomatoes on my balcony.") == 1.0
+        # assistant-ism + no first person → penalized
+        low = voice_heuristic("As an AI language model, the tomato is a fruit.")
+        assert low < 1.0
+
+    async def test_judge_voice_offline_uses_heuristic(self):
+        persona = load_personas()[0].persona
+        router = LLMRouter(ModelRegistry([]), {"mock": MockProvider()})
+        score, method = await judge_voice(
+            "I write longhand every morning in my notebooks.", persona, router
+        )
+        assert method == "heuristic"
+        assert 0.0 <= score <= 1.0

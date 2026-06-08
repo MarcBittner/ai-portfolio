@@ -61,3 +61,10 @@ def voice_violations(answer: str) -> list[str]:
     if len(tokens(answer)) > 10 and not re.search(r"\b(i|my|me|we)\b", lowered):
         hits.append("no first-person voice")
     return hits
+
+
+def voice_heuristic(answer: str) -> float:
+    """Deterministic offline proxy for voice consistency: 1.0 with no
+    assistant-isms, dropping with each violation. The LLM voice judge
+    replaces this when a real provider is configured (see judge.py)."""
+    return max(0.0, 1.0 - 0.34 * len(voice_violations(answer)))

@@ -27,7 +27,7 @@ from persona_twin.config import Settings
 from persona_twin.corpus import PersonaRecord
 from persona_twin.embedding.base import Embedder
 from persona_twin.eval.dataset import EvalItem
-from persona_twin.eval.judge import JUDGE_SYSTEM, SupportVerdict
+from persona_twin.eval.judge import JUDGE_SYSTEM, SupportVerdict, judge_voice
 from persona_twin.eval.metrics import (
     contains_reference,
     lexical_support,
@@ -200,6 +200,7 @@ async def _bench_twin(
     f1s: list[float] = []
     facts: list[bool] = []
     supports: list[float] = []
+    voices: list[float] = []
     cited_total = cited_ok = 0
     false_refusals = 0
     refused_unanswerable = 0
@@ -240,12 +241,15 @@ async def _bench_twin(
             if c.chunk_id in retrieved:
                 cited_texts.append(retrieved[c.chunk_id].chunk.text)
         supports.append(lexical_support(r.answer, cited_texts) if cited_texts else 0.0)
+        vscore, _ = await judge_voice(r.answer, ctx.personas[item.persona_id], router)
+        voices.append(vscore)
 
     metrics = {
         "fact_presence": _mean([float(x) for x in facts]),
         "token_f1": _mean(f1s),
         "citation_precision": (cited_ok / cited_total) if cited_total else 0.0,
         "claim_support": _mean(supports),
+        "voice_consistency": _mean(voices),
         "false_refusal_rate": false_refusals / len(answerable) if answerable else 0.0,
     }
     if unanswerable:

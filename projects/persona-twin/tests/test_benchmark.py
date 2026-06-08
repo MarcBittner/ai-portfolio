@@ -86,6 +86,8 @@ class TestRunBenchmark:
         assert ("rerank", "baseline", "none") in tasks
         assert ("rerank", "baseline", "lexical") in tasks
         assert ("eval_judge", "mock", "mock-extractive-1") in tasks
+        twin = next(r for r in run.results if r.task == "twin_answer")
+        assert "voice_consistency" in twin.metrics  # judged voice metric present
         for r in run.results:
             for value in r.metrics.values():
                 assert 0.0 <= value <= 1.0
