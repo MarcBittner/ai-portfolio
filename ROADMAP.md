@@ -24,9 +24,9 @@ Projects 3–10; the roadmaps below are what's next._
 
 ## Cross-cutting initiatives (highest leverage)
 
-1. **Deploy the 7 remaining services to Argo** — each lists "Dockerfile +
-   `deploy/k8s` + `deploy/argocd`, mirror pii-redactor". Small pods (64–256 MB),
-   GitOps auto-sync, ports 8002–8008. all nine services now sync via GitOps.
+1. **Deploy every service to Argo** ✅ done — all nine services (persona-twin +
+   the eight self-contained projects) now build to small non-root images
+   (64–256 MB) and sync Healthy via GitOps from `deploy/argocd`.
 2. **Shared-code decision** — `llm.py` is vendored 9×, and PII detectors are
    duplicated across pii-redactor / promptguard / multimodal-ocr. Choose:
    keep vendored (self-containment, current ethos) **or** extract an installable
