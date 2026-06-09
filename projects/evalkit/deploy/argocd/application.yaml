@@ -1,0 +1,26 @@
+# Argo CD Application: evalkit synced from the public repo.
+#
+#   kubectl apply -f deploy/argocd/application.yaml
+#
+# Assumes the image (evalkit:v0.1.0) is already loaded into the kind node
+# (docker save | ctr images import), since imagePullPolicy: Never.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: evalkit
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/MarcBittner/ai-portfolio.git
+    targetRevision: main
+    path: projects/evalkit/deploy/k8s
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: evalkit
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
