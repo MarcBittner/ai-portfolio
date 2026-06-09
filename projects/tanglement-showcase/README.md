@@ -12,6 +12,8 @@
 > portfolio, this directory is a curated showcase of proprietary work; see
 > [`LICENSE`](LICENSE). No production code is included.
 
+![Tanglement.ai teaser site](docs/screenshot.png)
+
 Tanglement.ai is a peer-to-peer network that optimizes LLM access through intelligent **client-side routing**, with *no centralized company infrastructure in the request path*. Apps embed the SDK; a local routing engine picks the best provider per request (cost / latency / reliability); calls go **directly** to the provider (OpenAI, Anthropic, Google) using the user's **own API keys** — Tanglement never touches or stores credentials — and nodes share routing intelligence over a gossip protocol. Result: no proxy bottleneck, no single point of failure, and operating cost of roughly **$0–65/month vs. $100k+/month** for a traditional API gateway.
 
 ## My role
