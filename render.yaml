@@ -1,0 +1,15 @@
+# Render Blueprint — one-click free deploy of the persona-twin demo.
+# Steps: render.com → New → Blueprint → connect this repo (MarcBittner/ai-portfolio) → Apply.
+# Public https URL in ~3-5 min. Runs fully OFFLINE (mock LLM + in-memory vector store);
+# no API keys, no cost. Free tier sleeps after ~15 min idle and cold-starts in ~30-60s.
+services:
+  - type: web
+    name: persona-twin
+    runtime: docker
+    plan: free
+    dockerfilePath: ./projects/persona-twin/Dockerfile
+    dockerContext: ./projects/persona-twin
+    healthCheckPath: /health
+    envVars:
+      - key: PERSONA_TWIN_ROUTE_OBJECTIVE
+        value: cost
