@@ -48,7 +48,7 @@ ai-portfolio/
 ## Shared Conventions (all projects)
 
 ### CONV-1: Zero-cost reviewability
-Every project runs end to end (`make setup && make demo && make test`) on a
+Every project runs end to end (`./run.sh setup && ./run.sh demo && ./run.sh test`) on a
 fresh clone with no `.env` and no paid accounts. External services
 (databases, LLM providers, caches) activate only when their environment
 variables are present.

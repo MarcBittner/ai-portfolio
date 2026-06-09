@@ -86,7 +86,7 @@ styles, live highlighting. MIT, offline, no secrets — conforms to CONV-1…4.
 
 - [x] Detection + validation core; five redaction styles (value-consistent)
 - [x] FastAPI `/detect` `/redact` `/types` `/health` + static single-page UI
-- [x] 23 tests (detect/redact/api), ruff clean, `make demo` offline
+- [x] 23 tests (detect/redact/api), ruff clean, `./run.sh demo` offline
 - [ ] Roadmap (see project plan): more types (IPv6, secrets w/ entropy),
       i18n formats, optional NER backend, container/deploy
 
@@ -98,7 +98,7 @@ secrets — conforms to CONV-1…4.
 
 - [x] Five deterministic metrics; evaluate / gate / compare core
 - [x] FastAPI `/evaluate` `/compare` `/metrics` `/health` + static UI
-- [x] 19 tests (metrics/evaluate/api), ruff clean, `make demo` offline
+- [x] 19 tests (metrics/evaluate/api), ruff clean, `./run.sh demo` offline
 - [ ] Roadmap (see project plan): LLM-judge metric, reference-free scorers,
       JSONL dataset loaders + CI CLI, real-embedder option, Argo deploy
 
@@ -110,7 +110,7 @@ and provenance spans. MIT, offline, no secrets — conforms to CONV-1…4.
 
 - [x] invoice/resume/contact schemas; extraction + validation core
 - [x] FastAPI `/extract` `/schemas` `/health` + static UI
-- [x] 13 tests (extract/api), ruff clean, `make demo` offline
+- [x] 13 tests (extract/api), ruff clean, `./run.sh demo` offline
 - [ ] Roadmap (see project plan): LLM extractor for messy docs, repeated/table
       fields, more schemas/locales, upstream OCR, Argo deploy
 
@@ -123,7 +123,7 @@ secrets — conforms to CONV-1…4.
 - [x] Sandboxed tools (AST calculator, unit convert, date_diff, KB search)
 - [x] Deterministic planner (+ chained case) and the agent loop with `{n}`
       data-flow; FastAPI `/run` `/tools` `/health` + trace UI
-- [x] 20 tests (tools/agent/api), ruff clean, `make demo` offline
+- [x] 20 tests (tools/agent/api), ruff clean, `./run.sh demo` offline
 - [ ] Roadmap (see project plan): LLM planner, more tools, self-correction,
       per-tool accounting, Argo deploy
 
@@ -136,7 +136,7 @@ detected secret. MIT, offline, no secrets — conforms to CONV-1…4.
 - [x] ~18 direction-aware rules (injection/jailbreak/exfiltration/secret/pii)
 - [x] scan engine (verdict + score, masked findings); FastAPI `/scan` `/rules`
       `/health` + UI with verdict badge, category highlights, detections table
-- [x] 15 tests (scan/api), ruff clean, `make demo` offline
+- [x] 15 tests (scan/api), ruff clean, `./run.sh demo` offline
 - [ ] Roadmap (see project plan): classifier augmentation, deny-lists/config,
       more providers + entropy gating, streaming output scan, Argo deploy
 
@@ -149,7 +149,7 @@ conforms to CONV-1…4.
 - [x] 15 typed generators + fictional pools; presets (users/transactions/tickets)
 - [x] generate (validated, reproducible, CSV) + FastAPI `/generate` `/schemas`
       `/types` `/health` + UI (preset → editable schema → table, copy JSON/CSV)
-- [x] 18 tests (generate/api), ruff clean, `make demo` offline
+- [x] 18 tests (generate/api), ruff clean, `./run.sh demo` offline
 - [ ] Roadmap (see project plan): distributions/correlations, more types/locales,
       streaming, a fixtures CLI, Argo deploy
 
@@ -162,7 +162,7 @@ uncertainty. MIT, offline, no secrets — conforms to CONV-1…4.
 - [x] 6 forecast methods + auto-selection by holdout backtest; 95% CI band
 - [x] rolling z-score anomalies; FastAPI `/forecast` `/anomalies` `/methods`
       `/health` + inline-SVG chart UI
-- [x] 17 tests (methods/backtest/anomaly/api), ruff clean, `make demo` offline
+- [x] 17 tests (methods/backtest/anomaly/api), ruff clean, `./run.sh demo` offline
 - [ ] Roadmap (see project plan): Holt-Winters/ARIMA, seasonality detection,
       rolling-origin backtest, CSV upload, Argo deploy
 
@@ -176,7 +176,7 @@ default, no secrets — conforms to CONV-1…4.
 - [x] OcrToken + sample layout + opt-in Tesseract adapter; PII detect (+Luhn)
 - [x] span→token-box mapping, redacted text + boxes; FastAPI `/process` `/ocr`
       `/samples` `/health` + side-by-side document/redacted SVG UI
-- [x] 16 tests (pipeline/api), ruff clean, `make demo` offline
+- [x] 16 tests (pipeline/api), ruff clean, `./run.sh demo` offline
 - [ ] Roadmap (see project plan): real image render/redact (Pillow), layout
       analysis, multilingual OCR, Argo deploy
 

@@ -26,7 +26,7 @@ The app runs on a **local kind cluster** (`kind-argo-demo`) under
 **Argo CD** (Application synced from this repo's `main`). The full
 ship loop for each feature:
 
-1. Build code; keep `make test` + `make lint` green and bump the version
+1. Build code; keep `./run.sh test` + `./run.sh lint` green and bump the version
    in `pyproject.toml`, `src/persona_twin/__init__.py`, and
    `deploy/k8s/persona-twin.yaml` (image tag) together
 2. `docker build -t persona-twin:vX.Y.Z .` then
@@ -61,7 +61,7 @@ at the bottom lists the next candidate features — quantifying the new
 retrieval paths via benchmarks is recommended). Pick one, implement it
 following the standing rules, ship
 it via the live deployment loop in claude-code.md §1, and verify through
-the gateway. Keep `make test` green.
+the gateway. Keep `./run.sh test` green.
 ```
 
 ---
@@ -114,4 +114,4 @@ live** on a local kind cluster under Argo CD.
 4. Pick the next roadmap feature (benchmark the new retrieval paths
    recommended),
    implement it, ship via the loop, verify through the
-   gateway at http://localhost:9081, keep `make test` green.
+   gateway at http://localhost:9081, keep `./run.sh test` green.
