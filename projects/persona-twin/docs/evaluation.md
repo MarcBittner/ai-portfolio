@@ -2,7 +2,7 @@
 
 It is tempting to grade a RAG/persona system with one number — "the
 twin is 93% accurate." This project deliberately refuses to, and the
-refusal is the design. `make eval` produces three tables
+refusal is the design. `./run.sh eval` produces three tables
 (`eval-report.md`), one per pipeline layer, and never a composite.
 
 ## The problem with one number
@@ -68,7 +68,7 @@ must stay separate:
 
 ## Operational rule
 
-When a change lands, run `make eval` and read the tables *top down*:
+When a change lands, run `./run.sh eval` and read the tables *top down*:
 a retrieval regression invalidates everything below it; a grounding
 regression invalidates quality. Improving a lower layer while an upper
 one is broken is wasted motion — which is precisely the information a

@@ -76,7 +76,7 @@ oversized blocks fall back to sentence packing.
 ## Measured results
 
 Offline backends (hash embedder, in-memory store), 28 answerable eval
-items, `make eval` — deterministic, reproduce with one command:
+items, `./run.sh eval` — deterministic, reproduce with one command:
 
 | Strategy | hit-rate@5 | MRR | + rerank hit-rate@5 | + rerank MRR |
 |---|---|---|---|---|

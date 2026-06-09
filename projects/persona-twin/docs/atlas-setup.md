@@ -13,7 +13,7 @@ Atlas Vector Search instead:
    MONGODB_VECTOR_INDEX=persona_chunks_index
    ```
 3. **Install the extra**: `.venv/bin/pip install -e ".[mongo]"`
-4. **Ingest once** (`make demo` or `POST /ingest`) so the `chunks`
+4. **Ingest once** (`./run.sh demo` or `POST /ingest`) so the `chunks`
    collection exists.
 5. **Create the vector index**: Atlas UI → your `persona_twin.chunks`
    collection → *Atlas Search → Create Search Index → Vector Search

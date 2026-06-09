@@ -6,7 +6,7 @@ RAG, LLM persona systems, multi-provider routing, and layered LLM
 evaluation.
 
 ```sh
-make setup && make demo    # fully offline — no API keys, no database
+./run.sh setup && ./run.sh demo    # fully offline — no API keys, no database
 ```
 
 ## What it demonstrates
@@ -57,15 +57,15 @@ report reproducible to the digit.
 ## Quickstart
 
 ```sh
-make setup    # venv + dependencies (Python 3.11+)
-make demo     # ingest synthetic corpus, query the twins, watch a refusal
-make test     # full suite; provider-contract tests auto-skip offline
-make eval     # regenerate eval-report.md (three tables, no composite)
-make serve    # uvicorn on :8000 — then POST /ask
+./run.sh setup    # venv + dependencies (Python 3.11+)
+./run.sh demo     # ingest synthetic corpus, query the twins, watch a refusal
+./run.sh test     # full suite; provider-contract tests auto-skip offline
+./run.sh eval     # regenerate eval-report.md (three tables, no composite)
+./run.sh serve    # uvicorn on :8000 — then POST /ask
 ```
 
 Optional web UI (React Router 7 + Tailwind + shadcn-style components;
-needs Node 20+): run `make serve` in one terminal and `make frontend`
+needs Node 20+): run `./run.sh serve` in one terminal and `./run.sh frontend`
 in another, then open <http://localhost:5173> — persona picker with
 HEXACO bars, citations, and a routing/timings debug panel, a **chat**
 tab that streams a multi-turn conversation token-by-token, and a

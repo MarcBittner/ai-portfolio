@@ -4,7 +4,7 @@
 
 Ordered, atomic, checkable tasks. Each phase ends in a coherent commit (or
 small series) using `(task) description` commit style; the repo must be
-green (`make test`) at every phase boundary from Phase 2 onward.
+green (`./run.sh test`) at every phase boundary from Phase 2 onward.
 
 All paths are relative to `projects/persona-twin/` (this repo is a
 monorepo; portfolio-level spec lives at `docs/spec/spec.md` in the root).
@@ -101,7 +101,7 @@ monorepo; portfolio-level spec lives at `docs/spec/spec.md` in the root).
       `/health`; debug payload (routing decision, rerank deltas, timings)
 - [x] Integration tests offline: ingest → ask → citations present →
       refusal on unanswerable
-- [x] `make demo` end-to-end offline; `make serve`
+- [x] `./run.sh demo` end-to-end offline; `./run.sh serve`
 
 ## Phase 7: Evaluation harness ✅
 
@@ -111,7 +111,7 @@ monorepo; portfolio-level spec lives at `docs/spec/spec.md` in the root).
 - [x] Grounding metrics: citation precision, claim support (LLM-judge with
       structured output + heuristic fallback for mock mode), refusal rate
 - [x] Answer quality metrics: correctness vs reference, voice consistency
-- [x] `make eval` → markdown report (separate metrics, no single score)
+- [x] `./run.sh eval` → markdown report (separate metrics, no single score)
 - [x] `docs/evaluation.md` — "why one fidelity % hides what matters"
 - [x] Back-fill measured numbers into `docs/chunking-tradeoffs.md`
 
@@ -120,19 +120,19 @@ monorepo; portfolio-level spec lives at `docs/spec/spec.md` in the root).
 - [x] README: architecture diagram, quickstart, component docs links,
       limitations
 - [x] `ruff` + type-check clean; prune dead code and TODOs
-- [x] Fresh-clone verification: `make setup && make demo && make test &&
-      make eval` with no `.env`
+- [x] Fresh-clone verification: `./run.sh setup && ./run.sh demo && ./run.sh test &&
+      ./run.sh eval` with no `.env`
 - [x] Tag `v0.1.0`
 
 ## Phase 9 (optional): Frontend ✅
 
 - [x] React Router 7 + Tailwind + shadcn/ui app in `frontend/`
 - [x] Persona picker, ask box, answer + citations + debug panel
-- [x] `make frontend` / `make frontend-build` targets + README section
+- [x] `./run.sh frontend` / `./run.sh frontend-build` targets + README section
 
 ## Phase 10 (optional): Deployment ✅
 
-- [x] Multi-stage Dockerfile (non-root) + `make docker` — build verified
+- [x] Multi-stage Dockerfile (non-root) + `./run.sh docker` — build verified
       via docker socket; image smoke-tested (API + UI from one container)
 - [x] GCP Cloud Run service YAML + deploy doc (placeholder project ids)
 - [x] Local k8s manifest (deploy/k8s/) — verified on a kind cluster:

@@ -13,12 +13,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.11" }
-      - run: make setup
-      - run: make lint
-      - run: make test
+      - run: ./run.sh setup --no-venv
+      - run: ./run.sh lint --no-venv
+      - run: ./run.sh test --no-venv
       - name: eval with regression gate
         run: |
-          make eval
+          ./run.sh eval --no-venv
           python - <<'PY'
           import re, sys
           text = open("eval-report.md").read()

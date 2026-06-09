@@ -188,7 +188,7 @@ throwaway test stubs — they are the documented offline mode.
   refusal rate
 - **FR-8.4** **Answer quality metrics** — correctness vs. reference and
   persona-voice consistency, scored separately from grounding
-- **FR-8.5** `make eval` produces a markdown report; metrics are **never**
+- **FR-8.5** `./run.sh eval` produces a markdown report; metrics are **never**
   collapsed into one number
 - **FR-8.6** `docs/evaluation.md` — write-up: why a single "fidelity %"
   hides what matters (a system can score 93% while failing all
@@ -368,7 +368,7 @@ throwaway test stubs — they are the documented offline mode.
 
 - **FR-10.1** `Makefile`: `setup` (venv + install), `demo` (ingest + sample
   questions end-to-end, offline), `test`, `eval`, `serve`, `lint`
-- **FR-10.2** `make demo` works on a fresh clone with no `.env` — this is a
+- **FR-10.2** `./run.sh demo` works on a fresh clone with no `.env` — this is a
   hard acceptance criterion
 - **FR-10.3** README: what it is, architecture diagram, 60-second
   quickstart, per-component docs links, honest limitations section
@@ -395,8 +395,8 @@ throwaway test stubs — they are the documented offline mode.
 ## Non-Functional Requirements
 
 ### NFR-1: Zero-Cost Reviewability
-- A reviewer with no paid accounts can run `make setup && make demo && make
-  test && make eval` successfully — offline mode is a first-class citizen,
+- A reviewer with no paid accounts can run `./run.sh setup && ./run.sh demo && make
+  test && ./run.sh eval` successfully — offline mode is a first-class citizen,
   not a degraded path
 
 ### NFR-2: Code Quality
