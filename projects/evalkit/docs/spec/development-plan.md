@@ -21,14 +21,23 @@
 - [x] `test_evaluate.py` — aggregate, gate pass/fail, compare deltas
 - [x] `test_api.py` — endpoints, gate, 422 paths, UI served (19 tests, ruff clean)
 
-## Roadmap
-- [ ] LLM-judge metric behind the `(prediction, reference) → [0,1]` contract
-      (opt-in; breaks the offline guarantee — gated by env like persona-twin)
-- [ ] Reference-free scorers: toxicity, refusal-quality, format/JSON validity
-- [ ] Dataset loaders (JSONL) + a `make eval` CLI for CI regression gates
-- [ ] Real embedder option for `semantic_similarity` (sentence-transformers)
-- [ ] Containerfile + Argo manifest (mirror pii-redactor) for a live demo
+
+## Shipped since v0.1.0 ✅
+
+- [x] Multi-provider LLM routing — vendored stdlib router
+      (`ollama → openrouter → openai → mock`, deterministic terminal fallback)
+- [x] LLM-judge metric via the router (token-F1 fallback)
+- [x] In-UI routing config + `GET /providers`; `run.sh` replaces `make`
+      (deps/version checks, `--flag` options, `doctor`); CI matrix + README badges
+
+## Toward v0.2.0
+
+- [ ] JSONL dataset loaders + a `run.sh eval` CLI for other projects' CI gates
+- [ ] Reference-free scorers: JSON-validity, refusal-quality, format checks
+- [ ] Real-embedder option for `semantic_similarity` (sentence-transformers)
+- [ ] Containerize + deploy to Argo (Dockerfile + `deploy/k8s` + `deploy/argocd`,
+      mirroring pii-redactor)
 
 ---
 
-**Status:** v0.1.0 — complete and tested; not yet deployed.
+**Status:** v0.1.x — LLM routing + run.sh + CI shipped; v0.2.0 planned.

@@ -21,15 +21,23 @@
 - [x] `test_redact.py` — every style, per-value consistency, counts
 - [x] `test_api.py` — endpoints, 422 paths, UI served (23 tests, ruff clean)
 
-## Roadmap
-- [ ] More types: IPv6, dates of birth, US passport/driver's-license, generic
-      API-key/secret patterns (with entropy gating)
+
+## Shipped since v0.1.0 ✅
+
+- [x] Multi-provider LLM routing — vendored stdlib router
+      (`ollama → openrouter → openai → mock`, deterministic terminal fallback)
+- [x] LLM named-entity pass (PERSON/ORG/LOCATION) merged with regex
+- [x] In-UI routing config + `GET /providers`; `run.sh` replaces `make`
+      (deps/version checks, `--flag` options, `doctor`); CI matrix + README badges
+
+## Toward v0.2.0
+
+- [ ] More types: IPv6, dates of birth, US passport/driver's-license
 - [ ] Internationalization: non-US phone/address formats behind a locale flag
 - [ ] Streaming/large-document mode; batch endpoint
-- [ ] Optional NER backend for name/place PII (opt-in, breaks the offline
-      guarantee — gated behind an env var like the portfolio's other projects)
-- [ ] Containerfile + deploy manifest (mirror persona-twin) if it goes live
+- [ ] Containerize + deploy to Argo (Dockerfile + `deploy/k8s` + `deploy/argocd`,
+      mirroring pii-redactor)
 
 ---
 
-**Status:** v0.1.0 — complete and tested; not yet deployed.
+**Status:** v0.1.x — LLM routing + run.sh + CI shipped; v0.2.0 planned.

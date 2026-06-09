@@ -24,13 +24,23 @@
       graceful tool error
 - [x] `test_api.py` — endpoints, chained run, 422, UI served (20 tests, ruff clean)
 
-## Roadmap
-- [ ] LLM planner behind the `plan()` contract (opt-in; breaks offline guarantee)
-- [ ] More tools (statistics, JSON query, regex) — all sandboxed/offline
-- [ ] Self-correction: let the planner react to a failed observation and retry
+
+## Shipped since v0.1.0 ✅
+
+- [x] Multi-provider LLM routing — vendored stdlib router
+      (`ollama → openrouter → openai → mock`, deterministic terminal fallback)
+- [x] LLM planner with rule-planner fallback
+- [x] In-UI routing config + `GET /providers`; `run.sh` replaces `make`
+      (deps/version checks, `--flag` options, `doctor`); CI matrix + README badges
+
+## Toward v0.2.0
+
+- [ ] Self-correction: planner reacts to a failed observation and retries
+- [ ] More sandboxed tools (statistics, JSON-query, regex) - all offline
 - [ ] Per-tool token/latency accounting in the trace
-- [ ] Containerfile + Argo manifest (mirror pii-redactor) for a live demo
+- [ ] Containerize + deploy to Argo (Dockerfile + `deploy/k8s` + `deploy/argocd`,
+      mirroring pii-redactor)
 
 ---
 
-**Status:** v0.1.0 — complete and tested; not yet deployed.
+**Status:** v0.1.x — LLM routing + run.sh + CI shipped; v0.2.0 planned.

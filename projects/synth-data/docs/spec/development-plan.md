@@ -22,13 +22,23 @@
 - [x] `test_api.py` — endpoints, reproducibility, custom fields, CSV format,
       422 paths, UI served (18 tests, ruff clean)
 
-## Roadmap
+
+## Shipped since v0.1.0 ✅
+
+- [x] Multi-provider LLM routing — vendored stdlib router
+      (`ollama → openrouter → openai → mock`, deterministic terminal fallback)
+- [x] `llm`-typed fields filled by the router (deterministic fallback)
+- [x] In-UI routing config + `GET /providers`; `run.sh` replaces `make`
+      (deps/version checks, `--flag` options, `doctor`); CI matrix + README badges
+
+## Toward v0.2.0
+
 - [ ] Statistical distributions + inter-column correlations (joint sampling)
-- [ ] More types/locales; weighted choices; nullable fields
-- [ ] Streaming/large-volume generation beyond the per-request cap
+- [ ] Weighted choices + nullable fields; more types/locales
 - [ ] A `synth-data` CLI for fixture generation in other projects' CI
-- [ ] Containerfile + Argo manifest (mirror pii-redactor) for a live demo
+- [ ] Containerize + deploy to Argo (Dockerfile + `deploy/k8s` + `deploy/argocd`,
+      mirroring pii-redactor)
 
 ---
 
-**Status:** v0.1.0 — complete and tested; not yet deployed.
+**Status:** v0.1.x — LLM routing + run.sh + CI shipped; v0.2.0 planned.

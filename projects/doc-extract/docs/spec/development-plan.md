@@ -20,13 +20,23 @@
       flag, global fallback, not-found
 - [x] `test_api.py` — endpoints, 422, UI served (13 tests, ruff clean)
 
-## Roadmap
-- [ ] LLM extractor behind the field contract for messy/unlabeled docs (opt-in)
-- [ ] List/repeated fields (e.g. invoice line items) and table extraction
+
+## Shipped since v0.1.0 ✅
+
+- [x] Multi-provider LLM routing — vendored stdlib router
+      (`ollama → openrouter → openai → mock`, deterministic terminal fallback)
+- [x] LLM fill for fields the deterministic pass misses
+- [x] In-UI routing config + `GET /providers`; `run.sh` replaces `make`
+      (deps/version checks, `--flag` options, `doctor`); CI matrix + README badges
+
+## Toward v0.2.0
+
+- [ ] List/repeated fields (invoice line items) and table extraction
+- [ ] Upstream PDF/DOCX -> text step feeding the input (pairs with multimodal-ocr)
 - [ ] More schemas + locales (intl phone/date/address)
-- [ ] Upstream OCR/file step (PDF, DOCX) feeding the text input
-- [ ] Containerfile + Argo manifest (mirror pii-redactor) for a live demo
+- [ ] Containerize + deploy to Argo (Dockerfile + `deploy/k8s` + `deploy/argocd`,
+      mirroring pii-redactor)
 
 ---
 
-**Status:** v0.1.0 — complete and tested; not yet deployed.
+**Status:** v0.1.x — LLM routing + run.sh + CI shipped; v0.2.0 planned.

@@ -219,6 +219,11 @@ Every self-contained project above ships the same operator surface:
 Configure routing via env (all optional): `OLLAMA_BASE_URL`, `OLLAMA_MODEL`,
 `OPENAI_API_KEY`, `OPENROUTER_API_KEY`, `LLM_TIMEOUT`.
 
+## Roadmap
+
+See [ROADMAP.md](ROADMAP.md) for the prioritized cross-cutting plan and each
+project's v0.2.0 milestone (per-project detail in `docs/spec/development-plan.md`).
+
 ## Repository conventions
 
 - One directory per project under `projects/`, each with its own spec

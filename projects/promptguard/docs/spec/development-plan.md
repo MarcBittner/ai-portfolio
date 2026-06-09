@@ -22,14 +22,23 @@
 - [x] `test_api.py` — endpoints, verdicts, secret-not-echoed, 422, UI served
       (15 tests, ruff clean; secret fixtures split so none sit in source)
 
-## Roadmap
-- [ ] Classifier augmentation (semantic injection, toxicity) behind the finding
-      contract (opt-in; breaks the offline guarantee)
-- [ ] Allow/deny lists and per-deployment severity tuning via config
-- [ ] More secret providers + entropy gating to cut false positives
+
+## Shipped since v0.1.0 ✅
+
+- [x] Multi-provider LLM routing — vendored stdlib router
+      (`ollama → openrouter → openai → mock`, deterministic terminal fallback)
+- [x] LLM semantic injection classifier folded into the verdict
+- [x] In-UI routing config + `GET /providers`; `run.sh` replaces `make`
+      (deps/version checks, `--flag` options, `doctor`); CI matrix + README badges
+
+## Toward v0.2.0
+
+- [ ] Allow/deny lists + per-deployment severity tuning via config
+- [ ] Entropy-gated secret detection to cut false positives
 - [ ] Streaming/output-token scanning for live response filtering
-- [ ] Containerfile + Argo manifest (mirror pii-redactor) for a live demo
+- [ ] Containerize + deploy to Argo (Dockerfile + `deploy/k8s` + `deploy/argocd`,
+      mirroring pii-redactor)
 
 ---
 
-**Status:** v0.1.0 — complete and tested; not yet deployed.
+**Status:** v0.1.x — LLM routing + run.sh + CI shipped; v0.2.0 planned.

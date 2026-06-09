@@ -23,13 +23,23 @@
 - [x] `test_api.py` — endpoints, tokens path, 422 paths, OCR-without-backend
       graceful 422, UI served (16 tests, ruff clean)
 
-## Roadmap
-- [ ] Render/redact real uploaded images (Pillow) end-to-end with the boxes
+
+## Shipped since v0.1.0 ✅
+
+- [x] Multi-provider LLM routing — vendored stdlib router
+      (`ollama → openrouter → openai → mock`, deterministic terminal fallback)
+- [x] LLM NER over the OCR text adding PERSON/ORG/LOCATION boxes
+- [x] In-UI routing config + `GET /providers`; `run.sh` replaces `make`
+      (deps/version checks, `--flag` options, `doctor`); CI matrix + README badges
+
+## Toward v0.2.0
+
+- [ ] Render/redact real uploaded images end-to-end with Pillow (draw the boxes)
 - [ ] Layout analysis (lines/tables/columns) for better reading order
-- [ ] More PII types + multilingual OCR via the Tesseract backend
-- [ ] Confidence from OCR token scores; redaction review/override UI
-- [ ] Containerfile (with tesseract) + Argo manifest for a live demo
+- [ ] OCR-token confidence + a redaction review/override UI
+- [ ] Containerize + deploy to Argo (Dockerfile + `deploy/k8s` + `deploy/argocd`,
+      mirroring pii-redactor)
 
 ---
 
-**Status:** v0.1.0 — complete and tested; not yet deployed.
+**Status:** v0.1.x — LLM routing + run.sh + CI shipped; v0.2.0 planned.

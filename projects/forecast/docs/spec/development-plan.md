@@ -22,13 +22,23 @@
       CI band, anomaly spike/none
 - [x] `test_api.py` — endpoints, auto, 422 paths, UI served (17 tests, ruff clean)
 
-## Roadmap
-- [ ] More forecasters (Holt-Winters seasonality, ARIMA) behind the registry
-- [ ] Automatic seasonality detection (ACF) for `seasonal_naive`/Holt-Winters
-- [ ] Prediction-interval calibration; multi-step backtest (rolling origin)
+
+## Shipped since v0.1.0 ✅
+
+- [x] Multi-provider LLM routing — vendored stdlib router
+      (`ollama → openrouter → openai → mock`, deterministic terminal fallback)
+- [x] Natural-language forecast summary via the router (template fallback)
+- [x] In-UI routing config + `GET /providers`; `run.sh` replaces `make`
+      (deps/version checks, `--flag` options, `doctor`); CI matrix + README badges
+
+## Toward v0.2.0
+
+- [ ] Holt-Winters seasonality + ACF automatic seasonality detection
+- [ ] Rolling-origin backtest + prediction-interval calibration
 - [ ] CSV upload + timestamp parsing in the UI
-- [ ] Containerfile + Argo manifest (mirror pii-redactor) for a live demo
+- [ ] Containerize + deploy to Argo (Dockerfile + `deploy/k8s` + `deploy/argocd`,
+      mirroring pii-redactor)
 
 ---
 
-**Status:** v0.1.0 — complete and tested; not yet deployed.
+**Status:** v0.1.x — LLM routing + run.sh + CI shipped; v0.2.0 planned.
