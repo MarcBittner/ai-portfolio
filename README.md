@@ -67,7 +67,7 @@ blindly flagged.
 
 ```sh
 cd projects/pii-redactor
-make setup && make serve   # API + UI at http://localhost:8001
+./run.sh setup && ./run.sh serve   # API + UI at http://localhost:8001
 ```
 
 ### [evalkit](projects/evalkit/) — v0.1.0
@@ -86,7 +86,7 @@ gate releases on per-metric thresholds, and compare runs (model A vs B).
 
 ```sh
 cd projects/evalkit
-make setup && make serve   # API + UI at http://localhost:8002
+./run.sh setup && ./run.sh serve   # API + UI at http://localhost:8002
 ```
 
 ### [doc-extract](projects/doc-extract/) — v0.1.0
@@ -104,7 +104,7 @@ validation/normalization, and provenance spans. Deterministic; no model.
 
 ```sh
 cd projects/doc-extract
-make setup && make serve   # API + UI at http://localhost:8003
+./run.sh setup && ./run.sh serve   # API + UI at http://localhost:8003
 ```
 
 ### [agent-sandbox](projects/agent-sandbox/) — v0.1.0
@@ -123,7 +123,7 @@ the same interface.
 
 ```sh
 cd projects/agent-sandbox
-make setup && make serve   # API + trace UI at http://localhost:8004
+./run.sh setup && ./run.sh serve   # API + trace UI at http://localhost:8004
 ```
 
 ### [promptguard](projects/promptguard/) — v0.1.0
@@ -141,7 +141,7 @@ score and findings; never echoes a secret it catches.
 
 ```sh
 cd projects/promptguard
-make setup && make serve   # API + UI at http://localhost:8005
+./run.sh setup && ./run.sh serve   # API + UI at http://localhost:8005
 ```
 
 ### [synth-data](projects/synth-data/) — v0.1.0
@@ -160,7 +160,7 @@ or CSV. The data the rest of the portfolio runs on.
 
 ```sh
 cd projects/synth-data
-make setup && make serve   # API + UI at http://localhost:8006
+./run.sh setup && ./run.sh serve   # API + UI at http://localhost:8006
 ```
 
 ### [forecast](projects/forecast/) — v0.1.0
@@ -177,7 +177,7 @@ backtesting and uncertainty.
 
 ```sh
 cd projects/forecast
-make setup && make serve   # API + chart UI at http://localhost:8007
+./run.sh setup && ./run.sh serve   # API + chart UI at http://localhost:8007
 ```
 
 ### [multimodal-ocr](projects/multimodal-ocr/) — v0.1.0
@@ -194,13 +194,35 @@ UI that blacks out PII *on the page*, not just in the text.
 
 ```sh
 cd projects/multimodal-ocr
-make setup && make serve   # API + UI at http://localhost:8008
+./run.sh setup && ./run.sh serve   # API + UI at http://localhost:8008
 ```
+
+## Shared capabilities (Projects 3–10)
+
+Every self-contained project above ships the same operator surface:
+
+- **Multi-provider LLM routing, Ollama-first** — a vendored, standard-library
+  router (`llm.py`) tries `ollama → openrouter → openai → mock`. The mock is a
+  deterministic terminal fallback, so each service works fully offline and its
+  deterministic core is never blocked on a model. Each project augments its core
+  with one LLM-powered feature (NER, LLM-judge, extraction fill, LLM planner,
+  semantic classifier, realistic values, NL summary).
+- **In-UI configuration** — every UI has a routing panel: provider, model, an
+  LLM on/off toggle, and live Ollama reachability (`GET /providers`).
+- **`run.sh`, not `make`** — one production-grade script per project
+  (`setup`/`serve`/`test`/`lint`/`check`/`demo`/`doctor`) with Python-version +
+  dependency checks, `--port/--host/--no-venv` flags, and strict mode.
+- **CI + badges** — a [matrix workflow](.github/workflows/projects-ci.yml) lints
+  and tests all projects; each README carries CI/license/Python/Ruff/FastAPI
+  badges.
+
+Configure routing via env (all optional): `OLLAMA_BASE_URL`, `OLLAMA_MODEL`,
+`OPENAI_API_KEY`, `OPENROUTER_API_KEY`, `LLM_TIMEOUT`.
 
 ## Repository conventions
 
 - One directory per project under `projects/`, each with its own spec
-  (`docs/spec/`), Makefile, tests, and docs
+  (`docs/spec/`), a `run.sh` (Projects 3–10) or Makefile, tests, and docs
 - No secrets in the repo — environment variables via gitignored `.env`,
   placeholder `.env.example` committed per project
 - All sample data is synthetic and fictional
