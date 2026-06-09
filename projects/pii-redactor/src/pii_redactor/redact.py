@@ -62,9 +62,15 @@ def redact(text: str, style: str = "token", types: set[str] | None = None):
 
     For ``token``/``hash`` a given value maps to a stable replacement across
     the whole text, so repeated PII reads consistently."""
+    return redact_spans(text, detect(text, types), style)
+
+
+def redact_spans(text: str, spans: list[Span], style: str = "token"):
+    """Apply a redaction ``style`` to pre-computed (possibly merged) spans —
+    used when LLM-found entities are merged with the regex detections."""
     if style not in STYLES:
         raise ValueError(f"unknown style {style!r}; valid: {STYLES}")
-    spans = detect(text, types)
+    spans = sorted(spans, key=lambda s: s.start)
     counts: dict[str, int] = {}
     value_repl: dict[tuple[str, str], str] = {}  # (type,value) → replacement
     pieces: list[str] = []

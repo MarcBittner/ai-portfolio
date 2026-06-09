@@ -41,13 +41,22 @@ reproducible and safe to drop into a data pipeline.
   highlight by type with counts, redaction-style selector, redacted output
   with copy, and per-type detection toggles.
 
-### FR-6: Conventions
+### FR-6: LLM named-entity pass (optional)
+- A multi-provider router (`llm.py`, stdlib-only) adds `PERSON`/`ORG`/`LOCATION`
+  detection, merged with the regex spans (regex wins on overlap). Routed to
+  local Ollama by default; `openrouter`/`openai` when keys are set; a
+  deterministic mock is the terminal fallback so it never fails and stays
+  offline-capable. On by default (`use_llm`), selectable per request.
+
+### FR-7: Conventions
 - Python 3.11+, type hints, `ruff` clean, lean pinned deps.
-- `make setup && make test && make lint` green on a fresh clone, no `.env`.
+- `./run.sh setup && ./run.sh check` green on a fresh clone, no `.env`
+  (a production-grade bash script with dependency/version checks; no `make`).
 - Synthetic, fictional sample data only; no secrets in the repo.
 
 ## Non-Goals
-- Named-entity PII (people, organizations, locations) — needs an NER model;
-  out of scope to stay offline and dependency-light.
+- A bundled NER/LLM model — the named-entity pass is routed to an external
+  provider (Ollama/OpenAI/OpenRouter); with none reachable it degrades to the
+  deterministic regex core.
 - Storage, audit logging, or de-identification key management.
 - Non-US address/phone formats beyond what the patterns cover (extensible).
