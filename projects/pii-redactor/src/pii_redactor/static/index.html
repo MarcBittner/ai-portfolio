@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>pii-redactor</title>
+    <style>
+      :root {
+        --bg: #0b0e14; --panel: #131722; --border: #232838; --fg: #e6e9ef;
+        --muted: #8b93a7; --accent: #6ea8fe; --danger: #ff6b6b;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; background: var(--bg); color: var(--fg);
+        font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      }
+      main { max-width: 1040px; margin: 0 auto; padding: 28px 20px 60px; }
+      h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -0.01em; }
+      p.lede { color: var(--muted); margin: 0 0 20px; }
+      .grid { display: grid; gap: 16px; grid-template-columns: 1fr 1fr; }
+      @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
+      .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+      .panel h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin: 0 0 10px; }
+      textarea {
+        width: 100%; min-height: 240px; resize: vertical; background: #0e1320;
+        color: var(--fg); border: 1px solid var(--border); border-radius: 8px;
+        padding: 10px; font: 13px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+      .out {
+        min-height: 240px; white-space: pre-wrap; word-break: break-word;
+        background: #0e1320; border: 1px solid var(--border); border-radius: 8px;
+        padding: 10px; font: 13px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 12px 0; }
+      .row .spacer { flex: 1; }
+      button, select {
+        background: #1b2230; color: var(--fg); border: 1px solid var(--border);
+        border-radius: 7px; padding: 6px 12px; font-size: 13px; cursor: pointer;
+      }
+      button:hover, select:hover { border-color: var(--accent); }
+      button.primary { background: var(--accent); color: #07101f; border-color: var(--accent); font-weight: 600; }
+      .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+      .chip { font-size: 12px; padding: 3px 8px; border-radius: 999px; border: 1px solid var(--border); }
+      .chip b { font-variant-numeric: tabular-nums; }
+      mark { border-radius: 3px; padding: 0 2px; color: #07101f; font-weight: 600; }
+      .filters { display: flex; flex-wrap: wrap; gap: 10px; margin: 4px 0 14px; }
+      .filters label { display: inline-flex; gap: 5px; align-items: center; font-size: 12px; color: var(--muted); }
+      .legend { display: inline-flex; gap: 4px; align-items: center; }
+      .swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+      footer { color: var(--muted); font-size: 12px; margin-top: 22px; }
+      a { color: var(--accent); }
+      .empty { color: var(--muted); }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>pii-redactor</h1>
+      <p class="lede">
+        Deterministic PII detection &amp; redaction — regex + checksum
+        validation (Luhn, IBAN mod-97, IPv4 range). No model, no network.
+        Type to see live detection; pick a style to redact.
+      </p>
+
+      <div class="filters" id="filters"></div>
+
+      <div class="grid">
+        <div class="panel">
+          <h2>Input</h2>
+          <textarea id="input" spellcheck="false" placeholder="Paste text containing PII…"></textarea>
+          <div class="row">
+            <button id="sample">Load sample</button>
+            <button id="clear">Clear</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Detected</h2>
+          <div class="out" id="highlight"><span class="empty">Detected PII will be highlighted here.</span></div>
+          <div class="chips" id="counts"></div>
+        </div>
+      </div>
+
+      <div class="row">
+        <label for="style">Redaction style</label>
+        <select id="style">
+          <option value="token">token — [EMAIL_1]</option>
+          <option value="label">label — &lt;EMAIL&gt;</option>
+          <option value="mask">mask — ••••</option>
+          <option value="partial">partial — keep last 4</option>
+          <option value="hash">hash — EMAIL_a1b2c3</option>
+        </select>
+        <div class="spacer"></div>
+        <button class="primary" id="copy">Copy redacted</button>
+      </div>
+
+      <div class="panel">
+        <h2>Redacted output</h2>
+        <div class="out" id="redacted"><span class="empty">Redacted text will appear here.</span></div>
+      </div>
+
+      <footer>
+        Endpoints: <code>POST /detect</code>, <code>POST /redact</code>,
+        <code>GET /types</code>, <code>GET /health</code>. All sample data is
+        synthetic. Part of the <a href="https://github.com/MarcBittner/ai-portfolio">ai-portfolio</a>.
+      </footer>
+    </main>
+
+    <script>
+      const COLORS = {
+        EMAIL: "#6ea8fe", PHONE: "#63e6be", SSN: "#ffd43b", CREDIT_CARD: "#ff8787",
+        IP_ADDRESS: "#da77f2", IBAN: "#ffa94d", STREET_ADDRESS: "#8ce99a",
+      };
+      const $ = (id) => document.getElementById(id);
+      const SAMPLE =
+        "Hi, I'm Jane Doe. Reach me at jane.doe@example.com or (415) 555-0132.\n" +
+        "My SSN is 123-45-6789 and card 4111 1111 1111 1111 (exp 04/27).\n" +
+        "Ship to 1600 Pennsylvania Ave, server 192.168.1.42, IBAN GB82WEST12345698765432.";
+
+      let enabled = new Set();
+
+      function esc(s) {
+        return s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+      }
+
+      function selectedTypes() {
+        return [...enabled];
+      }
+
+      async function refresh() {
+        const text = $("input").value;
+        const types = selectedTypes();
+        if (!text.trim()) {
+          $("highlight").innerHTML = '<span class="empty">Detected PII will be highlighted here.</span>';
+          $("counts").innerHTML = "";
+          $("redacted").innerHTML = '<span class="empty">Redacted text will appear here.</span>';
+          return;
+        }
+        const body = JSON.stringify({ text, types, style: $("style").value });
+        const [det, red] = await Promise.all([
+          fetch("/detect", { method: "POST", headers: { "content-type": "application/json" }, body }).then((r) => r.json()),
+          fetch("/redact", { method: "POST", headers: { "content-type": "application/json" }, body }).then((r) => r.json()),
+        ]);
+        renderHighlight(text, det.spans);
+        renderCounts(det.counts, det.total);
+        $("redacted").textContent = red.redacted;
+      }
+
+      function renderHighlight(text, spans) {
+        let html = "", cursor = 0;
+        for (const s of spans) {
+          html += esc(text.slice(cursor, s.start));
+          const color = COLORS[s.type] || "#adb5bd";
+          html += `<mark style="background:${color}" title="${s.type}">${esc(text.slice(s.start, s.end))}</mark>`;
+          cursor = s.end;
+        }
+        html += esc(text.slice(cursor));
+        $("highlight").innerHTML = html || '<span class="empty">No PII detected.</span>';
+      }
+
+      function renderCounts(counts, total) {
+        const el = $("counts");
+        if (!total) { el.innerHTML = '<span class="chip empty">no PII detected</span>'; return; }
+        el.innerHTML = Object.entries(counts)
+          .map(([t, n]) => {
+            const c = COLORS[t] || "#adb5bd";
+            return `<span class="chip"><span class="swatch" style="background:${c}"></span> ${t} <b>${n}</b></span>`;
+          })
+          .join("");
+      }
+
+      async function buildFilters() {
+        const types = await fetch("/types").then((r) => r.json());
+        enabled = new Set(types.map((t) => t.name));
+        $("filters").innerHTML = types
+          .map((t) => {
+            const c = COLORS[t.name] || "#adb5bd";
+            return `<label title="${t.description}"><input type="checkbox" data-type="${t.name}" checked />
+              <span class="legend"><span class="swatch" style="background:${c}"></span>${t.name}</span></label>`;
+          })
+          .join("");
+        $("filters").querySelectorAll("input[type=checkbox]").forEach((cb) => {
+          cb.addEventListener("change", () => {
+            cb.checked ? enabled.add(cb.dataset.type) : enabled.delete(cb.dataset.type);
+            refresh();
+          });
+        });
+      }
+
+      let timer;
+      const debounced = () => { clearTimeout(timer); timer = setTimeout(refresh, 250); };
+      $("input").addEventListener("input", debounced);
+      $("style").addEventListener("change", refresh);
+      $("sample").addEventListener("click", () => { $("input").value = SAMPLE; refresh(); });
+      $("clear").addEventListener("click", () => { $("input").value = ""; refresh(); });
+      $("copy").addEventListener("click", async () => {
+        await navigator.clipboard?.writeText($("redacted").textContent || "");
+        $("copy").textContent = "Copied"; setTimeout(() => ($("copy").textContent = "Copy redacted"), 1200);
+      });
+
+      buildFilters().then(refresh);
+    </script>
+  </body>
+</html>

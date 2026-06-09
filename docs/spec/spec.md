@@ -30,6 +30,7 @@ ai-portfolio/
 |---|---|---|
 | [persona-twin](../../projects/persona-twin/) | In development | Query AI digital twins of synthetic HEXACO personas, grounded in retrieved data with citations — RAG pipeline (chunking/embedding/vector search/reranking), multi-provider LLM routing (OpenAI + Anthropic), layered evaluation harness, PII redaction. |
 | [tanglement-showcase](../../projects/tanglement-showcase/) | Work showcase | Curated public showcase of Tanglement.ai — a decentralized P2P, client-side, multi-provider LLM routing network (Chord DHT + gossip, WireGuard mesh). Technical spec, Next.js demo site, a stdlib-only Go code sample, and the pitch deck. |
+| [pii-redactor](../../projects/pii-redactor/) | v0.1.0 | Deterministic PII detection + redaction — FastAPI service and zero-build web UI. Regex + checksum validation (Luhn, IBAN mod-97, IPv4 range); five redaction styles; live highlighting. No model, no network. |
 
 > **Showcase exception.** `tanglement-showcase` is a *work showcase* (design
 > docs, a demo site, and a code sample), not a runnable reference project. It is

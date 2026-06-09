@@ -74,7 +74,19 @@ deck. Imported as a snapshot from `MarcBittner/tanglement-showcase`.
 - [ ] Optional follow-ups: trim the 12 MB `.pptx` (keep the PDF) or move
       binaries to Git LFS; light README polish for portfolio consistency
 
-## Project 3+ (future)
+## Project 3: pii-redactor ✅ v0.1.0
+
+Deterministic PII detection + redaction — FastAPI service and a zero-build web
+UI. Regex + checksum validation (Luhn, IBAN mod-97, IPv4 range), five redaction
+styles, live highlighting. MIT, offline, no secrets — conforms to CONV-1…4.
+
+- [x] Detection + validation core; five redaction styles (value-consistent)
+- [x] FastAPI `/detect` `/redact` `/types` `/health` + static single-page UI
+- [x] 23 tests (detect/redact/api), ruff clean, `make demo` offline
+- [ ] Roadmap (see project plan): more types (IPv6, secrets w/ entropy),
+      i18n formats, optional NER backend, container/deploy
+
+## Project 4+ (future)
 
 - [ ] To be specified — candidates: agent orchestration patterns, eval
       tooling extracted as a library, streaming inference service

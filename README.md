@@ -51,6 +51,25 @@ share routing intelligence over a Chord DHT + gossip mesh.
 > and carries its own [LICENSE](projects/tanglement-showcase/LICENSE)
 > (all rights reserved). The production backend is private.
 
+### [pii-redactor](projects/pii-redactor/) — v0.1.0
+
+Deterministic **PII detection & redaction** — a small FastAPI service plus a
+zero-build web UI. Regex detectors confirmed by checksums (Luhn for cards,
+mod-97 for IBANs) and range checks (IPv4), so a random run of digits isn't
+blindly flagged.
+
+- **Validated detection** — EMAIL / PHONE / SSN / CREDIT_CARD / IP / IBAN /
+  STREET_ADDRESS, with non-overlapping priority-resolved spans
+- **Five redaction styles** — token, label, mask, partial (keep last 4), and
+  deterministic hash; same value → same placeholder (coreference preserved)
+- **Live UI** — paste text, see PII highlighted by type with counts, switch
+  style, copy the result; no model, no network, no secrets
+
+```sh
+cd projects/pii-redactor
+make setup && make serve   # API + UI at http://localhost:8001
+```
+
 ## Repository conventions
 
 - One directory per project under `projects/`, each with its own spec
