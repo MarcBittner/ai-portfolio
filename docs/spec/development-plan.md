@@ -140,11 +140,24 @@ detected secret. MIT, offline, no secrets — conforms to CONV-1…4.
 - [ ] Roadmap (see project plan): classifier augmentation, deny-lists/config,
       more providers + entropy gating, streaming output scan, Argo deploy
 
-## Project 8+ (future)
+## Project 8: synth-data ✅ v0.1.0
 
-Candidates from the portfolio backlog (one at a time): **synth-data** (PII-free
-synthetic dataset generator), **forecast** (classic-ML time-series, no LLM),
-**multimodal-ocr** (image → OCR → extract → redact).
+Deterministic, PII-free synthetic dataset generation — library + FastAPI + UI.
+Seeded/reproducible; PII-free by construction. MIT, offline, no secrets —
+conforms to CONV-1…4.
+
+- [x] 15 typed generators + fictional pools; presets (users/transactions/tickets)
+- [x] generate (validated, reproducible, CSV) + FastAPI `/generate` `/schemas`
+      `/types` `/health` + UI (preset → editable schema → table, copy JSON/CSV)
+- [x] 18 tests (generate/api), ruff clean, `make demo` offline
+- [ ] Roadmap (see project plan): distributions/correlations, more types/locales,
+      streaming, a fixtures CLI, Argo deploy
+
+## Project 9+ (future)
+
+Candidates from the portfolio backlog (one at a time): **forecast** (classic-ML
+time-series, no LLM — breadth beyond LLMs), **multimodal-ocr** (image → OCR →
+extract → redact; needs an OCR model, weaker offline story).
 
 ---
 

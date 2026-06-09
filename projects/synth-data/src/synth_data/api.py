@@ -1,0 +1,76 @@
+"""FastAPI service: generate synthetic datasets and serve the UI.
+
+Stateless, fully offline (deterministic, no model, no network). Output data is
+PII-free by construction (see generators.py).
+"""
+
+from pathlib import Path
+
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse, PlainTextResponse
+
+from synth_data import __version__
+from synth_data.generate import PRESET_NAMES, PRESETS, generate, to_csv
+from synth_data.generators import TYPE_NAMES
+from synth_data.models import (
+    GenerateRequest,
+    GenerateResponse,
+    HealthResponse,
+    PresetInfo,
+    TypeInfo,
+)
+
+STATIC_DIR = Path(__file__).parent / "static"
+
+app = FastAPI(
+    title="synth-data",
+    version=__version__,
+    description="Deterministic, PII-free synthetic dataset generation.",
+)
+
+
+@app.get("/health", response_model=HealthResponse)
+def health() -> HealthResponse:
+    return HealthResponse(status="ok", version=__version__,
+                          types=len(TYPE_NAMES), presets=len(PRESET_NAMES))
+
+
+@app.get("/types", response_model=list[TypeInfo])
+def list_types() -> list[TypeInfo]:
+    return [TypeInfo(name=t) for t in TYPE_NAMES]
+
+
+@app.get("/schemas", response_model=list[PresetInfo])
+def list_presets() -> list[PresetInfo]:
+    return [PresetInfo(name=name, fields=fields) for name, fields in PRESETS.items()]
+
+
+@app.post("/generate")
+def run_generate(request: GenerateRequest):
+    if request.preset:
+        if request.preset not in PRESETS:
+            raise HTTPException(
+                status_code=422, detail=f"unknown preset: {request.preset}"
+            )
+        fields = [dict(f) for f in PRESETS[request.preset]]
+    elif request.fields:
+        fields = [f.model_dump() for f in request.fields]
+    else:
+        raise HTTPException(status_code=422, detail="provide a preset or fields")
+
+    try:
+        rows = generate(fields, request.n, request.seed)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    if request.fmt == "csv":
+        return PlainTextResponse(to_csv(rows), media_type="text/csv")
+    return GenerateResponse(
+        n=len(rows), seed=request.seed,
+        columns=list(rows[0].keys()) if rows else [], rows=rows,
+    )
+
+
+@app.get("/", include_in_schema=False)
+def index() -> FileResponse:
+    return FileResponse(STATIC_DIR / "index.html")

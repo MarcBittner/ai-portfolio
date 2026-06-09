@@ -144,6 +144,25 @@ cd projects/promptguard
 make setup && make serve   # API + UI at http://localhost:8005
 ```
 
+### [synth-data](projects/synth-data/) — v0.1.0
+
+Deterministic, **PII-free synthetic dataset generation** — library + FastAPI +
+UI. Define a schema (or pick a preset), set rows + seed, get reproducible JSON
+or CSV. The data the rest of the portfolio runs on.
+
+- **Deterministic** — same schema/seed → identical rows (seeded), so fixtures
+  are reproducible and diffable
+- **PII-free by construction** — RFC 2606 `example.*` emails, reserved
+  `555-01xx` phones, fictional name/city/company pools; can't collide with real
+  people
+- **Live UI** — pick a preset, edit the schema, generate → table preview with
+  copy-as-JSON / copy-as-CSV
+
+```sh
+cd projects/synth-data
+make setup && make serve   # API + UI at http://localhost:8006
+```
+
 ## Repository conventions
 
 - One directory per project under `projects/`, each with its own spec

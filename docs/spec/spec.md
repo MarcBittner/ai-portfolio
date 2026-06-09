@@ -35,6 +35,7 @@ ai-portfolio/
 | [doc-extract](../../projects/doc-extract/) | v0.1.0 | Schema-driven structured extraction — FastAPI service + UI. Label-anchored + global-pattern strategies, type validation/normalization (date→ISO, money→number), per-field confidence and provenance spans. No model, no network. |
 | [agent-sandbox](../../projects/agent-sandbox/) | v0.1.0 | ReAct-style agent over safe deterministic tools (AST calculator, unit convert, date-diff, KB search) with multi-step chaining and a thought→action→observation trace UI. Pluggable planner; no model, no network. |
 | [promptguard](../../projects/promptguard/) | v0.1.0 | Deterministic LLM-firewall — scan prompts for injection/jailbreaks and responses for secret/PII leakage; allow/flag/block verdict + risk score. Never echoes detected secrets. No model, no network. |
+| [synth-data](../../projects/synth-data/) | v0.1.0 | Deterministic, PII-free synthetic dataset generation — library + FastAPI + UI. Seeded/reproducible; emails on RFC 2606 example.* and phones in the reserved 555-01xx range; JSON/CSV output. No model, no network. |
 
 > **Showcase exception.** `tanglement-showcase` is a *work showcase* (design
 > docs, a demo site, and a code sample), not a runnable reference project. It is
