@@ -69,10 +69,14 @@
           <option value="input">input (prompt)</option>
           <option value="output">output (response)</option>
         </select>
+        <label><input type="checkbox" id="useLlm" checked /> LLM classifier</label>
+        <label>provider <select id="provider"><option value="auto">auto</option></select></label>
+        <label>model <input id="model" placeholder="(default)" style="width:120px" /></label>
         <div class="spacer"></div>
         <button class="primary" id="scan">Scan</button>
       </div>
       <div class="row samples" id="samples"></div>
+      <div id="routing" style="font-size:12px;color:var(--muted);font-family:ui-monospace,Menlo,monospace;margin:6px 0"></div>
 
       <div id="verdict"></div>
 
@@ -112,6 +116,12 @@
             const [, text, dir] = SAMPLES[b.dataset.i];
             $("text").value = text; $("direction").value = dir; scan();
           }));
+        try {
+          const p = await fetch("/providers").then((r) => r.json());
+          for (const n of Object.keys(p.available))
+            $("provider").insertAdjacentHTML("beforeend",
+              `<option value="${n}">${n}${p.available[n] ? "" : " (unavailable)"}</option>`);
+        } catch { /* optional */ }
       }
 
       async function scan() {
@@ -119,10 +129,15 @@
         if (!text.trim()) return;
         const res = await fetch("/scan", {
           method: "POST", headers: { "content-type": "application/json" },
-          body: JSON.stringify({ text, direction: $("direction").value }),
+          body: JSON.stringify({ text, direction: $("direction").value,
+            use_llm: $("useLlm").checked, provider: $("provider").value,
+            model: $("model").value || null }),
         });
         if (!res.ok) { alert(await res.text()); return; }
-        render(await res.json(), text);
+        const data = await res.json();
+        $("routing").textContent = data.routing
+          ? `LLM classifier routed via ${data.routing.provider} (${data.routing.model})` : "";
+        render(data, text);
       }
 
       function render(data, text) {

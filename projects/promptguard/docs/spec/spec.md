@@ -39,13 +39,14 @@ pipeline — and it never re-emits a detected secret.
 
 ### FR-6: Conventions
 - Python 3.11+, type hints, `ruff` clean, lean pinned deps.
-- `make setup && make test && make lint` green on a fresh clone, no `.env`.
+- `./run.sh setup && ./run.sh check` green on a fresh clone, no `.env`.
 - Synthetic data only; no secrets in the repo (test fixtures are split so no
   secret-shaped token sits in source).
 
 ## Non-Goals
-- Model-based classification (toxicity, semantic injection) — a future
-  augmentation behind the same finding contract; the default is regex + offline.
+- A bundled classifier — the optional LLM semantic classifier routes to an
+  external provider (Ollama/OpenAI/OpenRouter) and the default stays regex +
+  offline when none is reachable.
 - Guaranteed coverage — a regex firewall errs toward flagging and is one layer,
   not a complete defense; tune rules/severities per deployment.
 - Rewriting/redacting the input in place — that's [`pii-redactor`](../../pii-redactor/)'s job;
