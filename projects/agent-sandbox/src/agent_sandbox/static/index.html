@@ -57,7 +57,14 @@
 
       <input type="text" id="q" placeholder="Ask something the tools can answer…" />
       <div class="row samples" id="samples"></div>
-      <div class="row"><div class="spacer"></div><button class="primary" id="run">Run agent</button></div>
+      <div class="row">
+        <label><input type="checkbox" id="useLlm" checked /> LLM planner</label>
+        <label>provider <select id="provider"><option value="auto">auto</option></select></label>
+        <label>model <input id="model" placeholder="(default)" style="width:130px" /></label>
+        <span id="ollamaStatus" style="font-size:12px;color:var(--muted)"></span>
+        <div class="spacer"></div>
+        <button class="primary" id="run">Run agent</button>
+      </div>
 
       <div id="answer"></div>
       <div id="trace"></div>
@@ -93,6 +100,14 @@
         ).join("");
         $("samples").querySelectorAll("button").forEach((b) =>
           b.addEventListener("click", () => { $("q").value = b.dataset.q; run(); }));
+        try {
+          const p = await fetch("/providers").then((r) => r.json());
+          for (const n of Object.keys(p.available))
+            $("provider").insertAdjacentHTML("beforeend",
+              `<option value="${n}">${n}${p.available[n] ? "" : " (unavailable)"}</option>`);
+          $("ollamaStatus").textContent = p.available.ollama
+            ? `Ollama: reachable (${p.models.ollama})` : "Ollama: not reachable → rule planner";
+        } catch { /* optional */ }
       }
 
       async function run() {
@@ -100,15 +115,19 @@
         if (!query) return;
         const res = await fetch("/run", {
           method: "POST", headers: { "content-type": "application/json" },
-          body: JSON.stringify({ query }),
+          body: JSON.stringify({ query, use_llm: $("useLlm").checked,
+            provider: $("provider").value, model: $("model").value || null }),
         });
         if (!res.ok) { alert(await res.text()); return; }
         render(await res.json());
       }
 
       function render(data) {
+        const via = data.planner === "llm" && data.routing
+          ? `planner: LLM via ${data.routing.provider} (${data.routing.model})`
+          : `planner: rule${data.routing ? " (LLM unavailable → fallback)" : ""}`;
         $("answer").innerHTML =
-          `<div class="answer"><div class="label">Answer</div><div class="val">${esc(data.answer)}</div></div>`;
+          `<div class="answer"><div class="label">Answer · ${esc(via)}</div><div class="val">${esc(data.answer)}</div></div>`;
         $("trace").innerHTML = data.steps.map((s, i) => {
           const args = Object.entries(s.args).map(([k, v]) => `${k}=${esc(JSON.stringify(v))}`).join(", ");
           return `<div class="step">

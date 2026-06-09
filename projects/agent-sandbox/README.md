@@ -1,66 +1,84 @@
 # agent-sandbox
 
-A **ReAct-style agent** over safe, deterministic tools: it reasons, calls a
-tool, observes the result, and repeats — **chaining** results across steps —
-emitting a full thought→action→observation trace. Deterministic and offline (a
-real LLM planner plugs in behind the same `plan(query) → steps` interface); no
-model, no network, no secrets.
+[![CI](https://github.com/MarcBittner/ai-portfolio/actions/workflows/projects-ci.yml/badge.svg)](https://github.com/MarcBittner/ai-portfolio/actions/workflows/projects-ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Offline-first](https://img.shields.io/badge/offline--first-yes-success)](#configuration)
+[![LLM routing](https://img.shields.io/badge/LLM-Ollama%E2%86%92mock-b197fc)](#llm-routing)
+
+> A **ReAct-style agent** over safe, deterministic tools — it reasons, calls a
+> tool, observes, and chains results across steps, emitting a full
+> thought→action→observation trace. Two planners: a **rule-based** one (offline)
+> and an **LLM planner** routed to local **Ollama**, which falls back to the
+> rule planner when no model is reachable.
 
 ```sh
-make setup && make demo     # a chained, multi-step run, offline
-make serve                  # API + trace UI at http://localhost:8004
+./run.sh setup && ./run.sh serve     # API + trace UI at http://localhost:8004
 ```
 
-## How it works
+---
+
+## What it does
 
 ```
 query → planner → [Step(thought, tool, args), …] → loop:
           run tool, record observation, substitute {n} into later args → answer
 ```
 
-- **Sandboxed tools** — the centerpiece. The calculator evaluates a **whitelisted
-  AST** (never `eval`); `convert` does unit math; `date_diff` counts days;
-  `search` hits a small synthetic KB. Each is pure and offline.
-- **Multi-step chaining** — "20% of the days between 2026-01-01 and 2026-02-01"
-  runs `date_diff` (→ `31`) then `calculator` with `20/100*{0}` filled from the
-  first observation (→ `6.2`).
-- **Graceful failure** — a tool error becomes a failed step in the trace, not a
-  crash; the run still returns.
-- **Pluggable planner** — the rule-based planner is a stand-in; swap in an LLM
-  planner without touching the loop or tools.
+- **Sandboxed tools** — `calculator` (whitelisted-AST eval, never `eval`),
+  `convert` (units), `date_diff`, `search` (KB). Pure and offline.
+- **Two planners** — rule-based (deterministic) or LLM (proposes a JSON plan
+  over the tool registry). The agent loop, tools, and `{n}` chaining are shared.
+- **Graceful** — tool errors become failed steps; LLM-planner failure falls back
+  to the rule planner. The response reports which planner ran.
 
-## Tools
+## Quickstart (`run.sh`, no `make`)
 
-| Tool | Does |
-|---|---|
-| `calculator` | arithmetic via safe AST eval (`+ - * / ^ %`, parens) |
-| `convert` | length / mass / temperature unit conversion |
-| `date_diff` | whole days between two `YYYY-MM-DD` dates |
-| `search` | keyword lookup over a small knowledge base |
+```sh
+./run.sh setup   ./run.sh serve [--port N]   ./run.sh test
+./run.sh lint    ./run.sh check              ./run.sh demo   ./run.sh doctor
+```
+
+## Architecture
+
+```
+                ┌──────────────── FastAPI ────────────────┐
+  query ──────▶ │ /run    /tools    /providers    /health  │
+                └──────┬───────────────────────┬───────────┘
+                       ▼                        ▼
+          planner.py (rule)            llm_planner.py (LLM plan)
+                       │                 llm.py: ollama→openrouter→openai→mock
+                       └───────────┬─────────┘  (None → rule fallback)
+                                   ▼
+                  agent.py loop → tools.py (sandboxed) → trace + answer
+```
+
+## LLM routing
+
+The vendored stdlib router (`llm.py`) tries `ollama → openrouter → openai →
+mock`. The LLM planner asks for a JSON plan; if the provider is the mock or the
+plan can't be parsed it returns `None` and the agent uses the rule planner.
+`GET /providers` reports availability for the UI.
 
 ## API
 
 | Method | Path | Body / result |
 |---|---|---|
-| `POST` | `/run` | `{query}` → `{steps:[{thought,tool,args,observation,ok}], answer, n_steps}` |
+| `POST` | `/run` | `{query, use_llm, provider, model}` → `{steps, answer, n_steps, planner, routing}` |
 | `GET` | `/tools` | available tools + descriptions |
-| `GET` | `/health` | status, version, tool count |
+| `GET` | `/providers` | provider availability + models |
+| `GET` | `/health` | status, version, tool count, Ollama reachability |
 | `GET` | `/` | the trace UI |
 
-```sh
-curl -s localhost:8004/run -H 'content-type: application/json' \
-  -d '{"query":"Convert 10 km to miles"}'
-```
+## Configuration
 
-## Design notes
+| Variable | Default | Purpose |
+|---|---|---|
+| `OLLAMA_BASE_URL` / `OLLAMA_MODEL` | `http://localhost:11434` / `llama3.1:8b` | LLM planner |
+| `OPENAI_API_KEY` / `OPENROUTER_API_KEY` | – | enable cloud providers |
+| `LLM_TIMEOUT` | `30` | per-call timeout (s) |
 
-- **Why deterministic** — the planner is rule-based so the agent is reproducible
-  and demoable with no accounts; the architecture (loop, tool registry, trace,
-  placeholder data-flow) is what generalizes to an LLM planner.
-- **Safety first** — tools an agent can invoke are sandboxed by construction
-  (AST-whitelisted calculator, no network, no filesystem).
-- **Layout** — `tools.py`, `planner.py`, `agent.py` (loop), `models.py`,
-  `api.py` (+ static UI). Spec in [`docs/spec/`](docs/spec/).
-
-Synthetic data only. MIT; part of the
-[ai-portfolio](https://github.com/MarcBittner/ai-portfolio).
+Synthetic data only; no secrets; tools are offline and side-effect-free. MIT.
+Part of the [ai-portfolio](https://github.com/MarcBittner/ai-portfolio).

@@ -25,10 +25,19 @@ class TraceStep:
 
 
 @dataclass
+class Routing:
+    provider: str
+    model: str
+    fallbacks: list[str] = field(default_factory=list)
+
+
+@dataclass
 class AgentRun:
     query: str
     steps: list[TraceStep] = field(default_factory=list)
     answer: str = ""
+    planner: str = "rule"           # "rule" or "llm"
+    routing: Routing | None = None
 
 
 def _fill(args: dict, observations: list[str]) -> dict:
@@ -41,11 +50,25 @@ def _fill(args: dict, observations: list[str]) -> dict:
     return out
 
 
-def run(query: str) -> AgentRun:
-    """Run the agent over ``query`` and return the trace + final answer."""
+def run(query: str, use_llm: bool = False, provider: str | None = "auto",
+        model: str | None = None) -> AgentRun:
+    """Run the agent over ``query``. With ``use_llm`` it asks the LLM planner
+    first (falling back to the rule planner when no provider is reachable)."""
+    planner_used = "rule"
+    routing = None
+    steps = None
+    if use_llm:
+        from agent_sandbox.llm_planner import llm_plan
+        steps, result = llm_plan(query, provider, model)
+        routing = Routing(result.provider, result.model, result.fallbacks)
+        if steps is not None:
+            planner_used = "llm"
+    if steps is None:
+        steps = plan(query)
+
     observations: list[str] = []
     trace: list[TraceStep] = []
-    for step in plan(query)[:MAX_STEPS]:
+    for step in steps[:MAX_STEPS]:
         args = _fill(step.args, observations)
         tool = TOOLS.get(step.tool)
         try:
@@ -57,4 +80,5 @@ def run(query: str) -> AgentRun:
         observations.append(observation)
         trace.append(TraceStep(step.thought, step.tool, args, observation, ok))
     answer = observations[-1] if observations else "I couldn't determine an answer."
-    return AgentRun(query=query, steps=trace, answer=answer)
+    return AgentRun(query=query, steps=trace, answer=answer,
+                    planner=planner_used, routing=routing)

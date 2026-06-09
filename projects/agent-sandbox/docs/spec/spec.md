@@ -39,11 +39,13 @@ same interface), and every tool is sandboxed, pure, and network-free.
 
 ### FR-6: Conventions
 - Python 3.11+, type hints, `ruff` clean, lean pinned deps.
-- `make setup && make test && make lint` green on a fresh clone, no `.env`.
+- `./run.sh setup && ./run.sh check` green on a fresh clone, no `.env`.
 - Synthetic data only; no secrets; tools are offline and side-effect-free.
 
 ## Non-Goals
-- An LLM planner in the box — it's a future plug-in; the default is rule-based
-  and offline. Free-form reasoning over arbitrary tools is out of scope.
+- A bundled LLM — the LLM planner routes to an external provider
+  (Ollama/OpenAI/OpenRouter) and falls back to the rule planner when none is
+  reachable; the default stays offline. Free-form reasoning over arbitrary
+  (non-sandboxed) tools is out of scope.
 - Tools with side effects or network access (web search, code execution,
   file/shell) — deliberately excluded; the point is a *safe* tool surface.
