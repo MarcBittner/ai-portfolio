@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>agent-sandbox</title>
+    <style>
+      :root {
+        --bg: #0b0e14; --panel: #131722; --border: #232838; --fg: #e6e9ef;
+        --muted: #8b93a7; --accent: #6ea8fe; --ok: #63e6be; --bad: #ff6b6b;
+        --think: #ffd43b;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--bg); color: var(--fg);
+        font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+      main { max-width: 860px; margin: 0 auto; padding: 28px 20px 60px; }
+      h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -0.01em; }
+      p.lede { color: var(--muted); margin: 0 0 18px; }
+      input[type=text] { width: 100%; background: #0e1320; color: var(--fg);
+        border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; font-size: 14px; }
+      input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+      .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 10px 0; }
+      .spacer { flex: 1; }
+      button { background: #1b2230; color: var(--fg); border: 1px solid var(--border);
+        border-radius: 7px; padding: 6px 12px; font-size: 12px; cursor: pointer; }
+      button.primary { background: var(--accent); color: #07101f; border-color: var(--accent); font-weight: 600; font-size: 14px; }
+      button:hover { border-color: var(--accent); }
+      .samples button { font-size: 12px; }
+      .answer { background: var(--panel); border: 1px solid var(--accent); border-radius: 10px;
+        padding: 14px; margin: 16px 0; }
+      .answer .label { font-size: 11px; text-transform: uppercase; color: var(--muted); letter-spacing: .05em; }
+      .answer .val { font-size: 18px; font-weight: 600; margin-top: 4px; word-break: break-word; }
+      .step { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+        padding: 12px 14px; margin-bottom: 10px; position: relative; }
+      .step .n { position: absolute; top: 12px; right: 14px; color: var(--muted); font-size: 12px; }
+      .step .think { color: var(--think); font-size: 13px; }
+      .step .act { margin-top: 6px; font-family: ui-monospace, Menlo, monospace; font-size: 13px; }
+      .step .act .tool { color: var(--accent); }
+      .step .obs { margin-top: 6px; font-size: 13px; }
+      .step .obs .tag { font-size: 11px; padding: 1px 6px; border-radius: 999px; border: 1px solid var(--border); margin-right: 6px; }
+      .step .obs.ok .tag { color: var(--ok); border-color: var(--ok); }
+      .step .obs.err .tag { color: var(--bad); border-color: var(--bad); }
+      .tools { color: var(--muted); font-size: 12px; margin-top: 18px; }
+      .tools code { color: var(--fg); }
+      .empty { color: var(--muted); }
+      a { color: var(--accent); }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>agent-sandbox</h1>
+      <p class="lede">
+        A ReAct-style agent: it reasons, calls a safe tool, observes the result,
+        and repeats — chaining results across steps. Deterministic and offline
+        (an LLM planner plugs in behind the same interface). Watch the trace.
+      </p>
+
+      <input type="text" id="q" placeholder="Ask something the tools can answer…" />
+      <div class="row samples" id="samples"></div>
+      <div class="row"><div class="spacer"></div><button class="primary" id="run">Run agent</button></div>
+
+      <div id="answer"></div>
+      <div id="trace"></div>
+
+      <div class="tools" id="tools"></div>
+
+      <p class="tools">
+        <code>POST /run</code> · <code>GET /tools</code>. Synthetic data only.
+        Part of the <a href="https://github.com/MarcBittner/ai-portfolio">ai-portfolio</a>.
+      </p>
+    </main>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      const SAMPLES = [
+        "What is 15% of 240?",
+        "Convert 10 km to miles",
+        "How many days between 2026-01-01 and 2026-03-01?",
+        "What is 20% of the days between 2026-01-01 and 2026-02-01?",
+        "Tell me about persona-twin",
+        "3 * (4 + 5)",
+      ];
+      function esc(s) {
+        return String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+      }
+
+      async function loadTools() {
+        const tools = await fetch("/tools").then((r) => r.json());
+        $("tools").innerHTML = "<b>Tools:</b> " +
+          tools.map((t) => `<code>${t.name}</code> — ${esc(t.description)}`).join(" · ");
+        $("samples").innerHTML = SAMPLES.map(
+          (s) => `<button data-q="${esc(s)}">${esc(s)}</button>`,
+        ).join("");
+        $("samples").querySelectorAll("button").forEach((b) =>
+          b.addEventListener("click", () => { $("q").value = b.dataset.q; run(); }));
+      }
+
+      async function run() {
+        const query = $("q").value.trim();
+        if (!query) return;
+        const res = await fetch("/run", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ query }),
+        });
+        if (!res.ok) { alert(await res.text()); return; }
+        render(await res.json());
+      }
+
+      function render(data) {
+        $("answer").innerHTML =
+          `<div class="answer"><div class="label">Answer</div><div class="val">${esc(data.answer)}</div></div>`;
+        $("trace").innerHTML = data.steps.map((s, i) => {
+          const args = Object.entries(s.args).map(([k, v]) => `${k}=${esc(JSON.stringify(v))}`).join(", ");
+          return `<div class="step">
+            <span class="n">step ${i + 1}</span>
+            <div class="think">💭 ${esc(s.thought)}</div>
+            <div class="act">→ <span class="tool">${esc(s.tool)}</span>(${args})</div>
+            <div class="obs ${s.ok ? "ok" : "err"}"><span class="tag">${s.ok ? "observation" : "error"}</span>${esc(s.observation)}</div>
+          </div>`;
+        }).join("");
+      }
+
+      $("run").addEventListener("click", run);
+      $("q").addEventListener("keydown", (e) => { if (e.key === "Enter") run(); });
+      loadTools();
+    </script>
+  </body>
+</html>

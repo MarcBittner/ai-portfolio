@@ -33,6 +33,7 @@ ai-portfolio/
 | [pii-redactor](../../projects/pii-redactor/) | v0.1.0 | Deterministic PII detection + redaction — FastAPI service and zero-build web UI. Regex + checksum validation (Luhn, IBAN mod-97, IPv4 range); five redaction styles; live highlighting. No model, no network. |
 | [evalkit](../../projects/evalkit/) | v0.1.0 | Deterministic, offline-first LLM evaluation toolkit — library + FastAPI service + UI. Layered metrics (exact/contains/token-F1/semantic/refusal), regression gate, run comparison. No model, no network. |
 | [doc-extract](../../projects/doc-extract/) | v0.1.0 | Schema-driven structured extraction — FastAPI service + UI. Label-anchored + global-pattern strategies, type validation/normalization (date→ISO, money→number), per-field confidence and provenance spans. No model, no network. |
+| [agent-sandbox](../../projects/agent-sandbox/) | v0.1.0 | ReAct-style agent over safe deterministic tools (AST calculator, unit convert, date-diff, KB search) with multi-step chaining and a thought→action→observation trace UI. Pluggable planner; no model, no network. |
 
 > **Showcase exception.** `tanglement-showcase` is a *work showcase* (design
 > docs, a demo site, and a code sample), not a runnable reference project. It is

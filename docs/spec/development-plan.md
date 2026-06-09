@@ -114,13 +114,25 @@ and provenance spans. MIT, offline, no secrets — conforms to CONV-1…4.
 - [ ] Roadmap (see project plan): LLM extractor for messy docs, repeated/table
       fields, more schemas/locales, upstream OCR, Argo deploy
 
-## Project 6+ (future)
+## Project 6: agent-sandbox ✅ v0.1.0
 
-Candidates from the portfolio backlog (one at a time): **agent-sandbox** (ReAct
-tool-use with a trace UI), **promptguard** (injection/jailbreak/secret-leak
-firewall), **synth-data** (PII-free synthetic dataset generator), **forecast**
-(classic-ML time-series, no LLM), **multimodal-ocr** (image → OCR → extract →
-redact).
+ReAct-style agent over safe, deterministic tools — multi-step chaining and a
+thought→action→observation trace UI; pluggable planner. MIT, offline, no
+secrets — conforms to CONV-1…4.
+
+- [x] Sandboxed tools (AST calculator, unit convert, date_diff, KB search)
+- [x] Deterministic planner (+ chained case) and the agent loop with `{n}`
+      data-flow; FastAPI `/run` `/tools` `/health` + trace UI
+- [x] 20 tests (tools/agent/api), ruff clean, `make demo` offline
+- [ ] Roadmap (see project plan): LLM planner, more tools, self-correction,
+      per-tool accounting, Argo deploy
+
+## Project 7+ (future)
+
+Candidates from the portfolio backlog (one at a time): **promptguard**
+(injection/jailbreak/secret-leak firewall), **synth-data** (PII-free synthetic
+dataset generator), **forecast** (classic-ML time-series, no LLM),
+**multimodal-ocr** (image → OCR → extract → redact).
 
 ---
 

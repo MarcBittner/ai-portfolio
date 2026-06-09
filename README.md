@@ -107,6 +107,25 @@ cd projects/doc-extract
 make setup && make serve   # API + UI at http://localhost:8003
 ```
 
+### [agent-sandbox](projects/agent-sandbox/) — v0.1.0
+
+A **ReAct-style agent** over safe, deterministic tools — it reasons, calls a
+tool, observes, and chains results across steps, emitting a full
+thought→action→observation trace. Deterministic; an LLM planner plugs in behind
+the same interface.
+
+- **Sandboxed tools** — calculator (whitelisted AST eval, never `eval`), unit
+  convert, date-diff, KB search; pure and offline
+- **Multi-step chaining** — e.g. "20% of the days between two dates" runs
+  `date_diff` then feeds the result into `calculator`
+- **Trace UI** — paste a query, watch each step's thought, tool call, and
+  observation, then the final answer
+
+```sh
+cd projects/agent-sandbox
+make setup && make serve   # API + trace UI at http://localhost:8004
+```
+
 ## Repository conventions
 
 - One directory per project under `projects/`, each with its own spec
