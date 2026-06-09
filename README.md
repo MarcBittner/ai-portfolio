@@ -60,6 +60,8 @@ cd projects/persona-twin
 ./run.sh setup && ./run.sh demo   # runs fully offline, no .env required
 ```
 
+![persona-twin UI](projects/persona-twin/docs/screenshot.png)
+
 ### [tanglement-showcase](projects/tanglement-showcase/) — work showcase
 
 Curated public showcase of **Tanglement.ai** — a decentralized, peer-to-peer,
@@ -78,6 +80,8 @@ share routing intelligence over a Chord DHT + gossip mesh.
 > ⚠️ **Proprietary — not MIT.** This directory is published for viewing only
 > and carries its own [LICENSE](projects/tanglement-showcase/LICENSE)
 > (all rights reserved). The production backend is private.
+
+![Tanglement.ai teaser](projects/tanglement-showcase/docs/screenshot.png)
 
 ### [pii-redactor](projects/pii-redactor/) — v0.1.0
 
@@ -98,6 +102,8 @@ cd projects/pii-redactor
 ./run.sh setup && ./run.sh serve   # API + UI at http://localhost:8001
 ```
 
+![pii-redactor UI](projects/pii-redactor/docs/screenshot.png)
+
 ### [evalkit](projects/evalkit/) — v0.1.0
 
 A deterministic, **offline-first LLM evaluation toolkit** — library + FastAPI
@@ -117,6 +123,8 @@ cd projects/evalkit
 ./run.sh setup && ./run.sh serve   # API + UI at http://localhost:8002
 ```
 
+![evalkit UI](projects/evalkit/docs/screenshot.png)
+
 ### [doc-extract](projects/doc-extract/) — v0.1.0
 
 **Schema-driven structured extraction** — pull typed fields from documents
@@ -134,6 +142,8 @@ validation/normalization, and provenance spans. Deterministic; no model.
 cd projects/doc-extract
 ./run.sh setup && ./run.sh serve   # API + UI at http://localhost:8003
 ```
+
+![doc-extract UI](projects/doc-extract/docs/screenshot.png)
 
 ### [agent-sandbox](projects/agent-sandbox/) — v0.1.0
 
@@ -154,6 +164,8 @@ cd projects/agent-sandbox
 ./run.sh setup && ./run.sh serve   # API + trace UI at http://localhost:8004
 ```
 
+![agent-sandbox UI](projects/agent-sandbox/docs/screenshot.png)
+
 ### [promptguard](projects/promptguard/) — v0.1.0
 
 A deterministic **LLM-firewall** — scan prompts for injection & jailbreaks and
@@ -171,6 +183,8 @@ score and findings; never echoes a secret it catches.
 cd projects/promptguard
 ./run.sh setup && ./run.sh serve   # API + UI at http://localhost:8005
 ```
+
+![promptguard UI](projects/promptguard/docs/screenshot.png)
 
 ### [synth-data](projects/synth-data/) — v0.1.0
 
@@ -191,7 +205,9 @@ cd projects/synth-data
 ./run.sh setup && ./run.sh serve   # API + UI at http://localhost:8006
 ```
 
-### [forecast](projects/forecast/) — v0.1.0
+![synth-data UI](projects/synth-data/docs/screenshot.png)
+
+### [forecast](projects/forecast/) — v0.2.0
 
 Classic-ML **time-series forecasting + anomaly detection** — library + FastAPI +
 chart UI. The portfolio's non-LLM project: hand-rolled statistics with proper
@@ -207,6 +223,8 @@ backtesting and uncertainty.
 cd projects/forecast
 ./run.sh setup && ./run.sh serve   # API + chart UI at http://localhost:8007
 ```
+
+![forecast UI](projects/forecast/docs/screenshot.png)
 
 ### [multimodal-ocr](projects/multimodal-ocr/) — v0.1.0
 
@@ -224,6 +242,8 @@ UI that blacks out PII *on the page*, not just in the text.
 cd projects/multimodal-ocr
 ./run.sh setup && ./run.sh serve   # API + UI at http://localhost:8008
 ```
+
+![multimodal-ocr UI](projects/multimodal-ocr/docs/screenshot.png)
 
 ## Shared capabilities (Projects 3–10)
 
