@@ -10,6 +10,11 @@ client = TestClient(app)
 def test_health():
     body = client.get("/health").json()
     assert body["status"] == "ok" and body["schemas"] == 3
+    assert "ollama" in body
+
+
+def test_providers_endpoint():
+    assert client.get("/providers").json()["available"]["mock"] is True
 
 
 def test_schemas_listing():
@@ -20,10 +25,10 @@ def test_schemas_listing():
     assert any(f["name"] == "total" and f["type"] == "money" for f in invoice["fields"])
 
 
-def test_extract_endpoint():
+def test_extract_endpoint_deterministic():
     r = client.post("/extract", json={
         "text": "Invoice #: INV-9\nTotal due: $42.00\nemail: a@b.com",
-        "schema": "invoice",
+        "schema": "invoice", "use_llm": False,
     })
     body = r.json()
     assert body["schema"] == "invoice"
@@ -33,6 +38,18 @@ def test_extract_endpoint():
     assert found["total"]["normalized"] == "42.00"
     assert found["vendor_email"]["value"] == "a@b.com"
     assert body["found"] == len(found) >= 3
+    assert body["routing"] is None  # no LLM pass
+
+
+def test_llm_fill_mock_changes_nothing():
+    # provider=mock -> no fill, but routing reported; deterministic results stand
+    r = client.post("/extract", json={
+        "text": "Invoice #: INV-9", "schema": "invoice",
+        "use_llm": True, "provider": "mock"}).json()
+    assert r["routing"]["provider"] == "mock"
+    found = {f["name"] for f in r["fields"] if f["found"]}
+    assert "invoice_number" in found  # regex still works
+    assert all(f["method"] != "llm" for f in r["fields"] if f["found"])
 
 
 def test_extract_unknown_schema_422():

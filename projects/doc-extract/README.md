@@ -1,65 +1,84 @@
 # doc-extract
 
-**Schema-driven structured extraction** — pull typed fields out of documents
-(invoices, resumes, contact blocks) with per-field **confidence**, **type
-validation/normalization**, and **provenance** (the exact span each value came
-from). Deterministic: no model, no network, no secrets.
+[![CI](https://github.com/MarcBittner/ai-portfolio/actions/workflows/projects-ci.yml/badge.svg)](https://github.com/MarcBittner/ai-portfolio/actions/workflows/projects-ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Offline-first](https://img.shields.io/badge/offline--first-yes-success)](#configuration)
+[![LLM routing](https://img.shields.io/badge/LLM-Ollama%E2%86%92mock-b197fc)](#llm-routing)
+
+> **Schema-driven structured extraction** — pull typed fields from documents
+> (invoices, resumes, contact blocks) with per-field confidence, type
+> validation, and provenance spans. A deterministic regex core plus an
+> **optional LLM pass** (routed to local **Ollama**) that fills the fields the
+> regex misses.
 
 ```sh
-make setup && make demo     # extracts an invoice offline
-make serve                  # API + UI at http://localhost:8003
+./run.sh setup && ./run.sh serve     # API + UI at http://localhost:8003
 ```
 
-## How it works
+---
 
-A *schema* is a list of fields; each field has a type and label aliases.
-Extraction tries two strategies per field, in order:
+## What it does
 
-1. **Label-anchored** — find a label alias (`Total due:`, `Invoice #:`) and
-   capture the typed value next to it → high confidence.
-2. **Global pattern** — for typed fields, fall back to the first matching value
-   anywhere in the text → lower confidence.
+1. **Label-anchored extraction** — find a label alias (`Total due:`) and capture
+   the adjacent typed value (high confidence).
+2. **Global-pattern fallback** — for typed fields, the first matching value.
+3. **LLM fill (optional)** — still-missing fields are sent to the router; values
+   are validated, normalized, and located in the text for a span. Method `llm`,
+   lower confidence; regex always wins where it found a value.
 
-Each value is then **validated/normalized** by type (date → ISO, money →
-number, email/phone/url by regex), and every result carries a confidence and a
-`[start, end)` span so the UI can highlight where it came from.
+Each value is type-validated (`date → ISO`, `money → number`, email/phone/url
+regex) and carries a `[start, end)` provenance span (`text[start:end] == value`).
+Built-in schemas: **invoice**, **resume**, **contact** (schemas are data).
 
-| Built-in schemas | Field types |
-|---|---|
-| `invoice`, `resume`, `contact` | email · phone · url · money · date · number · string |
+## Quickstart (`run.sh`, no `make`)
 
-- **Validation, not just capture** — `2026-04-13` normalizes; `13/45/2026`
-  matches the date *shape* but is flagged invalid.
-- **Provenance** — `text[start:end] == value`, so matches are highlightable.
-- **Live UI** — paste a document, pick a schema, see highlighted matches, a
-  fields table (value → normalized, confidence bar, valid/invalid, label vs
-  pattern), and clean JSON output.
+```sh
+./run.sh setup   ./run.sh serve [--port N]   ./run.sh test
+./run.sh lint    ./run.sh check              ./run.sh demo   ./run.sh doctor
+```
+
+## Architecture
+
+```
+                ┌──────────────── FastAPI ────────────────┐
+  doc ────────▶ │ /extract  /schemas  /providers  /health  │
+                └──────┬───────────────────────┬───────────┘
+                       ▼                        ▼
+            extract.py (label-anchored     llm_extract.py (fills missing)
+             + global pattern + validate)   llm.py router:
+                       │                     ollama→openrouter→openai→mock
+                       └───────────┬─────────┘  (regex wins on conflict)
+                                   ▼
+                       fields: value · normalized · confidence · span · method
+```
+
+## LLM routing
+
+The vendored stdlib router (`llm.py`) tries `ollama → openrouter → openai →
+mock`. The LLM fill runs only for fields the deterministic pass left empty, and
+no-ops when the provider is the mock or unreachable. `GET /providers` reports
+availability for the UI.
 
 ## API
 
 | Method | Path | Body / result |
 |---|---|---|
-| `POST` | `/extract` | `{text, schema}` → `{fields:[{name,type,value,normalized,valid,confidence,start,end,method}], found, total}` |
+| `POST` | `/extract` | `{text, schema, use_llm, provider, model}` → `{fields, found, total, routing}` |
 | `GET` | `/schemas` | schemas + their fields |
-| `GET` | `/health` | status, version, schema count |
+| `GET` | `/providers` | provider availability + models |
+| `GET` | `/health` | status, version, schema count, Ollama reachability |
 | `GET` | `/` | the web UI |
 
-```sh
-curl -s localhost:8003/extract -H 'content-type: application/json' -d '{
-  "text": "Invoice #: INV-7\nTotal due: $42.00\nemail: a@b.com",
-  "schema": "invoice"
-}'
-```
+## Configuration
 
-## Design notes
+| Variable | Default | Purpose |
+|---|---|---|
+| `OLLAMA_BASE_URL` / `OLLAMA_MODEL` | `http://localhost:11434` / `llama3.1:8b` | local LLM fill |
+| `OPENAI_API_KEY` / `OPENROUTER_API_KEY` | – | enable cloud providers |
+| `LLM_TIMEOUT` | `30` | per-call timeout (s) |
 
-- **Deterministic, offline** — regex + checksum-free validators only; an LLM
-  extractor could plug in behind the same field contract for messy documents,
-  but the default needs no accounts.
-- **Schemas are data** — adding a document type is a `Schema` entry, not code.
-- **Layout** — `schemas.py` (field defs), `extract.py` (strategies + validators),
-  `models.py` (API types), `api.py` (FastAPI + static UI). Spec in
-  [`docs/spec/`](docs/spec/).
-
-Synthetic data only. MIT; part of the
+Synthetic data only; no secrets. MIT. Part of the
 [ai-portfolio](https://github.com/MarcBittner/ai-portfolio).

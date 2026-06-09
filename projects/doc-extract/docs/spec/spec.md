@@ -43,11 +43,12 @@ reproducible and safe in a pipeline.
 
 ### FR-7: Conventions
 - Python 3.11+, type hints, `ruff` clean, lean pinned deps.
-- `make setup && make test && make lint` green on a fresh clone, no `.env`.
+- `./run.sh setup && ./run.sh check` green on a fresh clone, no `.env`.
 - Synthetic data only; no secrets.
 
 ## Non-Goals
-- LLM-based extraction for messy/unlabeled documents — a future plug-in behind
-  the same field contract; the default stays deterministic and offline.
+- A bundled model — the optional LLM fill routes to an external provider
+  (Ollama/OpenAI/OpenRouter) and no-ops when none is reachable; the default
+  stays deterministic and offline.
 - OCR / file parsing (PDF, DOCX) — input is text; pair with an OCR step upstream.
 - Many locales — patterns cover common US/ISO formats; extensible per field.

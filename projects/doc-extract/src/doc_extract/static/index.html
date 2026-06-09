@@ -66,6 +66,14 @@
         <div class="spacer"></div>
         <button class="primary" id="run">Extract</button>
       </div>
+      <div class="row">
+        <label><input type="checkbox" id="useLlm" checked /> LLM fill missing</label>
+        <label>provider <select id="provider"><option value="auto">auto</option></select></label>
+        <label>model <input id="model" placeholder="(default)" style="width:140px" /></label>
+        <span class="spacer"></span>
+        <span id="ollamaStatus" style="font-size:12px;color:var(--muted)">checking Ollama…</span>
+      </div>
+      <div id="routing" style="font-size:12px;color:var(--muted);font-family:ui-monospace,Menlo,monospace;margin:6px 0"></div>
 
       <div class="grid">
         <div class="panel">
@@ -128,11 +136,27 @@
         if (!text.trim()) return;
         const res = await fetch("/extract", {
           method: "POST", headers: { "content-type": "application/json" },
-          body: JSON.stringify({ text, schema }),
+          body: JSON.stringify({ text, schema, use_llm: $("useLlm").checked,
+            provider: $("provider").value, model: $("model").value || null }),
         });
         if (!res.ok) { alert(await res.text()); return; }
-        render(await res.json(), text);
+        const data = await res.json();
+        $("routing").textContent = data.routing
+          ? `LLM fill routed via ${data.routing.provider} (${data.routing.model})` : "";
+        render(data, text);
       }
+
+      async function loadProviders() {
+        try {
+          const p = await fetch("/providers").then((r) => r.json());
+          for (const n of Object.keys(p.available))
+            $("provider").insertAdjacentHTML("beforeend",
+              `<option value="${n}">${n}${p.available[n] ? "" : " (unavailable)"}</option>`);
+          $("ollamaStatus").textContent = p.available.ollama
+            ? `Ollama: reachable (${p.models.ollama})` : "Ollama: not reachable → deterministic only";
+        } catch { /* optional */ }
+      }
+      loadProviders();
 
       function render(data, text) {
         // highlight provenance spans (non-overlapping, sorted)
