@@ -48,9 +48,13 @@
       <div class="row">
         <label>Sample document</label>
         <select id="sample"></select>
+        <label><input type="checkbox" id="useLlm" checked /> LLM NER</label>
+        <label>provider <select id="provider"><option value="auto">auto</option></select></label>
+        <label>model <input id="model" placeholder="(default)" style="width:120px" /></label>
         <div class="spacer"></div>
         <button class="primary" id="run">Detect &amp; redact</button>
       </div>
+      <div id="routing" style="font-size:12px;color:var(--muted);font-family:ui-monospace,Menlo,monospace;margin:4px 0"></div>
 
       <div class="grid2">
         <div class="panel"><h2>Document</h2><svg id="orig"></svg></div>
@@ -86,6 +90,12 @@
         const h = await fetch("/health").then((r) => r.json());
         $("backend").textContent = `OCR backend: ${h.ocr_backend}` +
           (h.ocr_backend === "samples-only" ? " (install the 'ocr' extra + tesseract for real image OCR)" : "");
+        try {
+          const p = await fetch("/providers").then((r) => r.json());
+          for (const n of Object.keys(p.available))
+            $("provider").insertAdjacentHTML("beforeend",
+              `<option value="${n}">${n}${p.available[n] ? "" : " (unavailable)"}</option>`);
+        } catch { /* optional */ }
         renderDoc("orig", SAMPLES[$("sample").value], []);
         $("redacted").innerHTML = "";
       }
@@ -116,8 +126,11 @@
         const sample = $("sample").value;
         const data = await fetch("/process", {
           method: "POST", headers: { "content-type": "application/json" },
-          body: JSON.stringify({ sample }),
+          body: JSON.stringify({ sample, use_llm: $("useLlm").checked,
+            provider: $("provider").value, model: $("model").value || null }),
         }).then((r) => r.json());
+        $("routing").textContent = data.routing
+          ? `LLM NER routed via ${data.routing.provider} (${data.routing.model})` : "";
         renderDoc("orig", data.tokens, []);
         renderDoc("redacted", data.tokens, data.boxes);
         $("findpanel").style.display = "block";

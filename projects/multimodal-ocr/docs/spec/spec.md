@@ -41,7 +41,7 @@ pluggable, opt-in backend.
 ### FR-7: Conventions
 - Python 3.11+, type hints, `ruff` clean, lean pinned deps (real-OCR deps are
   an optional extra).
-- `make setup && make test && make lint` green on a fresh clone, no `.env`.
+- `./run.sh setup && ./run.sh check` green on a fresh clone, no `.env`.
 - Synthetic data only; no secrets; detected PII is never echoed.
 
 ## Non-Goals

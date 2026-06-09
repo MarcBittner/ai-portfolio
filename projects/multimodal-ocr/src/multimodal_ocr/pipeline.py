@@ -31,12 +31,20 @@ class Finding:
 
 
 @dataclass
+class Routing:
+    provider: str
+    model: str
+    fallbacks: list[str]
+
+
+@dataclass
 class Result:
     text: str
     redacted_text: str
     findings: list[Finding]
     boxes: list[Box]
     counts: dict[str, int]
+    routing: Routing | None = None
 
 
 def tokens_to_text(tokens: list[OcrToken]):
@@ -59,9 +67,20 @@ def tokens_to_text(tokens: list[OcrToken]):
     return "".join(parts), ordered, spans
 
 
-def process(tokens: list[OcrToken], types: set[str] | None = None) -> Result:
+def process(tokens: list[OcrToken], types: set[str] | None = None,
+            use_llm: bool = False, provider: str | None = "auto",
+            model: str | None = None) -> Result:
     text, ordered, spans = tokens_to_text(tokens)
     pii = detect(text, types)
+
+    routing = None
+    if use_llm:
+        from multimodal_ocr.llm_ner import llm_entities, merge
+        llm_spans, result = llm_entities(text, provider, model)
+        if types is not None:
+            llm_spans = [s for s in llm_spans if s.type in types]
+        pii = merge(pii, llm_spans)
+        routing = Routing(result.provider, result.model, result.fallbacks)
 
     boxes: list[Box] = []
     counts: dict[str, int] = {}
@@ -77,7 +96,7 @@ def process(tokens: list[OcrToken], types: set[str] | None = None) -> Result:
         for s in pii
     ]
     redacted_text = _redact_text(text, pii)
-    return Result(text, redacted_text, findings, boxes, counts)
+    return Result(text, redacted_text, findings, boxes, counts, routing)
 
 
 def _redact_text(text: str, pii) -> str:

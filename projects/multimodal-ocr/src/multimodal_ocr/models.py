@@ -15,6 +15,15 @@ class ProcessRequest(BaseModel):
     sample: str | None = None
     tokens: list[TokenIO] | None = None
     types: list[str] | None = None
+    use_llm: bool = True            # LLM NER over the OCR text (names/orgs)
+    provider: str = "auto"
+    model: str | None = None
+
+
+class RoutingInfo(BaseModel):
+    provider: str
+    model: str
+    fallbacks: list[str] = []
 
 
 class BoxOut(BaseModel):
@@ -39,6 +48,7 @@ class ProcessResponse(BaseModel):
     findings: list[FindingOut]
     boxes: list[BoxOut]
     counts: dict[str, int]
+    routing: RoutingInfo | None = None
 
 
 class SampleInfo(BaseModel):
@@ -56,3 +66,4 @@ class HealthResponse(BaseModel):
     samples: int
     types: int
     ocr_backend: str  # "tesseract" if available, else "samples-only"
+    ollama: bool

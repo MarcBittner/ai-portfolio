@@ -1,59 +1,87 @@
 # multimodal-ocr
 
-An **OCR → PII-detection → box-level redaction** pipeline — a library, a
-FastAPI service, and a zero-build UI that blacks out PII *on the page*. The
-pipeline maps each detected PII span back to the OCR tokens it covers and
-redacts those bounding boxes (and the text). Deterministic and offline by
-default; real OCR is opt-in.
+[![CI](https://github.com/MarcBittner/ai-portfolio/actions/workflows/projects-ci.yml/badge.svg)](https://github.com/MarcBittner/ai-portfolio/actions/workflows/projects-ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Offline-first](https://img.shields.io/badge/offline--first-yes-success)](#configuration)
+[![LLM routing](https://img.shields.io/badge/LLM-Ollama%E2%86%92mock-b197fc)](#llm-routing)
+
+> An **OCR → PII-detection → box-level redaction** pipeline that blacks out PII
+> *on the page*. Regex catches structured PII; an optional **LLM NER pass**
+> (routed to local **Ollama**) adds names/orgs/locations. Deterministic on
+> bundled samples; real OCR (Tesseract) is opt-in.
 
 ```sh
-make setup && make demo     # redact a bundled sample document, offline
-make serve                  # API + UI at http://localhost:8008
+./run.sh setup && ./run.sh serve     # API + UI at http://localhost:8008
 ```
+
+---
 
 ## How it works
 
 ```
-image ──(OCR)──▶ tokens (word + box) ──▶ join to text (track char spans)
-      ──▶ detect PII ──▶ map spans back to overlapping tokens
-      ──▶ black out those boxes + redact the text
+image ─(OCR)─▶ tokens (word + box) ─▶ join to text (track char spans)
+   ─▶ detect PII (regex)  ─┐
+   ─▶ LLM NER (optional) ──┴─ merge (regex wins) ─▶ map spans → token boxes
+   ─▶ black out boxes + redact text
 ```
 
-- **Box-level redaction** — the multimodal part: PII is removed from the
-  *image regions*, not just the text, by reusing each token's bounding box.
-- **Pluggable OCR** — the pipeline runs on OCR tokens. The **default, offline**
-  path uses bundled sample documents (tokens synthesized from a known layout),
-  so the whole flow is real and tested with no model. A **Tesseract** backend
-  (`/ocr`, opt-in `ocr` extra + the tesseract binary) handles arbitrary images.
-- **Validated detection** — EMAIL, PHONE, SSN, CREDIT_CARD (Luhn). Findings
-  report category + length only — the value is never echoed.
+- **Box-level redaction** — PII removed from the *image regions* via each
+  token's bounding box, not just the text.
+- **Two detectors** — regex/Luhn for EMAIL/PHONE/SSN/CREDIT_CARD; an optional
+  LLM pass for PERSON/ORG/LOCATION over the OCR text, merged (regex wins).
+- **Pluggable OCR** — deterministic on bundled samples; a Tesseract backend
+  (`/ocr`, opt-in `ocr` extra) handles arbitrary images.
+- **Governance-consistent** — findings report category + length, never the value.
+
+## Quickstart (`run.sh`, no `make`)
+
+```sh
+./run.sh setup   ./run.sh serve [--port N]   ./run.sh test
+./run.sh lint    ./run.sh check              ./run.sh demo   ./run.sh doctor
+```
+
+## Architecture
+
+```
+                ┌──────────────── FastAPI ──────────────────┐
+  tokens ─────▶ │ /process /ocr /samples /providers /health  │
+                └──────┬───────────────────────┬─────────────┘
+                       ▼                        ▼
+        detect.py (regex+Luhn) + pipeline   llm_ner.py (PERSON/ORG/LOCATION)
+        (tokens→text→span→box mapping)       llm.py: ollama→openrouter→openai→mock
+                       └───────────┬─────────┘  (None → regex only)
+                                   ▼
+                  redacted text + token boxes (blacked out in the UI)
+```
+
+## LLM routing
+
+The vendored stdlib router (`llm.py`) tries `ollama → openrouter → openai →
+mock`. The NER pass runs over the OCR text and no-ops when the provider is the
+mock or unreachable. `GET /providers` reports availability for the UI.
 
 ## API
 
 | Method | Path | Body / result |
 |---|---|---|
-| `POST` | `/process` | `{sample \| tokens, types?}` → `{text, redacted_text, tokens, findings, boxes, counts}` |
+| `POST` | `/process` | `{sample \| tokens, types?, use_llm, provider, model}` → `{text, redacted_text, tokens, findings, boxes, counts, routing}` |
 | `POST` | `/ocr` | `{image_b64}` → same (opt-in; 422 if Tesseract absent) |
-| `GET` | `/samples` | bundled documents + their tokens |
-| `GET` | `/health` | status, version, sample/type counts, OCR backend |
+| `GET` | `/samples` | bundled documents + tokens |
+| `GET` | `/providers` | provider availability + models |
+| `GET` | `/health` | status, version, counts, OCR backend, Ollama reachability |
 | `GET` | `/` | the web UI |
 
-```sh
-curl -s localhost:8008/process -H 'content-type: application/json' -d '{"sample":"receipt"}'
-# {"counts":{"EMAIL":1,"PHONE":1,"CREDIT_CARD":1}, "boxes":[...], "redacted_text":"...[EMAIL]..."}
-```
+## Configuration
 
-## Design notes
+| Variable | Default | Purpose |
+|---|---|---|
+| `OLLAMA_BASE_URL` / `OLLAMA_MODEL` | `http://localhost:11434` / `llama3.1:8b` | LLM NER |
+| `OPENAI_API_KEY` / `OPENROUTER_API_KEY` | – | enable cloud providers |
+| `LLM_TIMEOUT` | `30` | per-call timeout (s) |
 
-- **Honest about OCR** — pixel OCR needs a model, so it's a pluggable backend;
-  the genuinely valuable, deterministic part (token → text → PII → box mapping →
-  redacted image regions) runs offline and is fully tested. Real OCR is one
-  adapter away.
-- **Governance-consistent** — never re-emits detected PII (pairs with
-  `pii-redactor` / `promptguard`).
-- **Layout** — `ocr.py` (tokens, samples, Tesseract adapter), `detect.py`,
-  `pipeline.py` (span→box mapping), `models.py`, `api.py` (+ static UI). Spec in
-  [`docs/spec/`](docs/spec/).
-
-Synthetic data only. MIT; part of the
+Real OCR needs the `ocr` extra (`pytesseract` + Pillow) and the tesseract
+binary. Synthetic data only; no secrets. MIT. Part of the
 [ai-portfolio](https://github.com/MarcBittner/ai-portfolio).

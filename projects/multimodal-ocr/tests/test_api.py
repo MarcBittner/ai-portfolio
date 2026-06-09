@@ -11,6 +11,11 @@ def test_health():
     body = client.get("/health").json()
     assert body["status"] == "ok" and body["samples"] == 2
     assert body["ocr_backend"] in {"tesseract", "samples-only"}
+    assert "ollama" in body
+
+
+def test_providers_endpoint():
+    assert client.get("/providers").json()["available"]["mock"] is True
 
 
 def test_samples_listing():
@@ -20,12 +25,21 @@ def test_samples_listing():
     assert all(s["tokens"] for s in samples)  # tokens have boxes
 
 
-def test_process_sample():
-    body = client.post("/process", json={"sample": "receipt"}).json()
+def test_process_sample_deterministic():
+    body = client.post("/process", json={"sample": "receipt", "use_llm": False}).json()
     assert body["counts"].get("EMAIL") == 1
     assert body["boxes"], "redaction boxes returned"
     assert "[EMAIL]" in body["redacted_text"]
     assert len(body["tokens"]) > 0
+    assert body["routing"] is None
+
+
+def test_llm_ner_mock_adds_nothing():
+    # provider=mock -> no extra entities; routing reported; regex stands
+    body = client.post("/process", json={
+        "sample": "receipt", "use_llm": True, "provider": "mock"}).json()
+    assert body["routing"]["provider"] == "mock"
+    assert body["counts"].get("EMAIL") == 1
 
 
 def test_process_tokens_directly():
@@ -33,7 +47,7 @@ def test_process_tokens_directly():
         {"text": "mail", "x": 0, "y": 0, "w": 36, "h": 20},
         {"text": "a@b.com", "x": 45, "y": 0, "w": 63, "h": 20},
     ]
-    body = client.post("/process", json={"tokens": tokens}).json()
+    body = client.post("/process", json={"tokens": tokens, "use_llm": False}).json()
     assert body["counts"].get("EMAIL") == 1
     assert len(body["boxes"]) == 1 and body["boxes"][0]["x"] == 45
 

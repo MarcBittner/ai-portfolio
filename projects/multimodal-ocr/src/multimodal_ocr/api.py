@@ -11,8 +11,9 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 
-from multimodal_ocr import __version__
+from multimodal_ocr import __version__, llm
 from multimodal_ocr.detect import TYPE_NAMES
+from multimodal_ocr.llm_ner import LLM_TYPES
 from multimodal_ocr.models import (
     BoxOut,
     FindingOut,
@@ -20,6 +21,7 @@ from multimodal_ocr.models import (
     OcrRequest,
     ProcessRequest,
     ProcessResponse,
+    RoutingInfo,
     SampleInfo,
     TokenIO,
 )
@@ -33,6 +35,8 @@ from multimodal_ocr.ocr import (
 from multimodal_ocr.pipeline import process, tokens_to_text
 
 STATIC_DIR = Path(__file__).parent / "static"
+ALL_TYPES = list(TYPE_NAMES) + list(LLM_TYPES)
+VALID_PROVIDERS = ("auto", *llm.PROVIDERS)
 
 app = FastAPI(
     title="multimodal-ocr",
@@ -49,7 +53,7 @@ def _ocr_backend() -> str:
 def _types(types: list[str] | None) -> set[str] | None:
     if types is None:
         return None
-    unknown = sorted(set(types) - set(TYPE_NAMES))
+    unknown = sorted(set(types) - set(ALL_TYPES))
     if unknown:
         raise HTTPException(status_code=422, detail=f"unknown types: {unknown}")
     return set(types)
@@ -62,7 +66,13 @@ def _to_io(tok: OcrToken) -> TokenIO:
 @app.get("/health", response_model=HealthResponse)
 def health() -> HealthResponse:
     return HealthResponse(status="ok", version=__version__, samples=len(SAMPLE_NAMES),
-                          types=len(TYPE_NAMES), ocr_backend=_ocr_backend())
+                          types=len(ALL_TYPES), ocr_backend=_ocr_backend(),
+                          ollama=llm.reachable())
+
+
+@app.get("/providers")
+def providers() -> dict:
+    return llm.providers_status()
 
 
 @app.get("/samples", response_model=list[SampleInfo])
@@ -83,16 +93,24 @@ def run_process(request: ProcessRequest) -> ProcessResponse:
         tokens = [OcrToken(t.text, t.x, t.y, t.w, t.h) for t in request.tokens]
     else:
         raise HTTPException(status_code=422, detail="provide a sample or tokens")
+    if request.provider not in VALID_PROVIDERS:
+        raise HTTPException(status_code=422, detail="unknown provider")
 
-    result = process(tokens, _types(request.types))
+    result = process(tokens, _types(request.types), request.use_llm,
+                     request.provider, request.model)
     _text, ordered, _spans = tokens_to_text(tokens)
+    routing = None
+    if result.routing is not None:
+        routing = RoutingInfo(provider=result.routing.provider,
+                              model=result.routing.model,
+                              fallbacks=result.routing.fallbacks)
     return ProcessResponse(
         text=result.text,
         redacted_text=result.redacted_text,
         tokens=[_to_io(t) for t in ordered],
         findings=[FindingOut(**vars(f)) for f in result.findings],
         boxes=[BoxOut(**vars(b)) for b in result.boxes],
-        counts=result.counts,
+        counts=result.counts, routing=routing,
     )
 
 
