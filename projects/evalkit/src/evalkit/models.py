@@ -1,5 +1,6 @@
 """Request/response models for the API."""
 
+
 from pydantic import BaseModel, Field
 
 
@@ -10,8 +11,10 @@ class EvalItem(BaseModel):
 
 class EvaluateRequest(BaseModel):
     items: list[EvalItem] = Field(min_length=1, max_length=2000)
-    metrics: list[str] | None = None  # default: all
-    thresholds: dict[str, float] | None = None  # metric -> minimum (gate)
+    metrics: list[str] | None = None     # may include "llm_judge"
+    thresholds: dict[str, float] | None = None
+    provider: str = "auto"               # for the llm_judge metric
+    model: str | None = None
 
 
 class ItemResult(BaseModel):
@@ -24,12 +27,19 @@ class GateResult(BaseModel):
     failures: dict[str, dict[str, float]]
 
 
+class RoutingInfo(BaseModel):
+    provider: str
+    model: str
+    fallbacks: list[str] = []
+
+
 class EvaluateResponse(BaseModel):
     n: int
     metrics: list[str]
     per_item: list[ItemResult]
     aggregate: dict[str, float]
     gate: GateResult | None = None
+    routing: RoutingInfo | None = None   # present when llm_judge ran
 
 
 class CompareRequest(BaseModel):
@@ -44,9 +54,11 @@ class CompareResponse(BaseModel):
 class MetricInfo(BaseModel):
     name: str
     description: str
+    source: str = "deterministic"
 
 
 class HealthResponse(BaseModel):
     status: str
     version: str
     metrics: int
+    ollama: bool

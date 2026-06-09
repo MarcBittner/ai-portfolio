@@ -9,13 +9,31 @@ client = TestClient(app)
 
 def test_health():
     body = client.get("/health").json()
-    assert body["status"] == "ok" and body["metrics"] == 5
+    assert body["status"] == "ok" and body["metrics"] == 6  # 5 + llm_judge
+    assert "ollama" in body
 
 
 def test_metrics_listing():
     metrics = client.get("/metrics").json()
     names = {m["name"] for m in metrics}
-    assert "token_f1" in names and all(m["description"] for m in metrics)
+    assert "token_f1" in names and "llm_judge" in names
+    assert all(m["description"] for m in metrics)
+    assert any(m["source"] == "llm" for m in metrics)
+
+
+def test_providers_endpoint():
+    body = client.get("/providers").json()
+    assert body["available"]["mock"] is True
+
+
+def test_llm_judge_metric_mock_fallback():
+    # provider=mock -> deterministic token-F1 fallback; routing reported as mock
+    r = client.post("/evaluate", json={
+        "items": [{"prediction": "the capital is Paris", "reference": "Paris"}],
+        "metrics": ["llm_judge"], "provider": "mock"}).json()
+    assert "llm_judge" in r["aggregate"]
+    assert r["routing"]["provider"] == "mock"
+    assert r["aggregate"]["llm_judge"] in (0.0, 1.0)
 
 
 def test_evaluate_with_gate():

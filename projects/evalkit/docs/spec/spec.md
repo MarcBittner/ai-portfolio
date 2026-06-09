@@ -41,12 +41,13 @@ so results are reproducible and the tool is safe in CI.
 
 ### FR-7: Conventions
 - Python 3.11+, type hints, `ruff` clean, lean pinned deps.
-- `make setup && make test && make lint` green on a fresh clone, no `.env`.
+- `./run.sh setup && ./run.sh check` green on a fresh clone, no `.env`.
 - Synthetic data only; no secrets.
 
 ## Non-Goals
-- Bundled LLM providers — the LLM-judge metric is a future plug-in behind the
-  same `(prediction, reference) → [0,1]` contract; evalkit stays offline by
-  default.
+- A bundled LLM — the `llm_judge` metric routes to an external provider
+  (Ollama/OpenAI/OpenRouter) via the vendored router and falls back to a
+  deterministic token-F1 threshold when none is reachable, so evalkit stays
+  offline by default.
 - Dataset storage / experiment tracking / a results database.
 - Reference-free metrics (toxicity, coherence) — could be added as new scorers.

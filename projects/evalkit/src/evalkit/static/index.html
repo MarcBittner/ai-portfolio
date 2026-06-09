@@ -71,6 +71,15 @@
       <div class="panel">
         <h2>Metrics &amp; gate thresholds (blank = no gate)</h2>
         <div class="metrics" id="metrics"></div>
+        <div class="row" style="margin-top:12px; border-top:1px solid var(--border); padding-top:10px">
+          <label>LLM judge provider
+            <select id="provider"><option value="auto">auto</option></select>
+          </label>
+          <label>model <input id="model" placeholder="(default)" style="width:150px" /></label>
+          <span class="spacer"></span>
+          <span id="ollamaStatus" style="font-size:12px;color:var(--muted)">checking Ollama…</span>
+        </div>
+        <div id="routing" style="font-size:12px;color:var(--muted);font-family:ui-monospace,Menlo,monospace;margin-top:6px"></div>
       </div>
 
       <div class="panel" id="results" style="display:none">
@@ -102,12 +111,20 @@
         $("metrics").innerHTML = metrics
           .map(
             (m) => `<div class="metric">
-              <label><input type="checkbox" data-m="${m.name}" checked />
+              <label><input type="checkbox" data-m="${m.name}" ${m.source === "llm" ? "" : "checked"} />
                 ${m.name} <span class="desc">${m.description}</span></label>
               <input type="number" min="0" max="1" step="0.05" data-th="${m.name}" placeholder="min" />
             </div>`,
           )
           .join("");
+        try {
+          const p = await fetch("/providers").then((r) => r.json());
+          for (const name of Object.keys(p.available))
+            $("provider").insertAdjacentHTML("beforeend",
+              `<option value="${name}">${name}${p.available[name] ? "" : " (unavailable)"}</option>`);
+          $("ollamaStatus").textContent = p.available.ollama
+            ? `Ollama: reachable (${p.models.ollama})` : "Ollama: not reachable → fallback";
+        } catch { /* providers optional */ }
       }
 
       function parseItems() {
@@ -127,12 +144,16 @@
         document.querySelectorAll("input[data-th]").forEach((i) => {
           if (i.value !== "" && metrics.includes(i.dataset.th)) thresholds[i.dataset.th] = Number(i.value);
         });
-        const body = { items, metrics, thresholds: Object.keys(thresholds).length ? thresholds : null };
+        const body = { items, metrics, thresholds: Object.keys(thresholds).length ? thresholds : null,
+          provider: $("provider").value, model: $("model").value || null };
         const res = await fetch("/evaluate", {
           method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
         });
         if (!res.ok) { alert(await res.text()); return; }
-        render(await res.json());
+        const data = await res.json();
+        $("routing").textContent = data.routing
+          ? `llm_judge routed via ${data.routing.provider} (${data.routing.model})` : "";
+        render(data);
       }
 
       function render(data) {

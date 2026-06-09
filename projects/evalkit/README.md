@@ -1,65 +1,90 @@
 # evalkit
 
-A deterministic, **offline-first LLM evaluation toolkit** — a library, a small
-FastAPI service, and a zero-build web UI. Score predictions against references
-across layered metrics, set a **regression gate**, and **compare runs**. No
-model, no network, no secrets: the metrics are computed in-process and
-reproducibly (a real embedder/LLM-judge plugs in later).
+[![CI](https://github.com/MarcBittner/ai-portfolio/actions/workflows/projects-ci.yml/badge.svg)](https://github.com/MarcBittner/ai-portfolio/actions/workflows/projects-ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Offline-first](https://img.shields.io/badge/offline--first-yes-success)](#configuration)
+[![LLM routing](https://img.shields.io/badge/LLM-Ollama%E2%86%92mock-b197fc)](#llm-routing)
+
+> An **offline-first LLM evaluation toolkit** — library, API, and UI. Score
+> predictions across layered deterministic metrics, set a **regression gate**,
+> and compare runs. Plus an optional **LLM-judge** metric routed to a local
+> **Ollama** model (deterministic fallback when none is reachable).
 
 ```sh
-make setup && make demo     # scores a few pairs offline
-make serve                  # API + UI at http://localhost:8002
+./run.sh setup && ./run.sh serve     # API + UI at http://localhost:8002
 ```
 
-## Why
+---
 
-A single "accuracy %" hides what matters. evalkit measures **separate** signals
-so you can see *how* a system is right or wrong, gate releases on the ones you
-care about, and compare two runs (model A vs B, before vs after).
+## What it does
 
-| Metric | Measures |
-|---|---|
-| `exact_match` | normalized strings identical |
-| `contains` | reference appears verbatim in the prediction |
-| `token_f1` | token-overlap F1 (SQuAD-style) |
-| `semantic_similarity` | cosine of hashed bag-of-tokens embeddings (deterministic) |
-| `refusal_match` | prediction & reference agree on refusing — scores "correctly declined" |
+A single "accuracy %" hides what matters. evalkit measures separate signals so
+you can see *how* a system is right or wrong and gate releases on the ones you
+care about.
 
-- **Deterministic** — stable hashing means the same input always yields the same
-  score, so the test suite is exact and a CI gate is trustworthy.
-- **Regression gate** — per-metric thresholds → pass/fail (drop into CI).
+| Metric | Kind | Measures |
+|---|---|---|
+| `exact_match` | deterministic | normalized strings identical |
+| `contains` | deterministic | reference appears verbatim |
+| `token_f1` | deterministic | token-overlap F1 (SQuAD-style) |
+| `semantic_similarity` | deterministic | hashed-embedding cosine (stable) |
+| `refusal_match` | deterministic | agree on refusing |
+| `llm_judge` | **LLM** | "is this answer correct?" via the router |
+
+- **Deterministic by default** — same input → same score; CI-safe gate.
+- **Regression gate** — per-metric thresholds → pass/fail.
 - **Run comparison** — per-metric `{baseline, candidate, delta}`.
-- **Live UI** — paste `prediction ||| reference` lines, pick metrics, set
-  thresholds, see aggregate bars + a gate badge + per-item table.
+- **LLM-judge** — routed to Ollama; falls back to a token-F1 threshold offline.
+
+## Quickstart (`run.sh`, no `make`)
+
+```sh
+./run.sh setup     ./run.sh serve [--port N]    ./run.sh test
+./run.sh lint      ./run.sh check               ./run.sh demo
+./run.sh doctor    ./run.sh --help
+```
+
+## Architecture
+
+```
+                ┌──────────────── FastAPI ────────────────┐
+  pairs ──────▶ │ /evaluate  /compare  /providers /metrics │
+                └──────┬───────────────────────┬───────────┘
+                       ▼                        ▼
+            metrics.py + evaluate.py       judge.py  (llm_judge)
+            (exact/contains/F1/semantic     llm.py router:
+             /refusal · gate · compare)     ollama→openrouter→openai→mock
+```
+
+## LLM routing
+
+The vendored stdlib router (`llm.py`) tries `ollama → openrouter → openai →
+mock`; the mock is a deterministic terminal fallback so a call never fails. The
+`llm_judge` metric uses it, with a token-F1 fallback when the provider is the
+mock or unreachable. `GET /providers` reports availability for the UI.
 
 ## API
 
 | Method | Path | Body / result |
 |---|---|---|
-| `POST` | `/evaluate` | `{items:[{prediction,reference}], metrics?, thresholds?}` → per-item + aggregate scores, optional gate |
-| `POST` | `/compare` | `{baseline, candidate}` (aggregate maps) → per-metric deltas |
-| `GET` | `/metrics` | available metrics + descriptions |
-| `GET` | `/health` | status, version, metric count |
+| `POST` | `/evaluate` | `{items, metrics?, thresholds?, provider, model}` → per-item + aggregate scores, gate, routing |
+| `POST` | `/compare` | `{baseline, candidate}` → per-metric deltas |
+| `GET` | `/metrics` | available metrics (deterministic + `llm_judge`) |
+| `GET` | `/providers` | provider availability + models |
+| `GET` | `/health` | status, version, metric count, Ollama reachability |
 | `GET` | `/` | the web UI |
 
-```sh
-curl -s localhost:8002/evaluate -H 'content-type: application/json' -d '{
-  "items": [{"prediction": "the capital is Paris", "reference": "Paris"}],
-  "metrics": ["contains", "token_f1"],
-  "thresholds": {"contains": 0.9}
-}'
-# {"aggregate":{"contains":1.0,"token_f1":0.4}, "gate":{"passed":true,...}, ...}
-```
+## Configuration
 
-## Design notes
+| Variable | Default | Purpose |
+|---|---|---|
+| `OLLAMA_BASE_URL` / `OLLAMA_MODEL` | `http://localhost:11434` / `llama3.1:8b` | local LLM judge |
+| `OPENAI_API_KEY` / `OPENAI_MODEL` | – / `gpt-4o-mini` | enable OpenAI |
+| `OPENROUTER_API_KEY` / `OPENROUTER_MODEL` | – | enable OpenRouter |
+| `LLM_TIMEOUT` | `30` | per-call timeout (s) |
 
-- **Offline by design** — `semantic_similarity` is a hashed bag-of-tokens cosine
-  (no embedder), so it ships dependency-free and reproducible; swap in a real
-  embedder or an LLM-judge metric behind the same `(prediction, reference) →
-  [0,1]` contract.
-- **Layout** — `metrics.py` (scorers), `evaluate.py` (aggregate/gate/compare),
-  `models.py` (API types), `api.py` (FastAPI + static UI). Spec in
-  [`docs/spec/`](docs/spec/).
-
-Synthetic data only. MIT; part of the
+Synthetic data only; no secrets. MIT. Part of the
 [ai-portfolio](https://github.com/MarcBittner/ai-portfolio).
