@@ -9,8 +9,17 @@ client = TestClient(app)
 
 def test_health():
     body = client.get("/health").json()
-    assert body["status"] == "ok" and body["methods"] == 6
+    assert body["status"] == "ok" and body["methods"] == 7  # + holt_winters
     assert "ollama" in body
+
+
+def test_forecast_detects_season_and_rolling_backtest():
+    season = [8, 12, 20, 10] * 4  # period-4 pattern
+    body = client.post("/forecast", json={
+        "series": season, "horizon": 4, "use_llm": False}).json()
+    assert body["season_period"] == 4
+    assert body["rolling_backtest"] is not None
+    assert "folds" in body["rolling_backtest"]
 
 
 def test_providers_endpoint():

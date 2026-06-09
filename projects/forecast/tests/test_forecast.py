@@ -4,7 +4,14 @@ import pytest
 
 from forecast.anomaly import detect
 from forecast.forecast import errors, forecast
-from forecast.methods import METHOD_NAMES, linear_trend, naive, seasonal_naive
+from forecast.methods import (
+    METHOD_NAMES,
+    holt_winters,
+    linear_trend,
+    naive,
+    seasonal_naive,
+)
+from forecast.seasonality import autocorrelation, detect_period
 
 
 def test_naive_repeats_last():
@@ -60,3 +67,36 @@ def test_anomaly_detection_flags_spike():
 
 def test_anomaly_none_on_smooth_series():
     assert detect([1, 2, 3, 4, 5, 6, 7, 8], window=4, threshold=3.0) == []
+
+
+def test_detect_period_finds_known_season():
+    season = [8, 12, 20, 10] * 5  # period 4
+    assert detect_period(season) == 4
+    # ACF at the true lag is strongly positive
+    assert autocorrelation(season, 4) > 0.5
+
+
+def test_detect_period_none_on_trend():
+    assert detect_period([float(i) for i in range(20)]) in (0,)  # monotonic, no season
+
+
+def test_holt_winters_tracks_seasonal_series():
+    season = [8, 12, 20, 10] * 5
+    fc, fitted = holt_winters(season, 4, season_period=4)
+    assert len(fc) == 4
+    # the forecast should resemble one more cycle of the pattern (within tolerance)
+    for predicted, expected in zip(fc, [8, 12, 20, 10], strict=True):
+        assert abs(predicted - expected) < 5
+
+
+def test_holt_winters_falls_back_when_too_short():
+    fc, _ = holt_winters([1, 2, 3], 2, season_period=4)  # < 2*period
+    assert len(fc) == 2  # delegates to holt, no crash
+
+
+def test_auto_selects_seasonal_method_on_seasonal_data():
+    season = [8, 12, 20, 10] * 6
+    r = forecast(season, horizon=4, method="auto")
+    assert r["season_period"] == 4
+    assert r["method"] in ("seasonal_naive", "holt_winters")
+    assert r["rolling_backtest"] is not None

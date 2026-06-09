@@ -28,7 +28,7 @@ spec:
         runAsUser: 1001
       containers:
         - name: api
-          image: forecast:v0.1.0
+          image: forecast:v0.2.0
           imagePullPolicy: Never
           ports:
             - containerPort: 8080

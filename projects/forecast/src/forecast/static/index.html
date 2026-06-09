@@ -54,6 +54,8 @@
         <label><input type="checkbox" id="useLlm" checked /> LLM summary</label>
         <label>provider <select id="provider"><option value="auto">auto</option></select></label>
         <div class="spacer"></div>
+        <label class="csv" style="cursor:pointer">📄 CSV
+          <input type="file" id="csv" accept=".csv,text/csv" style="display:none" /></label>
         <button class="primary" id="run">Forecast</button>
       </div>
       <div class="row samples" id="samples"></div>
@@ -149,13 +151,34 @@
         for (const a of anom.anomalies)
           add("circle", { cx: sx(a.index), cy: sy(a.value), r: "4", fill: "#ff6b6b" });
 
-        const bt = f.backtest;
+        const bt = f.backtest, rb = f.rolling_backtest;
         $("meta").innerHTML =
           `<span>method <b>${f.method}</b></span>` +
-          (bt ? `<span>backtest MAE <b>${bt.mae}</b></span><span>RMSE <b>${bt.rmse}</b></span><span>MAPE <b>${bt.mape}%</b></span>` : "") +
+          (f.season_period ? `<span>season <b>${f.season_period}</b></span>` : "") +
+          (bt ? `<span>holdout MAE <b>${bt.mae}</b></span>` : "") +
+          (rb ? `<span>rolling MAE <b>${rb.mae}</b> (${rb.folds} folds)</span>` : "") +
           `<span>anomalies <b>${anom.anomalies.length}</b></span>` +
           `<span>next: <b>${f.forecast.slice(0, 5).join(", ")}${h > 5 ? "…" : ""}</b></span>`;
       }
+
+      // CSV upload: take the first numeric column (skips a header row if present)
+      function parseCsv(text) {
+        const out = [];
+        for (const line of text.split(/\r?\n/)) {
+          if (!line.trim()) continue;
+          const cells = line.split(",");
+          const v = Number(cells[cells.length - 1]);   // last column = value
+          if (!Number.isNaN(v)) out.push(v);
+        }
+        return out;
+      }
+      $("csv").addEventListener("change", async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const nums = parseCsv(await file.text());
+        if (nums.length < 2) { alert("No numeric column found in the CSV."); return; }
+        $("series").value = nums.join(", "); run();
+      });
 
       $("run").addEventListener("click", run);
       loadMethods();

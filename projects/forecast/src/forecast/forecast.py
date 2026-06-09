@@ -7,7 +7,8 @@ when ``method="auto"``), returns the horizon forecast with a residual-based
 
 import math
 
-from forecast.methods import METHOD_NAMES, METHODS
+from forecast.methods import METHOD_NAMES, METHODS, SEASONAL_METHODS
+from forecast.seasonality import detect_period
 
 Series = list[float]
 MAX_HORIZON = 200
@@ -42,10 +43,33 @@ def _backtest(method: str, history: Series, params: dict) -> dict | None:
     return errors(test, fc)
 
 
+def _rolling_backtest(method: str, history: Series, params: dict,
+                      folds: int = 3) -> dict | None:
+    """Expanding-window (rolling-origin) backtest: average error over ``folds``
+    successive train/test splits — a more robust read than a single holdout."""
+    n = len(history)
+    test_h = max(1, min(4, n // (folds + 2)))
+    min_train = max(4, 2 * int(params.get("season_period") or 2))
+    rows: list[dict] = []
+    for f in range(folds):
+        end = n - (folds - f) * test_h
+        if end < min_train:
+            continue
+        train, test = history[:end], history[end:end + test_h]
+        if not test:
+            continue
+        fc, _ = METHODS[method](train, len(test), **params)
+        rows.append(errors(test, fc))
+    if not rows:
+        return None
+    return {k: round(sum(r[k] for r in rows) / len(rows), 4)
+            for k in ("mae", "rmse", "mape")} | {"folds": len(rows)}
+
+
 def _select(history: Series, params: dict) -> str:
     candidates = ["naive", "mean", "linear_trend", "ses", "holt"]
     if params.get("season_period"):
-        candidates.append("seasonal_naive")
+        candidates += list(SEASONAL_METHODS)
     best, best_mae = "naive", float("inf")
     for m in candidates:
         bt = _backtest(m, history, params)
@@ -59,6 +83,13 @@ def forecast(series: Series, horizon: int = 5, method: str = "auto",
     if len(series) < 2:
         raise ValueError("need at least 2 data points")
     horizon = max(1, min(int(horizon), MAX_HORIZON))
+
+    # auto-detect the season length when the caller didn't give one
+    if not params.get("season_period"):
+        detected = detect_period(series)
+        if detected:
+            params["season_period"] = detected
+
     if method == "auto":
         method = _select(series, params)
     elif method not in METHODS:
@@ -74,4 +105,6 @@ def forecast(series: Series, horizon: int = 5, method: str = "auto",
         "upper": [round(v + z * std, 4) for v in fc],
         "fitted": [round(f, 4) if f is not None else None for f in fitted],
         "backtest": _backtest(method, series, params),
+        "rolling_backtest": _rolling_backtest(method, series, params),
+        "season_period": params.get("season_period", 0) or 0,
     }

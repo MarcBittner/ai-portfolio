@@ -11,12 +11,23 @@ Python, deterministic, offline.
 
 ### FR-1: Methods
 - `naive`, `mean`, `linear_trend` (least squares), `ses` (simple exponential
-  smoothing), `holt` (double-exp level+trend), `seasonal_naive`. Each returns the
-  horizon forecast and the in-sample one-step fitted series.
+  smoothing), `holt` (double-exp level+trend), `seasonal_naive`, `holt_winters`
+  (additive triple-exp level+trend+seasonal). Each returns the horizon forecast
+  and the in-sample one-step fitted series.
+
+### FR-1b: Automatic seasonality (v0.2.0)
+- When no `season_period` is supplied, detect it via ACF on the first-differenced
+  series (so trend isn't mistaken for season); feed it to the seasonal methods
+  and return the detected `season_period`.
 
 ### FR-2: Backtest & auto-selection
 - Hold out the tail, fit on the rest, score MAE/RMSE/MAPE. `method="auto"`
-  selects the candidate with the lowest backtest MAE.
+  selects the candidate with the lowest backtest MAE; seasonal methods join the
+  candidate set when a period is detected.
+
+### FR-2b: Rolling-origin backtest (v0.2.0)
+- An expanding-window, multi-fold backtest averaged across folds, returned
+  alongside the single-holdout backtest for a more robust error estimate.
 
 ### FR-3: Confidence band
 - A 95% interval (±1.96·σ) from in-sample residual standard deviation.

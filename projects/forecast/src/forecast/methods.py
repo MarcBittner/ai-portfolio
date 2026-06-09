@@ -80,6 +80,31 @@ def seasonal_naive(history: Series, horizon: int, season_period: int = 0,
     return forecast, fitted
 
 
+def holt_winters(history: Series, horizon: int, season_period: int = 0,
+                 alpha: float = 0.5, beta: float = 0.1, gamma: float = 0.3,
+                 **_) -> Result:
+    """Additive triple-exponential smoothing (level + trend + seasonal).
+    Falls back to :func:`holt` when there isn't enough data for the period."""
+    m = int(season_period)
+    if m < 2 or len(history) < 2 * m:
+        return holt(history, horizon)
+    level = sum(history[:m]) / m
+    trend = (sum(history[m:2 * m]) - sum(history[:m])) / (m * m)
+    seasonal = [history[i] - level for i in range(m)]
+    fitted: list[float | None] = [None] * m
+    for t in range(m, len(history)):
+        s = seasonal[t % m]
+        fitted.append(level + trend + s)          # one-step forecast
+        prev_level = level
+        level = alpha * (history[t] - s) + (1 - alpha) * (level + trend)
+        trend = beta * (level - prev_level) + (1 - beta) * trend
+        seasonal[t % m] = gamma * (history[t] - level) + (1 - gamma) * s
+    n = len(history)
+    forecast = [level + (h + 1) * trend + seasonal[(n + h) % m]
+                for h in range(horizon)]
+    return forecast, fitted
+
+
 METHODS: dict[str, Callable[..., Result]] = {
     "naive": naive,
     "mean": mean,
@@ -87,5 +112,7 @@ METHODS: dict[str, Callable[..., Result]] = {
     "ses": ses,
     "holt": holt,
     "seasonal_naive": seasonal_naive,
+    "holt_winters": holt_winters,
 }
 METHOD_NAMES = list(METHODS)
+SEASONAL_METHODS = ("seasonal_naive", "holt_winters")

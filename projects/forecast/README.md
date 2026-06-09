@@ -23,11 +23,17 @@
 ## What it does
 
 - **Forecast** with `naive`, `mean`, `linear_trend` (least squares), `ses`,
-  `holt` (double-exp), `seasonal_naive`, or `auto` (best by holdout-backtest MAE).
-- **Backtest** every forecast — MAE/RMSE/MAPE on a held-out tail, returned so
-  the method choice is evidence-based.
+  `holt` (double-exp), `seasonal_naive`, `holt_winters` (additive triple-exp),
+  or `auto` (best by backtest MAE).
+- **Automatic seasonality** — detects the season length via ACF on the
+  first-differenced series (so a trend isn't mistaken for a season) and feeds it
+  to the seasonal methods; the detected `season_period` is returned.
+- **Backtest** every forecast — single-holdout **and** rolling-origin
+  (expanding-window, multi-fold) MAE/RMSE/MAPE, returned so the method choice is
+  evidence-based.
 - **Confidence band** — 95% interval from in-sample residual spread.
 - **Anomalies** — rolling z-score (past-only, no leakage).
+- **CSV upload** in the UI — drop a one-column CSV to forecast it.
 - **NL summary (optional)** — a plain-English description of the trend / next
   values / backtest error via the router; falls back to a deterministic template.
 

@@ -33,11 +33,11 @@
 
 ## Toward v0.2.0
 
-- [ ] Holt-Winters seasonality + ACF automatic seasonality detection
-- [ ] Rolling-origin backtest + prediction-interval calibration
-- [ ] CSV upload + timestamp parsing in the UI
+- [x] Holt-Winters seasonality + ACF automatic seasonality detection ✅
+- [x] Rolling-origin backtest ✅ (interval calibration still open)
+- [x] CSV upload in the UI ✅ (timestamp parsing still open)
 - [x] Containerize + deploy to Argo (Dockerfile + `deploy/k8s` + `deploy/argocd`) ✅ deployed
 
 ---
 
-**Status:** v0.1.x — LLM routing + run.sh + CI shipped; v0.2.0 planned.
+**Status:** v0.2.0 — Holt-Winters + ACF seasonality + rolling-origin backtest + CSV upload.

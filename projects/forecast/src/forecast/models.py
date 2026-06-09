@@ -28,6 +28,8 @@ class ForecastResponse(BaseModel):
     upper: list[float]
     fitted: list[float | None]
     backtest: dict[str, float] | None
+    rolling_backtest: dict[str, float] | None = None
+    season_period: int = 0
     summary: str | None = None
     routing: RoutingInfo | None = None
 
