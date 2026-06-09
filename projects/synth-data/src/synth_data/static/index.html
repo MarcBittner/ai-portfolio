@@ -59,6 +59,15 @@
         <div class="spacer"></div>
         <button class="primary" id="gen">Generate</button>
       </div>
+      <div class="row">
+        <label><input type="checkbox" id="useLlm" checked /> LLM fields</label>
+        <label>provider <select id="provider"><option value="auto">auto</option></select></label>
+        <label>model <input id="model" placeholder="(default)" style="width:130px" /></label>
+        <span id="ollamaStatus" style="font-size:12px;color:var(--muted)"></span>
+        <span class="spacer"></span>
+        <span id="routing" style="font-size:12px;color:var(--muted);font-family:ui-monospace,Menlo,monospace"></span>
+      </div>
+      <p class="small" style="margin:4px 0 0">Tip: add a field of type <code>llm</code> with a <code>description</code> for realistic values (routed to Ollama; not PII-guaranteed).</p>
 
       <div class="panel">
         <h2>Schema (editable JSON — fields: name, type, constraints)</h2>
@@ -92,6 +101,14 @@
         PRESETS = Object.fromEntries(schemas.map((s) => [s.name, s.fields]));
         $("preset").innerHTML = schemas.map((s) => `<option>${s.name}</option>`).join("");
         setSchema();
+        try {
+          const p = await fetch("/providers").then((r) => r.json());
+          for (const n of Object.keys(p.available))
+            $("provider").insertAdjacentHTML("beforeend",
+              `<option value="${n}">${n}${p.available[n] ? "" : " (unavailable)"}</option>`);
+          $("ollamaStatus").textContent = p.available.ollama
+            ? `Ollama: reachable (${p.models.ollama})` : "Ollama: not reachable → placeholder";
+        } catch { /* optional */ }
       }
       function setSchema() {
         $("schema").value = JSON.stringify(PRESETS[$("preset").value] || [], null, 2);
@@ -103,11 +120,15 @@
         catch (e) { alert("Schema is not valid JSON: " + e.message); return; }
         const res = await fetch("/generate", {
           method: "POST", headers: { "content-type": "application/json" },
-          body: JSON.stringify({ fields, n: Number($("n").value), seed: Number($("seed").value) }),
+          body: JSON.stringify({ fields, n: Number($("n").value), seed: Number($("seed").value),
+            use_llm: $("useLlm").checked, provider: $("provider").value,
+            model: $("model").value || null }),
         });
         if (!res.ok) { alert(await res.text()); return; }
         const data = await res.json();
         LAST_ROWS = data.rows;
+        $("routing").textContent = data.routing
+          ? `llm fields via ${data.routing.provider} (${data.routing.model})` : "";
         render(data);
       }
 

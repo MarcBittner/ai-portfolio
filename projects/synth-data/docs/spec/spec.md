@@ -39,7 +39,7 @@ produces reproducible rows as JSON or CSV. No model and no network.
 
 ### FR-7: Conventions
 - Python 3.11+, type hints, `ruff` clean, lean pinned deps.
-- `make setup && make test && make lint` green on a fresh clone, no `.env`.
+- `./run.sh setup && ./run.sh check` green on a fresh clone, no `.env`.
 - Synthetic data only; no secrets.
 
 ## Non-Goals

@@ -10,13 +10,27 @@ client = TestClient(app)
 def test_health():
     body = client.get("/health").json()
     assert body["status"] == "ok" and body["presets"] == 3 and body["types"] >= 10
+    assert "ollama" in body
+
+
+def test_providers_endpoint():
+    assert client.get("/providers").json()["available"]["mock"] is True
 
 
 def test_schemas_and_types():
     presets = {p["name"] for p in client.get("/schemas").json()}
     assert presets == {"users", "transactions", "support_tickets"}
     types = {t["name"] for t in client.get("/types").json()}
-    assert {"email", "phone", "integer", "date"} <= types
+    assert {"email", "phone", "integer", "date", "llm"} <= types
+
+
+def test_llm_field_mock_falls_back_to_placeholder():
+    # provider=mock -> deterministic placeholder; routing reported
+    body = client.post("/generate", json={
+        "fields": [{"name": "review", "type": "llm", "description": "a short review"}],
+        "n": 3, "seed": 1, "use_llm": True, "provider": "mock"}).json()
+    assert body["routing"]["provider"] == "mock"
+    assert len(body["rows"]) == 3 and all(r["review"] for r in body["rows"])
 
 
 def test_generate_preset_json():

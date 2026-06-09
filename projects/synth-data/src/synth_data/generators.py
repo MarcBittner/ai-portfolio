@@ -116,11 +116,17 @@ def gen_sentence(rng, spec, i):
     return words[0].capitalize() + " " + " ".join(words[1:]) + "."
 
 
+def gen_llm(rng, spec, i):
+    # deterministic placeholder; the API fills this column from the LLM router
+    # (per the field's "description") when use_llm is on and a provider is up
+    return gen_sentence(rng, spec, i)
+
+
 TYPES = {
     "id": gen_id, "uuid": gen_uuid, "name": gen_name, "first_name": gen_first_name,
     "email": gen_email, "phone": gen_phone, "integer": gen_integer,
     "float": gen_float, "bool": gen_bool, "choice": gen_choice, "date": gen_date,
     "city": gen_city, "company": gen_company, "address": gen_address,
-    "sentence": gen_sentence,
+    "sentence": gen_sentence, "llm": gen_llm,
 }
 TYPE_NAMES = list(TYPES)

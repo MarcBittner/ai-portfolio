@@ -1,61 +1,84 @@
 # synth-data
 
-Deterministic, **PII-free synthetic dataset generation** — a library, a FastAPI
-service, and a zero-build UI. Define a schema (or pick a preset), set a row
-count and a seed, and get reproducible rows as JSON or CSV. No model, no
-network.
+[![CI](https://github.com/MarcBittner/ai-portfolio/actions/workflows/projects-ci.yml/badge.svg)](https://github.com/MarcBittner/ai-portfolio/actions/workflows/projects-ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Offline-first](https://img.shields.io/badge/offline--first-yes-success)](#configuration)
+[![LLM routing](https://img.shields.io/badge/LLM-Ollama%E2%86%92mock-b197fc)](#llm-routing)
+
+> Deterministic, **PII-free synthetic dataset generation** — library, API, UI.
+> Define a schema (or pick a preset), set rows + seed, get reproducible JSON or
+> CSV. Optional **`llm`-typed fields** generate realistic values via local
+> **Ollama** (deterministic placeholder fallback).
 
 ```sh
-make setup && make demo     # 5 synthetic users as CSV, offline
-make serve                  # API + UI at http://localhost:8006
+./run.sh setup && ./run.sh serve     # API + UI at http://localhost:8006
 ```
 
-## Why
+---
 
-This is the data the rest of the portfolio runs on. Two guarantees make it
-safe to commit, share, and test against:
+## What it does
 
-- **Deterministic** — same `(schema, n, seed)` → identical rows (seeded
-  Mersenne Twister), so fixtures are reproducible and diffable.
-- **PII-free by construction** — emails use RFC 2606 `example.{com,org,net}`,
-  phones use the reserved fictional `555-01xx` range, and names/cities/companies
-  come from fictional pools. Generated data can't collide with a real person.
+- **Deterministic** — same `(schema, n, seed)` → identical rows (seeded), so
+  fixtures are reproducible and diffable.
+- **PII-free by construction** — emails on RFC 2606 `example.*`, phones in the
+  reserved `555-01xx` range, fictional name/city/company pools.
+- **`llm` field type (optional)** — give it a `description`; the router fills the
+  column with realistic values in one call. ⚠️ LLM-generated values are
+  realistic and **not** covered by the PII-free guarantee.
 
-## Field types
+Field types: `id` `uuid` `name` `email` `phone` `integer` `float` `bool`
+`choice` `date` `city` `company` `address` `sentence` `llm`. Presets: **users**,
+**transactions**, **support_tickets**.
 
-`id` · `uuid` · `name` · `first_name` · `email` · `phone` · `integer` (min/max) ·
-`float` (min/max/decimals) · `bool` (p_true) · `choice` (choices) · `date`
-(start/end) · `city` · `company` · `address` · `sentence` (words)
+## Quickstart (`run.sh`, no `make`)
 
-Presets: **users**, **transactions**, **support_tickets**. A custom schema is
-just a list of `{name, type, …constraints}`.
+```sh
+./run.sh setup   ./run.sh serve [--port N]   ./run.sh test
+./run.sh lint    ./run.sh check              ./run.sh demo   ./run.sh doctor
+```
+
+## Architecture
+
+```
+                ┌──────────────── FastAPI ────────────────┐
+  schema ─────▶ │ /generate  /schemas  /types  /providers  │
+                └──────┬───────────────────────┬───────────┘
+                       ▼                        ▼
+            generators.py + generate.py    llm_gen.py (llm-typed fields)
+            (seeded, PII-free, CSV)         llm.py: ollama→openrouter→openai→mock
+                       └───────────┬─────────┘  (None → placeholder)
+                                   ▼
+                          rows (JSON or CSV)
+```
+
+## LLM routing
+
+The vendored stdlib router (`llm.py`) tries `ollama → openrouter → openai →
+mock`. `llm`-typed fields are filled via the router; with a mock/unreachable
+provider they keep the deterministic placeholder. `GET /providers` reports
+availability for the UI.
 
 ## API
 
 | Method | Path | Body / result |
 |---|---|---|
-| `POST` | `/generate` | `{preset \| fields, n, seed, format}` → rows (JSON) or CSV |
-| `GET` | `/schemas` | presets + their field schemas |
-| `GET` | `/types` | available field types |
-| `GET` | `/health` | status, version, type/preset counts |
+| `POST` | `/generate` | `{preset \| fields, n, seed, format, use_llm, provider, model}` → rows (JSON) or CSV |
+| `GET` | `/schemas` | presets + field schemas |
+| `GET` | `/types` | field types |
+| `GET` | `/providers` | provider availability + models |
+| `GET` | `/health` | status, version, counts, Ollama reachability |
 | `GET` | `/` | the web UI |
 
-```sh
-curl -s localhost:8006/generate -H 'content-type: application/json' -d '{
-  "preset": "users", "n": 5, "seed": 42
-}'
-# rows with emails @example.* and phones (xxx) 555-01xx
-```
+## Configuration
 
-## Design notes
+| Variable | Default | Purpose |
+|---|---|---|
+| `OLLAMA_BASE_URL` / `OLLAMA_MODEL` | `http://localhost:11434` / `llama3.1:8b` | LLM fields |
+| `OPENAI_API_KEY` / `OPENROUTER_API_KEY` | – | enable cloud providers |
+| `LLM_TIMEOUT` | `30` | per-call timeout (s) |
 
-- **Reproducibility is a feature** — a seed pins the whole dataset, which makes
-  it usable as committed test fixtures and for regression diffs.
-- **Safe defaults** — the contact generators can only emit reserved/fictional
-  values; there's no "use real-ish data" mode.
-- **Layout** — `generators.py` (typed field generators + pools), `generate.py`
-  (schema → rows, presets, CSV), `models.py`, `api.py` (+ static UI). Spec in
-  [`docs/spec/`](docs/spec/).
-
-All data is synthetic. MIT; part of the
+Deterministic data is synthetic and PII-free. MIT. Part of the
 [ai-portfolio](https://github.com/MarcBittner/ai-portfolio).

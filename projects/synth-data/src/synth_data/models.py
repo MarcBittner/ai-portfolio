@@ -20,6 +20,15 @@ class GenerateRequest(BaseModel):
     n: int = Field(default=10, ge=1, le=1000)
     seed: int = 42
     fmt: Literal["json", "csv"] = Field(default="json", validation_alias="format")
+    use_llm: bool = True            # fill `llm`-typed fields via the router
+    provider: str = "auto"
+    model: str | None = None
+
+
+class RoutingInfo(BaseModel):
+    provider: str
+    model: str
+    fallbacks: list[str] = []
 
 
 class GenerateResponse(BaseModel):
@@ -27,6 +36,7 @@ class GenerateResponse(BaseModel):
     seed: int
     columns: list[str]
     rows: list[dict[str, Any]]
+    routing: RoutingInfo | None = None
 
 
 class TypeInfo(BaseModel):
@@ -43,3 +53,4 @@ class HealthResponse(BaseModel):
     version: str
     types: int
     presets: int
+    ollama: bool
