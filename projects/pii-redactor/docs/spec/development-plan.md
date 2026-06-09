@@ -13,7 +13,7 @@
       unknown type/style; serves the UI at `/`
 - [x] Static single-page UI — live highlight by type, counts, style selector,
       type toggles, copy (no build step)
-- [x] `Makefile` (setup/test/lint/serve/demo), `pyproject.toml`, MIT LICENSE,
+- [x] `Makefile` (setup/test/lint/serve/demo), `pyproject.toml`, proprietary LICENSE,
       README, this spec
 
 ## Phase 2: Tests ✅

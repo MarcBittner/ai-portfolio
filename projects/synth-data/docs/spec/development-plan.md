@@ -13,7 +13,7 @@
       `/health`; serves the UI at `/`
 - [x] Static single-page UI — preset → editable schema JSON, rows + seed,
       generate → table preview + copy JSON/CSV (no build step)
-- [x] `Makefile` (setup/test/lint/serve/demo), `pyproject.toml`, MIT LICENSE,
+- [x] `Makefile` (setup/test/lint/serve/demo), `pyproject.toml`, proprietary LICENSE,
       README, this spec
 
 ## Phase 2: Tests ✅

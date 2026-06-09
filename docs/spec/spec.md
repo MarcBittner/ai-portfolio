@@ -11,7 +11,7 @@ dependencies, Makefile, tests, and docs — and runnable by a reviewer with
 
 ```
 ai-portfolio/
-  LICENSE                      # MIT, covers the whole repo
+  LICENSE                      # Proprietary, covers the whole repo
   README.md                    # portfolio index
   docs/spec/                   # portfolio-level spec + plan (this file)
   projects/
@@ -42,7 +42,7 @@ ai-portfolio/
 > **Showcase exception.** `tanglement-showcase` is a *work showcase* (design
 > docs, a demo site, and a code sample), not a runnable reference project. It is
 > **proprietary, all-rights-reserved** (its own LICENSE) and is exempt from the
-> MIT license and from CONV-1/CONV-3 below. CONV-2 (no secrets) still applies —
+> proprietary license and from CONV-1/CONV-3 below. CONV-2 (no secrets) still applies —
 > it was sanitized for public release.
 
 ## Shared Conventions (all projects)

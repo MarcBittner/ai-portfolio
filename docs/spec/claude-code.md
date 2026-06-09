@@ -96,7 +96,7 @@ untracked credentials), so free-model discovery is on; hybrid retrieval
 
 ### Resume Prompt for Next Session
 
-You are resuming work on **persona-twin** — a public, MIT-licensed
+You are resuming work on **persona-twin** — a public, source-available (proprietary)
 reference implementation of RAG, HEXACO persona twins, multi-provider LLM
 routing, layered evaluation, model benchmarking, hybrid retrieval,
 streamed conversational twins, a browser persona builder, observability,

@@ -11,7 +11,7 @@ checkboxed plan at `projects/<name>/docs/spec/development-plan.md`.
 
 ## Repository
 
-- [x] Bootstrap: MIT LICENSE, .gitignore, first commit
+- [x] Bootstrap: proprietary LICENSE, .gitignore, first commit
 - [x] Portfolio spec + monorepo layout (`projects/` per-project)
 - [x] Root README portfolio index (grows as projects land)
 
@@ -74,7 +74,7 @@ deck. Imported as a snapshot from `MarcBittner/tanglement-showcase`.
 
 - [x] Snapshot imported under `projects/tanglement-showcase/`
 - [x] **Proprietary**, all-rights-reserved (own LICENSE) — exempt from the
-      portfolio's MIT license and CONV-1/CONV-3; sanitized (CONV-2 holds)
+      portfolio's proprietary license and CONV-1/CONV-3; sanitized (CONV-2 holds)
 - [ ] Optional follow-ups: trim the 12 MB `.pptx` (keep the PDF) or move
       binaries to Git LFS; light README polish for portfolio consistency
 
@@ -82,7 +82,7 @@ deck. Imported as a snapshot from `MarcBittner/tanglement-showcase`.
 
 Deterministic PII detection + redaction — FastAPI service and a zero-build web
 UI. Regex + checksum validation (Luhn, IBAN mod-97, IPv4 range), five redaction
-styles, live highlighting. MIT, offline, no secrets — conforms to CONV-1…4.
+styles, live highlighting. Proprietary, offline, no secrets — conforms to CONV-1…4.
 
 - [x] Detection + validation core; five redaction styles (value-consistent)
 - [x] FastAPI `/detect` `/redact` `/types` `/health` + static single-page UI
@@ -93,7 +93,7 @@ styles, live highlighting. MIT, offline, no secrets — conforms to CONV-1…4.
 ## Project 4: evalkit ✅ v0.1.0
 
 Deterministic, offline-first LLM evaluation toolkit — library + FastAPI service
-+ web UI. Layered metrics, regression gate, run comparison. MIT, offline, no
++ web UI. Layered metrics, regression gate, run comparison. Proprietary, offline, no
 secrets — conforms to CONV-1…4.
 
 - [x] Five deterministic metrics; evaluate / gate / compare core
@@ -106,7 +106,7 @@ secrets — conforms to CONV-1…4.
 
 Schema-driven structured extraction — FastAPI service + UI. Label-anchored +
 global-pattern strategies, type validation/normalization, per-field confidence
-and provenance spans. MIT, offline, no secrets — conforms to CONV-1…4.
+and provenance spans. Proprietary, offline, no secrets — conforms to CONV-1…4.
 
 - [x] invoice/resume/contact schemas; extraction + validation core
 - [x] FastAPI `/extract` `/schemas` `/health` + static UI
@@ -117,7 +117,7 @@ and provenance spans. MIT, offline, no secrets — conforms to CONV-1…4.
 ## Project 6: agent-sandbox ✅ v0.1.0
 
 ReAct-style agent over safe, deterministic tools — multi-step chaining and a
-thought→action→observation trace UI; pluggable planner. MIT, offline, no
+thought→action→observation trace UI; pluggable planner. Proprietary, offline, no
 secrets — conforms to CONV-1…4.
 
 - [x] Sandboxed tools (AST calculator, unit convert, date_diff, KB search)
@@ -131,7 +131,7 @@ secrets — conforms to CONV-1…4.
 
 Deterministic LLM-firewall — scan prompts for injection/jailbreaks and responses
 for secret/PII leakage; allow/flag/block verdict + risk score; never echoes a
-detected secret. MIT, offline, no secrets — conforms to CONV-1…4.
+detected secret. Proprietary, offline, no secrets — conforms to CONV-1…4.
 
 - [x] ~18 direction-aware rules (injection/jailbreak/exfiltration/secret/pii)
 - [x] scan engine (verdict + score, masked findings); FastAPI `/scan` `/rules`
@@ -143,7 +143,7 @@ detected secret. MIT, offline, no secrets — conforms to CONV-1…4.
 ## Project 8: synth-data ✅ v0.1.0
 
 Deterministic, PII-free synthetic dataset generation — library + FastAPI + UI.
-Seeded/reproducible; PII-free by construction. MIT, offline, no secrets —
+Seeded/reproducible; PII-free by construction. Proprietary, offline, no secrets —
 conforms to CONV-1…4.
 
 - [x] 15 typed generators + fictional pools; presets (users/transactions/tickets)
@@ -157,7 +157,7 @@ conforms to CONV-1…4.
 
 Classic-ML time-series forecasting + anomaly detection — library + FastAPI +
 chart UI. The portfolio's non-LLM project: hand-rolled stats, backtesting,
-uncertainty. MIT, offline, no secrets — conforms to CONV-1…4.
+uncertainty. Proprietary, offline, no secrets — conforms to CONV-1…4.
 
 - [x] 6 forecast methods + auto-selection by holdout backtest; 95% CI band
 - [x] rolling z-score anomalies; FastAPI `/forecast` `/anomalies` `/methods`
@@ -170,7 +170,7 @@ uncertainty. MIT, offline, no secrets — conforms to CONV-1…4.
 
 OCR → PII-detection → box-level redaction pipeline — library + FastAPI + UI.
 Maps PII spans back to OCR token boxes and blacks them out; deterministic on
-bundled samples, opt-in Tesseract backend for real images. MIT, offline by
+bundled samples, opt-in Tesseract backend for real images. Proprietary, offline by
 default, no secrets — conforms to CONV-1…4.
 
 - [x] OcrToken + sample layout + opt-in Tesseract adapter; PII detect (+Luhn)

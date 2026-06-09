@@ -2,7 +2,7 @@
 
 [![projects CI](https://github.com/MarcBittner/ai-portfolio/actions/workflows/projects-ci.yml/badge.svg)](https://github.com/MarcBittner/ai-portfolio/actions/workflows/projects-ci.yml)
 [![persona-twin CI](https://github.com/MarcBittner/ai-portfolio/actions/workflows/ci.yml/badge.svg)](https://github.com/MarcBittner/ai-portfolio/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License: Proprietary](https://img.shields.io/badge/license-proprietary-red.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
@@ -10,7 +10,7 @@
 [![Projects: 10](https://img.shields.io/badge/projects-10-blueviolet)](#projects-at-a-glance)
 
 Production-grade AI engineering projects. Each project is self-contained,
-MIT-licensed, and runnable with **zero paid accounts** — offline fallbacks
+source-available (proprietary), and runnable with **zero paid accounts** — offline fallbacks
 (in-memory vector store, deterministic mock LLM) are first-class, and real
 providers (Ollama, MongoDB Atlas, OpenAI, OpenRouter) switch on via
 environment variables. All nine services deploy to Kubernetes via Argo CD.
@@ -77,7 +77,7 @@ share routing intelligence over a Chord DHT + gossip mesh.
   (transparent git file encryption, ECDH/ECDSA)
 - **Pitch deck** — PDF (viewable) + PPTX source
 
-> ⚠️ **Proprietary — not MIT.** This directory is published for viewing only
+> ⚠️ **Proprietary — all rights reserved.** This directory is published for viewing only
 > and carries its own [LICENSE](projects/tanglement-showcase/LICENSE)
 > (all rights reserved). The production backend is private.
 
@@ -253,13 +253,16 @@ project's v0.2.0 milestone (per-project detail in `docs/spec/development-plan.md
 ## Repository conventions
 
 - One directory per project under `projects/`, each with its own spec
-  (`docs/spec/`), a `run.sh` (Projects 3–10) or Makefile, tests, and docs
+  (`docs/spec/`), a production-grade `run.sh`, tests, and docs
 - No secrets in the repo — environment variables via gitignored `.env`,
   placeholder `.env.example` committed per project
 - All sample data is synthetic and fictional
 
 ## License
 
-[MIT](LICENSE) covers the repository **except** `projects/tanglement-showcase/`,
-which is proprietary and carries its
-[own LICENSE](projects/tanglement-showcase/LICENSE) (all rights reserved).
+**Proprietary — all rights reserved.** This repository is public and
+source-available for viewing, evaluation, and portfolio purposes only; it is
+**not** open source. See [LICENSE](LICENSE). No right to use, copy, modify, or
+distribute is granted without explicit prior written permission.
+`projects/tanglement-showcase/` carries its own proprietary
+[LICENSE](projects/tanglement-showcase/LICENSE).

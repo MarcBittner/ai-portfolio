@@ -15,7 +15,7 @@
 - [x] Static single-page UI — render a sample document (SVG tokens) + a redacted
       copy with PII boxes blacked out, plus text panels + findings (no build step)
 - [x] `Makefile` (setup/test/lint/serve/demo), `pyproject.toml` (+ `ocr` extra),
-      MIT LICENSE, README, this spec
+      proprietary LICENSE, README, this spec
 
 ## Phase 2: Tests ✅
 - [x] `test_pipeline.py` — layout, span alignment, detection, box mapping

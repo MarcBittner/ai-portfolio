@@ -7,7 +7,7 @@ name = "agent-sandbox"
 version = "0.1.0"
 description = "Deterministic ReAct-style agent over safe, offline tools — API + UI"
 readme = "README.md"
-license = "MIT"
+license = "LicenseRef-Proprietary"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115",

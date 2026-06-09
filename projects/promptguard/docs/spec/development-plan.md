@@ -13,7 +13,7 @@
       response never contains a detected secret value
 - [x] Static single-page UI — paste text, pick direction, verdict badge +
       highlighted findings by category + detections table (no build step)
-- [x] `Makefile` (setup/test/lint/serve/demo), `pyproject.toml`, MIT LICENSE,
+- [x] `Makefile` (setup/test/lint/serve/demo), `pyproject.toml`, proprietary LICENSE,
       README, this spec
 
 ## Phase 2: Tests ✅

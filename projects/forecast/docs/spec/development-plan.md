@@ -14,7 +14,7 @@
       serves the UI at `/`
 - [x] Static single-page UI — inline SVG chart (history, dashed forecast,
       shaded band, anomaly dots) + backtest metrics (no build step)
-- [x] `Makefile` (setup/test/lint/serve/demo), `pyproject.toml`, MIT LICENSE,
+- [x] `Makefile` (setup/test/lint/serve/demo), `pyproject.toml`, proprietary LICENSE,
       README, this spec
 
 ## Phase 2: Tests ✅

@@ -7,7 +7,7 @@ name = "pii-redactor"
 version = "0.1.0"
 description = "Deterministic PII detection and redaction — API + UI, no model, no network"
 readme = "README.md"
-license = "MIT"
+license = "LicenseRef-Proprietary"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115",

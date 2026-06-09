@@ -1,7 +1,7 @@
 # promptguard
 
 [![CI](https://github.com/MarcBittner/ai-portfolio/actions/workflows/projects-ci.yml/badge.svg)](https://github.com/MarcBittner/ai-portfolio/actions/workflows/projects-ci.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License: Proprietary](https://img.shields.io/badge/license-proprietary-red.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
@@ -127,4 +127,4 @@ hermetic and offline.
 
 
 Synthetic data only; no secrets (test fixtures are split so none sit in source).
-MIT. Part of the [ai-portfolio](https://github.com/MarcBittner/ai-portfolio).
+Proprietary — all rights reserved. Part of the [ai-portfolio](https://github.com/MarcBittner/ai-portfolio).

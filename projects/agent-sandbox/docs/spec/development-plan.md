@@ -14,7 +14,7 @@
 - [x] FastAPI `api.py` — `/run`, `/tools`, `/health`; serves the UI at `/`
 - [x] Static single-page UI — query + samples; thought→action→observation step
       cards + final answer (no build step)
-- [x] `Makefile` (setup/test/lint/serve/demo), `pyproject.toml`, MIT LICENSE,
+- [x] `Makefile` (setup/test/lint/serve/demo), `pyproject.toml`, proprietary LICENSE,
       README, this spec
 
 ## Phase 2: Tests ✅

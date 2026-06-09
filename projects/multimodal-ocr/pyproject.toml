@@ -7,7 +7,7 @@ name = "multimodal-ocr"
 version = "0.1.0"
 description = "OCR → PII detection → box-level redaction pipeline — API + UI"
 readme = "README.md"
-license = "MIT"
+license = "LicenseRef-Proprietary"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115",

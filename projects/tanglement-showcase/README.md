@@ -8,7 +8,7 @@
 
 **Public work showcase by Marc Bittner (founding engineer).** Architecture & spec, the demo site, and the pitch — the engineering, not the production codebase.
 
-> ⚠️ **Proprietary — all rights reserved.** Unlike the rest of this MIT-licensed
+> ⚠️ **Proprietary — all rights reserved.** Unlike the rest of this source-available (proprietary)
 > portfolio, this directory is a curated showcase of proprietary work; see
 > [`LICENSE`](LICENSE). No production code is included.
 

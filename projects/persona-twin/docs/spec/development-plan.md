@@ -20,7 +20,7 @@ monorepo; portfolio-level spec lives at `docs/spec/spec.md` in the root).
 
 ## Phase 0: Repository bootstrap ✅
 
-- [x] `git init`, MIT `LICENSE`, `.gitignore` (repo root), `.env.example`
+- [x] `git init`, proprietary `LICENSE`, `.gitignore` (repo root), `.env.example`
       as first commit
 - [x] `docs/spec/spec.md` — product specification
 - [x] `docs/spec/development-plan.md` — this plan
