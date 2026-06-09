@@ -180,6 +180,23 @@ cd projects/forecast
 make setup && make serve   # API + chart UI at http://localhost:8007
 ```
 
+### [multimodal-ocr](projects/multimodal-ocr/) — v0.1.0
+
+An **OCR → PII-detection → box-level redaction** pipeline — library + FastAPI +
+UI that blacks out PII *on the page*, not just in the text.
+
+- **Box-level redaction** — maps each PII span back to the OCR tokens it covers
+  and redacts those bounding boxes
+- **Pluggable OCR** — deterministic/offline on bundled sample documents; a
+  Tesseract backend is opt-in for arbitrary images
+- **Governance-consistent** — validated detection (Luhn), and detected PII is
+  never echoed; UI shows the document and a box-redacted copy side by side
+
+```sh
+cd projects/multimodal-ocr
+make setup && make serve   # API + UI at http://localhost:8008
+```
+
 ## Repository conventions
 
 - One directory per project under `projects/`, each with its own spec

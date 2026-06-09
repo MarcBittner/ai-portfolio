@@ -166,10 +166,26 @@ uncertainty. MIT, offline, no secrets — conforms to CONV-1…4.
 - [ ] Roadmap (see project plan): Holt-Winters/ARIMA, seasonality detection,
       rolling-origin backtest, CSV upload, Argo deploy
 
-## Project 10+ (future)
+## Project 10: multimodal-ocr ✅ v0.1.0
 
-Candidate from the portfolio backlog: **multimodal-ocr** (image → OCR → extract
-→ redact; needs an OCR model, so a weaker offline story than the others).
+OCR → PII-detection → box-level redaction pipeline — library + FastAPI + UI.
+Maps PII spans back to OCR token boxes and blacks them out; deterministic on
+bundled samples, opt-in Tesseract backend for real images. MIT, offline by
+default, no secrets — conforms to CONV-1…4.
+
+- [x] OcrToken + sample layout + opt-in Tesseract adapter; PII detect (+Luhn)
+- [x] span→token-box mapping, redacted text + boxes; FastAPI `/process` `/ocr`
+      `/samples` `/health` + side-by-side document/redacted SVG UI
+- [x] 16 tests (pipeline/api), ruff clean, `make demo` offline
+- [ ] Roadmap (see project plan): real image render/redact (Pillow), layout
+      analysis, multilingual OCR, Argo deploy
+
+## Backlog complete 🎉
+
+All ten planned projects are built. Future projects to be specified as new
+directions arise; candidates include agent-eval harnesses, a RAG-over-code
+assistant, or extracting shared tooling (the eval/redaction layers) into
+installable packages.
 
 ---
 

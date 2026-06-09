@@ -37,6 +37,7 @@ ai-portfolio/
 | [promptguard](../../projects/promptguard/) | v0.1.0 | Deterministic LLM-firewall — scan prompts for injection/jailbreaks and responses for secret/PII leakage; allow/flag/block verdict + risk score. Never echoes detected secrets. No model, no network. |
 | [synth-data](../../projects/synth-data/) | v0.1.0 | Deterministic, PII-free synthetic dataset generation — library + FastAPI + UI. Seeded/reproducible; emails on RFC 2606 example.* and phones in the reserved 555-01xx range; JSON/CSV output. No model, no network. |
 | [forecast](../../projects/forecast/) | v0.1.0 | Classic-ML time-series forecasting + anomaly detection — library + FastAPI + chart UI. Hand-rolled methods (naive/mean/linear/SES/Holt/seasonal) with auto-selection by backtest, a 95% band, and rolling z-score anomalies. No LLM. |
+| [multimodal-ocr](../../projects/multimodal-ocr/) | v0.1.0 | OCR → PII-detection → box-level redaction — library + FastAPI + UI. Maps PII spans back to OCR token boxes and blacks them out; deterministic on bundled samples, opt-in Tesseract backend. Detected PII never echoed. |
 
 > **Showcase exception.** `tanglement-showcase` is a *work showcase* (design
 > docs, a demo site, and a code sample), not a runnable reference project. It is
