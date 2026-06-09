@@ -9,7 +9,7 @@ from persona_twin.llm.base import (
     ModelSpec,
 )
 from persona_twin.llm.mock import MockProvider
-from persona_twin.llm.policy import TASKS, RoutingPolicy, TaskRoute
+from persona_twin.llm.policy import TASKS, RoutingPolicy, TaskRoute, parse_route_pins
 from persona_twin.llm.registry import ModelRegistry
 from persona_twin.llm.router import (
     AllProvidersFailedError,
@@ -82,6 +82,10 @@ def get_router(settings: Settings) -> LLMRouter:
     for extra in parse_extra_providers(settings.extra_providers):
         providers[extra.name] = CustomOpenAIProvider(extra)
         specs = specs + extra_specs(extra)
-    return LLMRouter(
-        ModelRegistry(specs), providers, objective=settings.route_objective
+    pins = parse_route_pins(settings.route_pins)
+    known = {f"{s.provider}:{s.id}" for s in specs}
+    policy = RoutingPolicy(
+        default_objective=settings.route_objective,
+        tasks={t: TaskRoute(pin=p) for t, p in pins.items() if p in known},
     )
+    return LLMRouter(ModelRegistry(specs), providers, policy=policy)

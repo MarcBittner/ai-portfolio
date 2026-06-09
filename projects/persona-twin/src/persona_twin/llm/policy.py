@@ -51,3 +51,20 @@ class RoutingPolicy(BaseModel):
             provider, _, model_id = route.pin.partition(":")
             return provider, model_id
         return None
+
+
+def parse_route_pins(spec: str | None) -> dict[str, str]:
+    """Parse ``"task=provider:model,task2=..."`` into ``{task: pin}``.
+
+    Unknown task names and malformed entries are skipped (fail safe) so a bad
+    env var degrades to default routing rather than crashing startup."""
+    pins: dict[str, str] = {}
+    for entry in (spec or "").split(","):
+        entry = entry.strip()
+        if "=" not in entry:
+            continue
+        task, _, pin = entry.partition("=")
+        task, pin = task.strip(), pin.strip()
+        if task in TASKS and ":" in pin:
+            pins[task] = pin
+    return pins

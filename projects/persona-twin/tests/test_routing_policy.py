@@ -184,3 +184,12 @@ class TestRoutingAPI:
             "/routing", json={"tasks": {"world_domination": {"objective": "cost"}}}
         )
         assert response.status_code == 422
+
+
+def test_parse_route_pins():
+    from persona_twin.llm.policy import parse_route_pins
+    pins = parse_route_pins("twin_answer=ollama:llama3.1:8b, twin_chat=ollama:x:y")
+    assert pins == {"twin_answer": "ollama:llama3.1:8b", "twin_chat": "ollama:x:y"}
+    # unknown task and malformed entries are skipped (fail safe)
+    assert parse_route_pins("bogus=ollama:m, twin_answer=nocolon, ") == {}
+    assert parse_route_pins(None) == {}

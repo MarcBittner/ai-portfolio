@@ -1,5 +1,5 @@
 # Local Kubernetes deployment (tested on kind). The image is loaded
-# directly into the node (`kind load docker-image persona-twin:v0.14.0`
+# directly into the node (`kind load docker-image persona-twin:v0.14.1`
 # or `docker save | ctr images import`), hence imagePullPolicy: Never.
 #
 #   kubectl apply -f deploy/k8s/persona-twin.yaml
@@ -57,13 +57,17 @@ spec:
         fsGroup: 1001  # PVC mounts group-writable for the app user
       containers:
         - name: api
-          image: persona-twin:v0.14.0
+          image: persona-twin:v0.14.1
           imagePullPolicy: Never
           ports:
             - containerPort: 8080
           env:
             - name: PERSONA_TWIN_ROUTE_OBJECTIVE
               value: cost
+            # Pin generation to a smaller local model to cap memory: gemma3:12b
+            # is ~8GB resident, llama3.1:8b ~4.5GB. Adjust/remove to taste.
+            - name: PERSONA_TWIN_ROUTE_PINS
+              value: "twin_answer=ollama:llama3.1:8b,twin_chat=ollama:llama3.1:8b,twin_interview=ollama:llama3.1:8b,query_rewrite=ollama:llama3.1:8b,eval_judge=ollama:llama3.1:8b"
             # Local Ollama on the host (Docker Desktop host gateway).
             # Remove if no Ollama is running; discovery fails safe.
             - name: OLLAMA_BASE_URL

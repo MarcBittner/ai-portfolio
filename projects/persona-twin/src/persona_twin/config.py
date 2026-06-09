@@ -66,6 +66,12 @@ class Settings(BaseSettings):
     route_objective: RouteObjective = Field(
         default="cost", validation_alias="PERSONA_TWIN_ROUTE_OBJECTIVE"
     )
+    # Default per-task model pins, applied at startup (survive restarts):
+    # comma-separated "task=provider:model" (e.g. pin generation to a smaller
+    # local model to cap memory). Unknown tasks/models fail safe (skipped).
+    route_pins: str | None = Field(
+        default=None, validation_alias="PERSONA_TWIN_ROUTE_PINS"
+    )
 
     @property
     def llm_backends(self) -> list[str]:
