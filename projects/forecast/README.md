@@ -1,54 +1,82 @@
 # forecast
 
-Classic-ML **time-series forecasting and anomaly detection** — a library, a
-FastAPI service, and a zero-build chart UI. No LLM, no model files, no network:
-the statistics are implemented in pure Python and run deterministically.
+[![CI](https://github.com/MarcBittner/ai-portfolio/actions/workflows/projects-ci.yml/badge.svg)](https://github.com/MarcBittner/ai-portfolio/actions/workflows/projects-ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Offline-first](https://img.shields.io/badge/offline--first-yes-success)](#configuration)
+[![LLM routing](https://img.shields.io/badge/LLM-Ollama%E2%86%92mock-b197fc)](#llm-routing)
+
+> Classic-ML **time-series forecasting + anomaly detection** — library, API, and
+> chart UI. Hand-rolled methods with auto-selection by backtest and a 95% band,
+> plus an optional **natural-language summary** of the forecast routed to local
+> **Ollama** (deterministic template fallback). The portfolio's non-LLM-core
+> project.
 
 ```sh
-make setup && make demo     # auto-forecast + an anomaly, offline
-make serve                  # API + chart UI at http://localhost:8007
+./run.sh setup && ./run.sh serve     # API + chart UI at http://localhost:8007
 ```
+
+---
 
 ## What it does
 
-- **Forecast** with classic methods — `naive`, `mean`, `linear_trend`
-  (least squares), `ses` (simple exponential smoothing), `holt` (double-exp
-  level+trend), `seasonal_naive` — or `auto`, which picks the best by **holdout
-  backtest** (MAE).
-- **Backtest** every forecast — MAE / RMSE / MAPE on a held-out tail, so the
-  method choice is evidence-based, not assumed.
-- **Confidence band** — a 95% interval from in-sample residual spread.
-- **Anomaly detection** — rolling z-score over a trailing window (past-only, no
-  leakage); flags points whose |z| ≥ threshold.
-- **Chart UI** — paste a series, pick a method + horizon, see history, the
-  dashed forecast, the shaded band, and anomaly dots, with backtest metrics.
+- **Forecast** with `naive`, `mean`, `linear_trend` (least squares), `ses`,
+  `holt` (double-exp), `seasonal_naive`, or `auto` (best by holdout-backtest MAE).
+- **Backtest** every forecast — MAE/RMSE/MAPE on a held-out tail, returned so
+  the method choice is evidence-based.
+- **Confidence band** — 95% interval from in-sample residual spread.
+- **Anomalies** — rolling z-score (past-only, no leakage).
+- **NL summary (optional)** — a plain-English description of the trend / next
+  values / backtest error via the router; falls back to a deterministic template.
+
+## Quickstart (`run.sh`, no `make`)
+
+```sh
+./run.sh setup   ./run.sh serve [--port N]   ./run.sh test
+./run.sh lint    ./run.sh check              ./run.sh demo   ./run.sh doctor
+```
+
+## Architecture
+
+```
+                ┌──────────────── FastAPI ────────────────┐
+  series ─────▶ │ /forecast /anomalies /methods /providers │
+                └──────┬───────────────────────┬───────────┘
+                       ▼                        ▼
+    methods.py + forecast.py + anomaly.py   llm_summary.py (NL summary)
+    (backtest, auto-select, CI band)         llm.py: ollama→openrouter→openai→mock
+                       └───────────┬─────────┘  (mock → template)
+                                   ▼
+                  forecast + band + backtest + summary + SVG chart
+```
+
+## LLM routing
+
+The vendored stdlib router (`llm.py`) tries `ollama → openrouter → openai →
+mock`. The summary uses it and falls back to a deterministic template when the
+provider is the mock or unreachable, so the field is never blank.
+`GET /providers` reports availability for the UI.
 
 ## API
 
 | Method | Path | Body / result |
 |---|---|---|
-| `POST` | `/forecast` | `{series, horizon, method, alpha?, beta?, season_period?}` → `{method, forecast, lower, upper, fitted, backtest}` |
-| `POST` | `/anomalies` | `{series, window, threshold}` → `{anomalies:[{index,value,zscore}]}` |
+| `POST` | `/forecast` | `{series, horizon, method, use_llm, provider, model, …}` → `{method, forecast, lower, upper, fitted, backtest, summary, routing}` |
+| `POST` | `/anomalies` | `{series, window, threshold}` → `{anomalies}` |
 | `GET` | `/methods` | available methods (incl. `auto`) |
-| `GET` | `/health` | status, version, method count |
+| `GET` | `/providers` | provider availability + models |
+| `GET` | `/health` | status, version, method count, Ollama reachability |
 | `GET` | `/` | the chart UI |
 
-```sh
-curl -s localhost:8007/forecast -H 'content-type: application/json' -d '{
-  "series": [10,12,13,15,16,18,19,21,22,24], "horizon": 4
-}'
-# {"method":"holt","forecast":[25.4,26.9,28.4,29.9], "backtest":{"mae":0.2,...}, ...}
-```
+## Configuration
 
-## Design notes
+| Variable | Default | Purpose |
+|---|---|---|
+| `OLLAMA_BASE_URL` / `OLLAMA_MODEL` | `http://localhost:11434` / `llama3.1:8b` | NL summary |
+| `OPENAI_API_KEY` / `OPENROUTER_API_KEY` | – | enable cloud providers |
+| `LLM_TIMEOUT` | `30` | per-call timeout (s) |
 
-- **Breadth, deliberately** — this is the portfolio's non-LLM project: classic
-  statistics, implemented from scratch, with proper backtesting and uncertainty.
-- **Evidence over assumption** — `auto` only wins by lower out-of-sample error;
-  the backtest is returned so the choice is auditable.
-- **Layout** — `methods.py` (forecasters), `forecast.py` (backtest/auto/CI),
-  `anomaly.py`, `models.py`, `api.py` (+ static chart UI). Spec in
-  [`docs/spec/`](docs/spec/).
-
-Synthetic data only. MIT; part of the
+Synthetic data only; no secrets. MIT. Part of the
 [ai-portfolio](https://github.com/MarcBittner/ai-portfolio).

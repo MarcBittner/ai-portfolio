@@ -10,6 +10,11 @@ client = TestClient(app)
 def test_health():
     body = client.get("/health").json()
     assert body["status"] == "ok" and body["methods"] == 6
+    assert "ollama" in body
+
+
+def test_providers_endpoint():
+    assert client.get("/providers").json()["available"]["mock"] is True
 
 
 def test_methods_listing():
@@ -20,10 +25,21 @@ def test_methods_listing():
 def test_forecast_endpoint():
     body = client.post("/forecast", json={
         "series": [1, 2, 3, 4, 5, 6, 7, 8], "horizon": 3, "method": "linear_trend",
+        "use_llm": False,
     }).json()
     assert len(body["forecast"]) == 3
     assert body["method"] == "linear_trend"
     assert body["backtest"] is not None
+    assert body["summary"] is None  # no LLM pass
+
+
+def test_summary_mock_uses_template():
+    # provider=mock -> deterministic template summary; routing reported
+    body = client.post("/forecast", json={
+        "series": [1, 2, 3, 4, 5, 6, 7, 8], "horizon": 3, "method": "linear_trend",
+        "use_llm": True, "provider": "mock"}).json()
+    assert body["routing"]["provider"] == "mock"
+    assert body["summary"] and "linear_trend" in body["summary"]
 
 
 def test_forecast_auto():

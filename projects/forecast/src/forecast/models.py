@@ -10,6 +10,15 @@ class ForecastRequest(BaseModel):
     alpha: float | None = Field(default=None, ge=0.0, le=1.0)
     beta: float | None = Field(default=None, ge=0.0, le=1.0)
     season_period: int | None = Field(default=None, ge=1, le=1000)
+    use_llm: bool = True            # natural-language summary via the router
+    provider: str = "auto"
+    model: str | None = None
+
+
+class RoutingInfo(BaseModel):
+    provider: str
+    model: str
+    fallbacks: list[str] = []
 
 
 class ForecastResponse(BaseModel):
@@ -19,6 +28,8 @@ class ForecastResponse(BaseModel):
     upper: list[float]
     fitted: list[float | None]
     backtest: dict[str, float] | None
+    summary: str | None = None
+    routing: RoutingInfo | None = None
 
 
 class AnomalyRequest(BaseModel):
@@ -47,3 +58,4 @@ class HealthResponse(BaseModel):
     status: str
     version: str
     methods: int
+    ollama: bool

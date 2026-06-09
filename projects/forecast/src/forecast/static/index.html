@@ -51,10 +51,13 @@
         <select id="method"></select>
         <label>Horizon</label>
         <input type="number" id="horizon" value="6" min="1" max="200" />
+        <label><input type="checkbox" id="useLlm" checked /> LLM summary</label>
+        <label>provider <select id="provider"><option value="auto">auto</option></select></label>
         <div class="spacer"></div>
         <button class="primary" id="run">Forecast</button>
       </div>
       <div class="row samples" id="samples"></div>
+      <div id="summary" style="font-size:13px;color:var(--fg);margin:6px 0"></div>
 
       <div class="panel" id="out" style="display:none">
         <div class="legend">
@@ -90,6 +93,12 @@
         $("samples").innerHTML = Object.keys(SAMPLES).map((k) => `<button data-k="${k}">${k}</button>`).join("");
         $("samples").querySelectorAll("button").forEach((b) =>
           b.addEventListener("click", () => { $("series").value = SAMPLES[b.dataset.k]; run(); }));
+        try {
+          const p = await fetch("/providers").then((r) => r.json());
+          for (const n of Object.keys(p.available))
+            $("provider").insertAdjacentHTML("beforeend",
+              `<option value="${n}">${n}${p.available[n] ? "" : " (unavailable)"}</option>`);
+        } catch { /* optional */ }
       }
       function parseSeries() {
         return $("series").value.split(/[\s,]+/).map(Number).filter((x) => !Number.isNaN(x));
@@ -98,13 +107,17 @@
       async function run() {
         const series = parseSeries();
         if (series.length < 2) { alert("Enter at least 2 numbers."); return; }
-        const body = { series, horizon: Number($("horizon").value), method: $("method").value };
+        const body = { series, horizon: Number($("horizon").value), method: $("method").value,
+          use_llm: $("useLlm").checked, provider: $("provider").value };
         const [fc, an] = await Promise.all([
           fetch("/forecast", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }),
           fetch("/anomalies", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ series }) }),
         ]);
         if (!fc.ok) { alert(await fc.text()); return; }
-        draw(series, await fc.json(), await an.json());
+        const fcData = await fc.json();
+        $("summary").textContent = fcData.summary
+          ? "📝 " + fcData.summary + (fcData.routing ? `  (via ${fcData.routing.provider})` : "") : "";
+        draw(series, fcData, await an.json());
       }
 
       function draw(history, f, anom) {

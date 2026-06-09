@@ -38,7 +38,7 @@ Python, deterministic, offline.
 ### FR-7: Conventions
 - Python 3.11+, type hints, `ruff` clean, lean pinned deps (no numpy — the math
   is hand-rolled).
-- `make setup && make test && make lint` green on a fresh clone, no `.env`.
+- `./run.sh setup && ./run.sh check` green on a fresh clone, no `.env`.
 - Synthetic data only; no secrets.
 
 ## Non-Goals
