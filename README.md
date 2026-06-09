@@ -126,6 +126,24 @@ cd projects/agent-sandbox
 make setup && make serve   # API + trace UI at http://localhost:8004
 ```
 
+### [promptguard](projects/promptguard/) — v0.1.0
+
+A deterministic **LLM-firewall** — scan prompts for injection & jailbreaks and
+responses for secret & PII leakage. Returns `allow`/`flag`/`block` with a risk
+score and findings; never echoes a secret it catches.
+
+- **Direction-aware rules** — injection/jailbreak on input, secret/PII leakage
+  on output, with severity-driven verdicts
+- **Safe by construction** — secret/PII findings report category + length only,
+  so logs and responses can't leak detected values
+- **Live UI** — paste text, pick a direction, see the verdict, findings
+  highlighted by category, and a detections table
+
+```sh
+cd projects/promptguard
+make setup && make serve   # API + UI at http://localhost:8005
+```
+
 ## Repository conventions
 
 - One directory per project under `projects/`, each with its own spec

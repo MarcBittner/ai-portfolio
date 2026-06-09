@@ -127,11 +127,23 @@ secrets — conforms to CONV-1…4.
 - [ ] Roadmap (see project plan): LLM planner, more tools, self-correction,
       per-tool accounting, Argo deploy
 
-## Project 7+ (future)
+## Project 7: promptguard ✅ v0.1.0
 
-Candidates from the portfolio backlog (one at a time): **promptguard**
-(injection/jailbreak/secret-leak firewall), **synth-data** (PII-free synthetic
-dataset generator), **forecast** (classic-ML time-series, no LLM),
+Deterministic LLM-firewall — scan prompts for injection/jailbreaks and responses
+for secret/PII leakage; allow/flag/block verdict + risk score; never echoes a
+detected secret. MIT, offline, no secrets — conforms to CONV-1…4.
+
+- [x] ~18 direction-aware rules (injection/jailbreak/exfiltration/secret/pii)
+- [x] scan engine (verdict + score, masked findings); FastAPI `/scan` `/rules`
+      `/health` + UI with verdict badge, category highlights, detections table
+- [x] 15 tests (scan/api), ruff clean, `make demo` offline
+- [ ] Roadmap (see project plan): classifier augmentation, deny-lists/config,
+      more providers + entropy gating, streaming output scan, Argo deploy
+
+## Project 8+ (future)
+
+Candidates from the portfolio backlog (one at a time): **synth-data** (PII-free
+synthetic dataset generator), **forecast** (classic-ML time-series, no LLM),
 **multimodal-ocr** (image → OCR → extract → redact).
 
 ---
