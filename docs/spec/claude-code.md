@@ -57,8 +57,9 @@ memory): `GIT_SSH_COMMAND="ssh -i docs/spec/untracked/ghostlocalhost.pem
 ```
 Continue persona-twin. Read projects/persona-twin/docs/spec/spec.md and
 projects/persona-twin/docs/spec/development-plan.md (the Roadmap section
-at the bottom lists the next candidate features — Eval refinements is
-recommended). Pick one, implement it following the standing rules, ship
+at the bottom lists the next candidate features — quantifying the new
+retrieval paths via benchmarks is recommended). Pick one, implement it
+following the standing rules, ship
 it via the live deployment loop in claude-code.md §1, and verify through
 the gateway. Keep `make test` green.
 ```
@@ -69,21 +70,23 @@ the gateway. Keep `make test` green.
 
 **Last Updated:** 2026-06-08
 
-**Project Status:** persona-twin **v0.13.0**, live on the local
-kind/Argo cluster. Phases 0–20 complete (RAG → twins → eval → frontend →
+**Project Status:** persona-twin **v0.14.0**, live on the local
+kind/Argo cluster. Phases 0–21 complete (RAG → twins → eval → frontend →
 deploy → routing console → benchmarks/analytics → persistence → aggregate
 scoreboard → free-model wiring → Ollama embeddings + circuit breaker →
 hybrid retrieval + CI → streaming + conversational twins → persona
-builder → observability). GitHub Actions CI is green (lint/test/eval gate
-+ frontend build). **Next:** pick a feature from the Roadmap section in
-the project plan — *Eval refinements* is recommended.
+builder → observability → eval refinements + interview). GitHub Actions
+CI is green (lint/test/eval gate + frontend build). **Next:** pick a
+feature from the Roadmap section in the project plan — *quantifying the new
+retrieval paths via benchmarks* is recommended.
 
-v0.13.0 adds **observability**: a dependency-free `/metrics` (Prometheus
-format) plus Prometheus + Grafana on the cluster with a committed
-dashboard (LLM latency/rate, cache ratio, circuit opens). Grafana is at
-**localhost:9082**, Prometheus at **9083** (via the gateway relay).
-v0.12.0's persona builder (`/builder`) and v0.11.0's streamed `/chat`
-remain live.
+v0.14.0 batch: **voice-consistency judge** (twin_answer benchmark metric),
+**query rewriting** (`query_rewrite` routed task, opt-in
+`PERSONA_TWIN_QUERY_REWRITE`), **history-aware chat retrieval**
+(`PERSONA_TWIN_CHAT_CONDENSE`, on by default), **twin-vs-twin**
+(`/interview` tab), and builder **doc upload**. Grafana at
+**localhost:9082**, Prometheus **9083**. Sibling project **pii-redactor**
+is also live on Argo at **localhost:9084** (its own Argo Application).
 
 Active config worth knowing: Ollama is the live embedder
 (`nomic-embed-text`, 768d) and provides local LLM models; OpenRouter free
@@ -96,18 +99,19 @@ untracked credentials), so free-model discovery is on; hybrid retrieval
 You are resuming work on **persona-twin** — a public, MIT-licensed
 reference implementation of RAG, HEXACO persona twins, multi-provider LLM
 routing, layered evaluation, model benchmarking, hybrid retrieval,
-streamed conversational twins, a browser persona builder, and
-observability. It is **v0.13.0, deployed live** on a local kind cluster
-under Argo CD.
+streamed conversational twins, a browser persona builder, observability,
+query rewriting, and twin-vs-twin interviews. It is **v0.14.0, deployed
+live** on a local kind cluster under Argo CD.
 
 1. Read `projects/persona-twin/docs/spec/spec.md` (requirements, FR-1…
-   FR-18) and `.../development-plan.md` — the **Roadmap** section at the
+   FR-20) and `.../development-plan.md` — the **Roadmap** section at the
    bottom lists the next candidate features
 2. Read `docs/spec/claude-code.md` §1 for the standing rules **and the
    live deployment / ship loop** (build → side-load into kind → bump
    manifest → push → Argo sync → bounce gateway → verify via gateway)
 3. Credentials live in `docs/spec/untracked/credentials.md` (gitignored:
    OpenRouter key, Argo admin password, GitHub SSH key). Never commit.
-4. Pick the next roadmap feature (Eval refinements recommended),
+4. Pick the next roadmap feature (benchmark the new retrieval paths
+   recommended),
    implement it, ship via the loop, verify through the
    gateway at http://localhost:9081, keep `make test` green.

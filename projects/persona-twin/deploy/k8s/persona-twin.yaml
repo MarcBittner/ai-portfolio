@@ -1,5 +1,5 @@
 # Local Kubernetes deployment (tested on kind). The image is loaded
-# directly into the node (`kind load docker-image persona-twin:v0.13.0`
+# directly into the node (`kind load docker-image persona-twin:v0.14.0`
 # or `docker save | ctr images import`), hence imagePullPolicy: Never.
 #
 #   kubectl apply -f deploy/k8s/persona-twin.yaml
@@ -57,7 +57,7 @@ spec:
         fsGroup: 1001  # PVC mounts group-writable for the app user
       containers:
         - name: api
-          image: persona-twin:v0.13.0
+          image: persona-twin:v0.14.0
           imagePullPolicy: Never
           ports:
             - containerPort: 8080

@@ -263,6 +263,9 @@ throwaway test stubs — they are the documented offline mode.
   already have results unless `force=true` — the UI offers "Run missing"
   and "Rerun selected" so models can be benchmarked one at a time into
   one scoreboard
+- **FR-14.9** `twin_answer` carries a judged **voice_consistency** metric
+  ("sounds like this persona", 0–1) via an LLM judge over the persona's voice
+  notes + HEXACO, with a deterministic heuristic offline
 
 ### FR-15: Hybrid Retrieval
 
@@ -315,6 +318,8 @@ throwaway test stubs — they are the documented offline mode.
 - **FR-17.5** Frontend `/builder` tab: HEXACO sliders with band hints,
   voice-note and multi-document editors, debounced live redaction badges
   (counts by type), and a created-summary linking straight into chat
+- **FR-17.6** Documents can be uploaded into the builder by reading `.txt`/
+  `.md` files client-side into the document editor
 
 ### FR-18: Observability
 
@@ -331,6 +336,33 @@ throwaway test stubs — they are the documented offline mode.
   cache hit ratio, circuit opens, index size)
 - **FR-18.4** Demo-grade by default: emptyDir storage (history resets on
   restart), Grafana anonymous viewer access, images side-loaded into kind
+
+### FR-19: Query Transformation
+
+- **FR-19.1** Query rewriting / multi-query expansion as a `query_rewrite`
+  routed task: an LLM expands the question into a few phrasings/sub-queries;
+  each is retrieved and fused (reciprocal-rank) before reranking. Opt-in via
+  `PERSONA_TWIN_QUERY_REWRITE` (default off so the measured `/ask` baseline is
+  stable); the original query is always included so it degrades to single-query
+  retrieval offline or on failure
+- **FR-19.2** History-aware chat retrieval: `condense_query` folds prior turns
+  into a standalone retrieval query (resolving pronouns) before retrieval,
+  controlled by `PERSONA_TWIN_CHAT_CONDENSE` (default on; degrades to the raw
+  message offline). Stateless `/ask` is unaffected
+- **FR-19.3** Benchmarkable: a `query_rewrite` benchmark task measures fused
+  retrieval hit-rate/MRR per model against the single-query baselines
+
+### FR-20: Twin-vs-twin
+
+- **FR-20.1** `POST /interview` (interviewer_id, subject_id, rounds): one twin
+  interviews another. Seed questions are drawn deterministically from the
+  subject's corpus; the interviewer rephrases each in its own voice
+  (`twin_interview` task, degrades to the seed offline)
+- **FR-20.2** The subject answers via `ask_twin` — grounded in its own
+  documents with validated citations, identical to `/ask`. Interviewer and
+  subject must differ (422); unknown persona → 404
+- **FR-20.3** Frontend `/interview` tab renders the transcript with per-answer
+  citations
 
 ### FR-10: Developer Experience
 

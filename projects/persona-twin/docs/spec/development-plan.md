@@ -264,24 +264,43 @@ monorepo; portfolio-level spec lives at `docs/spec/spec.md` in the root).
 - [x] Offline tests: counter/gauge/histogram render + cumulative buckets,
       label escaping, `/metrics` exposition end-to-end
 
+## Phase 21: Eval refinements + conversation/interaction upgrades ✅
+
+Five features shipped together as v0.14.0:
+
+- [x] **Voice-consistency LLM judge** — judged "sounds like this persona"
+      score (0–1) added to the `twin_answer` benchmark (`judge_voice`;
+      deterministic heuristic offline)
+- [x] **Query rewriting / multi-query expansion** — new `query_rewrite`
+      routed task; LLM expands the question → per-query retrieval → RRF
+      fusion; opt-in (`PERSONA_TWIN_QUERY_REWRITE`); benchmarkable per model
+- [x] **History-aware chat retrieval** — `condense_query` folds prior turns
+      into a standalone retrieval query (`PERSONA_TWIN_CHAT_CONDENSE`,
+      degrades to the raw message offline)
+- [x] **Twin-vs-twin** — `POST /interview` + `/interview` UI; one twin
+      interviews another, subject answers grounded + cited via `ask_twin`
+- [x] **Builder doc upload** — `/builder` reads `.txt`/`.md` files into the
+      document editor
+- [x] Offline tests across all five (voice judge, rewrite, condense,
+      interview, plus existing builder coverage); default `/ask` path
+      unchanged (kept as a separate branch)
+
 ---
 
-## Roadmap (post-v0.13.0 — next session picks one)
+## Roadmap (post-v0.14.0 — next session picks one)
 
 Ordered by recommendation. All build on the live system; "go" means
 implement, ship via Argo (build image → `docker save | ctr import` into
 the kind node → bump manifest → push → Argo syncs → bounce gateway), and
 verify through the gateway before reporting done.
 
-1. **Eval refinements** *(recommended)* — (a) voice-consistency LLM judge in twin
-   benchmarks (replace the heuristic with a judged "sounds like Ada"
-   score per model); (b) query rewriting / multi-query expansion as a
-   fourth routed task, benchmarked like the others.
-2. **Twin-vs-twin** — one twin interviews another; both answers grounded
-   in their own corpora with citations on each side.
-3. **History-aware chat retrieval** — condense the conversation into a
-   standalone query before retrieval (chat currently retrieves on the
-   latest message only); benchmark vs the single-message baseline.
+1. **Quantify the new retrieval paths** *(recommended)* — run the
+   `query_rewrite` benchmark vs the `rerank` baselines and the voice judge
+   across models; needs a real provider (and a multi-turn set for condense).
+2. **History-aware chat benchmark** — a small multi-turn eval set to
+   measure condense vs single-message retrieval.
+3. **Observability for the new tasks** — dashboard panels for
+   `twin_chat` / `query_rewrite` / `twin_interview` latency and rate.
 
 ### Parked / deferred
 - **ghcr image push + CD** — user chose to stay on Argo with side-loaded
@@ -291,4 +310,4 @@ verify through the gateway before reporting done.
 
 ---
 
-**Last Updated:** 2026-06-08
+**Last Updated:** 2026-06-09

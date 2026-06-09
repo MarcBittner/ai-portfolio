@@ -15,20 +15,22 @@ checkboxed plan at `projects/<name>/docs/spec/development-plan.md`.
 - [x] Portfolio spec + monorepo layout (`projects/` per-project)
 - [x] Root README portfolio index (grows as projects land)
 
-## Project 1: persona-twin 🔄 v0.13.0 (live on local Argo/kind)
+## Project 1: persona-twin 🔄 v0.14.0 (live on local Argo/kind)
 
 Digital twins of synthetic HEXACO personas — RAG, multi-provider routing,
 layered evaluation, model benchmarking. Detailed plan:
 [projects/persona-twin/docs/spec/development-plan.md](../../projects/persona-twin/docs/spec/development-plan.md)
 
-Phases 0–20 complete (see the project plan). Highlights since v0.1.0:
+Phases 0–21 complete (see the project plan). Highlights since v0.1.0:
 multi-provider routing console, model benchmarking + analytics tab,
 incremental aggregate scoreboard, Ollama local models + embeddings,
 OpenRouter/free-model wiring, circuit-breaker routing, hybrid (BM25+RRF)
 retrieval, GitHub Actions CI with an eval-regression gate, streamed
 conversational twins (SSE `/chat` with per-session memory), a browser
-persona builder with live PII-redaction preview, and observability
-(`/metrics` + Prometheus & Grafana with a committed dashboard).
+persona builder with live PII-redaction preview, observability
+(`/metrics` + Prometheus & Grafana with a committed dashboard), and the
+v0.14.0 batch: voice-consistency judge, query rewriting, history-aware
+chat retrieval, and twin-vs-twin interviews.
 
 - [x] Phases 0–10: core build → v0.1.0 (RAG, twins, eval, frontend, deploy)
 - [x] Phase 11: routing console (per-task policy, OpenRouter) — v0.3.0
@@ -44,15 +46,17 @@ persona builder with live PII-redaction preview, and observability
       preview, runtime ingest, PVC persistence) — v0.12.0
 - [x] Phase 20: observability (`/metrics` + Prometheus & Grafana with a
       committed dashboard) — v0.13.0
+- [x] Phase 21: eval refinements (voice judge, query rewriting) +
+      history-aware chat, twin-vs-twin, builder doc upload — v0.14.0
 
 ### Roadmap (next session — pick from these)
 
-- [ ] **Eval refinements** (recommended next): voice-consistency LLM
-      judge; query-rewriting as a routed task
-- [ ] Twin-vs-twin (one twin interviews another, both grounded)
-- [ ] History-aware chat retrieval: condense the conversation into a
-      standalone query before retrieving (chat currently uses the latest
-      message only)
+- [ ] **Quantify the new paths** (recommended next): benchmark
+      `query_rewrite` vs `rerank` baselines and the voice judge across
+      models (needs a real provider)
+- [ ] History-aware chat benchmark: a small multi-turn eval set
+- [ ] Observability panels for `twin_chat` / `query_rewrite` /
+      `twin_interview`
 - [ ] **Parked by user:** ghcr image push + CD (staying on Argo with
       side-loaded images for now)
 

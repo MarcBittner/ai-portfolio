@@ -18,7 +18,9 @@ make setup && make demo    # fully offline — no API keys, no database
 | Reranking | retrieve wide (k=25) → IDF-weighted lexical rerank → top 5; measured, not assumed | [docs/reranking.md](docs/reranking.md) |
 | Persona twins | HEXACO profiles → concrete style instructions; style never overrides grounding; citations validated against what was retrieved | [docs/personas.md](docs/personas.md) |
 | Multi-provider routing | Anthropic + OpenAI + deterministic mock behind one port; cost/latency/quality objectives from a declarative model registry; fallback chains with recorded reasons; schema-validated structured outputs with retry | `src/persona_twin/llm/` |
-| Streaming chat | token-by-token SSE conversation with per-session memory; grounded prose streamed live, then a citation tail validated against retrieval exactly like `/ask` | `src/persona_twin/persona/chat.py` |
+| Streaming chat | token-by-token SSE conversation with per-session memory and history-aware retrieval (the follow-up is condensed into a standalone query); grounded prose streamed live, then a citation tail validated against retrieval exactly like `/ask` | `src/persona_twin/persona/chat.py` |
+| Query rewriting | optional multi-query expansion as a routed task — the question is expanded into sub-queries, each retrieved and reciprocal-rank-fused before reranking; benchmarkable per model | `src/persona_twin/retrieval/rewrite.py` |
+| Twin-vs-twin | one twin interviews another (`/interview`); the subject answers grounded in its own corpus with validated citations | `src/persona_twin/persona/interview.py` |
 | **Evaluation** | retrieval / grounding / answer-quality measured **separately** over a committed dataset; deliberately no composite score | [docs/evaluation.md](docs/evaluation.md) |
 | Data governance | deterministic PII redaction as a mandatory ingest gate; synthetic data only | [docs/data-governance.md](docs/data-governance.md) |
 | Persona builder | create a twin in the browser — HEXACO sliders, paste documents, live redaction preview (counts by type), then it's ingested and queryable; PII redacted before anything is stored | `src/persona_twin/persona/store.py` |
@@ -31,7 +33,7 @@ make setup && make demo    # fully offline — no API keys, no database
 ```
                   ┌─────────────────────────────────────────┐
                   │ FastAPI (async, Pydantic)               │
-                  │ /personas /ask /chat /ingest /health     │
+                  │ /ask /chat /interview /personas /metrics  │
                   └──────┬──────────────────────────────────┘
                          │
    ┌──────────────┬──────┴────────────┬───────────────────┐
@@ -67,7 +69,8 @@ needs Node 20+): run `make serve` in one terminal and `make frontend`
 in another, then open <http://localhost:5173> — persona picker with
 HEXACO bars, citations, and a routing/timings debug panel, a **chat**
 tab that streams a multi-turn conversation token-by-token, and a
-**build** tab that creates a new twin with live PII-redaction preview.
+**build** tab that creates a new twin with live PII-redaction preview, and an
+**interview** tab where one twin interviews another.
 
 ```sh
 curl -s localhost:8000/ask -H 'content-type: application/json' -d '{
