@@ -1,5 +1,14 @@
 # persona-twin
 
+[![CI](https://github.com/MarcBittner/ai-portfolio/actions/workflows/ci.yml/badge.svg)](https://github.com/MarcBittner/ai-portfolio/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![React + Vite](https://img.shields.io/badge/UI-React%20%2B%20Vite-61dafb?logo=react&logoColor=000)](frontend/)
+[![Deploy: Argo GitOps](https://img.shields.io/badge/deploy-Argo%20GitOps-success)](deploy/)
+[![Version 0.14.1](https://img.shields.io/badge/version-0.14.1-blueviolet)](docs/spec/development-plan.md)
+
 Query AI **digital twins** of synthetic personas, grounded in retrieved
 data with citations — a production-grade reference implementation of
 RAG, LLM persona systems, multi-provider routing, and layered LLM
@@ -8,6 +17,8 @@ evaluation.
 ```sh
 ./run.sh setup && ./run.sh demo    # fully offline — no API keys, no database
 ```
+
+![persona-twin UI](docs/screenshot.png)
 
 ## What it demonstrates
 

@@ -19,6 +19,9 @@
 
 ---
 
+
+![synth-data UI](docs/screenshot.png)
+
 ## What it does
 
 - **Deterministic** — same `(schema, n, seed)` → identical rows (seeded), so
@@ -79,6 +82,48 @@ availability for the UI.
 | `OLLAMA_BASE_URL` / `OLLAMA_MODEL` | `http://localhost:11434` / `llama3.1:8b` | LLM fields |
 | `OPENAI_API_KEY` / `OPENROUTER_API_KEY` | – | enable cloud providers |
 | `LLM_TIMEOUT` | `30` | per-call timeout (s) |
+
+
+## Internals & operations
+
+**Module map**
+
+- `generators.py` — 16 seeded generators; contact types are **PII-free by
+  construction** (RFC 2606 `example.*`, reserved `555-01xx`).
+- `generate.py` — validates schema, builds rows, caps at `MAX_ROWS`, CSV
+  serialization; presets (users/transactions/support_tickets).
+- `llm_gen.py` — fills `llm`-typed columns from the field `description` in one call.
+
+**Request flow** — `schema + seed → deterministic rows → [optional] llm column
+fill → JSON or CSV (+ routing)`.
+
+**Determinism & performance** — a seeded `random.Random` is reproducible across
+processes/platforms, so `(schema, n, seed)` always yields identical rows.
+
+### Deployment
+
+Containerized (single-stage, **non-root**) and deployed to Kubernetes via
+**Argo CD**, mirroring the rest of the portfolio:
+
+- `Dockerfile` — runtime-only deps (the router is stdlib); serves on `:8080`.
+- `deploy/k8s/synth-data.yaml` — Namespace + Deployment (readiness/liveness probes,
+  `requests 25m/64Mi`, `limits 500m/256Mi`) + ClusterIP Service.
+- `deploy/argocd/application.yaml` — Argo CD `Application` (auto-sync, self-heal,
+  `CreateNamespace=true`), synced from `main`.
+
+```sh
+docker build -t synth-data:v0.1.0 .
+docker save synth-data:v0.1.0 | docker exec -i <kind-node> ctr -n k8s.io images import -   # imagePullPolicy: Never
+kubectl apply -f deploy/argocd/application.yaml
+```
+
+### Testing
+
+`./run.sh check` runs **ruff + pytest** (20 tests); the CI matrix
+([`.github/workflows/projects-ci.yml`](../../.github/workflows/projects-ci.yml))
+runs the same on every push. LLM-path tests pin `provider:"mock"` so they stay
+hermetic and offline.
+
 
 Deterministic data is synthetic and PII-free. MIT. Part of the
 [ai-portfolio](https://github.com/MarcBittner/ai-portfolio).

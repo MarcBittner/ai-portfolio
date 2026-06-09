@@ -19,6 +19,9 @@
 
 ---
 
+
+![evalkit UI](docs/screenshot.png)
+
 ## What it does
 
 A single "accuracy %" hides what matters. evalkit measures separate signals so
@@ -85,6 +88,48 @@ mock or unreachable. `GET /providers` reports availability for the UI.
 | `OPENAI_API_KEY` / `OPENAI_MODEL` | – / `gpt-4o-mini` | enable OpenAI |
 | `OPENROUTER_API_KEY` / `OPENROUTER_MODEL` | – | enable OpenRouter |
 | `LLM_TIMEOUT` | `30` | per-call timeout (s) |
+
+
+## Internals & operations
+
+**Module map**
+
+- `metrics.py` — deterministic scorers (`exact_match`, `contains`, `token_f1`,
+  `semantic_similarity` via hashed embeddings, `refusal_match`).
+- `evaluate.py` — per-item + aggregate scoring, regression `gate()`, run `compare()`.
+- `judge.py` — `llm_judge` metric (router verdict, token-F1 fallback).
+- `api.py` — splits deterministic metrics (pure) from `llm_judge` (per-item).
+
+**Request flow** — `items → deterministic metrics (pure) → [optional] llm_judge
+per item → aggregate + gate (pass/fail) + routing`.
+
+**Determinism & performance** — every deterministic metric is pure and stable
+(hashed embeddings, not a model), so scores are CI-safe and diffable.
+
+### Deployment
+
+Containerized (single-stage, **non-root**) and deployed to Kubernetes via
+**Argo CD**, mirroring the rest of the portfolio:
+
+- `Dockerfile` — runtime-only deps (the router is stdlib); serves on `:8080`.
+- `deploy/k8s/evalkit.yaml` — Namespace + Deployment (readiness/liveness probes,
+  `requests 25m/64Mi`, `limits 500m/256Mi`) + ClusterIP Service.
+- `deploy/argocd/application.yaml` — Argo CD `Application` (auto-sync, self-heal,
+  `CreateNamespace=true`), synced from `main`.
+
+```sh
+docker build -t evalkit:v0.1.0 .
+docker save evalkit:v0.1.0 | docker exec -i <kind-node> ctr -n k8s.io images import -   # imagePullPolicy: Never
+kubectl apply -f deploy/argocd/application.yaml
+```
+
+### Testing
+
+`./run.sh check` runs **ruff + pytest** (21 tests); the CI matrix
+([`.github/workflows/projects-ci.yml`](../../.github/workflows/projects-ci.yml))
+runs the same on every push. LLM-path tests pin `provider:"mock"` so they stay
+hermetic and offline.
+
 
 Synthetic data only; no secrets. MIT. Part of the
 [ai-portfolio](https://github.com/MarcBittner/ai-portfolio).

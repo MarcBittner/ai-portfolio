@@ -20,6 +20,9 @@
 
 ---
 
+
+![promptguard UI](docs/screenshot.png)
+
 ## What it does
 
 | Category | Direction | How |
@@ -80,6 +83,48 @@ availability for the UI.
 | `OLLAMA_BASE_URL` / `OLLAMA_MODEL` | `http://localhost:11434` / `llama3.1:8b` | LLM classifier |
 | `OPENAI_API_KEY` / `OPENROUTER_API_KEY` | – | enable cloud providers |
 | `LLM_TIMEOUT` | `30` | per-call timeout (s) |
+
+
+## Internals & operations
+
+**Module map**
+
+- `rules.py` — direction-scoped regex rules (injection/jailbreak/secret/PII) +
+  severity weights.
+- `scan.py` — findings → score → verdict (`allow`/`flag`/`block`); category counts.
+- `llm_classify.py` — LLM semantic-injection verdict folded into the score on the
+  input direction.
+
+**Request flow** — `text + direction → regex scan → [optional] llm classify
+(input) → max-severity verdict + score + findings (+ routing)`.
+
+**Security posture** — secret/PII findings report **category + length only**; a
+detected value is never echoed in the response (verified by test).
+
+### Deployment
+
+Containerized (single-stage, **non-root**) and deployed to Kubernetes via
+**Argo CD**, mirroring the rest of the portfolio:
+
+- `Dockerfile` — runtime-only deps (the router is stdlib); serves on `:8080`.
+- `deploy/k8s/promptguard.yaml` — Namespace + Deployment (readiness/liveness probes,
+  `requests 25m/64Mi`, `limits 500m/256Mi`) + ClusterIP Service.
+- `deploy/argocd/application.yaml` — Argo CD `Application` (auto-sync, self-heal,
+  `CreateNamespace=true`), synced from `main`.
+
+```sh
+docker build -t promptguard:v0.1.0 .
+docker save promptguard:v0.1.0 | docker exec -i <kind-node> ctr -n k8s.io images import -   # imagePullPolicy: Never
+kubectl apply -f deploy/argocd/application.yaml
+```
+
+### Testing
+
+`./run.sh check` runs **ruff + pytest** (17 tests); the CI matrix
+([`.github/workflows/projects-ci.yml`](../../.github/workflows/projects-ci.yml))
+runs the same on every push. LLM-path tests pin `provider:"mock"` so they stay
+hermetic and offline.
+
 
 Synthetic data only; no secrets (test fixtures are split so none sit in source).
 MIT. Part of the [ai-portfolio](https://github.com/MarcBittner/ai-portfolio).

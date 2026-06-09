@@ -20,6 +20,9 @@
 
 ---
 
+
+![agent-sandbox UI](docs/screenshot.png)
+
 ## What it does
 
 ```
@@ -79,6 +82,49 @@ plan can't be parsed it returns `None` and the agent uses the rule planner.
 | `OLLAMA_BASE_URL` / `OLLAMA_MODEL` | `http://localhost:11434` / `llama3.1:8b` | LLM planner |
 | `OPENAI_API_KEY` / `OPENROUTER_API_KEY` | – | enable cloud providers |
 | `LLM_TIMEOUT` | `30` | per-call timeout (s) |
+
+
+## Internals & operations
+
+**Module map**
+
+- `tools.py` — sandboxed tools: `calculator` (whitelisted-AST eval, never
+  `eval()`), `convert`, `date_diff`, `search` (KB). Pure, offline, side-effect-free.
+- `planner.py` — rule planner → ordered `Step`s. `llm_planner.py` — LLM plan as
+  JSON, validated against the tool registry.
+- `agent.py` — the loop: substitute `{n}` references, run tool, capture
+  observation/error, build the trace.
+
+**Request flow** — `query → planner (LLM → rule fallback) → execute steps
+(chaining results) → trace + answer + which planner ran`.
+
+**Determinism & performance** — the rule path is fully deterministic; a failed
+tool becomes a failed step (no crash); LLM-plan parse failure falls back to rules.
+
+### Deployment
+
+Containerized (single-stage, **non-root**) and deployed to Kubernetes via
+**Argo CD**, mirroring the rest of the portfolio:
+
+- `Dockerfile` — runtime-only deps (the router is stdlib); serves on `:8080`.
+- `deploy/k8s/agent-sandbox.yaml` — Namespace + Deployment (readiness/liveness probes,
+  `requests 25m/64Mi`, `limits 500m/256Mi`) + ClusterIP Service.
+- `deploy/argocd/application.yaml` — Argo CD `Application` (auto-sync, self-heal,
+  `CreateNamespace=true`), synced from `main`.
+
+```sh
+docker build -t agent-sandbox:v0.1.0 .
+docker save agent-sandbox:v0.1.0 | docker exec -i <kind-node> ctr -n k8s.io images import -   # imagePullPolicy: Never
+kubectl apply -f deploy/argocd/application.yaml
+```
+
+### Testing
+
+`./run.sh check` runs **ruff + pytest** (22 tests); the CI matrix
+([`.github/workflows/projects-ci.yml`](../../.github/workflows/projects-ci.yml))
+runs the same on every push. LLM-path tests pin `provider:"mock"` so they stay
+hermetic and offline.
+
 
 Synthetic data only; no secrets; tools are offline and side-effect-free. MIT.
 Part of the [ai-portfolio](https://github.com/MarcBittner/ai-portfolio).

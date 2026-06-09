@@ -1,6 +1,16 @@
 # Tanglement.ai — Decentralized, Multi-Provider LLM Routing
 
+[![License: Proprietary](https://img.shields.io/badge/license-proprietary-red.svg)](LICENSE)
+[![Type: Work showcase](https://img.shields.io/badge/type-work%20showcase-orange)](#my-role)
+[![Stack: Go + TypeScript](https://img.shields.io/badge/stack-Go%20%2B%20TypeScript-00ADD8?logo=go&logoColor=white)](#in-this-showcase)
+[![Demo: Next.js](https://img.shields.io/badge/demo-Next.js-000?logo=nextdotjs&logoColor=white)](demo-site/)
+[![Transport: Chord DHT + gossip](https://img.shields.io/badge/p2p-Chord%20DHT%20%2B%20gossip-blueviolet)](docs/spec/)
+
 **Public work showcase by Marc Bittner (founding engineer).** Architecture & spec, the demo site, and the pitch — the engineering, not the production codebase.
+
+> ⚠️ **Proprietary — all rights reserved.** Unlike the rest of this MIT-licensed
+> portfolio, this directory is a curated showcase of proprietary work; see
+> [`LICENSE`](LICENSE). No production code is included.
 
 Tanglement.ai is a peer-to-peer network that optimizes LLM access through intelligent **client-side routing**, with *no centralized company infrastructure in the request path*. Apps embed the SDK; a local routing engine picks the best provider per request (cost / latency / reliability); calls go **directly** to the provider (OpenAI, Anthropic, Google) using the user's **own API keys** — Tanglement never touches or stores credentials — and nodes share routing intelligence over a gossip protocol. Result: no proxy bottleneck, no single point of failure, and operating cost of roughly **$0–65/month vs. $100k+/month** for a traditional API gateway.
 

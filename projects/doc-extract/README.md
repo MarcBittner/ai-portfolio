@@ -20,6 +20,9 @@
 
 ---
 
+
+![doc-extract UI](docs/screenshot.png)
+
 ## What it does
 
 1. **Label-anchored extraction** — find a label alias (`Total due:`) and capture
@@ -79,6 +82,49 @@ availability for the UI.
 | `OLLAMA_BASE_URL` / `OLLAMA_MODEL` | `http://localhost:11434` / `llama3.1:8b` | local LLM fill |
 | `OPENAI_API_KEY` / `OPENROUTER_API_KEY` | – | enable cloud providers |
 | `LLM_TIMEOUT` | `30` | per-call timeout (s) |
+
+
+## Internals & operations
+
+**Module map**
+
+- `schemas.py` — schemas as data (`Field`: name/type/labels/description); built-in
+  invoice/resume/contact.
+- `extract.py` — label-anchored capture → global-pattern fallback → `_validate`
+  (date→ISO, money→number, email/phone/url) with provenance spans.
+- `llm_extract.py` — fills still-missing fields via the router; validates,
+  normalizes, and locates each value for a span.
+
+**Request flow** — `text + schema → deterministic extract → [optional] llm_fill
+of missing fields → fields(value, normalized, confidence, span, method) + routing`.
+
+**Determinism & performance** — regex anchors are deterministic; the LLM only
+runs for fields the deterministic pass left empty, and regex wins on conflict.
+
+### Deployment
+
+Containerized (single-stage, **non-root**) and deployed to Kubernetes via
+**Argo CD**, mirroring the rest of the portfolio:
+
+- `Dockerfile` — runtime-only deps (the router is stdlib); serves on `:8080`.
+- `deploy/k8s/doc-extract.yaml` — Namespace + Deployment (readiness/liveness probes,
+  `requests 25m/64Mi`, `limits 500m/256Mi`) + ClusterIP Service.
+- `deploy/argocd/application.yaml` — Argo CD `Application` (auto-sync, self-heal,
+  `CreateNamespace=true`), synced from `main`.
+
+```sh
+docker build -t doc-extract:v0.1.0 .
+docker save doc-extract:v0.1.0 | docker exec -i <kind-node> ctr -n k8s.io images import -   # imagePullPolicy: Never
+kubectl apply -f deploy/argocd/application.yaml
+```
+
+### Testing
+
+`./run.sh check` runs **ruff + pytest** (17 tests); the CI matrix
+([`.github/workflows/projects-ci.yml`](../../.github/workflows/projects-ci.yml))
+runs the same on every push. LLM-path tests pin `provider:"mock"` so they stay
+hermetic and offline.
+
 
 Synthetic data only; no secrets. MIT. Part of the
 [ai-portfolio](https://github.com/MarcBittner/ai-portfolio).

@@ -19,6 +19,9 @@
 
 ---
 
+
+![multimodal-ocr UI](docs/screenshot.png)
+
 ## How it works
 
 ```
@@ -81,6 +84,48 @@ mock or unreachable. `GET /providers` reports availability for the UI.
 | `OLLAMA_BASE_URL` / `OLLAMA_MODEL` | `http://localhost:11434` / `llama3.1:8b` | LLM NER |
 | `OPENAI_API_KEY` / `OPENROUTER_API_KEY` | – | enable cloud providers |
 | `LLM_TIMEOUT` | `30` | per-call timeout (s) |
+
+
+## Internals & operations
+
+**Module map**
+
+- `ocr.py` — `OcrToken` (word + box), sample-document layout, opt-in **Tesseract**
+  adapter (`pytesseract`+Pillow extra).
+- `detect.py` — regex + Luhn over the joined text. `llm_ner.py` — LLM entity pass.
+- `pipeline.py` — tokens→text (tracking char spans) → detect (+LLM merge) →
+  map PII spans back to **token boxes** → redacted text + boxes.
+
+**Request flow** — `tokens (sample/Tesseract) → text → detect (+LLM NER) → span→box
+mapping → redacted text + blacked-out boxes (+ routing)`.
+
+**Determinism & performance** — deterministic on bundled samples; the OCR backend
+is pluggable so real images are one opt-in adapter away.
+
+### Deployment
+
+Containerized (single-stage, **non-root**) and deployed to Kubernetes via
+**Argo CD**, mirroring the rest of the portfolio:
+
+- `Dockerfile` — runtime-only deps (the router is stdlib); serves on `:8080`.
+- `deploy/k8s/multimodal-ocr.yaml` — Namespace + Deployment (readiness/liveness probes,
+  `requests 25m/64Mi`, `limits 500m/256Mi`) + ClusterIP Service.
+- `deploy/argocd/application.yaml` — Argo CD `Application` (auto-sync, self-heal,
+  `CreateNamespace=true`), synced from `main`.
+
+```sh
+docker build -t multimodal-ocr:v0.1.0 .
+docker save multimodal-ocr:v0.1.0 | docker exec -i <kind-node> ctr -n k8s.io images import -   # imagePullPolicy: Never
+kubectl apply -f deploy/argocd/application.yaml
+```
+
+### Testing
+
+`./run.sh check` runs **ruff + pytest** (18 tests); the CI matrix
+([`.github/workflows/projects-ci.yml`](../../.github/workflows/projects-ci.yml))
+runs the same on every push. LLM-path tests pin `provider:"mock"` so they stay
+hermetic and offline.
+
 
 Real OCR needs the `ocr` extra (`pytesseract` + Pillow) and the tesseract
 binary. Synthetic data only; no secrets. MIT. Part of the

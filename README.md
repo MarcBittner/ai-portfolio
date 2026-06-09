@@ -1,14 +1,42 @@
 # ai-portfolio
 
+[![projects CI](https://github.com/MarcBittner/ai-portfolio/actions/workflows/projects-ci.yml/badge.svg)](https://github.com/MarcBittner/ai-portfolio/actions/workflows/projects-ci.yml)
+[![persona-twin CI](https://github.com/MarcBittner/ai-portfolio/actions/workflows/ci.yml/badge.svg)](https://github.com/MarcBittner/ai-portfolio/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Deploy: Argo GitOps](https://img.shields.io/badge/deploy-Argo%20GitOps-success)](#shared-capabilities-projects-310)
+[![Projects: 10](https://img.shields.io/badge/projects-10-blueviolet)](#projects-at-a-glance)
+
 Production-grade AI engineering projects. Each project is self-contained,
 MIT-licensed, and runnable with **zero paid accounts** — offline fallbacks
 (in-memory vector store, deterministic mock LLM) are first-class, and real
-providers (MongoDB Atlas, OpenAI, Anthropic, Redis) switch on via
-environment variables.
+providers (Ollama, MongoDB Atlas, OpenAI, OpenRouter) switch on via
+environment variables. All nine services deploy to Kubernetes via Argo CD.
+
+![ai-portfolio UIs](docs/screenshots/hero.png)
+
+## Projects at a glance
+
+| # | Project | What it is | Stack | Docs |
+|---|---|---|---|---|
+| 1 | **persona-twin** | RAG digital-twins: chunking/embedding/rerank, eval, streaming chat, observability | FastAPI · Mongo Atlas · Vite | [README](projects/persona-twin/README.md) |
+| 2 | **tanglement-showcase** | P2P multi-provider LLM routing network (proprietary showcase) | spec · Next.js | [README](projects/tanglement-showcase/README.md) |
+| 3 | **pii-redactor** | PII detect/redact — regex+checksum core + LLM NER | FastAPI · UI | [README](projects/pii-redactor/README.md) |
+| 4 | **evalkit** | Offline-first LLM eval toolkit + LLM-judge + regression gate | FastAPI · UI | [README](projects/evalkit/README.md) |
+| 5 | **doc-extract** | Schema-driven extraction + provenance + LLM fill | FastAPI · UI | [README](projects/doc-extract/README.md) |
+| 6 | **agent-sandbox** | ReAct agent over safe tools — rule or LLM planner | FastAPI · UI | [README](projects/agent-sandbox/README.md) |
+| 7 | **promptguard** | LLM-firewall: injection/secret/PII + LLM classifier | FastAPI · UI | [README](projects/promptguard/README.md) |
+| 8 | **synth-data** | Deterministic PII-free synthetic data + LLM fields | FastAPI · UI | [README](projects/synth-data/README.md) |
+| 9 | **forecast** | Classic-ML forecasting + anomalies (no-LLM core) | FastAPI · UI | [README](projects/forecast/README.md) |
+| 10 | **multimodal-ocr** | OCR → PII → box-level redaction + LLM NER | FastAPI · UI | [README](projects/multimodal-ocr/README.md) |
+
+See **[ROADMAP.md](ROADMAP.md)** for what's next per project.
 
 ## Projects
 
-### [persona-twin](projects/persona-twin/) — v0.13.0
+### [persona-twin](projects/persona-twin/) — v0.14.1
 
 Query AI **digital twins** of synthetic personas, grounded in retrieved
 data with citations.
@@ -29,7 +57,7 @@ data with citations.
 
 ```sh
 cd projects/persona-twin
-make setup && make demo   # runs fully offline, no .env required
+./run.sh setup && ./run.sh demo   # runs fully offline, no .env required
 ```
 
 ### [tanglement-showcase](projects/tanglement-showcase/) — work showcase

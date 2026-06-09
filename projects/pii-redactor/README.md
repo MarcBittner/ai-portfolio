@@ -19,6 +19,9 @@
 
 ---
 
+
+![pii-redactor UI](docs/screenshot.png)
+
 ## What it does
 
 - **Structured PII via regex + validation** — `EMAIL`, `PHONE`, `SSN`,
@@ -116,6 +119,51 @@ All optional; nothing is required to run offline.
   `llm.py` (router), `llm_ner.py` (entity pass), `models.py`, `api.py` (+ static
   UI). Spec in [`docs/spec/`](docs/spec/).
 - `./run.sh check` runs ruff + pytest (also enforced in CI).
+
+
+## Internals & operations
+
+**Module map**
+
+- `detect.py` — regex patterns + validators: Luhn (cards), mod-97 (IBAN), IPv4
+  octet-range; resolves to **non-overlapping** typed spans.
+- `redact.py` — five styles (`token`/`label`/`mask`/`partial`/`hash`);
+  `redact_spans()` applies pre-merged spans with stable per-value replacement.
+- `llm.py` — vendored multi-provider router. `llm_ner.py` — LLM entity pass
+  (PERSON/ORG/LOCATION) + `merge()` (regex wins on overlap).
+- `models.py` / `api.py` / `static/index.html` — schema, endpoints, zero-build UI.
+
+**Request flow** — `text → detect (regex+checksum) → [optional] llm_entities →
+merge → redact_spans → {spans, counts, redacted, routing}`.
+
+**Determinism & performance** — single-pass regex, O(n·rules); fully
+deterministic and stateless. The LLM pass is the only network touch and degrades
+to regex-only when no provider is reachable.
+
+### Deployment
+
+Containerized (single-stage, **non-root**) and deployed to Kubernetes via
+**Argo CD**, mirroring the rest of the portfolio:
+
+- `Dockerfile` — runtime-only deps (the router is stdlib); serves on `:8080`.
+- `deploy/k8s/pii-redactor.yaml` — Namespace + Deployment (readiness/liveness probes,
+  `requests 25m/64Mi`, `limits 500m/256Mi`) + ClusterIP Service.
+- `deploy/argocd/application.yaml` — Argo CD `Application` (auto-sync, self-heal,
+  `CreateNamespace=true`), synced from `main`.
+
+```sh
+docker build -t pii-redactor:v0.1.0 .
+docker save pii-redactor:v0.1.0 | docker exec -i <kind-node> ctr -n k8s.io images import -   # imagePullPolicy: Never
+kubectl apply -f deploy/argocd/application.yaml
+```
+
+### Testing
+
+`./run.sh check` runs **ruff + pytest** (31 tests); the CI matrix
+([`.github/workflows/projects-ci.yml`](../../.github/workflows/projects-ci.yml))
+runs the same on every push. LLM-path tests pin `provider:"mock"` so they stay
+hermetic and offline.
+
 
 Synthetic data only; no secrets. MIT. Part of the
 [ai-portfolio](https://github.com/MarcBittner/ai-portfolio).

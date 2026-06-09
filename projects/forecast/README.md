@@ -20,6 +20,9 @@
 
 ---
 
+
+![forecast UI](docs/screenshot.png)
+
 ## What it does
 
 - **Forecast** with `naive`, `mean`, `linear_trend` (least squares), `ses`,
@@ -83,6 +86,49 @@ provider is the mock or unreachable, so the field is never blank.
 | `OLLAMA_BASE_URL` / `OLLAMA_MODEL` | `http://localhost:11434` / `llama3.1:8b` | NL summary |
 | `OPENAI_API_KEY` / `OPENROUTER_API_KEY` | – | enable cloud providers |
 | `LLM_TIMEOUT` | `30` | per-call timeout (s) |
+
+
+## Internals & operations
+
+**Module map**
+
+- `methods.py` — 7 forecasters incl. `holt_winters` (additive triple-exp);
+  `seasonality.py` — `detect_period` via ACF on the **first-differenced** series.
+- `forecast.py` — auto-selection by backtest; single-holdout **and**
+  rolling-origin backtests; residual-based 95% band.
+- `anomaly.py` — rolling z-score (past-only). `llm_summary.py` — NL summary
+  (template fallback).
+
+**Request flow** — `series → detect period → auto-select method → forecast +
+band + holdout/rolling backtests + [optional] NL summary (+ routing)`.
+
+**Determinism & performance** — all statistics are hand-rolled pure Python
+(no numpy); identical inputs give identical forecasts.
+
+### Deployment
+
+Containerized (single-stage, **non-root**) and deployed to Kubernetes via
+**Argo CD**, mirroring the rest of the portfolio:
+
+- `Dockerfile` — runtime-only deps (the router is stdlib); serves on `:8080`.
+- `deploy/k8s/forecast.yaml` — Namespace + Deployment (readiness/liveness probes,
+  `requests 25m/64Mi`, `limits 500m/256Mi`) + ClusterIP Service.
+- `deploy/argocd/application.yaml` — Argo CD `Application` (auto-sync, self-heal,
+  `CreateNamespace=true`), synced from `main`.
+
+```sh
+docker build -t forecast:v0.2.0 .
+docker save forecast:v0.2.0 | docker exec -i <kind-node> ctr -n k8s.io images import -   # imagePullPolicy: Never
+kubectl apply -f deploy/argocd/application.yaml
+```
+
+### Testing
+
+`./run.sh check` runs **ruff + pytest** (25 tests); the CI matrix
+([`.github/workflows/projects-ci.yml`](../../.github/workflows/projects-ci.yml))
+runs the same on every push. LLM-path tests pin `provider:"mock"` so they stay
+hermetic and offline.
+
 
 Synthetic data only; no secrets. MIT. Part of the
 [ai-portfolio](https://github.com/MarcBittner/ai-portfolio).
