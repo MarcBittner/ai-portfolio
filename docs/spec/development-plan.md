@@ -102,13 +102,25 @@ secrets — conforms to CONV-1…4.
 - [ ] Roadmap (see project plan): LLM-judge metric, reference-free scorers,
       JSONL dataset loaders + CI CLI, real-embedder option, Argo deploy
 
-## Project 5+ (future)
+## Project 5: doc-extract ✅ v0.1.0
 
-Candidates from the portfolio backlog (one at a time): **doc-extract**
-(schema-driven structured extraction), **agent-sandbox** (ReAct tool-use with a
-trace UI), **promptguard** (injection/jailbreak/secret-leak firewall),
-**synth-data** (PII-free synthetic dataset generator), **forecast** (classic-ML
-time-series, no LLM), **multimodal-ocr** (image → OCR → extract → redact).
+Schema-driven structured extraction — FastAPI service + UI. Label-anchored +
+global-pattern strategies, type validation/normalization, per-field confidence
+and provenance spans. MIT, offline, no secrets — conforms to CONV-1…4.
+
+- [x] invoice/resume/contact schemas; extraction + validation core
+- [x] FastAPI `/extract` `/schemas` `/health` + static UI
+- [x] 13 tests (extract/api), ruff clean, `make demo` offline
+- [ ] Roadmap (see project plan): LLM extractor for messy docs, repeated/table
+      fields, more schemas/locales, upstream OCR, Argo deploy
+
+## Project 6+ (future)
+
+Candidates from the portfolio backlog (one at a time): **agent-sandbox** (ReAct
+tool-use with a trace UI), **promptguard** (injection/jailbreak/secret-leak
+firewall), **synth-data** (PII-free synthetic dataset generator), **forecast**
+(classic-ML time-series, no LLM), **multimodal-ocr** (image → OCR → extract →
+redact).
 
 ---
 

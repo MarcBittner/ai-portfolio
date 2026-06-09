@@ -89,6 +89,24 @@ cd projects/evalkit
 make setup && make serve   # API + UI at http://localhost:8002
 ```
 
+### [doc-extract](projects/doc-extract/) — v0.1.0
+
+**Schema-driven structured extraction** — pull typed fields from documents
+(invoices, resumes, contact blocks) with per-field confidence, type
+validation/normalization, and provenance spans. Deterministic; no model.
+
+- **Two strategies** — label-anchored capture, then global-pattern fallback;
+  values are type-validated (date → ISO, money → number, email/phone/url regex)
+- **Provenance** — every value carries the `[start,end)` span it came from, so
+  matches are highlightable and auditable
+- **Live UI** — paste a document, pick a schema, see highlighted matches, a
+  confidence-scored fields table, and clean JSON output
+
+```sh
+cd projects/doc-extract
+make setup && make serve   # API + UI at http://localhost:8003
+```
+
 ## Repository conventions
 
 - One directory per project under `projects/`, each with its own spec
