@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>forecast</title>
+    <style>
+      :root {
+        --bg: #0b0e14; --panel: #131722; --border: #232838; --fg: #e6e9ef;
+        --muted: #8b93a7; --accent: #6ea8fe; --fc: #63e6be; --bad: #ff6b6b;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--bg); color: var(--fg);
+        font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+      main { max-width: 900px; margin: 0 auto; padding: 28px 20px 60px; }
+      h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -0.01em; }
+      p.lede { color: var(--muted); margin: 0 0 16px; }
+      textarea { width: 100%; min-height: 80px; resize: vertical; background: #0e1320; color: var(--fg);
+        border: 1px solid var(--border); border-radius: 8px; padding: 10px;
+        font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+      .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 10px 0; }
+      .spacer { flex: 1; }
+      label { font-size: 13px; color: var(--muted); }
+      select, input, button { background: #1b2230; color: var(--fg); border: 1px solid var(--border);
+        border-radius: 7px; padding: 6px 10px; font-size: 13px; }
+      input[type=number] { width: 80px; }
+      button { cursor: pointer; }
+      button.primary { background: var(--accent); color: #07101f; border-color: var(--accent); font-weight: 600; }
+      .samples button { font-size: 12px; }
+      .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-top: 14px; }
+      .legend { display: flex; gap: 16px; font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+      .legend i { display: inline-block; width: 14px; height: 3px; vertical-align: middle; margin-right: 5px; }
+      .meta { display: flex; gap: 18px; flex-wrap: wrap; font-size: 13px; margin-top: 10px; }
+      .meta b { color: var(--fg); }
+      .empty { color: var(--muted); }
+      a { color: var(--accent); }
+      .small { color: var(--muted); font-size: 12px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>forecast</h1>
+      <p class="lede">
+        Classic time-series forecasting + anomaly detection — pure-Python, no
+        model. Auto-selects the best method by backtest, with a 95% band.
+      </p>
+
+      <textarea id="series" spellcheck="false" placeholder="Numbers separated by commas, spaces, or newlines…"></textarea>
+      <div class="row">
+        <label>Method</label>
+        <select id="method"></select>
+        <label>Horizon</label>
+        <input type="number" id="horizon" value="6" min="1" max="200" />
+        <div class="spacer"></div>
+        <button class="primary" id="run">Forecast</button>
+      </div>
+      <div class="row samples" id="samples"></div>
+
+      <div class="panel" id="out" style="display:none">
+        <div class="legend">
+          <span><i style="background:#6ea8fe"></i>history</span>
+          <span><i style="background:#63e6be"></i>forecast</span>
+          <span><i style="background:#2b3550"></i>95% band</span>
+          <span><i style="background:#ff6b6b"></i>anomaly</span>
+        </div>
+        <svg id="chart" viewBox="0 0 640 240" width="100%" preserveAspectRatio="none"></svg>
+        <div class="meta" id="meta"></div>
+      </div>
+
+      <p class="small">
+        <code>POST /forecast</code> · <code>POST /anomalies</code> ·
+        <code>GET /methods</code>. Part of the
+        <a href="https://github.com/MarcBittner/ai-portfolio">ai-portfolio</a>.
+      </p>
+    </main>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      const SVGNS = "http://www.w3.org/2000/svg";
+      const W = 640, H = 240, PAD = 24;
+      const SAMPLES = {
+        "trend":   "10,12,13,15,16,18,19,21,22,24,25,27,28,30",
+        "seasonal":"8,12,20,10,9,13,21,11,10,14,22,12,11,15",
+        "spike":   "20,21,19,22,20,21,55,20,19,21,20,22,21,20",
+      };
+
+      async function loadMethods() {
+        const ms = await fetch("/methods").then((r) => r.json());
+        $("method").innerHTML = ms.map((m) => `<option>${m.name}</option>`).join("");
+        $("samples").innerHTML = Object.keys(SAMPLES).map((k) => `<button data-k="${k}">${k}</button>`).join("");
+        $("samples").querySelectorAll("button").forEach((b) =>
+          b.addEventListener("click", () => { $("series").value = SAMPLES[b.dataset.k]; run(); }));
+      }
+      function parseSeries() {
+        return $("series").value.split(/[\s,]+/).map(Number).filter((x) => !Number.isNaN(x));
+      }
+
+      async function run() {
+        const series = parseSeries();
+        if (series.length < 2) { alert("Enter at least 2 numbers."); return; }
+        const body = { series, horizon: Number($("horizon").value), method: $("method").value };
+        const [fc, an] = await Promise.all([
+          fetch("/forecast", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }),
+          fetch("/anomalies", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ series }) }),
+        ]);
+        if (!fc.ok) { alert(await fc.text()); return; }
+        draw(series, await fc.json(), await an.json());
+      }
+
+      function draw(history, f, anom) {
+        $("out").style.display = "block";
+        const n = history.length, h = f.forecast.length, total = n + h;
+        const all = [...history, ...f.forecast, ...f.upper, ...f.lower];
+        const min = Math.min(...all), max = Math.max(...all), rng = (max - min) || 1;
+        const sx = (i) => PAD + (i / (total - 1)) * (W - 2 * PAD);
+        const sy = (v) => H - PAD - ((v - min) / rng) * (H - 2 * PAD);
+        const svg = $("chart");
+        svg.innerHTML = "";
+        const add = (tag, attrs) => {
+          const e = document.createElementNS(SVGNS, tag);
+          for (const k in attrs) e.setAttribute(k, attrs[k]);
+          svg.appendChild(e); return e;
+        };
+        // CI band over the forecast region
+        const bandTop = f.upper.map((v, j) => `${sx(n + j)},${sy(v)}`);
+        const bandBot = f.lower.map((v, j) => `${sx(n + j)},${sy(v)}`).reverse();
+        add("polygon", { points: [...bandTop, ...bandBot].join(" "), fill: "#2b3550", opacity: "0.6" });
+        // history line
+        add("polyline", { points: history.map((v, i) => `${sx(i)},${sy(v)}`).join(" "),
+          fill: "none", stroke: "#6ea8fe", "stroke-width": "2" });
+        // forecast line (dashed), starting from last history point
+        const fcPts = [`${sx(n - 1)},${sy(history[n - 1])}`, ...f.forecast.map((v, j) => `${sx(n + j)},${sy(v)}`)];
+        add("polyline", { points: fcPts.join(" "), fill: "none", stroke: "#63e6be",
+          "stroke-width": "2", "stroke-dasharray": "5 4" });
+        // anomaly dots
+        for (const a of anom.anomalies)
+          add("circle", { cx: sx(a.index), cy: sy(a.value), r: "4", fill: "#ff6b6b" });
+
+        const bt = f.backtest;
+        $("meta").innerHTML =
+          `<span>method <b>${f.method}</b></span>` +
+          (bt ? `<span>backtest MAE <b>${bt.mae}</b></span><span>RMSE <b>${bt.rmse}</b></span><span>MAPE <b>${bt.mape}%</b></span>` : "") +
+          `<span>anomalies <b>${anom.anomalies.length}</b></span>` +
+          `<span>next: <b>${f.forecast.slice(0, 5).join(", ")}${h > 5 ? "…" : ""}</b></span>`;
+      }
+
+      $("run").addEventListener("click", run);
+      loadMethods();
+    </script>
+  </body>
+</html>

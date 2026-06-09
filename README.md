@@ -163,6 +163,23 @@ cd projects/synth-data
 make setup && make serve   # API + UI at http://localhost:8006
 ```
 
+### [forecast](projects/forecast/) — v0.1.0
+
+Classic-ML **time-series forecasting + anomaly detection** — library + FastAPI +
+chart UI. The portfolio's non-LLM project: hand-rolled statistics with proper
+backtesting and uncertainty.
+
+- **Methods** — naive, mean, linear trend, SES, Holt, seasonal-naive, or `auto`
+  (chosen by holdout-backtest MAE), with a 95% confidence band
+- **Backtested** — MAE/RMSE/MAPE on a held-out tail, returned for auditability
+- **Anomalies** — rolling z-score (past-only); plus an inline SVG chart of
+  history, forecast, band, and anomaly points
+
+```sh
+cd projects/forecast
+make setup && make serve   # API + chart UI at http://localhost:8007
+```
+
 ## Repository conventions
 
 - One directory per project under `projects/`, each with its own spec

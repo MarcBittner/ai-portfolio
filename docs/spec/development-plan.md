@@ -153,11 +153,23 @@ conforms to CONV-1…4.
 - [ ] Roadmap (see project plan): distributions/correlations, more types/locales,
       streaming, a fixtures CLI, Argo deploy
 
-## Project 9+ (future)
+## Project 9: forecast ✅ v0.1.0
 
-Candidates from the portfolio backlog (one at a time): **forecast** (classic-ML
-time-series, no LLM — breadth beyond LLMs), **multimodal-ocr** (image → OCR →
-extract → redact; needs an OCR model, weaker offline story).
+Classic-ML time-series forecasting + anomaly detection — library + FastAPI +
+chart UI. The portfolio's non-LLM project: hand-rolled stats, backtesting,
+uncertainty. MIT, offline, no secrets — conforms to CONV-1…4.
+
+- [x] 6 forecast methods + auto-selection by holdout backtest; 95% CI band
+- [x] rolling z-score anomalies; FastAPI `/forecast` `/anomalies` `/methods`
+      `/health` + inline-SVG chart UI
+- [x] 17 tests (methods/backtest/anomaly/api), ruff clean, `make demo` offline
+- [ ] Roadmap (see project plan): Holt-Winters/ARIMA, seasonality detection,
+      rolling-origin backtest, CSV upload, Argo deploy
+
+## Project 10+ (future)
+
+Candidate from the portfolio backlog: **multimodal-ocr** (image → OCR → extract
+→ redact; needs an OCR model, so a weaker offline story than the others).
 
 ---
 
