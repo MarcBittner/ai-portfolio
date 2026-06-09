@@ -70,6 +70,25 @@ cd projects/pii-redactor
 make setup && make serve   # API + UI at http://localhost:8001
 ```
 
+### [evalkit](projects/evalkit/) — v0.1.0
+
+A deterministic, **offline-first LLM evaluation toolkit** — library + FastAPI
+service + web UI. Score predictions against references across layered metrics,
+gate releases on per-metric thresholds, and compare runs (model A vs B).
+
+- **Layered metrics** — exact-match, contains, token-F1, deterministic semantic
+  similarity (hashed-embedding cosine), refusal agreement; each scores a pair
+  in [0,1] so they compose into one report
+- **Regression gate + run compare** — pass/fail thresholds for CI, and
+  per-metric `{baseline, candidate, delta}` diffs
+- **Live UI** — paste `prediction ||| reference` lines, pick metrics, set
+  thresholds, see aggregate bars, a gate badge, and a per-item table; no model
+
+```sh
+cd projects/evalkit
+make setup && make serve   # API + UI at http://localhost:8002
+```
+
 ## Repository conventions
 
 - One directory per project under `projects/`, each with its own spec

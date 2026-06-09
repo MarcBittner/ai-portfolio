@@ -90,10 +90,25 @@ styles, live highlighting. MIT, offline, no secrets — conforms to CONV-1…4.
 - [ ] Roadmap (see project plan): more types (IPv6, secrets w/ entropy),
       i18n formats, optional NER backend, container/deploy
 
-## Project 4+ (future)
+## Project 4: evalkit ✅ v0.1.0
 
-- [ ] To be specified — candidates: agent orchestration patterns, eval
-      tooling extracted as a library, streaming inference service
+Deterministic, offline-first LLM evaluation toolkit — library + FastAPI service
++ web UI. Layered metrics, regression gate, run comparison. MIT, offline, no
+secrets — conforms to CONV-1…4.
+
+- [x] Five deterministic metrics; evaluate / gate / compare core
+- [x] FastAPI `/evaluate` `/compare` `/metrics` `/health` + static UI
+- [x] 19 tests (metrics/evaluate/api), ruff clean, `make demo` offline
+- [ ] Roadmap (see project plan): LLM-judge metric, reference-free scorers,
+      JSONL dataset loaders + CI CLI, real-embedder option, Argo deploy
+
+## Project 5+ (future)
+
+Candidates from the portfolio backlog (one at a time): **doc-extract**
+(schema-driven structured extraction), **agent-sandbox** (ReAct tool-use with a
+trace UI), **promptguard** (injection/jailbreak/secret-leak firewall),
+**synth-data** (PII-free synthetic dataset generator), **forecast** (classic-ML
+time-series, no LLM), **multimodal-ocr** (image → OCR → extract → redact).
 
 ---
 

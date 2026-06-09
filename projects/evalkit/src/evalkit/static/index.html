@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>evalkit</title>
+    <style>
+      :root {
+        --bg: #0b0e14; --panel: #131722; --border: #232838; --fg: #e6e9ef;
+        --muted: #8b93a7; --accent: #6ea8fe; --ok: #63e6be; --bad: #ff6b6b;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--bg); color: var(--fg);
+        font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+      main { max-width: 1040px; margin: 0 auto; padding: 28px 20px 60px; }
+      h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -0.01em; }
+      p.lede { color: var(--muted); margin: 0 0 20px; }
+      .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-bottom: 16px; }
+      .panel h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin: 0 0 10px; }
+      textarea { width: 100%; min-height: 150px; resize: vertical; background: #0e1320; color: var(--fg);
+        border: 1px solid var(--border); border-radius: 8px; padding: 10px;
+        font: 13px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; }
+      textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+      .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+      @media (max-width: 640px) { .metrics { grid-template-columns: 1fr; } }
+      .metric { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+      .metric label { flex: 1; display: flex; gap: 6px; align-items: center; }
+      .metric .desc { color: var(--muted); font-size: 11px; }
+      .metric input[type=number] { width: 64px; background: #0e1320; color: var(--fg);
+        border: 1px solid var(--border); border-radius: 6px; padding: 3px 6px; font-size: 12px; }
+      .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 12px 0; }
+      .spacer { flex: 1; }
+      button { background: var(--accent); color: #07101f; border: 1px solid var(--accent);
+        border-radius: 7px; padding: 7px 14px; font-size: 13px; font-weight: 600; cursor: pointer; }
+      button.ghost { background: #1b2230; color: var(--fg); border-color: var(--border); font-weight: 400; }
+      .bars { display: grid; gap: 8px; }
+      .bar { display: grid; grid-template-columns: 160px 1fr 48px; gap: 10px; align-items: center; font-size: 13px; }
+      .bar .track { height: 10px; background: #0e1320; border-radius: 999px; overflow: hidden; border: 1px solid var(--border); }
+      .bar .fill { height: 100%; background: var(--accent); }
+      .bar .val { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+      .gate { display: inline-block; padding: 4px 12px; border-radius: 999px; font-weight: 600; font-size: 13px; }
+      .gate.pass { background: rgba(99,230,190,.15); color: var(--ok); border: 1px solid var(--ok); }
+      .gate.fail { background: rgba(255,107,107,.15); color: var(--bad); border: 1px solid var(--bad); }
+      table { width: 100%; border-collapse: collapse; font-size: 12px; }
+      th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--border); font-variant-numeric: tabular-nums; }
+      th { color: var(--muted); font-weight: 500; }
+      .empty { color: var(--muted); }
+      footer { color: var(--muted); font-size: 12px; margin-top: 20px; }
+      a { color: var(--accent); }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>evalkit</h1>
+      <p class="lede">
+        Deterministic, offline-first LLM evaluation — score predictions against
+        references across layered metrics, set a regression gate, and compare
+        runs. No model, no network.
+      </p>
+
+      <div class="panel">
+        <h2>Items — one per line: <code>prediction ||| reference</code></h2>
+        <textarea id="items" spellcheck="false"></textarea>
+        <div class="row">
+          <button class="ghost" id="sample">Load sample</button>
+          <div class="spacer"></div>
+          <button id="run">Evaluate</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Metrics &amp; gate thresholds (blank = no gate)</h2>
+        <div class="metrics" id="metrics"></div>
+      </div>
+
+      <div class="panel" id="results" style="display:none">
+        <h2>Results <span id="gate"></span></h2>
+        <div class="bars" id="bars"></div>
+        <div style="margin-top:14px; max-height:260px; overflow:auto">
+          <table id="table"></table>
+        </div>
+      </div>
+
+      <footer>
+        <code>POST /evaluate</code> · <code>POST /compare</code> ·
+        <code>GET /metrics</code>. Synthetic data only. Part of the
+        <a href="https://github.com/MarcBittner/ai-portfolio">ai-portfolio</a>.
+      </footer>
+    </main>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      const SAMPLE = [
+        "The capital of France is Paris. ||| Paris",
+        "It is roughly 384,400 km to the Moon. ||| 384,400 km",
+        "I don't have information on that. ||| Not covered in the notes.",
+        "The Eiffel Tower opened in 1889. ||| The Eiffel Tower opened in 1887.",
+      ].join("\n");
+
+      async function loadMetrics() {
+        const metrics = await fetch("/metrics").then((r) => r.json());
+        $("metrics").innerHTML = metrics
+          .map(
+            (m) => `<div class="metric">
+              <label><input type="checkbox" data-m="${m.name}" checked />
+                ${m.name} <span class="desc">${m.description}</span></label>
+              <input type="number" min="0" max="1" step="0.05" data-th="${m.name}" placeholder="min" />
+            </div>`,
+          )
+          .join("");
+      }
+
+      function parseItems() {
+        return $("items").value
+          .split("\n").map((l) => l.trim()).filter(Boolean)
+          .map((l) => {
+            const [prediction, reference = ""] = l.split("|||");
+            return { prediction: prediction.trim(), reference: reference.trim() };
+          });
+      }
+
+      async function run() {
+        const items = parseItems();
+        if (!items.length) return;
+        const metrics = [...document.querySelectorAll("input[data-m]:checked")].map((c) => c.dataset.m);
+        const thresholds = {};
+        document.querySelectorAll("input[data-th]").forEach((i) => {
+          if (i.value !== "" && metrics.includes(i.dataset.th)) thresholds[i.dataset.th] = Number(i.value);
+        });
+        const body = { items, metrics, thresholds: Object.keys(thresholds).length ? thresholds : null };
+        const res = await fetch("/evaluate", {
+          method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
+        });
+        if (!res.ok) { alert(await res.text()); return; }
+        render(await res.json());
+      }
+
+      function render(data) {
+        $("results").style.display = "block";
+        $("bars").innerHTML = data.metrics
+          .map((m) => {
+            const v = data.aggregate[m] ?? 0;
+            return `<div class="bar"><span>${m}</span>
+              <span class="track"><span class="fill" style="width:${(v * 100).toFixed(0)}%"></span></span>
+              <span class="val">${v.toFixed(3)}</span></div>`;
+          })
+          .join("");
+        const g = $("gate");
+        if (data.gate) {
+          g.className = "gate " + (data.gate.passed ? "pass" : "fail");
+          g.textContent = data.gate.passed
+            ? "gate: PASS"
+            : "gate: FAIL — " + Object.keys(data.gate.failures).join(", ");
+        } else { g.className = ""; g.textContent = ""; }
+        const head = "<tr><th>#</th>" + data.metrics.map((m) => `<th>${m}</th>`).join("") + "</tr>";
+        const rows = data.per_item
+          .map((r) => `<tr><td>${r.index}</td>` + data.metrics.map((m) => `<td>${(r.scores[m] ?? 0).toFixed(3)}</td>`).join("") + "</tr>")
+          .join("");
+        $("table").innerHTML = head + rows;
+      }
+
+      $("sample").addEventListener("click", () => { $("items").value = SAMPLE; run(); });
+      $("run").addEventListener("click", run);
+      loadMetrics();
+    </script>
+  </body>
+</html>
