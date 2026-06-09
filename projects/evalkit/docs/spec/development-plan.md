@@ -35,8 +35,7 @@
 - [ ] JSONL dataset loaders + a `run.sh eval` CLI for other projects' CI gates
 - [ ] Reference-free scorers: JSON-validity, refusal-quality, format checks
 - [ ] Real-embedder option for `semantic_similarity` (sentence-transformers)
-- [ ] Containerize + deploy to Argo (Dockerfile + `deploy/k8s` + `deploy/argocd`,
-      mirroring pii-redactor)
+- [x] Containerize + deploy to Argo (Dockerfile + `deploy/k8s` + `deploy/argocd`) ✅ deployed
 
 ---
 

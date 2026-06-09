@@ -34,8 +34,7 @@
 - [ ] List/repeated fields (invoice line items) and table extraction
 - [ ] Upstream PDF/DOCX -> text step feeding the input (pairs with multimodal-ocr)
 - [ ] More schemas + locales (intl phone/date/address)
-- [ ] Containerize + deploy to Argo (Dockerfile + `deploy/k8s` + `deploy/argocd`,
-      mirroring pii-redactor)
+- [x] Containerize + deploy to Argo (Dockerfile + `deploy/k8s` + `deploy/argocd`) ✅ deployed
 
 ---
 

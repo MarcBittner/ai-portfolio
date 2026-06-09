@@ -13,20 +13,20 @@ Projects 3–10; the roadmaps below are what's next._
 |---|---|---|---|
 | persona-twin | 0.14.1 | ✅ Argo | 0.15.0 — conversation-level eval, tenant isolation, cost/latency panel |
 | pii-redactor | 0.1.x | ✅ Argo | 0.2.0 |
-| evalkit | 0.1.x | — | 0.2.0 + deploy |
-| doc-extract | 0.1.x | — | 0.2.0 + deploy |
-| agent-sandbox | 0.1.x | — | 0.2.0 + deploy |
-| promptguard | 0.1.x | — | 0.2.0 + deploy |
-| synth-data | 0.1.x | — | 0.2.0 + deploy |
-| forecast | 0.1.x | — | 0.2.0 + deploy |
-| multimodal-ocr | 0.1.x | — | 0.2.0 + deploy |
+| evalkit | 0.1.x | ✅ Argo | 0.2.0 |
+| doc-extract | 0.1.x | ✅ Argo | 0.2.0 |
+| agent-sandbox | 0.1.x | ✅ Argo | 0.2.0 |
+| promptguard | 0.1.x | ✅ Argo | 0.2.0 |
+| synth-data | 0.1.x | ✅ Argo | 0.2.0 |
+| forecast | 0.1.x | ✅ Argo | 0.2.0 |
+| multimodal-ocr | 0.1.x | ✅ Argo | 0.2.0 |
 | tanglement-showcase | — | n/a | frozen (proprietary snapshot) |
 
 ## Cross-cutting initiatives (highest leverage)
 
 1. **Deploy the 7 remaining services to Argo** — each lists "Dockerfile +
    `deploy/k8s` + `deploy/argocd`, mirror pii-redactor". Small pods (64–256 MB),
-   GitOps auto-sync, ports 8002–8008. _In progress._
+   GitOps auto-sync, ports 8002–8008. all nine services now sync via GitOps.
 2. **Shared-code decision** — `llm.py` is vendored 9×, and PII detectors are
    duplicated across pii-redactor / promptguard / multimodal-ocr. Choose:
    keep vendored (self-containment, current ethos) **or** extract an installable

@@ -36,8 +36,7 @@
 - [ ] Holt-Winters seasonality + ACF automatic seasonality detection
 - [ ] Rolling-origin backtest + prediction-interval calibration
 - [ ] CSV upload + timestamp parsing in the UI
-- [ ] Containerize + deploy to Argo (Dockerfile + `deploy/k8s` + `deploy/argocd`,
-      mirroring pii-redactor)
+- [x] Containerize + deploy to Argo (Dockerfile + `deploy/k8s` + `deploy/argocd`) ✅ deployed
 
 ---
 

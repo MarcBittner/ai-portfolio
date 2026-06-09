@@ -37,8 +37,7 @@
 - [ ] Render/redact real uploaded images end-to-end with Pillow (draw the boxes)
 - [ ] Layout analysis (lines/tables/columns) for better reading order
 - [ ] OCR-token confidence + a redaction review/override UI
-- [ ] Containerize + deploy to Argo (Dockerfile + `deploy/k8s` + `deploy/argocd`,
-      mirroring pii-redactor)
+- [x] Containerize + deploy to Argo (Dockerfile + `deploy/k8s` + `deploy/argocd`) ✅ deployed
 
 ---
 

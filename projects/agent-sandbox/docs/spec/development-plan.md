@@ -38,8 +38,7 @@
 - [ ] Self-correction: planner reacts to a failed observation and retries
 - [ ] More sandboxed tools (statistics, JSON-query, regex) - all offline
 - [ ] Per-tool token/latency accounting in the trace
-- [ ] Containerize + deploy to Argo (Dockerfile + `deploy/k8s` + `deploy/argocd`,
-      mirroring pii-redactor)
+- [x] Containerize + deploy to Argo (Dockerfile + `deploy/k8s` + `deploy/argocd`) ✅ deployed
 
 ---
 

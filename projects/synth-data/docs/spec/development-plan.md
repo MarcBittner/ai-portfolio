@@ -36,8 +36,7 @@
 - [ ] Statistical distributions + inter-column correlations (joint sampling)
 - [ ] Weighted choices + nullable fields; more types/locales
 - [ ] A `synth-data` CLI for fixture generation in other projects' CI
-- [ ] Containerize + deploy to Argo (Dockerfile + `deploy/k8s` + `deploy/argocd`,
-      mirroring pii-redactor)
+- [x] Containerize + deploy to Argo (Dockerfile + `deploy/k8s` + `deploy/argocd`) ✅ deployed
 
 ---
 

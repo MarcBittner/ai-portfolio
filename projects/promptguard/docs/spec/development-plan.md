@@ -36,8 +36,7 @@
 - [ ] Allow/deny lists + per-deployment severity tuning via config
 - [ ] Entropy-gated secret detection to cut false positives
 - [ ] Streaming/output-token scanning for live response filtering
-- [ ] Containerize + deploy to Argo (Dockerfile + `deploy/k8s` + `deploy/argocd`,
-      mirroring pii-redactor)
+- [x] Containerize + deploy to Argo (Dockerfile + `deploy/k8s` + `deploy/argocd`) ✅ deployed
 
 ---
 
