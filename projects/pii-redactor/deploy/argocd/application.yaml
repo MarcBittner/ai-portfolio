@@ -1,0 +1,26 @@
+# Argo CD Application: pii-redactor synced from the public repo.
+#
+#   kubectl apply -f deploy/argocd/application.yaml
+#
+# Assumes the image (pii-redactor:v0.1.0) is already loaded into the kind
+# node (docker save | ctr images import), since imagePullPolicy: Never.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: pii-redactor
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/MarcBittner/ai-portfolio.git
+    targetRevision: main
+    path: projects/pii-redactor/deploy/k8s
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: pii-redactor
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
