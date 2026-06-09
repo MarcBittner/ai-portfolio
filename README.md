@@ -6,7 +6,7 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
-[![Deploy: Argo GitOps](https://img.shields.io/badge/deploy-Argo%20GitOps-success)](#shared-capabilities-projects-310)
+[![Deploy: Argo GitOps](https://img.shields.io/badge/deploy-Argo%20GitOps-success)](ROADMAP.md)
 [![Projects: 10](https://img.shields.io/badge/projects-10-blueviolet)](#projects-at-a-glance)
 
 Production-grade AI engineering projects. Each project is self-contained,
@@ -244,28 +244,6 @@ cd projects/multimodal-ocr
 ```
 
 ![multimodal-ocr UI](projects/multimodal-ocr/docs/screenshot.png)
-
-## Shared capabilities (Projects 3–10)
-
-Every self-contained project above ships the same operator surface:
-
-- **Multi-provider LLM routing, Ollama-first** — a vendored, standard-library
-  router (`llm.py`) tries `ollama → openrouter → openai → mock`. The mock is a
-  deterministic terminal fallback, so each service works fully offline and its
-  deterministic core is never blocked on a model. Each project augments its core
-  with one LLM-powered feature (NER, LLM-judge, extraction fill, LLM planner,
-  semantic classifier, realistic values, NL summary).
-- **In-UI configuration** — every UI has a routing panel: provider, model, an
-  LLM on/off toggle, and live Ollama reachability (`GET /providers`).
-- **`run.sh`, not `make`** — one production-grade script per project
-  (`setup`/`serve`/`test`/`lint`/`check`/`demo`/`doctor`) with Python-version +
-  dependency checks, `--port/--host/--no-venv` flags, and strict mode.
-- **CI + badges** — a [matrix workflow](.github/workflows/projects-ci.yml) lints
-  and tests all projects; each README carries CI/license/Python/Ruff/FastAPI
-  badges.
-
-Configure routing via env (all optional): `OLLAMA_BASE_URL`, `OLLAMA_MODEL`,
-`OPENAI_API_KEY`, `OPENROUTER_API_KEY`, `LLM_TIMEOUT`.
 
 ## Roadmap
 
