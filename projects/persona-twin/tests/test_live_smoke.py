@@ -159,6 +159,8 @@ def test_prod_vector_backend_is_atlas(health):
     assert health["vector_backend"] == "atlas", health
 
 
-@pytest.mark.skipif(not EXPECT_LLM, reason="set PERSONA_TWIN_EXPECT_LLM=<provider> to require live inference")
+@pytest.mark.skipif(
+    not EXPECT_LLM, reason="set PERSONA_TWIN_EXPECT_LLM=<provider> to require live inference"
+)
 def test_prod_llm_backend_present(health):
     assert EXPECT_LLM in health["llm_backends"], health
