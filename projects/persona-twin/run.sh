@@ -52,16 +52,17 @@ EOF
 
 need() { command -v "$1" >/dev/null 2>&1 || die "'$1' is required but not installed"; }
 
+PYBIN="${PYTHON:-python3}"
 check_python() {
-  need python3
+  need "$PYBIN"
   local maj min
-  read -r maj min < <(python3 -c 'import sys; print(sys.version_info[0], sys.version_info[1])')
+  read -r maj min < <("$PYBIN" -c 'import sys; print(sys.version_info[0], sys.version_info[1])')
   if (( maj < MIN_PY_MAJOR || (maj == MIN_PY_MAJOR && min < MIN_PY_MINOR) )); then
     die "Python >= ${MIN_PY_MAJOR}.${MIN_PY_MINOR} required, found ${maj}.${min}"
   fi
 }
 
-py()   { if (( USE_VENV )); then "$VENV/bin/python" "$@"; else python3 "$@"; fi; }
+py()   { if (( USE_VENV )); then "$VENV/bin/python" "$@"; else "$PYBIN" "$@"; fi; }
 tool() { local t="$1"; shift; if (( USE_VENV )); then "$VENV/bin/$t" "$@"; else "$t" "$@"; fi; }
 
 ensure_installed() {
@@ -72,7 +73,7 @@ ensure_installed() {
 }
 
 cmd_doctor() {
-  check_python && grn "python3: $(python3 --version 2>&1) (>= ${MIN_PY_MAJOR}.${MIN_PY_MINOR} ok)"
+  check_python && grn "python: $("$PYBIN" --version 2>&1) (>= ${MIN_PY_MAJOR}.${MIN_PY_MINOR} ok, via \$PYBIN=$PYBIN)"
   if command -v node >/dev/null 2>&1; then grn "node: $(node --version) (frontend ok)"; else dim "node: not found (frontend targets unavailable)"; fi
   if (( USE_VENV )) && [[ -x "$VENV/bin/python" ]]; then grn "venv: $VENV ready"; else dim "venv: not created (run setup)"; fi
   if curl -sf -m 1 "${OLLAMA_BASE_URL:-http://localhost:11434}/api/tags" >/dev/null 2>&1; then
@@ -85,11 +86,11 @@ cmd_doctor() {
 cmd_setup() {
   check_python
   if (( USE_VENV )); then
-    [[ -d "$VENV" ]] || python3 -m venv "$VENV" || die "venv creation failed (install python3-venv)"
+    [[ -d "$VENV" ]] || "$PYBIN" -m venv "$VENV" || die "venv creation failed (install python3-venv)"
     "$VENV/bin/python" -m pip install --quiet --upgrade pip
     "$VENV/bin/pip" install -e ".[dev]"
   else
-    python3 -m pip install -e ".[dev]"
+    "$PYBIN" -m pip install -e ".[dev]"
   fi
   grn "$PROJECT installed. Next: ./run.sh demo  (offline) or ./run.sh serve"
 }
