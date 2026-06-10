@@ -42,3 +42,16 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm run typecheck
+
+  container:
+    # Source of truth: run the suite with the image's FROZEN deps, then prove the
+    # production image builds. No host Python — exactly what ships.
+    runs-on: ubuntu-latest
+    defaults:
+      run: { working-directory: projects/persona-twin }
+    steps:
+      - uses: actions/checkout@v4
+      - name: test in frozen container (lint + offline suite)
+        run: docker build --target test -t persona-twin:test .
+      - name: build production image
+        run: docker build --target runtime -t persona-twin:runtime .
