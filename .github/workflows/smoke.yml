@@ -1,0 +1,25 @@
+name: smoke
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "Deployment base URL to smoke-test"
+        default: "https://persona-twin-usu4.onrender.com"
+  schedule:
+    - cron: "0 14 * * *"   # daily 14:00 UTC
+
+jobs:
+  live-smoke:
+    runs-on: ubuntu-latest
+    defaults:
+      run: { working-directory: projects/persona-twin }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install httpx pytest pytest-asyncio
+      - name: live smoke + regression against the deployment
+        env:
+          PERSONA_TWIN_LIVE: "1"
+          PERSONA_TWIN_BASE_URL: ${{ github.event.inputs.base_url || 'https://persona-twin-usu4.onrender.com' }}
+        run: pytest tests/test_live_smoke.py -v
