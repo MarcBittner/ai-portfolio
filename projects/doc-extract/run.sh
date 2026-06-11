@@ -35,12 +35,14 @@ Commands:
   lint        Run ruff
   check       lint + test
   demo        Run the offline library demo
+  smoke       Run the live smoke/regression suite (local server, or --url <deploy>)
   doctor      Report Python / venv / Ollama status
   help        Show this help
 
 Options:
   --port <n>   Port for serve (default $DEFAULT_PORT; or env PORT)
   --host <a>   Host for serve (default 127.0.0.1; or env HOST)
+  --url <u>    For 'smoke': target a remote deployment instead of a local server
   --no-venv    Use the current Python env instead of $VENV (CI/containers)
   -h, --help   Show this help
 EOF
@@ -89,6 +91,39 @@ cmd_setup() {
   grn "$PROJECT installed. Next: ./run.sh serve  (then open http://$HOST:$PORT)"
 }
 
+# Run the live smoke suite (tests/test_live_smoke.py) against a real HTTP endpoint.
+# No --url: start a local uvicorn, wait for /health, run, tear down.
+# --url <deploy>: run the same suite against a remote deployment.
+# The suite is gated/parameterised by <PKG>_LIVE / <PKG>_BASE_URL, derived from $PKG.
+cmd_smoke() {
+  ensure_installed
+  local prefix; prefix="$(printf '%s' "$PKG" | tr '[:lower:]' '[:upper:]')"
+  local url="${SMOKE_URL:-}" pid="" log="${TMPDIR:-/tmp}/${PROJECT}-smoke.log"
+  if [[ -n "$url" ]]; then
+    url="${url%/}"; dim "smoke: targeting remote $url"
+  else
+    url="http://127.0.0.1:$PORT"; dim "smoke: starting local server on :$PORT"
+    py -m uvicorn "$APP" --host 127.0.0.1 --port "$PORT" >"$log" 2>&1 &
+    pid=$!
+    local up=0 i
+    for i in $(seq 1 60); do
+      if py -c "import urllib.request; urllib.request.urlopen('$url/health', timeout=2)" 2>/dev/null; then up=1; break; fi
+      kill -0 "$pid" 2>/dev/null || break
+      sleep 0.5
+    done
+    if (( ! up )); then
+      red "server did not become healthy; last log lines:"; tail -n 20 "$log" >&2 || true
+      [[ -n "$pid" ]] && kill "$pid" 2>/dev/null || true
+      die "smoke aborted"
+    fi
+  fi
+  local rc=0
+  ( export "${prefix}_LIVE=1" "${prefix}_BASE_URL=$url"
+    py -m pytest -q tests/test_live_smoke.py "$@" ) || rc=$?
+  if [[ -n "$pid" ]]; then kill "$pid" 2>/dev/null || true; wait "$pid" 2>/dev/null || true; fi
+  return $rc
+}
+
 cmd_serve() { ensure_installed; tool uvicorn "$APP" --host "$HOST" --port "$PORT" --reload; }
 cmd_test()  { ensure_installed; py -m pytest -q "$@"; }
 cmd_lint()  { ensure_installed; tool ruff check src tests; }
@@ -108,9 +143,11 @@ while (( $# )); do
     --port=*) PORT="${1#*=}"; shift;;
     --host) HOST="${2:?--host needs a value}"; shift 2;;
     --host=*) HOST="${1#*=}"; shift;;
+    --url) SMOKE_URL="${2:?--url needs a value}"; shift 2;;
+    --url=*) SMOKE_URL="${1#*=}"; shift;;
     --no-venv) USE_VENV=0; shift;;
     -h|--help) usage; exit 0;;
-    setup|serve|test|lint|check|demo|doctor|help) CMD="$1"; shift;;
+    setup|serve|test|lint|check|demo|smoke|doctor|help) CMD="$1"; shift;;
     *) die "unknown argument: $1  (run './run.sh --help')";;
   esac
 done
@@ -123,6 +160,7 @@ case "$CMD" in
   lint)  cmd_lint;;
   check) cmd_lint; cmd_test;;
   demo)  cmd_demo;;
+  smoke) cmd_smoke;;
   doctor) cmd_doctor;;
   help)  usage;;
 esac
