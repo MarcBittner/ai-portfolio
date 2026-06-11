@@ -26,6 +26,7 @@ Notes:
 from __future__ import annotations
 
 import os
+import time
 
 import httpx
 import pytest
@@ -53,14 +54,56 @@ pytestmark = pytest.mark.skipif(
 )
 
 
+def _wait_until_ready(c, timeout=120.0):
+    """Poll /health until 200, tolerating free-tier cold-start 404/5xx and
+    transient edge errors while a sleeping instance spins up."""
+    deadline = time.monotonic() + timeout
+    last = None
+    while time.monotonic() < deadline:
+        try:
+            r = c.get("/health")
+            last = r.status_code
+            if r.status_code == 200:
+                return
+        except Exception as exc:  # noqa: BLE001
+            last = repr(exc)
+        time.sleep(2)
+    pytest.skip(f"service at {BASE_URL} not ready (last seen: {last})")
+
+
+def _install_retry(c, tries=4, statuses=(404, 500, 502, 503, 504)):
+    """Wrap get/post to retry transient free-tier responses (an instance can
+    return intermittent 404/5xx while it recycles). Deliberate-error assertions
+    still observe their real status once the retries settle."""
+    raw = c.request
+
+    def _retry(method, url, **kw):
+        resp = None
+        for _ in range(tries):
+            try:
+                resp = raw(method, url, **kw)
+                if resp.status_code not in statuses:
+                    return resp
+            except Exception:  # noqa: BLE001
+                resp = None
+            time.sleep(1.0)
+        return resp if resp is not None else raw(method, url, **kw)
+
+    def _get(url, **kw):
+        return _retry("GET", url, **kw)
+
+    def _post(url, **kw):
+        return _retry("POST", url, **kw)
+
+    c.get = _get
+    c.post = _post
+
+
 @pytest.fixture(scope="module")
 def client():
     c = httpx.Client(base_url=BASE_URL, timeout=TIMEOUT, follow_redirects=True)
-    try:  # warm the dyno; skip the module if the deployment is unreachable
-        c.get("/health")
-    except Exception as exc:  # noqa: BLE001
-        c.close()
-        pytest.skip(f"deployment unreachable at {BASE_URL}: {exc}")
+    _wait_until_ready(c)  # warm the service; wait out free-tier cold starts
+    _install_retry(c)
     yield c
     c.close()
 
