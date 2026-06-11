@@ -35,6 +35,7 @@ Commands:
   lint             Run ruff
   check            lint + test
   demo             Ingest the synthetic corpus and query the twins (offline)
+  smoke            Run the live smoke/regression suite (local server, or --url <deploy>)
   eval             Regenerate eval-report.md (retrieval metrics)
   frontend         Install + run the Vite dev server (needs 'serve' running)
   frontend-build   Install, build, and typecheck the frontend
@@ -45,6 +46,7 @@ Commands:
 Options:
   --port <n>   Port for serve (default $DEFAULT_PORT; or env PORT)
   --host <a>   Host for serve (default 127.0.0.1; or env HOST)
+  --url <u>    For 'smoke': target a remote deployment instead of a local server
   --no-venv    Use the current Python env instead of $VENV (CI/containers)
   -h, --help   Show this help
 EOF
@@ -97,6 +99,39 @@ cmd_setup() {
 
 cmd_serve() { ensure_installed; py -m uvicorn "$APP" --host "$HOST" --port "$PORT" --reload; }
 cmd_test()  { ensure_installed; py -m pytest -q "$@"; }
+
+# Run the live smoke suite (tests/test_live_smoke.py) against a real HTTP endpoint.
+# No --url: start a local uvicorn (lifespan ingests the corpus), wait for /health,
+# run, tear down. --url <deploy>: run the same suite against a remote deployment.
+# Gated/parameterised by PERSONA_TWIN_LIVE / PERSONA_TWIN_BASE_URL (derived from $PKG).
+cmd_smoke() {
+  ensure_installed
+  local prefix; prefix="$(printf '%s' "$PKG" | tr '[:lower:]' '[:upper:]')"
+  local url="${SMOKE_URL:-}" pid="" log="${TMPDIR:-/tmp}/${PROJECT}-smoke.log"
+  if [[ -n "$url" ]]; then
+    url="${url%/}"; dim "smoke: targeting remote $url"
+  else
+    url="http://127.0.0.1:$PORT"; dim "smoke: starting local server on :$PORT"
+    py -m uvicorn "$APP" --host 127.0.0.1 --port "$PORT" >"$log" 2>&1 &
+    pid=$!
+    local up=0 i
+    for i in $(seq 1 60); do
+      if py -c "import urllib.request; urllib.request.urlopen('$url/health', timeout=2)" 2>/dev/null; then up=1; break; fi
+      kill -0 "$pid" 2>/dev/null || break
+      sleep 0.5
+    done
+    if (( ! up )); then
+      red "server did not become healthy; last log lines:"; tail -n 20 "$log" >&2 || true
+      [[ -n "$pid" ]] && kill "$pid" 2>/dev/null || true
+      die "smoke aborted"
+    fi
+  fi
+  local rc=0
+  ( export "${prefix}_LIVE=1" "${prefix}_BASE_URL=$url"
+    py -m pytest -q tests/test_live_smoke.py "$@" ) || rc=$?
+  if [[ -n "$pid" ]]; then kill "$pid" 2>/dev/null || true; wait "$pid" 2>/dev/null || true; fi
+  return $rc
+}
 cmd_lint()  { ensure_installed; tool ruff check src tests; }
 cmd_demo()  { ensure_installed; py -m persona_twin.demo; }
 cmd_eval()  { ensure_installed; py -m persona_twin.eval.run; }
@@ -121,9 +156,11 @@ while (( $# )); do
     --port=*) PORT="${1#*=}"; shift;;
     --host) HOST="${2:?--host needs a value}"; shift 2;;
     --host=*) HOST="${1#*=}"; shift;;
+    --url) SMOKE_URL="${2:?--url needs a value}"; shift 2;;
+    --url=*) SMOKE_URL="${1#*=}"; shift;;
     --no-venv) USE_VENV=0; shift;;
     -h|--help) usage; exit 0;;
-    setup|serve|test|lint|check|demo|eval|frontend|frontend-build|docker|doctor|help)
+    setup|serve|test|lint|check|demo|smoke|eval|frontend|frontend-build|docker|doctor|help)
       CMD="$1"; shift;;
     *) die "unknown argument: $1  (run './run.sh --help')";;
   esac
@@ -137,6 +174,7 @@ case "$CMD" in
   lint)  cmd_lint;;
   check) cmd_lint; cmd_test;;
   demo)  cmd_demo;;
+  smoke) cmd_smoke;;
   eval)  cmd_eval;;
   frontend) cmd_frontend;;
   frontend-build) cmd_frontend_build;;

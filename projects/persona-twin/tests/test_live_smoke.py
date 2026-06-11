@@ -1,14 +1,17 @@
-"""Live smoke + regression tests against the DEPLOYED persona-twin service.
+"""Live smoke + regression tests against a RUNNING persona-twin service.
 
-These hit the running deployment (Render + MongoDB Atlas + OpenRouter), not an
-in-process app. They are OPT-IN: the whole module is skipped unless
-``PERSONA_TWIN_LIVE=1`` is set, so the normal offline suite (``./run.sh test``)
-stays fast and network-free.
+These hit a real HTTP endpoint — a locally-started server *or* a remote
+deployment — not an in-process app. The same assertions run either way; only
+``PERSONA_TWIN_BASE_URL`` changes, making this a deployment regression net.
+OPT-IN: the whole module is skipped unless ``PERSONA_TWIN_LIVE=1`` is set, so the
+normal offline suite (``./run.sh test``) stays fast and network-free.
 
-Run:
-    PERSONA_TWIN_LIVE=1 pytest tests/test_live_smoke.py -v
+Run locally (``./run.sh smoke`` starts a server, ingests the corpus, tears down):
+    ./run.sh smoke
 
-Point at a different deployment / assert production backends:
+Run against a deployment (and optionally assert production backends):
+    ./run.sh smoke --url https://persona-twin-usu4.onrender.com
+    # or directly:
     PERSONA_TWIN_LIVE=1 \
     PERSONA_TWIN_BASE_URL=https://persona-twin-usu4.onrender.com \
     PERSONA_TWIN_EXPECT_ATLAS=1 PERSONA_TWIN_EXPECT_LLM=openrouter \
@@ -28,11 +31,18 @@ import httpx
 import pytest
 
 BASE_URL = os.environ.get(
-    "PERSONA_TWIN_BASE_URL", "https://persona-twin-usu4.onrender.com"
+    "PERSONA_TWIN_BASE_URL", "http://127.0.0.1:8000"
 ).rstrip("/")
 EXPECT_ATLAS = os.environ.get("PERSONA_TWIN_EXPECT_ATLAS") == "1"
 EXPECT_LLM = os.environ.get("PERSONA_TWIN_EXPECT_LLM")  # e.g. "openrouter"
 KNOWN_PERSONAS = {"ada-quill", "buck-ramirez", "gus-okafor", "mei-tanaka"}
+
+# A question whose wording lexically overlaps ada-quill's garden-journal doc
+# ("balcony", "tomato", "garden", "compost"). Strong overlap means it retrieves
+# reliably under BOTH the offline hash embedder (local) and a real embedder
+# (remote) — recall on sparser phrasings is embedder-dependent, which would make
+# the suite flaky across the two run modes.
+GROUNDED_Q = "Tell me about your balcony tomato garden and compost."
 
 # generous: a sleeping free-tier dyno can take ~60s to wake
 TIMEOUT = httpx.Timeout(90.0, connect=30.0)
@@ -99,7 +109,7 @@ def test_smoke_persona_detail_and_404(client):
 
 
 def test_smoke_ask_returns_grounded_answer(client):
-    body = _ask(client, "ada-quill", "What do you enjoy about gardening?")
+    body = _ask(client, "ada-quill", GROUNDED_Q)
     assert body["answered"] is True
     assert body["answer"].strip()
     assert body["citations"], "an answerable question must return citations"
@@ -123,7 +133,7 @@ def test_regression_tenant_isolation(client):
 def test_regression_citations_have_scores(client):
     # use a query that reliably retrieves (hash-embedding recall is phrasing-sensitive);
     # the point of this test is citation *shape*, not recall on an arbitrary question.
-    cites = _ask(client, "ada-quill", "What do you enjoy about balcony gardening?")["citations"]
+    cites = _ask(client, "ada-quill", GROUNDED_Q)["citations"]
     assert cites, "the gardening query should retrieve at least one chunk"
     for c in cites:
         assert isinstance(c.get("score"), (int, float))
@@ -141,7 +151,7 @@ def test_regression_answer_shape_even_when_no_retrieval(client):
 
 def test_regression_retrieval_is_relevant(client):
     # lenient relevance guard: a gardening question should surface a garden-ish doc.
-    cites = _ask(client, "ada-quill", "What do you enjoy about balcony gardening?")["citations"]
+    cites = _ask(client, "ada-quill", GROUNDED_Q)["citations"]
     docs = " ".join(c.get("doc_id", "") for c in cites).lower()
     assert docs, "expected at least one citation"
     assert any(t in docs for t in ("garden", "tomato", "balcony", "plant")), f"irrelevant: {docs}"
