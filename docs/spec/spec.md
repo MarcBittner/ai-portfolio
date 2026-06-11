@@ -68,3 +68,21 @@ repository. No scraped content, no real-person data, no PII in fixtures.
 - Commit style: `(task) description`, one coherent unit per commit
 - Project plans tracked as checkboxes in each project's
   `docs/spec/development-plan.md`
+
+### CONV-5: Live smoke/regression net (local **and** remote)
+Every runnable project ships `tests/test_live_smoke.py` — a smoke + regression
+suite that hits the service over **real HTTP**, so the same assertions cover a
+locally-started server *and* a deployed instance. It is the deployment
+regression net: run it after every ship to prove the live contract still holds.
+
+- **Local:** `./run.sh smoke` starts the app, waits for `/health`, runs the
+  suite, and tears the server down.
+- **Remote:** `./run.sh smoke --url https://<deployment>` runs the *same* suite
+  against a deployment (no local server).
+- **Opt-in & offline-safe:** the module is gated by `<PKG>_LIVE=1` (e.g.
+  `PII_REDACTOR_LIVE`), so the default `./run.sh test` stays fast and
+  network-free; the target is set via `<PKG>_BASE_URL`.
+- Assertions are **structural/deterministic** — forced offline (`use_llm=false`,
+  fixed `seed`, exact-match metrics) so they hold regardless of LLM/embedder
+  backend, and they pin the cardinal invariants (e.g. a redactor never echoes a
+  redacted value; tenant isolation in retrieval).
