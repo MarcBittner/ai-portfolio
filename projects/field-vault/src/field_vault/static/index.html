@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>field-vault — de-identified access</title>
+<style>
+  :root{--bg:#0f1419;--panel:#171d26;--panel2:#1d2530;--line:#2a3441;
+    --ink:#e7edf3;--dim:#9aa7b4;--accent:#5b9dff;--ok:#3fb56b;--deny:#ef5b6b;--warn:#e0a64a}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.5 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+  header{padding:18px 26px;border-bottom:1px solid var(--line);display:flex;gap:14px;align-items:baseline;flex-wrap:wrap}
+  header h1{margin:0;font-size:19px} header .tag{color:var(--dim);font-size:13px}
+  main{max-width:1140px;margin:0 auto;padding:20px 26px;display:grid;gap:16px;grid-template-columns:1fr 1fr}
+  .full{grid-column:1/-1}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px}
+  .panel h2{margin:0;padding:12px 16px;font-size:12px;border-bottom:1px solid var(--line);
+    color:var(--dim);text-transform:uppercase;letter-spacing:.6px}
+  .panel .body{padding:14px 16px}
+  select,button,input{font:inherit;color:var(--ink);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+  button{cursor:pointer} button.primary{background:var(--accent);border-color:var(--accent);color:#06101f;font-weight:600}
+  .ctl{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .ctl label{color:var(--dim);font-size:12px;display:flex;gap:6px;align-items:center}
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th,td{text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+  th{color:var(--dim);font-size:11px}
+  code{background:var(--panel2);padding:1px 5px;border-radius:5px;font-size:12px}
+  .tok{color:var(--warn)}
+  .badge{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11.5px;font-weight:700}
+  .b-ok{background:rgba(63,181,107,.16);color:var(--ok)} .b-deny{background:rgba(239,91,107,.18);color:var(--deny)}
+  .result{margin-top:12px;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--panel2);font-size:13.5px}
+  .ex{font-size:11.5px;color:var(--dim);border:1px dashed var(--line);background:transparent}
+  .muted{color:var(--dim);font-size:12px}
+  .scorebar{height:7px;background:var(--panel2);border-radius:4px;overflow:hidden;width:90px;display:inline-block;vertical-align:middle}
+  .scorebar>i{display:block;height:100%;background:var(--ok)}
+  .verifyline{padding:10px 16px;border-top:1px solid var(--line);display:flex;gap:10px;align-items:center}
+</style>
+</head>
+<body>
+<header>
+  <h1>field-vault</h1>
+  <span class="tag">de-identified at ingest · least-privilege field access · tamper-evident audit</span>
+</header>
+<main>
+  <div class="panel full">
+    <h2>Access console — request a field as a role</h2>
+    <div class="body">
+      <div class="ctl">
+        <label>role <select id="role"></select></label>
+        <label>record <select id="record"></select></label>
+        <label>field <select id="field"></select></label>
+        <label>purpose <select id="purpose"><option value="">—</option><option>treatment</option><option>care_coordination</option><option>analytics</option></select></label>
+        <label><input type="checkbox" id="reid"> re-identify</label>
+        <button class="primary" id="go">Request access</button>
+      </div>
+      <div class="ctl" style="margin-top:8px">
+        <span class="muted">try:</span>
+        <button class="ex" data-r="analyst" data-f="dx_code">analyst reads dx_code</button>
+        <button class="ex" data-r="analyst" data-f="member_name" data-reid="1">analyst re-identifies name (deny)</button>
+        <button class="ex" data-r="care_coordinator" data-f="member_name" data-reid="1" data-p="treatment">care_coordinator re-identifies (treatment)</button>
+        <button class="ex" data-r="care_coordinator" data-f="member_name" data-reid="1">care_coordinator, no purpose (deny)</button>
+      </div>
+      <div class="result" id="result"><span class="muted">Request a field to see the policy decision + audit entry.</span></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>De-identified surface (what analysts see)</h2>
+    <div class="body" style="padding:0;overflow-x:auto"><table id="records"></table></div>
+  </div>
+
+  <div class="panel">
+    <h2>De-identified provider outcome score (no PHI)</h2>
+    <div class="body" style="padding:0"><table id="scores"></table></div>
+  </div>
+
+  <div class="panel full">
+    <h2>Tamper-evident access audit</h2>
+    <div class="body" style="padding:0;max-height:260px;overflow:auto"><table id="audit"></table></div>
+    <div class="verifyline">
+      <button id="verify">Verify chain</button>
+      <button id="tamper" class="ex">Tamper #0 (demo)</button>
+      <span id="vres" class="muted">—</span>
+    </div>
+  </div>
+</main>
+<script>
+const $=s=>document.querySelector(s);
+const isTok=v=>typeof v==="string"&&v.startsWith("tok_");
+async function j(u,o){return (await fetch(u,o)).json();}
+const FIELDS=["member_id","member_name","dob","zip","service_date","provider_id","dx_code","procedure_code","outcome","allowed_amount"];
+
+async function init(){
+  const roles=await j("roles");
+  $("#role").innerHTML=roles.map(r=>`<option>${r.role}</option>`).join("");
+  $("#field").innerHTML=FIELDS.map(f=>`<option>${f}</option>`).join("");
+  const recs=(await j("records")).records;
+  $("#record").innerHTML=recs.map(r=>`<option>${r.record_id}</option>`).join("");
+  renderRecords(recs.slice(0,8));
+  renderScores((await j("scores")).providers);
+  refreshAudit();
+}
+function renderRecords(recs){
+  const cols=["record_id","member_name","dob","zip","provider_id","dx_code","outcome","allowed_amount"];
+  $("#records").innerHTML=`<thead><tr>${cols.map(c=>`<th>${c}</th>`).join("")}</tr></thead><tbody>`+
+    recs.map(r=>`<tr>${cols.map(c=>`<td class="${isTok(r[c])?'tok':''}">${isTok(r[c])?'<code>'+r[c]+'</code>':r[c]}</td>`).join("")}</tr>`).join("")+`</tbody>`;
+}
+function renderScores(ps){
+  $("#scores").innerHTML=`<thead><tr><th>#</th><th>provider</th><th>claims</th><th>outcome</th><th>adverse</th><th>avg $</th></tr></thead><tbody>`+
+    ps.map(p=>`<tr><td>${p.rank}</td><td><code>${p.provider_id}</code></td><td>${p.claims}</td>
+      <td><span class="scorebar"><i style="width:${p.outcome_score*100}%"></i></span> ${p.outcome_score}</td>
+      <td>${p.adverse_rate}</td><td>$${p.avg_allowed_amount}</td></tr>`).join("")+`</tbody>`;
+}
+async function refreshAudit(){
+  const a=await j("audit");
+  $("#audit").innerHTML=`<thead><tr><th>#</th><th>role</th><th>record</th><th>field</th><th>class</th><th>action</th><th>purpose</th><th>decision</th></tr></thead><tbody>`+
+    a.entries.slice(-14).reverse().map(e=>`<tr><td>${e.seq}</td><td>${e.role}</td><td>${e.record_id}</td>
+      <td>${e.field}</td><td>${e.field_class}</td><td>${e.action}</td><td>${e.purpose||'—'}</td>
+      <td><span class="badge ${e.allowed?'b-ok':'b-deny'}">${e.allowed?'allow':'deny'}</span></td></tr>`).join("")
+      +`</tbody>`||"";
+}
+async function request(){
+  const body={role:$("#role").value,record_id:$("#record").value,field:$("#field").value,
+    purpose:$("#purpose").value||null,reidentify:$("#reid").checked};
+  const r=await j("access",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
+  const badge=r.allowed?'<span class="badge b-ok">ALLOWED</span>':'<span class="badge b-deny">DENIED</span>';
+  const val=r.allowed?`<div style="margin-top:6px">value: <code>${r.value}</code> ${isTok(r.value)?'<span class="muted">(de-identified token)</span>':''}</div>`:'';
+  $("#result").innerHTML=`${badge} <b>${body.role}</b> · ${body.action||(body.reidentify?'reidentify':'read_deid')} · <code>${body.field}</code><div class="muted" style="margin-top:4px">${r.reason}</div>${val}<div class="muted" style="margin-top:4px">audit #${r.audit_seq}</div>`;
+  refreshAudit();
+}
+$("#go").onclick=request;
+document.querySelectorAll(".ex[data-r]").forEach(b=>b.onclick=()=>{
+  $("#role").value=b.dataset.r; $("#field").value=b.dataset.f;
+  $("#reid").checked=b.dataset.reid==="1"; $("#purpose").value=b.dataset.p||"";
+  request();
+});
+$("#verify").onclick=async()=>{const v=await j("audit/verify");
+  $("#vres").innerHTML=v.ok?`<span class="badge b-ok">chain verified</span> ${v.length} entries`:`<span class="badge b-deny">broken at #${v.broken_at}</span> ${v.reason}`;};
+$("#tamper").onclick=async()=>{await j("audit/_demo_tamper?seq=0",{method:"POST"});const v=await j("audit/verify");
+  $("#vres").innerHTML=v.ok?`<span class="badge b-ok">verified</span>`:`<span class="badge b-deny">tamper detected at #${v.broken_at}</span> ${v.reason}`;};
+init();
+</script>
+</body>
+</html>
