@@ -1,0 +1,69 @@
+"""FastAPI service: mint scoped real-time access tokens, verify them, run the
+adversarial suite, and serve the AV-pipeline threat model. The signing key is a
+demo default (env ``RTC_GUARD_SIGNING_KEY`` overrides); no real secrets required.
+"""
+
+from pathlib import Path
+
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse, PlainTextResponse
+
+from rtc_guard import __version__, adversary, token
+from rtc_guard.models import HealthResponse, TokenRequest, VerifyRequest
+from rtc_guard.threat_model import threat_model
+
+STATIC_DIR = Path(__file__).parent / "static"
+SAMPLE = Path(__file__).parent.parent.parent / "samples" / "voice_agent.py"
+
+app = FastAPI(
+    title="rtc-guard",
+    version=__version__,
+    description="Scoped real-time access tokens + adversarial suite + threat model.",
+)
+
+
+@app.get("/health", response_model=HealthResponse)
+def health() -> HealthResponse:
+    return HealthResponse(status="ok", version=__version__,
+                          templates=len(token.GRANT_TEMPLATES),
+                          threats=threat_model()["count"])
+
+
+@app.get("/templates")
+def templates() -> dict:
+    return {"templates": token.GRANT_TEMPLATES, "default_ttl": token.DEFAULT_TTL}
+
+
+@app.post("/v1/token")
+def mint_token(req: TokenRequest) -> dict:
+    try:
+        tok = token.mint(req.identity, req.room, req.template, req.ttl)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    return {"token": tok, "claims": token.decode(tok), "expires_in": req.ttl}
+
+
+@app.post("/v1/verify")
+def verify_token(req: VerifyRequest) -> dict:
+    return token.verify(req.token, expected_room=req.expected_room)
+
+
+@app.get("/threat-model")
+def threats() -> dict:
+    return threat_model()
+
+
+@app.get("/adversary")
+def run_adversary() -> dict:
+    return adversary.run()
+
+
+@app.get("/sample/voice-agent")
+def voice_agent_sample() -> PlainTextResponse:
+    text = SAMPLE.read_text() if SAMPLE.exists() else "# sample unavailable"
+    return PlainTextResponse(text)
+
+
+@app.get("/", include_in_schema=False)
+def index() -> FileResponse:
+    return FileResponse(STATIC_DIR / "index.html")
