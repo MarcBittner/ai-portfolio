@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>reconcile — line-item reconciliation</title>
+<style>
+  :root{
+    --bg:#0f1419; --panel:#171d26; --panel2:#1d2530; --line:#2a3441;
+    --ink:#e7edf3; --dim:#9aa7b4; --accent:#5b9dff;
+    --ok:#3fb56b; --over:#ef5b6b; --warn:#e0a64a; --new:#5b9dff; --unknown:#b07ce0;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.5 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+  header{padding:22px 28px;border-bottom:1px solid var(--line);
+    display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+  header h1{margin:0;font-size:20px;letter-spacing:.2px}
+  header .tag{color:var(--dim);font-size:13px}
+  header .spacer{flex:1}
+  header .evalbadge{font-size:12px;color:var(--dim);border:1px solid var(--line);
+    padding:4px 10px;border-radius:999px}
+  main{max-width:1120px;margin:0 auto;padding:24px 28px;display:grid;gap:20px}
+  .controls{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  select,button,textarea{font:inherit;color:var(--ink);background:var(--panel2);
+    border:1px solid var(--line);border-radius:8px;padding:9px 12px}
+  textarea{width:100%;min-height:150px;margin-top:12px;resize:vertical;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#06101f;
+    font-weight:600;cursor:pointer}
+  button.ghost{cursor:pointer}
+  label.chk{color:var(--dim);display:flex;align-items:center;gap:7px;cursor:pointer}
+  .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+  .card .k{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.5px}
+  .card .v{font-size:24px;font-weight:700;margin-top:6px}
+  .card.recover .v{color:var(--over)}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .panel h2{margin:0;padding:14px 18px;font-size:14px;border-bottom:1px solid var(--line);
+    color:var(--dim);text-transform:uppercase;letter-spacing:.6px}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--line)}
+  th{color:var(--dim);font-weight:600;font-size:12px}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+  tr.over{background:rgba(239,91,107,.07)}
+  tr.unknown{background:rgba(176,124,224,.07)}
+  .badge{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11.5px;
+    font-weight:700;text-transform:uppercase;letter-spacing:.4px}
+  .b-ok{background:rgba(63,181,107,.15);color:var(--ok)}
+  .b-over{background:rgba(239,91,107,.16);color:var(--over)}
+  .b-under{background:rgba(224,166,74,.15);color:var(--warn)}
+  .b-new_scope{background:rgba(91,157,255,.15);color:var(--new)}
+  .b-unknown{background:rgba(176,124,224,.16);color:var(--unknown)}
+  .flag{color:var(--over);font-weight:700}
+  .queue{padding:6px 0}
+  .queue .item{padding:12px 18px;border-bottom:1px solid var(--line);display:flex;gap:14px}
+  .queue .item:last-child{border-bottom:none}
+  .queue .amt{color:var(--over);font-weight:700;font-variant-numeric:tabular-nums;min-width:96px;text-align:right}
+  .queue .why{color:var(--dim);font-size:12.5px;margin-top:3px}
+  .muted{color:var(--dim);font-size:12.5px}
+  .conf{display:inline-block;height:6px;width:46px;background:var(--line);border-radius:3px;overflow:hidden;vertical-align:middle}
+  .conf > i{display:block;height:100%;background:var(--ok)}
+  .empty{padding:18px;color:var(--dim)}
+</style>
+</head>
+<body>
+<header>
+  <h1>reconcile</h1>
+  <span class="tag">line-item reconciliation · contract + market diff · review queue</span>
+  <span class="spacer"></span>
+  <span class="evalbadge" id="evalbadge">extraction eval: …</span>
+</header>
+
+<main>
+  <div class="controls">
+    <div class="row">
+      <select id="sample"></select>
+      <button class="ghost" id="load">Load sample</button>
+      <label class="chk"><input type="checkbox" id="usellm" /> use LLM extraction (if a provider is configured)</label>
+      <span class="spacer" style="flex:1"></span>
+      <button class="primary" id="analyze">Analyze →</button>
+    </div>
+    <textarea id="doc" placeholder="Paste a change order / invoice, or load a sample…"></textarea>
+  </div>
+
+  <div class="cards" id="cards" style="display:none">
+    <div class="card"><div class="k">Document total</div><div class="v" id="c-total">—</div></div>
+    <div class="card"><div class="k">Lines over</div><div class="v" id="c-over">—</div></div>
+    <div class="card recover"><div class="k">Recoverable</div><div class="v" id="c-recover">—</div></div>
+    <div class="card"><div class="k">Needs review</div><div class="v" id="c-review">—</div></div>
+  </div>
+
+  <div class="panel" id="linespanel" style="display:none">
+    <h2>Line items</h2>
+    <table>
+      <thead><tr>
+        <th>CSI</th><th>Description</th><th class="num">Qty</th>
+        <th class="num">Unit $</th><th class="num">Benchmark</th><th class="num">Δ%</th>
+        <th class="num">Recoverable</th><th>Conf</th><th>Verdict</th>
+      </tr></thead>
+      <tbody id="lines"></tbody>
+    </table>
+  </div>
+
+  <div class="panel" id="queuepanel" style="display:none">
+    <h2>Human-review queue · money-path first</h2>
+    <div class="queue" id="queue"></div>
+  </div>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+const money = n => n==null ? "—" : "$" + Number(n).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+const pct = n => n==null ? "—" : (n*100>=0?"+":"") + (n*100).toFixed(0) + "%";
+
+async function loadSamples(){
+  const s = await (await fetch("samples")).json();
+  const sel = $("#sample");
+  sel.innerHTML = s.map(x=>`<option value="${x.name}">${x.name}</option>`).join("");
+  window._samples = Object.fromEntries(s.map(x=>[x.name,x.text]));
+}
+async function loadEval(){
+  try{
+    const e = await (await fetch("eval")).json(), a = e.aggregate;
+    $("#evalbadge").textContent = `extraction eval · P ${a.precision.toFixed(2)} · R ${a.recall.toFixed(2)} · F1 ${a.f1.toFixed(2)} (${a.documents} docs)`;
+  }catch{ $("#evalbadge").style.display="none"; }
+}
+$("#load").onclick = () => { $("#doc").value = window._samples[$("#sample").value] || ""; };
+
+$("#analyze").onclick = async () => {
+  const text = $("#doc").value.trim();
+  const sample = $("#sample").value;
+  const body = text ? {text, use_llm:$("#usellm").checked}
+                    : {sample, use_llm:$("#usellm").checked};
+  const r = await fetch("analyze",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
+  if(!r.ok){ alert("analyze failed: " + r.status); return; }
+  render(await r.json());
+};
+
+function render(d){
+  const s = d.summary;
+  $("#cards").style.display = "grid";
+  $("#c-total").textContent = money(s.document_total);
+  $("#c-over").textContent = s.flagged_over;
+  $("#c-recover").textContent = money(s.recoverable_total);
+  $("#c-review").textContent = s.needs_review;
+
+  $("#linespanel").style.display = "block";
+  $("#lines").innerHTML = d.lines.map(ln => {
+    const conf = Math.round(ln.confidence*100);
+    return `<tr class="${ln.verdict}">
+      <td>${ln.csi}</td><td>${ln.description}</td>
+      <td class="num">${ln.quantity.toLocaleString()} ${ln.unit}</td>
+      <td class="num">${money(ln.unit_cost)}</td>
+      <td class="num">${ln.benchmark_unit_cost==null?"—":money(ln.benchmark_unit_cost)}</td>
+      <td class="num">${pct(ln.delta_pct)}</td>
+      <td class="num ${ln.recoverable>0?'flag':''}">${ln.recoverable>0?money(ln.recoverable):"—"}</td>
+      <td><span class="conf"><i style="width:${conf}%"></i></span></td>
+      <td><span class="badge b-${ln.verdict}">${ln.verdict.replace("_"," ")}</span></td>
+    </tr>`;
+  }).join("");
+
+  const q = d.review_queue;
+  $("#queuepanel").style.display = "block";
+  $("#queue").innerHTML = q.count ? q.queue.map(it => `
+    <div class="item">
+      <div class="amt">${it.recoverable>0?money(it.recoverable):"review"}</div>
+      <div>
+        <div><b>${it.csi}</b> · ${it.description} <span class="badge b-${it.verdict}">${it.verdict.replace("_"," ")}</span></div>
+        <div class="why">${it.reason} — ${it.rationale}</div>
+      </div>
+    </div>`).join("")
+    : `<div class="empty">No lines need review — everything reconciles to contract and market.</div>`;
+}
+
+loadSamples(); loadEval();
+</script>
+</body>
+</html>
