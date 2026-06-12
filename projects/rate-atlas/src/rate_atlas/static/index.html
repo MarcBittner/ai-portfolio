@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>rate-atlas — negotiated-rate comparison</title>
+<style>
+  :root{--bg:#0f1419;--panel:#171d26;--panel2:#1d2530;--line:#2a3441;
+    --ink:#e7edf3;--dim:#9aa7b4;--accent:#5b9dff;--ok:#3fb56b;--hi:#ef5b6b;--lo:#3fb56b;--warn:#e0a64a}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 ui-sans-serif,system-ui,Segoe UI,Roboto,sans-serif}
+  header{padding:18px 26px;border-bottom:1px solid var(--line);display:flex;gap:14px;align-items:baseline;flex-wrap:wrap}
+  header h1{margin:0;font-size:19px} header .tag{color:var(--dim);font-size:13px}
+  main{max-width:1080px;margin:0 auto;padding:20px 26px;display:grid;gap:16px}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px}
+  .panel h2{margin:0;padding:12px 16px;font-size:12px;border-bottom:1px solid var(--line);color:var(--dim);text-transform:uppercase;letter-spacing:.6px}
+  .panel .body{padding:14px 16px}
+  select,button{font:inherit;color:var(--ink);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 11px}
+  button{cursor:pointer} button.primary{background:var(--accent);border-color:var(--accent);color:#06101f;font-weight:600}
+  .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
+  .card{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px}
+  .card .k{color:var(--dim);font-size:11px;text-transform:uppercase} .card .v{font-size:20px;font-weight:700;margin-top:3px}
+  .card.spread .v{color:var(--warn)}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--line)}
+  th{color:var(--dim);font-size:11px}
+  td.num{text-align:right;font-variant-numeric:tabular-nums}
+  .ratebar{height:8px;background:var(--panel2);border-radius:4px;overflow:hidden;width:140px;display:inline-block;vertical-align:middle;margin-right:8px}
+  .ratebar>i{display:block;height:100%}
+  .pill{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11px;background:var(--panel2);color:var(--dim)}
+  .muted{color:var(--dim);font-size:12.5px} code{background:var(--panel2);padding:1px 5px;border-radius:5px;font-size:12px}
+</style>
+</head>
+<body>
+<header>
+  <h1>rate-atlas</h1>
+  <span class="tag">price-transparency files → one model → compare negotiated rates across payers</span>
+</header>
+<main>
+  <div class="panel">
+    <h2>Compare a procedure's negotiated rate</h2>
+    <div class="body">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <select id="code"></select>
+        <button class="primary" id="go">Compare →</button>
+        <span class="muted" id="desc"></span>
+      </div>
+      <div id="cards" class="cards" style="display:none;margin-top:14px"></div>
+      <table id="quotes" style="display:none"></table>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Rate outliers (|z| ≥ 2 within a code)</h2>
+    <div class="body" style="padding:0"><table id="outliers"></table></div>
+  </div>
+
+  <div class="panel">
+    <h2>Sources — three shapes, one normalized model</h2>
+    <div class="body" style="padding:0"><table id="sources"></table></div>
+  </div>
+</main>
+<script>
+const $=s=>document.querySelector(s);
+const money=n=>"$"+Number(n).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+async function j(u){return (await fetch(u)).json();}
+
+async function init(){
+  const p=(await j("procedures")).procedures;
+  $("#code").innerHTML=p.map(x=>`<option value="${x.code}">${x.code} — ${x.description} (${x.rate_count})</option>`).join("");
+  renderSources((await j("sources")).sources);
+  renderOutliers((await j("outliers")).outliers);
+  compare();
+}
+async function compare(){
+  const c=await j("compare/"+$("#code").value);
+  $("#desc").textContent=c.description||"";
+  const s=c.stats;
+  $("#cards").style.display="grid";
+  $("#cards").innerHTML=`
+    <div class="card"><div class="k">Lowest</div><div class="v">${money(s.min)}</div></div>
+    <div class="card"><div class="k">Median</div><div class="v">${money(s.median)}</div></div>
+    <div class="card"><div class="k">Highest</div><div class="v">${money(s.max)}</div></div>
+    <div class="card spread"><div class="k">Spread</div><div class="v">${(s.spread_pct*100).toFixed(0)}%</div></div>`;
+  $("#quotes").style.display="table";
+  $("#quotes").innerHTML=`<thead><tr><th>hospital</th><th>payer</th><th>plan</th><th></th><th class="num">rate</th></tr></thead><tbody>`+
+    c.quotes.map(q=>{const f=(q.rate-s.min)/(s.max-s.min||1);
+      const col=f>0.66?'var(--hi)':f<0.34?'var(--lo)':'var(--warn)';
+      return `<tr><td>${q.hospital}</td><td>${q.payer}</td><td><span class="pill">${q.plan||'—'}</span></td>
+        <td><span class="ratebar"><i style="width:${Math.max(6,f*100)}%;background:${col}"></i></span></td>
+        <td class="num">${money(q.rate)}</td></tr>`;}).join("")+`</tbody>`;
+}
+function renderSources(ss){
+  $("#sources").innerHTML=`<thead><tr><th>hospital</th><th>source file</th><th>detected shape</th><th class="num">rows</th></tr></thead><tbody>`+
+    ss.map(s=>`<tr><td>${s.hospital}</td><td><code>${s.source}</code></td><td><span class="pill">${s.shape}</span></td><td class="num">${s.rows}</td></tr>`).join("")+`</tbody>`;
+}
+function renderOutliers(os){
+  $("#outliers").innerHTML=`<thead><tr><th>code</th><th>hospital</th><th>payer</th><th class="num">rate</th><th class="num">code mean</th><th class="num">z</th></tr></thead><tbody>`+
+    (os.length?os.map(o=>`<tr><td><code>${o.code}</code> ${o.description}</td><td>${o.hospital}</td><td>${o.payer}</td>
+      <td class="num">${money(o.rate)}</td><td class="num">${money(o.code_mean)}</td><td class="num" style="color:var(--warn)">${o.zscore}</td></tr>`).join("")
+      :`<tr><td colspan="6" class="muted" style="padding:14px">No outliers at this threshold.</td></tr>`)+`</tbody>`;
+}
+$("#go").onclick=compare;
+init();
+</script>
+</body>
+</html>
