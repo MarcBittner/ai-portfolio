@@ -8,20 +8,21 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Deploy: Argo GitOps](https://img.shields.io/badge/deploy-Argo%20GitOps-success)](ROADMAP.md)
 [![Live demos: Render](https://img.shields.io/badge/live%20demos-Render-46E3B7?logo=render&logoColor=white)](#live-demos)
-[![Projects: 10](https://img.shields.io/badge/projects-10-blueviolet)](#projects-at-a-glance)
+[![Projects: 11](https://img.shields.io/badge/projects-11-blueviolet)](#projects-at-a-glance)
 
 Production-grade AI engineering projects. Each project is self-contained,
 source-available (proprietary), and runnable with **zero paid accounts** — offline fallbacks
 (in-memory vector store, deterministic mock LLM) are first-class, and real
 providers (Ollama, MongoDB Atlas, OpenAI, OpenRouter) switch on via
-environment variables. All nine services deploy to Kubernetes via Argo CD
-**and run as free [live demos on Render](#live-demos)**.
+environment variables. All ten services run as free
+**[live demos on Render](#live-demos)**; the core nine also deploy to Kubernetes
+via Argo CD.
 
 ![ai-portfolio UIs](docs/screenshots/hero.png)
 
 ## Live demos
 
-All nine services run as **free live demos on Render**, in offline mode (mock LLM
+All ten services run as **free live demos on Render**, in offline mode (mock LLM
 + in-memory stores — no keys, no cost). Free instances sleep after ~15 min idle,
 so the **first request cold-starts in ~30–60s** (a heavier app like persona-twin
 toward the upper end); just reload if it stalls. Each link opens the app's UI.
@@ -32,7 +33,7 @@ toward the upper end); just reload if it stalls. Each link opens the app's UI.
 | **pii-redactor** | [open ↗](https://pii-redactor-lk6x.onrender.com) | **promptguard** | [open ↗](https://promptguard-oiqr.onrender.com) |
 | **evalkit** | [open ↗](https://evalkit-2ptv.onrender.com) | **synth-data** | [open ↗](https://synth-data.onrender.com) |
 | **doc-extract** | [open ↗](https://doc-extract-oyuj.onrender.com) | **forecast** | [open ↗](https://forecast-h6uf.onrender.com) |
-| **multimodal-ocr** | [open ↗](https://multimodal-ocr-x2g3.onrender.com) | | |
+| **multimodal-ocr** | [open ↗](https://multimodal-ocr-x2g3.onrender.com) | **reconcile** | [open ↗](https://reconcile-gfuj.onrender.com) |
 
 > Verify a deployment's contract any time with the smoke suite:
 > `cd projects/<name> && ./run.sh smoke --url <live-url>` (see [CONV-5](docs/spec/spec.md)).
@@ -51,6 +52,7 @@ toward the upper end); just reload if it stalls. Each link opens the app's UI.
 | 8 | **synth-data** | Deterministic PII-free synthetic data + LLM fields | FastAPI · UI | [README](projects/synth-data/README.md) |
 | 9 | **forecast** | Classic-ML forecasting + anomalies (no-LLM core) | FastAPI · UI | [README](projects/forecast/README.md) |
 | 10 | **multimodal-ocr** | OCR → PII → box-level redaction + LLM NER | FastAPI · UI | [README](projects/multimodal-ocr/README.md) |
+| 11 | **reconcile** | Document line-item reconciliation — extract → diff vs baseline + market → recoverable $ → review queue | FastAPI · UI | [README](projects/reconcile/README.md) |
 
 See **[ROADMAP.md](ROADMAP.md)** for what's next per project.
 
