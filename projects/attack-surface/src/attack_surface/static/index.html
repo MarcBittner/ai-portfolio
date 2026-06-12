@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>attack-surface — control-mapped exposure report</title>
+<style>
+  :root{--bg:#0f1419;--panel:#171d26;--panel2:#1d2530;--line:#2a3441;--ink:#e7edf3;--dim:#9aa7b4;--accent:#5b9dff;
+    --crit:#ef5b6b;--high:#e0673f;--med:#e0a64a;--low:#5b9dff;--ok:#3fb56b}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 ui-sans-serif,system-ui,Segoe UI,Roboto,sans-serif}
+  header{padding:18px 26px;border-bottom:1px solid var(--line);display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+  header h1{margin:0;font-size:19px} header .tag{color:var(--dim);font-size:13px} header .spacer{flex:1}
+  select,button,input{font:inherit;color:var(--ink);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+  button{cursor:pointer} button.primary{background:var(--accent);border-color:var(--accent);color:#06101f;font-weight:600}
+  main{max-width:1100px;margin:0 auto;padding:20px 26px;display:grid;gap:16px}
+  .top{display:grid;grid-template-columns:200px 1fr;gap:16px}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px}
+  .panel h2{margin:0;padding:12px 16px;font-size:12px;border-bottom:1px solid var(--line);color:var(--dim);text-transform:uppercase;letter-spacing:.6px}
+  .panel .body{padding:14px 16px}
+  .grade{font-size:64px;font-weight:800;line-height:1;text-align:center;margin:6px 0}
+  .gA{color:var(--ok)} .gB{color:#8ad17a} .gC{color:var(--med)} .gD{color:var(--high)} .gF{color:var(--crit)}
+  .scoremut{text-align:center;color:var(--dim);font-size:13px}
+  .sev{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  .sevcard{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px;text-align:center}
+  .sevcard .n{font-size:24px;font-weight:700} .sevcard .l{font-size:11px;text-transform:uppercase;color:var(--dim)}
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--dim);font-size:11px}
+  .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;text-transform:uppercase}
+  .b-critical{background:rgba(239,91,107,.18);color:var(--crit)} .b-high{background:rgba(224,103,63,.18);color:var(--high)}
+  .b-medium{background:rgba(224,166,74,.18);color:var(--med)} .b-low{background:rgba(91,157,255,.16);color:var(--low)}
+  .b-fail{background:rgba(239,91,107,.18);color:var(--crit)} .b-pass{background:rgba(63,181,107,.16);color:var(--ok)}
+  .ctl{font-family:ui-monospace,Menlo,monospace;font-size:11px;background:var(--panel2);padding:1px 6px;border-radius:5px;margin-right:4px;display:inline-block}
+  .muted{color:var(--dim);font-size:12px} code{background:var(--panel2);padding:1px 5px;border-radius:5px;font-size:12px}
+  .rem{color:var(--dim);font-size:12px;margin-top:3px}
+</style>
+</head>
+<body>
+<header>
+  <h1>attack-surface</h1>
+  <span class="tag">CT enumeration · service fingerprint · SOC 2 / ISO 27001 control-mapped report</span>
+  <span class="spacer"></span>
+  <button class="primary" id="scan">Scan owned domain</button>
+</header>
+<main>
+  <div class="top">
+    <div class="panel"><h2>Posture</h2><div class="body">
+      <div class="grade" id="grade">—</div>
+      <div class="scoremut"><span id="score">—</span>/100 · <span id="domain"></span></div>
+      <div class="scoremut" id="ctrlfail" style="margin-top:8px"></div>
+    </div></div>
+    <div class="panel"><h2>Findings by severity</h2><div class="body">
+      <div class="sev" id="sev"></div>
+      <div class="muted" id="subs" style="margin-top:12px"></div>
+    </div></div>
+  </div>
+
+  <div class="panel"><h2>Findings → controls (governed evidence)</h2>
+    <div class="body" style="padding:0"><table id="findings"></table></div>
+  </div>
+
+  <div class="panel"><h2>Control coverage</h2>
+    <div class="body" style="padding:0"><table id="controls"></table></div>
+  </div>
+  <p class="muted">Fixture mode runs the full report on the owned synthetic domain
+  <code>example-corp.test</code>. <code>POST /scan {"mode":"live","domain":"&lt;yours&gt;"}</code>
+  does <b>passive</b> CT-log recon only — never active scanning of hosts you don't own.</p>
+</main>
+<script>
+const $=s=>document.querySelector(s);
+async function j(u){return (await fetch(u)).json();}
+async function run(){
+  const r=await j("scan");
+  const p=r.posture;
+  $("#grade").textContent=p.grade; $("#grade").className="grade g"+p.grade;
+  $("#score").textContent=p.score; $("#domain").textContent=r.domain;
+  $("#ctrlfail").textContent=`${p.controls_failing}/${p.controls_total} controls failing`;
+  $("#sev").innerHTML=["critical","high","medium","low"].map(s=>
+    `<div class="sevcard"><div class="n b-${s}" style="background:none">${r.severity_counts[s]}</div><div class="l">${s}</div></div>`).join("");
+  $("#subs").innerHTML=`<b>${r.assets.subdomains.length}</b> subdomains from CT · <b>${r.assets.services.length}</b> services fingerprinted`;
+  $("#findings").innerHTML=`<thead><tr><th>severity</th><th>finding</th><th>asset</th><th>controls</th></tr></thead><tbody>`+
+    r.findings.map(f=>`<tr><td><span class="badge b-${f.severity}">${f.severity}</span></td>
+      <td><b>${f.title}</b><div class="muted">${f.detail}</div><div class="rem">↳ ${f.remediation}</div></td>
+      <td><code>${f.asset}</code></td>
+      <td>${f.controls.map(c=>`<span class="ctl">${c}</span>`).join("")}</td></tr>`).join("")+`</tbody>`;
+  $("#controls").innerHTML=`<thead><tr><th>control</th><th>framework</th><th>title</th><th>status</th><th class="num">findings</th></tr></thead><tbody>`+
+    r.controls.map(c=>`<tr><td><span class="ctl">${c.id}</span></td><td>${c.framework}</td><td>${c.title}</td>
+      <td><span class="badge b-${c.status}">${c.status}</span></td><td>${c.finding_count}</td></tr>`).join("")+`</tbody>`;
+}
+$("#scan").onclick=run;
+run();
+</script>
+</body>
+</html>
