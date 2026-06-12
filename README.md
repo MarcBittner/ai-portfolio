@@ -8,13 +8,13 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Deploy: Argo GitOps](https://img.shields.io/badge/deploy-Argo%20GitOps-success)](ROADMAP.md)
 [![Live demos: Render](https://img.shields.io/badge/live%20demos-Render-46E3B7?logo=render&logoColor=white)](#live-demos)
-[![Projects: 16](https://img.shields.io/badge/projects-16-blueviolet)](#live-demos)
+[![Projects: 17](https://img.shields.io/badge/projects-17-blueviolet)](#live-demos)
 
 Production-grade AI engineering projects. Each project is self-contained,
 source-available (proprietary), and runnable with **zero paid accounts** — offline fallbacks
 (in-memory vector store, deterministic mock LLM) are first-class, and real
 providers (Ollama, MongoDB Atlas, OpenAI, OpenRouter) switch on via
-environment variables. All fifteen services run as free
+environment variables. All sixteen services run as free
 **[live demos on Render](#live-demos)**; the core nine also deploy to Kubernetes
 via Argo CD.
 
@@ -22,7 +22,7 @@ via Argo CD.
 
 ## Live demos
 
-All fifteen services run as **free live demos on Render**, in offline mode (mock LLM
+All sixteen services run as **free live demos on Render**, in offline mode (mock LLM
 + in-memory stores — no keys, no cost). Free instances sleep after ~15 min idle,
 so the **first request cold-starts in ~30–60s** (a heavier app like persona-twin
 toward the upper end); just reload if it stalls. Each **Live** link opens the
@@ -46,6 +46,7 @@ app's UI.
 | 14 | **field-vault** | Field-level de-identification + least-privilege access + tamper-evident audit for regulated records | FastAPI · UI | [open ↗](https://field-vault.onrender.com) | [README](projects/field-vault/README.md) |
 | 15 | **rtc-guard** | Scoped WebRTC access tokens + adversarial test suite + AV-pipeline threat model | FastAPI · UI | [open ↗](https://rtc-guard.onrender.com) | [README](projects/rtc-guard/README.md) |
 | 16 | **rate-atlas** | Normalize inconsistent price-transparency files → one model; compare negotiated rates across payers | FastAPI · SQLite · UI | [open ↗](https://rate-atlas.onrender.com) | [README](projects/rate-atlas/README.md) |
+| 17 | **attack-surface** | CT-log enumeration → service fingerprint → SOC 2 / ISO 27001 control-mapped exposure report | FastAPI · UI | [open ↗](https://attack-surface.onrender.com) | [README](projects/attack-surface/README.md) |
 
 > Verify a deployment's contract any time with the smoke suite:
 > `cd projects/<name> && ./run.sh smoke --url <live-url>` (see [CONV-5](docs/spec/spec.md)).
