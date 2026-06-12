@@ -19,6 +19,14 @@ jobs:
           - synth-data
           - forecast
           - multimodal-ocr
+          - reconcile
+          - llm-gateway
+          - slo-kit
+          - field-vault
+          - rtc-guard
+          - rate-atlas
+          - attack-surface
+          - txn-ledger
     defaults:
       run:
         working-directory: projects/${{ matrix.project }}
