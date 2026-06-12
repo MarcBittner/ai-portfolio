@@ -26,12 +26,13 @@ All seventeen services run as **free live demos on Render**, in offline mode (mo
 + in-memory stores — no keys, no cost). Free instances sleep after ~15 min idle,
 so the **first request cold-starts in ~30–60s** (a heavier app like persona-twin
 toward the upper end); just reload if it stalls. Each **Live** link opens the
-app's UI.
+app's UI — #2 (tanglement-showcase) is the Next.js marketing teaser site, the rest
+are the offline-first API services.
 
 | # | Project | What it is | Stack | Live | Docs |
 |---|---|---|---|---|---|
 | 1 | **persona-twin** | RAG digital-twins: chunking/embedding/rerank, eval, streaming chat, observability | FastAPI · Mongo Atlas · Vite | [open ↗](https://persona-twin-usu4.onrender.com) | [README](projects/persona-twin/README.md) |
-| 2 | **tanglement-showcase** | P2P multi-provider LLM routing network (proprietary showcase) | spec · Next.js | — | [README](projects/tanglement-showcase/README.md) |
+| 2 | **tanglement-showcase** | P2P multi-provider LLM routing network (proprietary showcase) | spec · Next.js | [open ↗](https://tanglement-teaser.onrender.com) | [README](projects/tanglement-showcase/README.md) |
 | 3 | **pii-redactor** | PII detect/redact — regex+checksum core + LLM NER | FastAPI · UI | [open ↗](https://pii-redactor-lk6x.onrender.com) | [README](projects/pii-redactor/README.md) |
 | 4 | **evalkit** | Offline-first LLM eval toolkit + LLM-judge + regression gate | FastAPI · UI | [open ↗](https://evalkit-2ptv.onrender.com) | [README](projects/evalkit/README.md) |
 | 5 | **doc-extract** | Schema-driven extraction + provenance + LLM fill | FastAPI · UI | [open ↗](https://doc-extract-oyuj.onrender.com) | [README](projects/doc-extract/README.md) |
@@ -92,7 +93,8 @@ share routing intelligence over a Chord DHT + gossip mesh.
 
 - **`docs/spec/`** — the multi-section technical specification (architecture,
   routing, security, protocols, DHT/NAT-traversal, ops, dev plan)
-- **`demo-site/`** — the public teaser site (Next.js)
+- **`demo-site/`** — the public **[teaser site](https://tanglement-teaser.onrender.com)**
+  (Next.js, live on Render)
 - **`code/git-encrypt/`** — a self-contained, stdlib-only Go CLI sample
   (transparent git file encryption, ECDH/ECDSA)
 - **Pitch deck** — PDF (viewable) + PPTX source
