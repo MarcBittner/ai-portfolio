@@ -8,13 +8,13 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Deploy: Argo GitOps](https://img.shields.io/badge/deploy-Argo%20GitOps-success)](ROADMAP.md)
 [![Live demos: Render](https://img.shields.io/badge/live%20demos-Render-46E3B7?logo=render&logoColor=white)](#live-demos)
-[![Projects: 13](https://img.shields.io/badge/projects-13-blueviolet)](#live-demos)
+[![Projects: 14](https://img.shields.io/badge/projects-14-blueviolet)](#live-demos)
 
 Production-grade AI engineering projects. Each project is self-contained,
 source-available (proprietary), and runnable with **zero paid accounts** — offline fallbacks
 (in-memory vector store, deterministic mock LLM) are first-class, and real
 providers (Ollama, MongoDB Atlas, OpenAI, OpenRouter) switch on via
-environment variables. All twelve services run as free
+environment variables. All thirteen services run as free
 **[live demos on Render](#live-demos)**; the core nine also deploy to Kubernetes
 via Argo CD.
 
@@ -22,7 +22,7 @@ via Argo CD.
 
 ## Live demos
 
-All twelve services run as **free live demos on Render**, in offline mode (mock LLM
+All thirteen services run as **free live demos on Render**, in offline mode (mock LLM
 + in-memory stores — no keys, no cost). Free instances sleep after ~15 min idle,
 so the **first request cold-starts in ~30–60s** (a heavier app like persona-twin
 toward the upper end); just reload if it stalls. Each **Live** link opens the
@@ -43,6 +43,7 @@ app's UI.
 | 11 | **reconcile** | Document line-item reconciliation — extract → diff vs baseline + market → recoverable $ → review queue | FastAPI · UI | [open ↗](https://reconcile-gfuj.onrender.com) | [README](projects/reconcile/README.md) |
 | 12 | **llm-gateway** | Provider-agnostic LLM gateway — firewall + PII/secret redaction + routing + tamper-evident audit | FastAPI · UI | [open ↗](https://llm-gateway-jwsq.onrender.com) | [README](projects/llm-gateway/README.md) |
 | 13 | **slo-kit** | Instrumented SRE reference — RED metrics, SLOs + error budgets, traces, incident-burn demo | FastAPI · UI | [open ↗](https://slo-kit.onrender.com) | [README](projects/slo-kit/README.md) |
+| 14 | **field-vault** | Field-level de-identification + least-privilege access + tamper-evident audit for regulated records | FastAPI · UI | [open ↗](https://field-vault.onrender.com) | [README](projects/field-vault/README.md) |
 
 > Verify a deployment's contract any time with the smoke suite:
 > `cd projects/<name> && ./run.sh smoke --url <live-url>` (see [CONV-5](docs/spec/spec.md)).
