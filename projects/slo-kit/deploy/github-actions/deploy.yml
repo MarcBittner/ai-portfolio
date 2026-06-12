@@ -1,0 +1,40 @@
+# slo-kit — deploy pipeline (illustrative reference).
+# merge → test → build → deploy → POST-DEPLOY SMOKE GATE. The same smoke suite
+# that runs locally verifies the live deployment's contract before the rollout is
+# considered done; a failed smoke check is a rollback signal.
+name: deploy
+on:
+  push:
+    branches: [main]
+    paths: ["projects/slo-kit/**"]
+
+jobs:
+  ship:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: projects/slo-kit
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Setup
+        run: ./run.sh setup
+
+      - name: Lint + test
+        run: ./run.sh check          # ruff + offline unit suite
+
+      - name: Build image
+        run: docker build -t slo-kit:${{ github.sha }} .
+
+      # ... push image + apply terraform + roll out (provider-specific) ...
+
+      - name: Post-deploy smoke gate
+        env:
+          DEPLOY_URL: ${{ secrets.SLO_KIT_URL }}
+        run: ./run.sh smoke --url "$DEPLOY_URL"   # same suite, live target
+
+      # On failure: the previous revision stays / is rolled back. The deploy is
+      # only "done" when the live contract verifies.

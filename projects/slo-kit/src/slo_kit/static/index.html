@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>slo-kit — service dashboard</title>
+<style>
+  :root{
+    --bg:#0f1419;--panel:#171d26;--panel2:#1d2530;--line:#2a3441;
+    --ink:#e7edf3;--dim:#9aa7b4;--accent:#5b9dff;
+    --ok:#3fb56b;--warn:#e0a64a;--bad:#ef5b6b;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.5 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+  header{padding:18px 26px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  header h1{margin:0;font-size:19px}
+  header .tag{color:var(--dim);font-size:13px}
+  header .spacer{flex:1}
+  .pill{font-size:12px;font-weight:700;padding:4px 12px;border-radius:999px;text-transform:uppercase;letter-spacing:.4px}
+  .s-healthy{background:rgba(63,181,107,.16);color:var(--ok)}
+  .s-at_risk,.s-exhausted,.s-violated{background:rgba(239,91,107,.18);color:var(--bad)}
+  .s-burning{background:rgba(224,166,74,.18);color:var(--warn)}
+  .s-no_data{background:var(--panel2);color:var(--dim)}
+  main{max-width:1160px;margin:0 auto;padding:20px 26px;display:grid;gap:16px}
+  .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px}
+  .panel h2{margin:0;padding:12px 16px;font-size:12px;border-bottom:1px solid var(--line);
+    color:var(--dim);text-transform:uppercase;letter-spacing:.6px}
+  .panel .body{padding:16px}
+  .stat{padding:16px}
+  .stat .k{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.5px}
+  .stat .v{font-size:26px;font-weight:700;margin-top:4px;font-variant-numeric:tabular-nums}
+  .bar{height:9px;background:var(--panel2);border-radius:5px;overflow:hidden;margin-top:8px}
+  .bar > i{display:block;height:100%;background:var(--ok);transition:width .4s}
+  .bar.warn > i{background:var(--warn)} .bar.bad > i{background:var(--bad)}
+  .slorow{display:flex;justify-content:space-between;font-size:13px;margin-top:4px;color:var(--dim)}
+  button,input,select{font:inherit;color:var(--ink);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 11px}
+  button{cursor:pointer}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#06101f;font-weight:600}
+  button.danger{border-color:rgba(239,91,107,.5);color:var(--bad)}
+  .ctl{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .ctl label{color:var(--dim);font-size:12.5px;display:flex;gap:6px;align-items:center}
+  .ctl input{width:84px}
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th,td{text-align:left;padding:7px 12px;border-bottom:1px solid var(--line)}
+  th{color:var(--dim);font-size:11px}
+  td.num{text-align:right;font-variant-numeric:tabular-nums}
+  .t-ok{color:var(--ok)} .t-error{color:var(--bad)}
+  .muted{color:var(--dim);font-size:12.5px}
+  code{background:var(--panel2);padding:1px 5px;border-radius:5px}
+</style>
+</head>
+<body>
+<header>
+  <h1>slo-kit</h1>
+  <span class="tag">outreach-api · RED metrics · SLOs + error budget · traces</span>
+  <span class="spacer"></span>
+  <span id="overall" class="pill s-no_data">no data</span>
+</header>
+
+<main>
+  <div class="panel">
+    <h2>Operator controls — drive traffic, inject an incident, recover</h2>
+    <div class="body ctl">
+      <label>requests <input id="n" type="number" value="300" min="1" max="5000"></label>
+      <button class="primary" id="load">Run load</button>
+      <span style="width:14px"></span>
+      <label>error % <input id="er" type="number" value="6" min="0" max="100"></label>
+      <label>+latency ms <input id="lat" type="number" value="450" min="0" max="5000"></label>
+      <button class="danger" id="incident">Inject incident + load</button>
+      <span class="spacer" style="flex:1"></span>
+      <button id="reset">Reset</button>
+    </div>
+  </div>
+
+  <div class="grid4">
+    <div class="panel stat"><div class="k">Requests (window)</div><div class="v" id="m-total">0</div></div>
+    <div class="panel stat"><div class="k">Error rate</div><div class="v" id="m-err">0%</div></div>
+    <div class="panel stat"><div class="k">Latency p95</div><div class="v" id="m-p95">0 ms</div></div>
+    <div class="panel stat"><div class="k">Latency p50</div><div class="v" id="m-p50">0 ms</div></div>
+  </div>
+
+  <div class="grid2">
+    <div class="panel">
+      <h2>Availability SLO · 99.5%</h2>
+      <div class="body">
+        <div class="slorow"><span>SLI <b id="a-sli">—</b></span><span id="a-status" class="pill s-no_data">—</span></div>
+        <div class="muted" style="margin-top:12px">Error budget remaining</div>
+        <div class="bar" id="a-bar"><i style="width:100%"></i></div>
+        <div class="slorow"><span id="a-rem">—</span><span>burn rate <b id="a-burn">—</b>×</span></div>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>Latency SLO · 95% under target</h2>
+      <div class="body">
+        <div class="slorow"><span>SLI <b id="l-sli">—</b></span><span id="l-status" class="pill s-no_data">—</span></div>
+        <div class="muted" style="margin-top:12px">Fast-enough requests (≤ <span id="l-target">250</span> ms)</div>
+        <div class="bar" id="l-bar"><i style="width:100%"></i></div>
+        <div class="slorow"><span>p95 <b id="l-p95">—</b> ms</span><span class="muted">target <span id="l-target2">250</span> ms</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Recent traces (OpenTelemetry-style spans)</h2>
+    <div class="body" style="padding:0">
+      <table><thead><tr><th>trace_id</th><th>span</th><th class="num">duration</th><th>status</th></tr></thead>
+      <tbody id="traces"></tbody></table>
+    </div>
+  </div>
+  <p class="muted">Prometheus exposition at <code>/metrics</code> · SLO JSON at <code>/slo</code> ·
+  the incident runbook is in <code>docs/runbook.md</code>.</p>
+</main>
+
+<script>
+const $=s=>document.querySelector(s);
+const pct=x=>(x*100).toFixed(2)+"%";
+async function j(u,o){return (await fetch(u,o)).json();}
+
+function applySlo(s){
+  $("#overall").className="pill s-"+s.overall_status; $("#overall").textContent=s.overall_status.replace("_"," ");
+  const a=s.availability;
+  $("#a-sli").textContent=pct(a.sli); $("#a-burn").textContent=a.burn_rate;
+  $("#a-rem").textContent=pct(a.budget_remaining)+" left";
+  $("#a-status").className="pill s-"+a.status; $("#a-status").textContent=a.status;
+  const bar=$("#a-bar"); bar.className="bar"+(a.budget_remaining<=0?" bad":a.budget_remaining<0.5?" warn":"");
+  bar.firstElementChild.style.width=(a.budget_remaining*100)+"%";
+  const l=s.latency;
+  $("#l-sli").textContent=pct(l.sli); $("#l-p95").textContent=l.p95_ms;
+  $("#l-target").textContent=l.target_ms; $("#l-target2").textContent=l.target_ms;
+  $("#l-status").className="pill s-"+l.status; $("#l-status").textContent=l.status;
+  const lb=$("#l-bar"); lb.className="bar"+(l.status==="violated"?" bad":"");
+  lb.firstElementChild.style.width=(l.sli*100)+"%";
+}
+async function refresh(){
+  const snap=await j("metrics/snapshot");
+  $("#m-total").textContent=snap.total.toLocaleString();
+  $("#m-err").textContent=pct(snap.error_rate);
+  $("#m-p95").textContent=snap.p95_ms+" ms"; $("#m-p50").textContent=snap.p50_ms+" ms";
+  applySlo(await j("slo"));
+  const t=await j("traces?limit=12");
+  $("#traces").innerHTML=t.spans.map(s=>`<tr><td><code>${s.trace_id.slice(-8)}</code></td>
+    <td>${s.name}</td><td class="num">${s.duration_ms} ms</td>
+    <td class="t-${s.status}">${s.status}</td></tr>`).join("")
+    ||`<tr><td colspan="4" class="muted" style="padding:14px">No requests yet — run some load.</td></tr>`;
+}
+const post=(u,b)=>j(u,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(b||{})});
+$("#load").onclick=async()=>{await post("admin/loadtest",{n:+$("#n").value});refresh();};
+$("#incident").onclick=async()=>{
+  await post("admin/fault",{error_rate:(+$("#er").value)/100,latency_ms:+$("#lat").value});
+  await post("admin/loadtest",{n:+$("#n").value}); refresh();
+};
+$("#reset").onclick=async()=>{await post("admin/reset");refresh();};
+refresh();
+</script>
+</body>
+</html>
