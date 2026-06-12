@@ -6,82 +6,219 @@
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![React + Vite](https://img.shields.io/badge/UI-React%20%2B%20Vite-61dafb?logo=react&logoColor=000)](frontend/)
-[![Deploy: Argo GitOps](https://img.shields.io/badge/deploy-Argo%20GitOps-success)](deploy/)
-[![Version 0.14.1](https://img.shields.io/badge/version-0.14.1-blueviolet)](docs/spec/development-plan.md)
 
-Query AI **digital twins** of synthetic personas, grounded in retrieved
-data with citations — a production-grade reference implementation of
-RAG, LLM persona systems, multi-provider routing, and layered LLM
-evaluation.
+![persona-twin UI](docs/screenshot.png)
+
+**[▶ Live demo](https://persona-twin-usu4.onrender.com)**
+
+Query AI **digital twins** of synthetic personas — each one answers in
+character, grounded in its own retrieved documents, with citations validated
+against what was actually retrieved. It is a reference implementation of RAG as
+an *architecture* (chunking → embedding → hybrid retrieval → reranking →
+grounded generation as separately swappable stages), multi-provider LLM routing
+with fallback and a circuit breaker, and **layered** evaluation that refuses to
+collapse fidelity into one number.
+
+> Offline by default — a deterministic hash embedder, an in-memory vector
+> store, and a mock LLM activate automatically, so reviewers need no keys and
+> incur no cost. Real backends (Ollama / OpenAI / Anthropic / Mongo Atlas /
+> Redis) switch on purely via environment variables. All persona and document
+> data is **synthetic and clearly fictional**; PII is redacted at ingest before
+> any text is embedded or stored, and redaction reports carry counts, never
+> values.
 
 ```sh
 ./run.sh setup && ./run.sh demo    # fully offline — no API keys, no database
 ```
 
-![persona-twin UI](docs/screenshot.png)
-
-## What it demonstrates
-
-| Concern | Implementation | Write-up |
-|---|---|---|
-| Chunking | fixed / semantic / content-aware behind one interface, exact-substring provenance | [docs/chunking-tradeoffs.md](docs/chunking-tradeoffs.md) |
-| Vector search | MongoDB Atlas `$vectorSearch` + in-memory NumPy store behind one port, shared contract tests | [docs/atlas-setup.md](docs/atlas-setup.md) |
-| Reranking | retrieve wide (k=25) → IDF-weighted lexical rerank → top 5; measured, not assumed | [docs/reranking.md](docs/reranking.md) |
-| Persona twins | HEXACO profiles → concrete style instructions; style never overrides grounding; citations validated against what was retrieved | [docs/personas.md](docs/personas.md) |
-| Multi-provider routing | Anthropic + OpenAI + deterministic mock behind one port; cost/latency/quality objectives from a declarative model registry; fallback chains with recorded reasons; schema-validated structured outputs with retry | `src/persona_twin/llm/` |
-| Streaming chat | token-by-token SSE conversation with per-session memory and history-aware retrieval (the follow-up is condensed into a standalone query); grounded prose streamed live, then a citation tail validated against retrieval exactly like `/ask` | `src/persona_twin/persona/chat.py` |
-| Query rewriting | optional multi-query expansion as a routed task — the question is expanded into sub-queries, each retrieved and reciprocal-rank-fused before reranking; benchmarkable per model | `src/persona_twin/retrieval/rewrite.py` |
-| Twin-vs-twin | one twin interviews another (`/interview`); the subject answers grounded in its own corpus with validated citations | `src/persona_twin/persona/interview.py` |
-| **Evaluation** | retrieval / grounding / answer-quality measured **separately** over a committed dataset; deliberately no composite score | [docs/evaluation.md](docs/evaluation.md) |
-| Data governance | deterministic PII redaction as a mandatory ingest gate; synthetic data only | [docs/data-governance.md](docs/data-governance.md) |
-| Persona builder | create a twin in the browser — HEXACO sliders, paste documents, live redaction preview (counts by type), then it's ingested and queryable; PII redacted before anything is stored | `src/persona_twin/persona/store.py` |
-| Observability | `/metrics` in Prometheus format from a dependency-free in-process metrics layer; Prometheus + Grafana on the cluster with a committed dashboard (LLM latency/rate, cache hit ratio, circuit opens) | [docs/observability.md](docs/observability.md) |
-| Free-model wiring | local Ollama auto-discovery, OpenRouter $0-model discovery, any OpenAI-compatible free tier as pure config | [docs/free-models.md](docs/free-models.md) |
-| Caching & deployment | answer/embedding cache port (LRU → Redis) with observable hit/miss counters; multi-stage Docker image; Cloud Run config | [docs/deployment.md](docs/deployment.md) |
-
 ## Architecture
 
+Every external dependency sits behind a port (protocol/ABC) with a
+zero-dependency offline default. The domain models in `models.py` (`Chunk`,
+`ScoredChunk`, `Citation`, `RoutingDecision`) are the contract every stage
+shares; the offline mode is **not a degraded path** — it is deterministic,
+which makes the integration tests exact and the eval report reproducible to the
+digit.
+
+| Package area | Responsibility |
+|---|---|
+| `pipeline/` | Ingest: load → **redact** → chunk → embed → upsert. Redaction is a mandatory gate; text reaches the embedder/store only after it. |
+| `chunking/` | `fixed` / `semantic` / `content_aware` chunkers behind one interface; each `Chunk` keeps an exact `char_span` for provenance. |
+| `embedding/` | `Embedder` port: `hashed` (offline default), `ollama_embed`, `openai_embed`, wrapped by a `cached` decorator with hit/miss stats. |
+| `vectorstore/` | `VectorStore` port: in-memory NumPy cosine (default) and Mongo Atlas `$vectorSearch`, shared contract tests, persona-scoped search. |
+| `retrieval/` | `bm25` (pure-Python Okapi), `fusion` (reciprocal-rank fusion), and `rewrite` (multi-query expansion / chat query condensing). |
+| `reranking/` | `lexical` IDF-weighted overlap reranker (default) and an optional `llm_rerank`; retrieve wide, rerank, keep top-k. |
+| `persona/` | HEXACO → style prompt mapping, grounded `twin` answering, streamed `chat`, twin-vs-twin `interview`, and a browser persona `store`. |
+| `llm/` | `LLMRouter` over a declarative `registry`; objective-aware ordering, per-task `policy`, fallback chain, `breaker` (circuit breaker), mock terminal. |
+| `governance/` | Deterministic regex + checksum PII `redact`or (email, SSN, Luhn card, phone, IP, street address); typed numbered tokens, counts only. |
+| `eval/` | Three-layer harness (retrieval / grounding / quality), an LLM-or-heuristic `judge`, a committed `dataset`, and a model `benchmark`. |
+| `observability/` | Dependency-free in-process counters/gauges rendered to Prometheus exposition at `/metrics`. |
+| `api/app.py` | FastAPI surface; assembles backends from the environment, ingests at startup, serves the built frontend from one origin. |
+
+### A `POST /ask` request, stage by stage
+
 ```
-                  ┌─────────────────────────────────────────┐
-                  │ FastAPI (async, Pydantic)               │
-                  │ /ask /chat /interview /personas /metrics  │
-                  └──────┬──────────────────────────────────┘
-                         │
-   ┌──────────────┬──────┴────────────┬───────────────────┐
-   ▼              ▼                   ▼                   ▼
-PII redaction  Retrieval pipeline  Persona layer       Eval harness
-(ingest gate)  chunk → embed →     HEXACO → style,     hit-rate / MRR
-               search → rerank     grounding rules,    grounding
-                     │             citations               quality
-                     ▼                   ▼
-           VectorStore (port)      LLMRouter (port)
-           ├─ Atlas $vectorSearch  ├─ Anthropic
-           └─ in-memory (default)  ├─ OpenAI
-                                   └─ mock (default)
+  question + persona_id
+        │
+        ▼
+  ① embed_query ─────────────────────────────────┐
+        │ (hash | ollama | openai)                │  [hybrid_retrieval=true]
+        ▼                                         ▼
+  ② vector search (k=25)            ②b BM25 keyword search (k=25)
+     persona-scoped only               persona-scoped only
+        └───────────────┬────────────────────┘
+                        ▼
+  ③ reciprocal-rank fusion (RRF, rank-based — fuses cosine vs BM25)
+                        │
+                        ▼
+  ④ lexical rerank (IDF-weighted overlap) → keep top-k (default 5)
+                        │
+                        ▼
+  ⑤ build system prompt (HEXACO style + grounding rules) + context block
+                        │
+                        ▼
+  ⑥ router.complete_structured(TwinAnswer)  ── ordered by objective:
+        │   anthropic ▸ openai ▸ ollama ▸ … ▸ mock (terminal)
+        │   skip open circuits; validate JSON, one retry; record fallbacks
+        ▼
+  ⑦ validate citations: drop any cited chunk_id not in the retrieved set
+                        │
+                        ▼
+  AskResponse { answer, answered, citations[], debug? }
 ```
 
-Every external dependency sits behind a port with a zero-dependency
-offline default. The offline mode is **not a degraded path** — it is
-deterministic, which makes the integration tests exact and the eval
-report reproducible to the digit.
+`/ask` is stateless and is the **measured** path — every eval and benchmark
+number comes from it. Non-debug answers are cached (in-process LRU, or Redis
+when `REDIS_URL` is set); `debug=true` recomputes and returns the routing
+decision, the reranked candidates, and per-stage timings.
 
-## Quickstart
+`POST /chat` reuses the same retrieval pipeline but **streams** the answer over
+Server-Sent Events: `meta` (session id) → `token` deltas → a `citations` tail
+(a separate structured pass, validated against retrieval exactly like `/ask`) →
+`done` (routing). Conversation memory is per-session and LRU-capped; with
+`chat_condense` on and prior turns present, the follow-up is first folded into a
+standalone retrieval query (resolving "them"/"it") so retrieval is
+history-aware. Stream failover only happens *before the first token* — once
+prose has reached the client it cannot be unsent, so a mid-stream failure ends
+the stream and trips the breaker rather than retrying.
 
-```sh
-./run.sh setup    # venv + dependencies (Python 3.11+)
-./run.sh demo     # ingest synthetic corpus, query the twins, watch a refusal
-./run.sh test     # full suite; provider-contract tests auto-skip offline
-./run.sh eval     # regenerate eval-report.md (three tables, no composite)
-./run.sh serve    # uvicorn on :8000 — then POST /ask
+**Walkthrough.** Ingestion redacts each document, chunks it (default
+`content_aware`, which keeps headings with their content and lists/Q&A atomic),
+embeds in batches, and upserts into the store; a BM25 index is built over the
+same chunks. At query time, dense retrieval catches paraphrase and BM25 catches
+exact terms ("Black Krim", "465"); RRF fuses the two rank lists without score
+normalization, the lexical reranker fixes the classic dense-retrieval miss where
+a topically-adjacent chunk outranks the one literally containing the term, and
+the top-k context is handed to the router. The persona's HEXACO profile shapes
+*voice only* — explicit grounding rules in the system prompt override style, and
+the model must answer `answered=false` rather than guess when the context does
+not support an answer. Finally, citations the model returns are intersected with
+the retrieved set, so a hallucinated citation can never reach the client.
+
+## Design decisions
+
+- **RAG as a swappable architecture, not a tool.** Chunking, embedding, vector
+  search, fusion, reranking, and generation are independent stages behind ports.
+  Any one can be swapped (a chunker, an embedder, the vector store) and measured
+  in isolation by the eval harness — the architecture is the point, not any
+  single implementation.
+
+- **Offline-first, deterministic core (CONV-1).** With no configuration the hash
+  embedder, in-memory store, and mock LLM activate automatically. This is the
+  documented offline mode, not a stub path: the hash embedder is stable across
+  runs and machines (blake2b, not Python's randomized `hash()`), the memory
+  store does exact cosine, and the mock provider is extractive and
+  citation-correct by construction — so tests are exact and the eval report is
+  reproducible. Backends switch on purely by environment variable; anything
+  unset falls back offline.
+
+- **Multi-provider routing with fallback + circuit breaker.** The router orders
+  registry candidates by the requested objective (`cost` / `latency` /
+  `quality`), tries them in order, and records every failover with its reason on
+  the `RoutingDecision`. A per-`provider:model` breaker opens immediately on a
+  429 (the provider told us to back off) or after N consecutive failures, skips
+  cooling-down circuits during routing, then allows one half-open trial. If
+  *every* candidate is cooling down it tries them anyway — degraded beats dead —
+  and `mock` is always the terminal fallback, so a request can degrade but never
+  dies with an empty hand. Structured outputs are schema-validated with one
+  retry before failover. Routing is **per task** (`twin_answer`, `twin_chat`,
+  `twin_interview`, `query_rewrite`, `rerank`, `eval_judge`), each pinnable or
+  re-objectived independently.
+
+- **Hybrid retrieval (BM25 + RRF).** Dense embeddings and BM25 live in
+  incomparable score spaces; reciprocal-rank fusion (`score = Σ 1/(60 + rank)`)
+  is rank-based, so it merges them without normalization gymnastics. On by
+  default; the benchmark measures vector-only vs hybrid so the choice is
+  evidence-backed.
+
+- **Layered evaluation, no composite score.** The harness reports three tables
+  that answer different questions: **retrieval** (hit-rate@k, MRR per chunking
+  strategy ± rerank ± hybrid), **grounding** (citation precision, claim-support
+  rate, refusal recall, false-refusal rate), and **answer quality** (token F1 /
+  fact presence vs reference, voice-violation rate). Collapsing these into one
+  "fidelity %" would hide *which* layer regressed; the report deliberately
+  refuses to.
+
+- **Data governance (CONV-2/3).** PII redaction is a mandatory ingest gate (spec
+  FR-9.2): deterministic regex + checksum (Luhn for cards, octet bounds for IPs),
+  replaced with typed numbered tokens (`[EMAIL_1]`) so redacted text stays
+  readable. Redaction *counts* are loggable and surfaced; redacted *values*
+  never leave the process. The browser persona builder previews exactly what the
+  gate would remove before anything is stored.
+
+**Trade-offs / what real backends add.** The hash embedder is a lexical
+projection, not a learned model — adequate for the demo corpus, and it flatters
+lexical reranking; re-run the eval with real embeddings (`ollama`/`openai`)
+before generalizing its numbers. The mock LLM is grounded but stylistically
+flat, so persona *voice* only really shows with a live provider. The
+claim-support and voice metrics use lexical heuristics offline; an **LLM judge**
+replaces each when a provider is configured, and the report labels which one
+produced every number. The in-memory store and BM25 index rebuild on ingest
+(microseconds at this scale); at production scale Atlas `$vectorSearch` and
+Atlas Search / OpenSearch sit behind the same ports unchanged. Chat memory is
+in-process — fine for a single replica, lost on restart, not shared across
+replicas.
+
+## Data model & invariants
+
+```
+Persona  { persona_id, name, tagline, bio, hexaco{6 traits 0..1}, voice_notes[], doc_count }
+Chunk    { chunk_id, doc_id, persona_id, text, strategy, char_span:(start,end) }
+Citation { doc_id, chunk_id, score, excerpt }   # excerpt ≤ 160 chars
 ```
 
-Optional web UI (React Router 7 + Tailwind + shadcn-style components;
-needs Node 20+): run `./run.sh serve` in one terminal and `./run.sh frontend`
-in another, then open <http://localhost:5173> — persona picker with
-HEXACO bars, citations, and a routing/timings debug panel, a **chat**
-tab that streams a multi-turn conversation token-by-token, and a
-**build** tab that creates a new twin with live PII-redaction preview, and an
-**interview** tab where one twin interviews another.
+Cardinal invariants:
+
+- **Tenant isolation.** Every retrieval (vector *and* BM25) is filtered by
+  `persona_id`, so a twin can only ever be grounded in — and cite — its own
+  corpus. Citations are produced solely from the persona-scoped retrieved set;
+  cross-persona leakage is structurally impossible.
+- **Citations ⊆ retrieved.** A citation is emitted only if its `chunk_id` is in
+  the set that was actually retrieved for *this* request; ids the model invents
+  are dropped (and the drop is visible in the debug payload). A refusal
+  (`answered=false`) carries no citations.
+- **Provenance is exact.** Each `Chunk` keeps the `char_span` it came from, so a
+  citation traces back to an exact substring of a source document.
+- **Redaction precedes storage.** No document text is embedded or upserted
+  before the redactor runs; counts are reported, values are not.
+- **Routing never raises.** `mock` is the terminal candidate, so `/ask` always
+  returns an `AskResponse` (possibly a refusal), never an empty hand.
+
+## API
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/health` | status, version, backends in use, cache stats, chunks indexed |
+| GET | `/metrics` | Prometheus exposition (request/LLM/cache counters, circuit gauges) |
+| GET | `/personas` · `/personas/{id}` | list / fetch personas (with HEXACO) |
+| POST | `/personas` · DELETE `/personas/{id}` | build / delete a browser twin (redacted, ingested live) |
+| POST | `/redaction/preview` | what the ingest gate would remove — counts by type |
+| POST | `/ask` | stateless grounded answer + validated citations (the measured path) |
+| POST | `/chat` | streamed conversational twin (SSE: `meta`→`token`→`citations`→`done`) |
+| POST | `/interview` | twin-vs-twin: one twin interviews another, grounded |
+| POST | `/ingest` | rebuild the index with a chosen chunking strategy |
+| GET/PUT | `/routing` | view / edit the per-task routing policy + see fallback plans |
+| GET/POST | `/benchmark` (+ `/aggregate` `/history` `/stop`) | run + browse model benchmarks |
 
 ```sh
 curl -s localhost:8000/ask -H 'content-type: application/json' -d '{
@@ -91,17 +228,24 @@ curl -s localhost:8000/ask -H 'content-type: application/json' -d '{
 }'
 ```
 
-`/ask` is the stateless, measured eval path. For a streamed multi-turn
-conversation, `POST /chat` returns Server-Sent Events (`meta` → `token`
-deltas → validated `citations` tail → `done`); omit `session_id` to start
-a thread, then pass it back to continue:
+## Quickstart
 
 ```sh
-curl -N localhost:8000/chat -H 'content-type: application/json' -d '{
-  "persona_id": "ada-quill",
-  "message": "What tomato variety are you growing this year?"
-}'
+./run.sh setup    # venv + dependencies (Python 3.11+)
+./run.sh demo     # ingest the synthetic corpus, query the twins, watch a refusal
+./run.sh test     # full suite; provider-contract tests auto-skip offline
+./run.sh eval     # regenerate eval-report.md (three tables, no composite)
+./run.sh serve    # uvicorn on :8000
+./run.sh smoke    # live smoke/regression (local, or --url <deploy>)
 ```
+
+Optional web UI (React Router 7 + Tailwind, needs Node 20+): run
+`./run.sh serve` in one terminal and `./run.sh frontend` in another, then open
+<http://localhost:5173> — a persona picker with HEXACO bars, citations, and a
+routing/timings debug panel; a **chat** tab that streams a multi-turn
+conversation token-by-token; a **build** tab that creates a new twin with live
+PII-redaction preview; and an **interview** tab where one twin interviews
+another.
 
 ### Switching on real backends
 
@@ -111,40 +255,28 @@ Copy `.env.example` → `.env` and set any of:
 |---|---|---|
 | `ANTHROPIC_API_KEY` | Anthropic provider in the router | `pip install -e ".[anthropic]"` |
 | `OPENAI_API_KEY` | OpenAI provider + OpenAI embeddings | `pip install -e ".[openai]"` |
-| `MONGODB_URI` | Atlas `$vectorSearch` store ([setup](docs/atlas-setup.md)) | `pip install -e ".[mongo]"` |
+| `OLLAMA_BASE_URL` | local Ollama models + embeddings | — |
+| `MONGODB_URI` | Atlas `$vectorSearch` store | `pip install -e ".[mongo]"` |
 | `REDIS_URL` | Redis answer/embedding cache (otherwise in-process LRU) | `pip install -e ".[redis]"` |
 | `PERSONA_TWIN_ROUTE_OBJECTIVE` | `cost` (default) / `latency` / `quality` | — |
 
-Backends are selected purely by environment — no code changes, and
-anything unset falls back offline.
+Backends are selected purely by environment — no code changes, and anything
+unset falls back offline.
 
 ## The personas
 
-Four fictional personas (authored for this repo, clearly marked as
-such) with deliberately distinct HEXACO profiles: a wry novelist, an
-extraverted strength coach, an anxious solo game developer, and a
-plainspoken retired ferry captain. Their documents cross-reference
-just enough to make retrieval interesting.
+Four fictional personas (authored for this repo, clearly marked as such) with
+deliberately distinct HEXACO profiles: **Ada Quill**, a cozy-mystery novelist
+and balcony gardener; **Buck Ramirez**, an extraverted strength coach;
+**Mei Tanaka**, an anxious solo indie game developer; and **Gus Okafor**, a
+plainspoken retired ferry captain. Their documents cross-reference just enough
+to make retrieval interesting.
 
-## Honest limitations
+---
 
-- The **hash embedder** is a lexical projection, not a learned model —
-  fine for the demo corpus, and it flatters lexical reranking; re-run
-  the eval with real embeddings before generalizing its numbers.
-- The **mock LLM** is extractive: grounded and citation-correct by
-  construction, stylistically flat. Persona voice only really shows
-  with a live provider.
-- The **claim-support heuristic** (offline) is lexical overlap; the
-  LLM judge replaces it when a provider is configured, and the report
-  labels which one produced each number.
-- PII redaction is deterministic-pattern only; names and free-text
-  identifiers need an NER pass (see [docs/data-governance.md](docs/data-governance.md)).
+Spec-driven: requirements in [docs/spec/spec.md](docs/spec/spec.md), task plan
+in [docs/spec/development-plan.md](docs/spec/development-plan.md).
 
-## Development
-
-Spec-driven: requirements in [docs/spec/spec.md](docs/spec/spec.md),
-task plan in [docs/spec/development-plan.md](docs/spec/development-plan.md).
-
-Contributors: wire up the secret scanner before committing —
-`ln -s ../../scripts/secret-scan.sh .git/hooks/pre-commit` (repo root;
-it blocks commits whose staged diff contains secret-shaped strings).
+Proprietary, offline-first, no secrets — conforms to the portfolio conventions
+(CONV-1…5: zero-cost reviewability, no secrets, synthetic data, engineering
+hygiene, local + remote smoke suite).
