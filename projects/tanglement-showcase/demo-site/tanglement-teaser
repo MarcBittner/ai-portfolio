@@ -1,0 +1,426 @@
+#!/usr/bin/env bash
+# =============================================================================
+# tanglement-teaser — unified control script for the Tanglement.ai teaser site
+# =============================================================================
+# One entry point for build / push / deploy / inspect, driven by named
+# switches. Cross-platform: auto-detects Linux (incl. TrueNAS Scale) and macOS
+# (Apple Silicon / Intel) and builds + deploys locally in that environment.
+#
+# Every parameter has a known-working default; every default is overridable
+# with a named switch.
+#
+#   ACTIONS (combine freely; run in this order: build -> push -> deploy)
+#     --build               Build the Docker image locally
+#     --push                Push the image to the registry (GHCR by default)
+#     --push-gcr            Also push to Google Container Registry
+#     --deploy              Run/replace the container locally
+#     --all                 Shorthand for --build --push --deploy
+#     --status              Show running-container status and exit
+#     --logs                Follow the container logs and exit
+#     --stop                Stop & remove the container and exit
+#     --git-push            git push using the deploy SSH key, then exit
+#
+#   PARAMETERS (override the defaults shown in brackets)
+#     --version VALUE       Image tag, e.g. 1.2.3        [local-<short-sha>]
+#     --tag VALUE           Alias for --version
+#     --image NAME          Image name or full ref       [marcbittner/teaser-site]
+#     --registry HOST       Registry host                [ghcr.io]
+#     --gcr-project ID      GCP project for --push-gcr   [tanglement-ai]
+#     --container NAME      Container name               [tanglement-teaser-site]
+#     --port N              Host port                    [3030]
+#     --container-port N    Container port               [3000]
+#     --context DIR         Docker build context         [the script's own directory]
+#     --dockerfile FILE     Dockerfile path              [<context>/Dockerfile]
+#     --platform P          Build platform               [host-native arch]
+#     --docker-bin PATH     Docker binary                [auto-detected]
+#     --env-file FILE       --env-file passed to docker run on --deploy
+#     --ssh-key FILE        SSH key for --git-push       [<context>/docs/spec/untracked/ghostlocalhost.pem]
+#     --restart POLICY      Container restart policy     [unless-stopped]
+#     --no-cache            Build without the Docker cache
+#     --no-latest           Do not also tag/push :latest on the main branch
+#     --dry-run             Print every command instead of executing it
+#     -h | --help           Show this help and exit
+#
+#   EXAMPLES
+#     ./tanglement-teaser --build
+#     ./tanglement-teaser --build --version 1.2.3 --deploy
+#     ./tanglement-teaser --build --push --deploy
+#     ./tanglement-teaser --deploy --image ghcr.io/marcbittner/teaser-site --tag latest
+#     ./tanglement-teaser --status
+#     ./tanglement-teaser --git-push
+# =============================================================================
+
+set -euo pipefail
+
+SCRIPT_VERSION="1.0.0"
+SCRIPT_NAME="$(basename "$0")"
+
+# -----------------------------------------------------------------------------
+# Logging
+# -----------------------------------------------------------------------------
+if [[ -t 1 && -z "${NO_COLOR:-}" ]]; then
+  C_RESET=$'\033[0m'; C_INFO=$'\033[0;36m'; C_OK=$'\033[0;32m'
+  C_WARN=$'\033[0;33m'; C_ERR=$'\033[0;31m'; C_STEP=$'\033[1;34m'
+else
+  C_RESET=""; C_INFO=""; C_OK=""; C_WARN=""; C_ERR=""; C_STEP=""
+fi
+log_info()  { printf '%s[info]%s  %s\n'  "$C_INFO" "$C_RESET" "$*"; }
+log_ok()    { printf '%s[ ok ]%s  %s\n'  "$C_OK"   "$C_RESET" "$*"; }
+log_warn()  { printf '%s[warn]%s  %s\n'  "$C_WARN" "$C_RESET" "$*" >&2; }
+log_error() { printf '%s[fail]%s  %s\n'  "$C_ERR"  "$C_RESET" "$*" >&2; }
+log_step()  { printf '\n%s==>%s %s\n'    "$C_STEP" "$C_RESET" "$*"; }
+die()       { log_error "$*"; exit 1; }
+
+usage() {
+  cat <<'USAGE'
+tanglement-teaser — unified control script for the Tanglement.ai teaser site
+
+One entry point for build / push / deploy / inspect, driven by named switches.
+Cross-platform: auto-detects Linux (incl. TrueNAS Scale) and macOS (Apple
+Silicon / Intel) and builds + deploys locally in that environment. Every
+parameter has a known-working default; every default is overridable.
+
+USAGE:
+  ./tanglement-teaser [ACTIONS] [PARAMETERS]
+
+ACTIONS (combine freely; run in order: build -> push -> deploy)
+  --build               Build the Docker image locally
+  --push                Push the image to the registry (GHCR by default)
+  --push-gcr            Also push to Google Container Registry
+  --deploy              Run/replace the container locally
+  --all                 Shorthand for --build --push --deploy
+  --status              Show running-container status and exit
+  --logs                Follow the container logs and exit
+  --stop                Stop & remove the container and exit
+  --git-push            git push using the deploy SSH key, then exit
+
+PARAMETERS (defaults in brackets)
+  --version VALUE       Image tag, e.g. 1.2.3        [local-<short-sha>]
+  --tag VALUE           Alias for --version
+  --image NAME          Image name or full ref       [marcbittner/teaser-site]
+  --registry HOST       Registry host                [ghcr.io]
+  --gcr-project ID      GCP project for --push-gcr   [tanglement-ai]
+  --container NAME      Container name               [tanglement-teaser-site]
+  --port N              Host port                    [3030]
+  --container-port N    Container port               [3000]
+  --context DIR         Docker build context         [the script's own directory]
+  --dockerfile FILE     Dockerfile path              [<context>/Dockerfile]
+  --platform P          Build platform               [host-native arch]
+  --docker-bin PATH     Docker binary                [auto-detected]
+  --env-file FILE       --env-file passed to docker run on --deploy
+  --ssh-key FILE        SSH key for --git-push       [<context>/docs/spec/untracked/ghostlocalhost.pem]
+  --restart POLICY      Container restart policy     [unless-stopped]
+  --no-cache            Build without the Docker cache
+  --no-latest           Do not also tag/push :latest on the main branch
+  --dry-run             Print every command instead of executing it
+  -h | --help           Show this help and exit
+
+EXAMPLES
+  ./tanglement-teaser --build
+  ./tanglement-teaser --build --version 1.2.3 --deploy
+  ./tanglement-teaser --build --push --deploy
+  ./tanglement-teaser --deploy --image ghcr.io/marcbittner/teaser-site --tag latest
+  ./tanglement-teaser --status
+  ./tanglement-teaser --git-push
+USAGE
+}
+
+# -----------------------------------------------------------------------------
+# Defaults
+# -----------------------------------------------------------------------------
+REGISTRY="ghcr.io"
+IMAGE_NAME="marcbittner/teaser-site"
+GCR_PROJECT="tanglement-ai"
+CONTAINER_NAME="tanglement-teaser-site"
+HOST_PORT="3030"
+CONTAINER_PORT="3000"
+RESTART_POLICY="unless-stopped"
+TAG=""                 # resolved later (defaults to local-<short-sha>)
+CONTEXT=""             # resolved later (<repo>/packages/teaser-site)
+DOCKERFILE=""          # resolved later (<context>/Dockerfile)
+PLATFORM=""            # resolved later (host-native)
+DOCKER_BIN=""          # resolved later (auto-detect)
+ENV_FILE=""
+SSH_KEY=""             # resolved later (<context>/docs/spec/untracked/ghostlocalhost.pem)
+NO_CACHE=false
+ALSO_LATEST=true
+DRY_RUN=false
+
+DO_BUILD=false; DO_PUSH=false; DO_PUSH_GCR=false; DO_DEPLOY=false
+DO_STATUS=false; DO_LOGS=false; DO_STOP=false; DO_GIT_PUSH=false
+
+# -----------------------------------------------------------------------------
+# Parse arguments
+# -----------------------------------------------------------------------------
+[[ $# -eq 0 ]] && { usage; exit 0; }
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --build)         DO_BUILD=true; shift ;;
+    --push)          DO_PUSH=true; shift ;;
+    --push-gcr)      DO_PUSH_GCR=true; shift ;;
+    --deploy)        DO_DEPLOY=true; shift ;;
+    --all)           DO_BUILD=true; DO_PUSH=true; DO_DEPLOY=true; shift ;;
+    --status)        DO_STATUS=true; shift ;;
+    --logs)          DO_LOGS=true; shift ;;
+    --stop)          DO_STOP=true; shift ;;
+    --git-push)      DO_GIT_PUSH=true; shift ;;
+    --version|--tag) TAG="${2:?--version/--tag needs a value}"; shift 2 ;;
+    --image)         IMAGE_NAME="${2:?--image needs a value}"; shift 2 ;;
+    --registry)      REGISTRY="${2:?--registry needs a value}"; shift 2 ;;
+    --gcr-project)   GCR_PROJECT="${2:?--gcr-project needs a value}"; shift 2 ;;
+    --container)     CONTAINER_NAME="${2:?--container needs a value}"; shift 2 ;;
+    --port)          HOST_PORT="${2:?--port needs a value}"; shift 2 ;;
+    --container-port)CONTAINER_PORT="${2:?--container-port needs a value}"; shift 2 ;;
+    --context)       CONTEXT="${2:?--context needs a value}"; shift 2 ;;
+    --dockerfile)    DOCKERFILE="${2:?--dockerfile needs a value}"; shift 2 ;;
+    --platform)      PLATFORM="${2:?--platform needs a value}"; shift 2 ;;
+    --docker-bin)    DOCKER_BIN="${2:?--docker-bin needs a value}"; shift 2 ;;
+    --env-file)      ENV_FILE="${2:?--env-file needs a value}"; shift 2 ;;
+    --ssh-key)       SSH_KEY="${2:?--ssh-key needs a value}"; shift 2 ;;
+    --restart)       RESTART_POLICY="${2:?--restart needs a value}"; shift 2 ;;
+    --no-cache)      NO_CACHE=true; shift ;;
+    --no-latest)     ALSO_LATEST=false; shift ;;
+    --dry-run)       DRY_RUN=true; shift ;;
+    -h|--help)       usage; exit 0 ;;
+    --version-info)  echo "$SCRIPT_NAME $SCRIPT_VERSION"; exit 0 ;;
+    *)               die "Unknown option: $1  (try --help)" ;;
+  esac
+done
+
+# run CMD... — echo, then execute unless --dry-run
+run() {
+  printf '%s$ %s%s\n' "$C_INFO" "$*" "$C_RESET"
+  $DRY_RUN || "$@"
+}
+
+# -----------------------------------------------------------------------------
+# Resolve environment: repo root, platform, docker binary
+# -----------------------------------------------------------------------------
+OS="$(uname -s)"
+ARCH="$(uname -m)"
+case "$OS" in
+  Linux)  PLATFORM_LABEL="Linux" ;;
+  Darwin) PLATFORM_LABEL="macOS" ;;
+  *)      PLATFORM_LABEL="$OS" ;;
+esac
+
+# Native build platform (so the image runs on this host) unless overridden.
+if [[ -z "$PLATFORM" ]]; then
+  case "$ARCH" in
+    x86_64|amd64)  PLATFORM="linux/amd64" ;;
+    arm64|aarch64) PLATFORM="linux/arm64" ;;
+    *)             PLATFORM="linux/amd64"; log_warn "Unknown arch '$ARCH'; defaulting platform to linux/amd64" ;;
+  esac
+fi
+
+# Repo root: prefer git; fall back to this script's directory.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null)"; then :; else
+  REPO_ROOT="$SCRIPT_DIR"
+  log_warn "Not inside a git repo; using script directory as repo root: $REPO_ROOT"
+fi
+
+# This script lives inside the teaser-site package, so its own directory IS the
+# default build context. REPO_ROOT (above) is still used for git operations.
+[[ -z "$CONTEXT" ]]    && CONTEXT="$SCRIPT_DIR"
+[[ -z "$DOCKERFILE" ]] && DOCKERFILE="$CONTEXT/Dockerfile"
+[[ -z "$SSH_KEY" ]]    && SSH_KEY="$CONTEXT/docs/spec/untracked/ghostlocalhost.pem"
+
+# Docker binary: PATH first, then TrueNAS host path.
+if [[ -z "$DOCKER_BIN" ]]; then
+  if command -v docker >/dev/null 2>&1; then
+    DOCKER_BIN="$(command -v docker)"
+  elif [[ -x /host/usr/bin/docker ]]; then
+    DOCKER_BIN="/host/usr/bin/docker"
+    log_info "Using TrueNAS host Docker at $DOCKER_BIN"
+  else
+    DOCKER_BIN="docker"  # leave as-is; will fail loudly when first used
+  fi
+fi
+
+# Git metadata (best-effort; works even on a detached/shallow checkout).
+GIT_BRANCH="$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)"
+GIT_SHA="$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || echo unknown)"
+GIT_SHORT_SHA="$(git -C "$REPO_ROOT" rev-parse --short HEAD 2>/dev/null || echo nogit)"
+BUILD_TIMESTAMP="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+
+# Tag default.
+[[ -z "$TAG" ]] && TAG="local-$GIT_SHORT_SHA"
+
+# Fully-qualified image reference. If --image already includes a registry host
+# (first path segment contains '.' or ':'), trust it; otherwise prepend registry.
+first_seg="${IMAGE_NAME%%/*}"
+if [[ "$IMAGE_NAME" == *"/"* && ( "$first_seg" == *"."* || "$first_seg" == *":"* ) ]]; then
+  IMAGE_REF="$IMAGE_NAME"
+else
+  IMAGE_REF="$REGISTRY/$IMAGE_NAME"
+fi
+IMAGE_TAGGED="$IMAGE_REF:$TAG"
+IMAGE_LATEST="$IMAGE_REF:latest"
+
+# Only treat :latest as a second tag when on main (mirrors build-local.sh).
+USE_LATEST=false
+if $ALSO_LATEST && [[ "$GIT_BRANCH" == "main" && "$TAG" != "latest" ]]; then
+  USE_LATEST=true
+fi
+
+# -----------------------------------------------------------------------------
+# Banner
+# -----------------------------------------------------------------------------
+cat <<BANNER
+============================================================
+  tanglement-teaser ${SCRIPT_VERSION}
+============================================================
+  Platform:   ${PLATFORM_LABEL} (${ARCH})  ->  build ${PLATFORM}
+  Docker:     ${DOCKER_BIN}
+  Repo root:  ${REPO_ROOT}
+  Context:    ${CONTEXT}
+  Image:      ${IMAGE_TAGGED}$( $USE_LATEST && printf '  (+ :latest)' )
+  Branch:     ${GIT_BRANCH} @ ${GIT_SHORT_SHA}
+  Dry run:    ${DRY_RUN}
+============================================================
+BANNER
+
+# -----------------------------------------------------------------------------
+# Helpers
+# -----------------------------------------------------------------------------
+require_docker() {
+  if ! $DRY_RUN && ! command -v "$DOCKER_BIN" >/dev/null 2>&1 && [[ ! -x "$DOCKER_BIN" ]]; then
+    die "Docker not found ('$DOCKER_BIN'). Install Docker or pass --docker-bin."
+  fi
+}
+
+# -----------------------------------------------------------------------------
+# Inspect-only actions (run and exit)
+# -----------------------------------------------------------------------------
+if $DO_STATUS; then
+  require_docker
+  log_step "Container status: $CONTAINER_NAME"
+  run "$DOCKER_BIN" ps -a --filter "name=^/${CONTAINER_NAME}$" \
+    --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}\t{{.Image}}'
+  exit 0
+fi
+
+if $DO_LOGS; then
+  require_docker
+  log_step "Following logs: $CONTAINER_NAME (Ctrl-C to stop)"
+  run "$DOCKER_BIN" logs -f "$CONTAINER_NAME"
+  exit 0
+fi
+
+if $DO_STOP; then
+  require_docker
+  log_step "Stopping & removing: $CONTAINER_NAME"
+  run "$DOCKER_BIN" stop "$CONTAINER_NAME" || true
+  run "$DOCKER_BIN" rm "$CONTAINER_NAME" || true
+  log_ok "Stopped."
+  exit 0
+fi
+
+if $DO_GIT_PUSH; then
+  [[ -f "$SSH_KEY" ]] || die "SSH key not found: $SSH_KEY (pass --ssh-key)"
+  log_step "git push using $SSH_KEY"
+  export GIT_SSH_COMMAND="ssh -i $SSH_KEY -o StrictHostKeyChecking=no"
+  run git -C "$REPO_ROOT" push origin "$GIT_BRANCH"
+  log_ok "Pushed $GIT_BRANCH."
+  exit 0
+fi
+
+# Nothing to do?
+if ! $DO_BUILD && ! $DO_PUSH && ! $DO_PUSH_GCR && ! $DO_DEPLOY; then
+  log_warn "No action requested. Use --build / --push / --deploy / --all (see --help)."
+  exit 0
+fi
+
+# -----------------------------------------------------------------------------
+# Build
+# -----------------------------------------------------------------------------
+if $DO_BUILD; then
+  require_docker
+  log_step "Pre-build checks"
+  [[ -f "$DOCKERFILE" ]] || die "Dockerfile not found: $DOCKERFILE"
+  [[ -f "$CONTEXT/package.json" ]] || die "package.json not found in context: $CONTEXT"
+  log_ok "Context and Dockerfile present."
+
+  log_step "Building image $IMAGE_TAGGED"
+  build_args=(build --platform "$PLATFORM"
+    --build-arg "BUILD_DATE=$BUILD_TIMESTAMP"
+    --build-arg "VCS_REF=$GIT_SHA"
+    --build-arg "VERSION=$TAG"
+    -t "$IMAGE_TAGGED"
+    -f "$DOCKERFILE")
+  $NO_CACHE && build_args+=(--no-cache)
+  $USE_LATEST && build_args+=(-t "$IMAGE_LATEST")
+  build_args+=("$CONTEXT")
+  run "$DOCKER_BIN" "${build_args[@]}"
+  log_ok "Build complete."
+fi
+
+# -----------------------------------------------------------------------------
+# Push (GHCR / configured registry)
+# -----------------------------------------------------------------------------
+if $DO_PUSH; then
+  require_docker
+  log_step "Pushing $IMAGE_TAGGED"
+  run "$DOCKER_BIN" push "$IMAGE_TAGGED"
+  if $USE_LATEST; then
+    run "$DOCKER_BIN" push "$IMAGE_LATEST"
+  fi
+  log_ok "Pushed to $REGISTRY."
+fi
+
+# -----------------------------------------------------------------------------
+# Push to GCR (optional)
+# -----------------------------------------------------------------------------
+if $DO_PUSH_GCR; then
+  require_docker
+  GCR_REF="gcr.io/$GCR_PROJECT/${IMAGE_NAME##*/}"
+  log_step "Pushing to GCR: $GCR_REF:$TAG"
+  if $DRY_RUN || command -v gcloud >/dev/null 2>&1; then
+    run gcloud auth configure-docker gcr.io --quiet || true
+    run "$DOCKER_BIN" tag "$IMAGE_TAGGED" "$GCR_REF:$TAG"
+    run "$DOCKER_BIN" push "$GCR_REF:$TAG"
+    log_ok "Pushed to GCR."
+  else
+    log_warn "gcloud not found; skipping GCR push."
+  fi
+fi
+
+# -----------------------------------------------------------------------------
+# Deploy locally
+# -----------------------------------------------------------------------------
+if $DO_DEPLOY; then
+  require_docker
+  log_step "Deploying $IMAGE_TAGGED as $CONTAINER_NAME on :$HOST_PORT"
+
+  # Replace any existing container.
+  run "$DOCKER_BIN" stop "$CONTAINER_NAME" || true
+  run "$DOCKER_BIN" rm "$CONTAINER_NAME" || true
+
+  run_args=(run -d
+    --name "$CONTAINER_NAME"
+    --restart "$RESTART_POLICY"
+    -p "$HOST_PORT:$CONTAINER_PORT")
+  [[ -n "$ENV_FILE" ]] && { [[ -f "$ENV_FILE" ]] || die "env file not found: $ENV_FILE"; run_args+=(--env-file "$ENV_FILE"); }
+  run_args+=(
+    --health-cmd "node -e \"require('http').get('http://localhost:$CONTAINER_PORT/api/health',(r)=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))\""
+    --health-interval=30s --health-timeout=3s --health-retries=3 --health-start-period=40s
+    "$IMAGE_TAGGED")
+  run "$DOCKER_BIN" "${run_args[@]}"
+
+  if ! $DRY_RUN; then
+    sleep 3
+    if "$DOCKER_BIN" ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+      log_ok "Deployed: http://localhost:$HOST_PORT  (container $CONTAINER_NAME)"
+    else
+      log_error "Container not running. Check: $DOCKER_BIN logs $CONTAINER_NAME"
+      exit 1
+    fi
+  fi
+fi
+
+log_step "Done."
+echo "Image:     $IMAGE_TAGGED"
+$DO_DEPLOY && echo "Local URL: http://localhost:$HOST_PORT"
+exit 0

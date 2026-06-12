@@ -1,0 +1,20 @@
+{
+  "service": "teaser-site",
+  "environment": "production",
+  "version": "",
+  "image": "",
+  "digest": "",
+  "timestamp": "",
+  "commit": {
+    "sha": "",
+    "message": "",
+    "author": "",
+    "url": ""
+  },
+  "status": "pending",
+  "deployed": false,
+  "deployment_required": false,
+  "deployed_at": null,
+  "deployed_by": null,
+  "deployment_logs": []
+}

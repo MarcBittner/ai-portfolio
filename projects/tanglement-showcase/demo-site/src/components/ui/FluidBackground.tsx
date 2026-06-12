@@ -144,16 +144,23 @@ export function FluidBackground({
       float screenDiagonal = length(uResolution);
       float distToMouse = length(fragPx - mousePx) / screenDiagonal;
 
-      // Very tight, dramatic spotlight - almost complete darkness outside
-      float spotlightRadius = 0.15; // Adjusted for diagonal-normalized distance
-      float spotlight = 1.0 - smoothstep(0.0, spotlightRadius, distToMouse);
-      spotlight = pow(spotlight, 4.0); // Very sharp falloff for dramatic effect
+      // Bright core wrapped in a wide, gradual dimming halo.
+      // Distance is diagonal-normalized.
+      float coreRadius = 0.22; // small, bright center
+      float haloRadius = 0.50; // larger surrounding halo (slightly smaller overall)
 
-      // Almost complete darkness - only 1% ambient light for dramatic effect
-      float baseBrightness = 0.01;
+      // Core: flat & bright at the very center, then drops off quickly once we
+      // leave the center.
+      float core = 1.0 - smoothstep(0.0, coreRadius, distToMouse);
+      core = pow(core, 2.0);
 
-      // Very bright reveal in spotlight (3x brightness)
-      float brightness = mix(baseBrightness, 3.0, spotlight);
+      // Halo: gentle, long tail so the lower intensities fade out gradually.
+      float halo = 1.0 - smoothstep(0.0, haloRadius, distToMouse);
+      halo = pow(halo, 0.8);
+
+      // Dim (not black) surroundings + quick-dropping core + gradual halo.
+      float baseBrightness = 0.12;
+      float brightness = baseBrightness + core * 1.35 + halo * 0.5;
 
       finalColor *= brightness;
 
@@ -173,21 +180,24 @@ export function FluidBackground({
       alpha: true,
     });
 
-    const updateSize = () => {
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-      if (uniformsRef.current) {
-        uniformsRef.current.uResolution.value.set(window.innerWidth, window.innerHeight);
-      }
-    };
+    // Size the renderer first so the drawing-buffer size is known before we
+    // initialise uResolution.
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
 
-    updateSize();
+    // gl_FragCoord (used in the shader) is in *device* pixels — i.e.
+    // CSS pixels * devicePixelRatio. uResolution must match, otherwise
+    // `uMouse * uResolution` lands at the wrong pixel and the spotlight is
+    // offset from the cursor on HiDPI/Retina displays (mouse in the centre
+    // ends up rendering in the lower-left quadrant at a 2x pixel ratio).
+    const drawingBuffer = new THREE.Vector2();
+    renderer.getDrawingBufferSize(drawingBuffer);
 
     // Brand colors (converted to 0-1 range)
     const uniforms = {
       uTime: { value: 0 },
       uMouse: { value: new THREE.Vector2(0.5, 0.5) },
-      uResolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
+      uResolution: { value: drawingBuffer.clone() },
       uSpeed: { value: speed },
       uIntensity: { value: 1.0 },
       uColor1: { value: new THREE.Vector3(0.04, 0.15, 0.25) }, // Deep blue #0a2540
@@ -210,13 +220,21 @@ export function FluidBackground({
     rendererRef.current = renderer;
     uniformsRef.current = uniforms;
 
-    // Mouse move handler with static offset correction
+    // Keep the renderer and uResolution in sync on resize, in device pixels.
+    const updateSize = () => {
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      const size = new THREE.Vector2();
+      renderer.getDrawingBufferSize(size);
+      uniforms.uResolution.value.copy(size);
+    };
+
+    // Mouse move handler. uMouse is normalised 0..1 with y flipped to match
+    // WebGL's bottom-left origin; the shader scales it by uResolution (device
+    // pixels) to recover the cursor's fragment position.
     const handleMouseMove = (e: MouseEvent) => {
-      // Apply static offset to match canvas coordinates
-      const offsetX = 0;
-      const offsetY = 0;
-      mouseRef.current.target.x = (e.clientX + offsetX) / window.innerWidth;
-      mouseRef.current.target.y = 1.0 - (e.clientY + offsetY) / window.innerHeight;
+      mouseRef.current.target.x = e.clientX / window.innerWidth;
+      mouseRef.current.target.y = 1.0 - e.clientY / window.innerHeight;
     };
 
     // Animation loop

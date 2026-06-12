@@ -167,7 +167,7 @@ export function CodeSamples({
   const { ref: featuresRef, isVisible: featuresVisible } = useScrollAnimation({ threshold: 0.2, delay: 300 });
 
   return (
-    <Section spacing="xl" variant="dark" className={cn('relative overflow-hidden', className)}>
+    <Section spacing="xl" variant="default" className={cn('relative overflow-hidden', className)}>
       {/* Background Gradient with mesh */}
       <div className="absolute inset-0 bg-gradient-to-br from-brand-primary/10 via-transparent to-brand-accent/10 pointer-events-none" />
       <div className="absolute inset-0 gradient-mesh opacity-30 pointer-events-none" />
@@ -234,7 +234,7 @@ export function CodeSamples({
             featuresVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
           )}
         >
-          <div className="p-6 rounded-lg bg-gray-900/50 border border-gray-800">
+          <div className="p-6 rounded-lg card-surface">
             <div className="text-brand-accent text-2xl font-bold mb-2">100%</div>
             <div className="text-white font-semibold mb-1">API Compatible</div>
             <div className="text-sm text-gray-400">
@@ -242,7 +242,7 @@ export function CodeSamples({
             </div>
           </div>
 
-          <div className="p-6 rounded-lg bg-gray-900/50 border border-gray-800">
+          <div className="p-6 rounded-lg card-surface">
             <div className="text-brand-accent text-2xl font-bold mb-2">&lt; 5min</div>
             <div className="text-white font-semibold mb-1">Setup Time</div>
             <div className="text-sm text-gray-400">
@@ -250,7 +250,7 @@ export function CodeSamples({
             </div>
           </div>
 
-          <div className="p-6 rounded-lg bg-gray-900/50 border border-gray-800">
+          <div className="p-6 rounded-lg card-surface">
             <div className="text-brand-accent text-2xl font-bold mb-2">0</div>
             <div className="text-white font-semibold mb-1">Code Changes</div>
             <div className="text-sm text-gray-400">

@@ -87,7 +87,7 @@ export function Footer({ className }: FooterProps) {
   const currentYear = new Date().getFullYear();
 
   return (
-    <Section as="footer" spacing="xl" variant="muted" className={cn('border-t border-gray-200', className)}>
+    <Section as="footer" spacing="xl" variant="muted" className={cn('border-t border-white/10', className)}>
       <Container>
         <Grid cols={12} gap="lg" className="mb-12">
           {/* Brand Column */}
@@ -118,7 +118,7 @@ export function Footer({ className }: FooterProps) {
                     href={link.href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-gray-500 hover:text-brand-primary transition-colors"
+                    className="text-gray-400 hover:text-brand-accent transition-colors"
                     aria-label={link.label}
                   >
                     {link.icon}
@@ -131,13 +131,13 @@ export function Footer({ className }: FooterProps) {
           {/* Product Links */}
           <div className="col-span-6 md:col-span-2">
             <Stack spacing="sm">
-              <h4 className="font-semibold text-gray-900">Product</h4>
+              <h4 className="font-semibold text-white">Product</h4>
               <ul className="space-y-2">
                 {footerLinks.product.map((link) => (
                   <li key={link.href}>
                     <Link
                       href={link.href}
-                      className="text-sm text-gray-600 hover:text-brand-primary transition-colors"
+                      className="text-sm text-gray-400 hover:text-brand-accent transition-colors"
                     >
                       {link.label}
                     </Link>
@@ -150,13 +150,13 @@ export function Footer({ className }: FooterProps) {
           {/* Company Links */}
           <div className="col-span-6 md:col-span-2">
             <Stack spacing="sm">
-              <h4 className="font-semibold text-gray-900">Company</h4>
+              <h4 className="font-semibold text-white">Company</h4>
               <ul className="space-y-2">
                 {footerLinks.company.map((link) => (
                   <li key={link.href}>
                     <Link
                       href={link.href}
-                      className="text-sm text-gray-600 hover:text-brand-primary transition-colors"
+                      className="text-sm text-gray-400 hover:text-brand-accent transition-colors"
                     >
                       {link.label}
                     </Link>
@@ -169,13 +169,13 @@ export function Footer({ className }: FooterProps) {
           {/* Legal Links */}
           <div className="col-span-6 md:col-span-2">
             <Stack spacing="sm">
-              <h4 className="font-semibold text-gray-900">Legal</h4>
+              <h4 className="font-semibold text-white">Legal</h4>
               <ul className="space-y-2">
                 {footerLinks.legal.map((link) => (
                   <li key={link.href}>
                     <Link
                       href={link.href}
-                      className="text-sm text-gray-600 hover:text-brand-primary transition-colors"
+                      className="text-sm text-gray-400 hover:text-brand-accent transition-colors"
                     >
                       {link.label}
                     </Link>
@@ -188,8 +188,8 @@ export function Footer({ className }: FooterProps) {
           {/* Newsletter Signup */}
           <div className="col-span-6 md:col-span-2">
             <Stack spacing="sm">
-              <h4 className="font-semibold text-gray-900">Stay Updated</h4>
-              <p className="text-sm text-gray-600">Get notified about launch updates and new features.</p>
+              <h4 className="font-semibold text-white">Stay Updated</h4>
+              <p className="text-sm text-gray-400">Get notified about launch updates and new features.</p>
               <Link
                 href="/#waitlist"
                 className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-brand-primary text-white text-sm font-medium hover:bg-brand-primary/90 transition-colors"
@@ -201,7 +201,7 @@ export function Footer({ className }: FooterProps) {
         </Grid>
 
         {/* Bottom Bar */}
-        <div className="pt-8 border-t border-gray-200">
+        <div className="pt-8 border-t border-white/10">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <p className="text-sm text-gray-500">&copy; {currentYear} Tanglement.ai. All rights reserved.</p>
             <p className="text-sm text-gray-500">

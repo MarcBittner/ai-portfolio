@@ -58,10 +58,7 @@ export function FAQ({
   return (
     <section
       id="faq"
-      className={cn(
-        'w-full bg-gradient-to-b from-white to-gray-50 py-24 dark:from-black dark:to-gray-900',
-        className
-      )}
+      className={cn('w-full bg-transparent py-24', className)}
     >
       <div className="container mx-auto max-w-4xl px-6">
         {/* Header */}
@@ -85,11 +82,11 @@ export function FAQ({
               <Accordion.Item
                 key={index}
                 value={`item-${index}`}
-                className="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900"
+                className="card-surface overflow-hidden rounded-lg transition-colors hover:border-brand-accent/40"
               >
                 <Accordion.Header>
-                  <Accordion.Trigger className="group flex w-full items-center justify-between px-6 py-5 text-left font-medium transition-all hover:bg-gray-50 dark:hover:bg-gray-800">
-                    <span className="text-lg text-gray-900 dark:text-gray-100">
+                  <Accordion.Trigger className="group flex w-full items-center justify-between px-6 py-5 text-left font-medium transition-all hover:bg-white/5">
+                    <span className="text-lg text-gray-100">
                       {item.question}
                     </span>
                     <ChevronDown
@@ -115,11 +112,11 @@ export function FAQ({
             <Accordion.Item
               key={index}
               value={`item-${index}`}
-              className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-950"
+              className="card-surface overflow-hidden rounded-lg transition-all hover:border-brand-accent/40 hover:shadow-md"
             >
               <Accordion.Header className="flex">
-                <Accordion.Trigger className="group flex w-full items-center justify-between px-6 py-5 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-900">
-                  <span className="text-lg font-semibold text-gray-900 dark:text-gray-50">
+                <Accordion.Trigger className="group flex w-full items-center justify-between px-6 py-5 text-left transition-colors hover:bg-white/5">
+                  <span className="text-lg font-semibold text-gray-50">
                     {item.question}
                   </span>
                   <ChevronDown

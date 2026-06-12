@@ -31,9 +31,9 @@ const testimonialVariants = cva(
   {
     variants: {
       variant: {
-        default: 'bg-white border border-gray-200 shadow-md hover:shadow-xl hover:shadow-brand-accent/10 hover:border-brand-accent/30',
-        compact: 'bg-gray-50 border border-gray-100 hover:bg-white hover:shadow-lg',
-        dark: 'bg-gray-900 border border-gray-800 text-white hover:border-brand-accent/50 hover:shadow-xl hover:shadow-brand-accent/20',
+        default: 'card-surface hover:shadow-xl hover:shadow-brand-accent/10 hover:border-brand-accent/30',
+        compact: 'card-surface hover:shadow-lg hover:border-brand-accent/20',
+        dark: 'card-surface text-white hover:border-brand-accent/50 hover:shadow-xl hover:shadow-brand-accent/20',
       },
     },
     defaultVariants: {
@@ -143,12 +143,7 @@ function TestimonialCard({
       )}
 
       {/* Quote */}
-      <blockquote
-        className={cn(
-          'mb-6 text-base leading-relaxed',
-          variant === 'dark' ? 'text-gray-100' : 'text-gray-700'
-        )}
-      >
+      <blockquote className="mb-6 text-base leading-relaxed text-gray-200">
         "{testimonial.quote}"
       </blockquote>
 
@@ -175,20 +170,10 @@ function TestimonialCard({
 
         {/* Name and Role */}
         <div className="flex-1">
-          <div
-            className={cn(
-              'font-semibold',
-              variant === 'dark' ? 'text-white' : 'text-gray-900'
-            )}
-          >
+          <div className="font-semibold text-white">
             {testimonial.name}
           </div>
-          <div
-            className={cn(
-              'text-sm',
-              variant === 'dark' ? 'text-gray-400' : 'text-gray-600'
-            )}
-          >
+          <div className="text-sm text-gray-400">
             {testimonial.role} at {testimonial.company}
           </div>
         </div>
@@ -216,20 +201,10 @@ export function Testimonials({
       <Container>
         {/* Header */}
         <div className="mb-16 text-center">
-          <p
-            className={cn(
-              'mb-3 text-sm font-semibold uppercase tracking-wider',
-              variant === 'dark' ? 'text-brand-accent' : 'text-accent'
-            )}
-          >
+          <p className="mb-3 text-sm font-semibold uppercase tracking-wider text-brand-accent">
             {subtitle}
           </p>
-          <h2
-            className={cn(
-              'text-4xl font-bold',
-              variant === 'dark' ? 'text-white' : 'text-gray-900'
-            )}
-          >
+          <h2 className="text-4xl font-bold text-white">
             {title}
           </h2>
         </div>
@@ -249,12 +224,7 @@ export function Testimonials({
 
         {/* Optional CTA */}
         <div className="mt-12 text-center">
-          <p
-            className={cn(
-              'text-sm',
-              variant === 'dark' ? 'text-gray-400' : 'text-gray-600'
-            )}
-          >
+          <p className="text-sm text-gray-400">
             Join the waitlist to experience these benefits yourself
           </p>
         </div>

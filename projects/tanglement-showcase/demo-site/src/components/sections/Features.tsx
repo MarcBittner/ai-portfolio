@@ -96,8 +96,7 @@ function FeatureCard({ feature }: FeatureCardProps) {
       href={feature.href}
       className={cn(
         'group relative p-8 rounded-2xl overflow-hidden',
-        'bg-white dark:bg-gray-900',
-        'border border-gray-200 dark:border-gray-800',
+        'card-surface',
         'transition-all duration-500 ease-out',
         'hover:shadow-2xl hover:shadow-brand-accent/20',
         'hover:border-brand-accent/50',

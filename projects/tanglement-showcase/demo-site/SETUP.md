@@ -18,7 +18,7 @@ If not installed, install from: https://nodejs.org/
 
 ### Step 1: Initialize Next.js Project
 
-From the teaser-site package root, run:
+From this directory (`/home/phaedrus/gits/tanglement.ai/packages/teaser-site`), run:
 
 ```bash
 npx create-next-app@latest . --typescript --tailwind --eslint --app --src-dir --import-alias "@/*" --no-git
@@ -37,7 +37,7 @@ npx create-next-app@latest . --typescript --tailwind --eslint --app --src-dir --
 
 Once Next.js is initialized, continue with the prompts in:
 
-`docs/spec/15-teaser-site/teaser-site-claude-code-prompts.md` (relative to the tanglement.ai repo root)
+`/home/phaedrus/gits/tanglement.ai/docs/spec/15-teaser-site/teaser-site-claude-code-prompts.md`
 
 Start with **Prompt P1-02: Install Dependencies and Configure Tools**
 

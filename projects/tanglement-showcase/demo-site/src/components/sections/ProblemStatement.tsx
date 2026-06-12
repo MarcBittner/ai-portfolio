@@ -158,7 +158,7 @@ function PainPointCard({
     <div
       ref={cardRef}
       className={cn(
-        'group relative p-8 rounded-2xl bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700',
+        'group relative p-8 rounded-2xl card-surface',
         'hover:border-error hover:shadow-xl transition-all duration-300',
         'transform',
         isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'

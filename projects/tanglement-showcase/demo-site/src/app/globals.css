@@ -1,5 +1,11 @@
 @import 'tailwindcss';
 
+/* The entire UI is presented over a dark, animated WebGL background, so the
+   site is always dark. Make Tailwind's `dark:` variant class-based (driven by
+   the `.dark` class on <html>) instead of following the OS preference, so the
+   dark styling applies consistently for every visitor. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* ============================================
    Tanglement.ai Design System
    ============================================ */
@@ -97,6 +103,20 @@
     --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.5), 0 4px 6px -4px rgb(0 0 0 / 0.5);
     --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.5);
   }
+}
+
+/* Always-on dark theme tokens (the site renders over a dark animated
+   background). `.dark` is set on <html>, so these win over the light :root
+   defaults and also cover elements that have no explicit `dark:` color. */
+.dark {
+  --background: #070b14;
+  --foreground: #e6ebf1;
+
+  --surface-primary: #0a0f1e;
+  --surface-secondary: #070b14;
+  --surface-tertiary: #1a1f36;
+  --border-primary: #1a1f36;
+  --border-secondary: #0a0f1e;
 }
 
 /* Tailwind Theme Configuration */
@@ -537,6 +557,17 @@ body {
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
     border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  /* Unified card surface — the single dark, translucent "glass" treatment
+     used for every card on the site so the animated background shows through
+     consistently. Pair with `card-3d` for the tilt and add hover border/shadow
+     utilities (e.g. hover:border-brand-accent/50) at the call site. */
+  .card-surface {
+    background-color: rgba(10, 15, 30, 0.55); /* gray-900 @ 55% */
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(26, 31, 54, 0.9); /* gray-800 */
   }
 
   /* Gradient mesh background */

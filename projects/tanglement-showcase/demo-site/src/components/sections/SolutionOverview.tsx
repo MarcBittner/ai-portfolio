@@ -229,7 +229,7 @@ function BenefitCard({
     <div
       ref={cardRef}
       className={cn(
-        'group p-6 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700',
+        'group p-6 rounded-xl card-surface',
         'hover:border-brand-accent hover:shadow-lg transition-all duration-300',
         'transform',
         isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'

@@ -85,7 +85,7 @@ const teamHighlights = [
 
 function SecurityCard({ item }: { item: typeof securityCommitments[0] }) {
   return (
-    <div className="group p-6 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 hover:border-brand-accent/50 transition-all duration-500 card-3d hover:shadow-xl hover:shadow-brand-accent/10">
+    <div className="group relative p-6 rounded-xl card-surface hover:border-brand-accent/50 transition-all duration-500 card-3d hover:shadow-xl hover:shadow-brand-accent/10">
       {/* Gradient overlay on hover */}
       <div className="absolute inset-0 bg-gradient-to-br from-brand-primary/0 via-brand-accent/0 to-brand-secondary/0 group-hover:from-brand-primary/5 group-hover:via-brand-accent/5 group-hover:to-brand-secondary/5 transition-all duration-500 rounded-xl" />
 
@@ -135,10 +135,10 @@ function RoadmapTimeline() {
                   className={cn(
                     'text-xs font-medium px-2 py-1 rounded-full',
                     phase.status === 'completed'
-                      ? 'bg-green-100 text-green-700'
+                      ? 'bg-green-500/15 text-green-400'
                       : phase.status === 'active'
                         ? 'bg-brand-accent/10 text-brand-accent'
-                        : 'bg-gray-100 text-gray-600'
+                        : 'bg-gray-700/60 text-gray-300'
                   )}
                 >
                   {phase.status}

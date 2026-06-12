@@ -168,6 +168,13 @@ secrets.json
 credentials.json
 
 # ============================================
+# Spec-driven workflow — untracked session data
+# ============================================
+# Holds credentials.md, session transcripts, and the deploy SSH key
+# (ghostlocalhost.pem). NEVER commit anything under this directory.
+docs/spec/untracked/
+
+# ============================================
 # Build Artifacts
 # ============================================
 .turbo/
