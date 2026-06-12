@@ -28,6 +28,9 @@ ALLOWLIST=(
   'sk-ant-your-key-here'
   'sk-your-key-here'
   'test-placeholder'
+  # synthetic, obviously-fake test vectors (security demos need secret-shaped data)
+  'sk-ant-EXAMPLE'
+  'AKIAIOSFODNN7EXAMPLE'
 )
 
 hits=""
