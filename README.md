@@ -29,9 +29,11 @@ demos have no model by design. In-memory stores, no accounts, no cost. Free inst
 sleep after ~15 min idle, so the **first request cold-starts in ~30–60s** (a heavier
 app like persona-twin toward the upper end, and a free model can add a few seconds);
 just reload if it stalls. Each **Live** link opens the app's UI — #2
-(tanglement-showcase) is a Next.js marketing teaser and #20 (trueline) is a full
-Next.js + Convex + Clerk app (sign in to try); the rest are the offline-first API
-services.
+(tanglement-showcase) is a Next.js marketing teaser, #20 (trueline) is a full
+Next.js + Convex + Clerk app (sign in to try), and **#21–26 are net-new demos each
+built on a specific target stack** — Go (relaytoken), Ruby on Rails (cycleledger),
+Flask (burnrate), and Python (postureline, quorum, baseplate). The rest are the
+offline-first FastAPI services.
 
 | # | Project | What it is | Stack | Live | Docs |
 |---|---|---|---|---|---|
@@ -55,6 +57,12 @@ services.
 | 18 | **txn-ledger** | High-volume contributions store — partitioned schema, query-plan tuning, FEC rollups, surge load test | FastAPI · SQLite · UI | [open ↗](https://txn-ledger.onrender.com) | [README](projects/txn-ledger/README.md) |
 | 19 | **agent-factory** | Build a tool-using agent from a declarative spec — template-simple or deep (prompt/tools/planner/model/guardrails); LLM or rule planner | FastAPI · UI | [open ↗](https://agent-factory-ov8r.onrender.com) | [README](projects/agent-factory/README.md) |
 | 20 | **trueline** | Invoice line-item verification — LLM extract → verify math in code → reconcile vs PO + catalog → flag recoverable $ → review → eval. Realtime, multi-tenant. *(sign in to try)* | Next.js · Convex · Clerk · LLM | [open ↗](https://trueline-moys.onrender.com) | [README](projects/trueline/README.md) |
+| 21 | **postureline** | Security posture & compliance — one engine, two scanners: warehouse (Snowflake masking-policy-as-code + k-anonymity + CI gate) and internet-exposure (SOC 2/HIPAA/ISO 27001/NIST/CMMC crosswalk + board report) | FastAPI · DuckDB/Snowflake-SQL · Terraform | [open ↗](https://postureline.onrender.com) | [README](projects/postureline/README.md) |
+| 22 | **relaytoken** | Scoped WebRTC room access tokens on the livekit/protocol auth lib + 8/8 adversarial breaker suite + LLM grant-risk linter | Go · WebRTC JWT | [open ↗](https://relaytoken.onrender.com) | [README](projects/relaytoken/README.md) |
+| 23 | **cycleledger** | High-volume contributions data layer — Postgres cycle-partitioning, FEC rollups, EXPLAIN-as-artifact, NL→SQL behind a read-only SQL guard | Ruby on Rails · Postgres · Sidekiq | [open ↗](https://cycleledger.onrender.com) | [README](projects/cycleledger/README.md) |
+| 24 | **quorum** | Vendor-neutral multi-agent orchestrator — workflow DAG + parallel fan-out, with PII redaction + tamper-evident audit baked into the engine | FastAPI · multi-agent | [open ↗](https://quorum.onrender.com) | [README](projects/quorum/README.md) |
+| 25 | **burnrate** | Instrumented Flask SRE service — Prometheus RED metrics, multi-window SLO burn rate, TaskTiger tasks, GitOps smoke-gated rollback, LLM incident summary | Flask · Prometheus · ArgoCD | [open ↗](https://burnrate-grza.onrender.com) | [README](projects/burnrate/README.md) |
+| 26 | **baseplate** | Platform paved-road — reusable Terraform/EKS/RDS + ArgoCD + golden CI, a self-service LLM service-scaffolder, and data-quality-as-an-SLI ingest | FastAPI · Terraform · k8s | [open ↗](https://baseplate-mlrj.onrender.com) | [README](projects/baseplate/README.md) |
 
 > Verify a deployment's contract any time with the smoke suite:
 > `cd projects/<name> && ./run.sh smoke --url <live-url>` (see [CONV-5](docs/spec/spec.md)).
