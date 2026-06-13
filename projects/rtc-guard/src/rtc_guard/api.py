@@ -8,8 +8,13 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, PlainTextResponse
 
-from rtc_guard import __version__, adversary, token
-from rtc_guard.models import HealthResponse, TokenRequest, VerifyRequest
+from rtc_guard import __version__, adversary, grant_audit, llm, token
+from rtc_guard.models import (
+    GrantAuditRequest,
+    HealthResponse,
+    TokenRequest,
+    VerifyRequest,
+)
 from rtc_guard.threat_model import threat_model
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -56,6 +61,25 @@ def threats() -> dict:
 @app.get("/adversary")
 def run_adversary() -> dict:
     return adversary.run()
+
+
+@app.post("/grant/audit")
+def audit_grant(req: GrantAuditRequest) -> dict:
+    """LLM-assisted least-privilege audit of a proposed grant: a plain-English
+    explanation + over-permissioning findings (deterministic offline fallback)."""
+    return grant_audit.audit(req.model_dump(exclude={"mode"}), mode=req.mode)
+
+
+@app.get("/evals")
+def evals() -> dict:
+    """Score the grant auditor over the labeled set (precision/recall on findings)."""
+    return grant_audit.evaluate()
+
+
+@app.get("/llm")
+def llm_status() -> dict:
+    """Which providers are configured/reachable + the active routing mode."""
+    return llm.status()
 
 
 @app.get("/sample/voice-agent")

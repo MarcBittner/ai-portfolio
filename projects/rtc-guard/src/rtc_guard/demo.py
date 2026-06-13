@@ -4,7 +4,7 @@ and summarize the threat model.
 Run: python -m rtc_guard.demo   (no network required)
 """
 
-from rtc_guard import adversary, token
+from rtc_guard import adversary, grant_audit, token
 from rtc_guard.threat_model import threat_model
 
 
@@ -26,6 +26,19 @@ def main() -> None:
     tm = threat_model()
     print(f"\nThreat model: {tm['count']} threats across "
           f"{', '.join(tm['by_category'])}.")
+
+    # Least-privilege grant auditor: review a PROPOSED (over-permissioned) grant.
+    proposed = {"identity": "eve", "room": "", "role": "viewer", "ttl": 86_400,
+                "roomJoin": True, "canSubscribe": True, "canPublish": True,
+                "canPublishData": True}
+    a = grant_audit.audit(proposed)
+    print(f"\nGrant auditor ({a['provider']}): a 'viewer' asking for publish + "
+          "data + no room + day-long TTL")
+    print(f"   {a['explanation']}")
+    for f in a["findings"]:
+        print(f"   [{f['severity'].upper():<6}] {f['issue']}")
+    print(f"   → {a['finding_count']} findings "
+          f"(least-privilege: {a['least_privilege']})")
 
 
 if __name__ == "__main__":

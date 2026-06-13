@@ -35,6 +35,7 @@ Commands:
   lint        Run ruff
   check       lint + test
   demo        Run the offline token + adversarial demo
+  eval        Score the grant auditor + adversary → eval-report.md
   smoke       Run the live smoke/regression suite (local server, or --url <deploy>)
   doctor      Report Python / venv / Ollama status
   help        Show this help
@@ -128,6 +129,7 @@ cmd_serve() { ensure_installed; tool uvicorn "$APP" --host "$HOST" --port "$PORT
 cmd_test()  { ensure_installed; py -m pytest -q "$@"; }
 cmd_lint()  { ensure_installed; tool ruff check src tests; }
 cmd_demo()  { ensure_installed; py -m rtc_guard.demo; }
+cmd_eval()  { ensure_installed; py -m rtc_guard.evaluate; }
 
 CMD=""
 while (( $# )); do
@@ -140,7 +142,7 @@ while (( $# )); do
     --url=*) SMOKE_URL="${1#*=}"; shift;;
     --no-venv) USE_VENV=0; shift;;
     -h|--help) usage; exit 0;;
-    setup|serve|test|lint|check|demo|smoke|doctor|help) CMD="$1"; shift;;
+    setup|serve|test|lint|check|demo|eval|smoke|doctor|help) CMD="$1"; shift;;
     *) die "unknown argument: $1  (run './run.sh --help')";;
   esac
 done
@@ -153,6 +155,7 @@ case "$CMD" in
   lint)  cmd_lint;;
   check) cmd_lint; cmd_test;;
   demo)  cmd_demo;;
+  eval)  cmd_eval;;
   smoke) cmd_smoke;;
   doctor) cmd_doctor;;
   help)  usage;;

@@ -221,6 +221,31 @@
   </div>
 
   <div class="panel full reveal">
+    <h2>Least-privilege grant auditor
+      <span class="muted" style="text-transform:none;letter-spacing:0;margin-left:auto;font-weight:400">LLM explains + flags over-permissioning · routing <span id="llmstat">offline</span></span></h2>
+    <div class="body">
+      <div class="ctl">
+        <div class="field-inline"><label>identity</label><input id="aidentity" value="eve"></div>
+        <div class="field-inline"><label>room <span class="muted" style="text-transform:none;letter-spacing:0">empty = wildcard</span></label><input id="aroom" value=""></div>
+        <div class="field-inline"><label>declared role</label><input id="arole" value="viewer"></div>
+        <div class="field-inline"><label>ttl (s)</label><input id="attl" type="number" value="86400"></div>
+      </div>
+      <div class="row" style="margin-bottom:6px">
+        <span class="pchip on" id="aroomJoin" data-cap="roomJoin">roomJoin ✓</span>
+        <span class="pchip on" id="acanSubscribe" data-cap="canSubscribe">canSubscribe ✓</span>
+        <span class="pchip on" id="acanPublish" data-cap="canPublish">canPublish ✓</span>
+        <span class="pchip on" id="acanPublishData" data-cap="canPublishData">canPublishData ✓</span>
+        <span class="muted" style="font-size:11px;margin-left:auto">click a capability to toggle</span>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn primary" id="audit"><span class="spin"></span><span class="lbl">Audit grant →</span></button>
+        <span id="auditmeta" class="muted" style="margin-left:auto">—</span>
+      </div>
+      <div class="claims" id="auditres"><span class="muted">Audit a proposed grant to see a plain-English explanation + least-privilege findings. The model explains and judges; the security core (mint/verify) stays deterministic.</span></div>
+    </div>
+  </div>
+
+  <div class="panel full reveal">
     <h2>Adversarial suite <span class="muted" style="text-transform:none;letter-spacing:0;margin-left:auto">every attack defeated</span></h2>
     <div class="body" style="padding:0"><table id="adv"></table></div>
   </div>
@@ -332,7 +357,9 @@ async function boot(){
   }catch{}
   try{renderAdv(await j("adversary"));}catch{$("#advpill").style.display="none"}
   try{renderThreats((await j("threat-model")).threats);}catch{}
+  loadLlm();
   mintToken({silent:true}); // populate the grant panel with a sample token
+  try{await auditGrant({silent:true});}catch{} // populate the auditor with the over-grant example
 }
 
 async function mintToken(opts={}){
@@ -373,6 +400,42 @@ $("#verify").onclick=async()=>{
   }catch(e){toast("Verify failed","bad")}
   finally{btn.classList.remove("loading")}
 };
+
+// ---- grant auditor ----
+const AUDIT_CAPS=["roomJoin","canSubscribe","canPublish","canPublishData"];
+function toggleCap(el){
+  const on=!el.classList.contains("on");el.classList.toggle("on",on);
+  el.textContent=`${el.dataset.cap} ${on?'✓':'✗'}`;
+}
+AUDIT_CAPS.forEach(c=>{const el=$("#a"+c);if(el)el.onclick=()=>toggleCap(el);});
+const SEV_BADGE={high:"b-block",medium:"b-flag",low:"b-info"};
+async function auditGrant(opts={}){
+  const btn=$("#audit");btn.classList.add("loading");
+  const body={identity:$("#aidentity").value,room:$("#aroom").value,
+    role:$("#arole").value,ttl:+$("#attl").value};
+  AUDIT_CAPS.forEach(c=>{body[c]=$("#a"+c).classList.contains("on");});
+  $("#auditres").innerHTML='<span class="muted">auditing…</span>';
+  try{
+    const r=await j("grant/audit",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
+    const lp=r.least_privilege
+      ?'<span class="badge b-allow">least-privilege</span>'
+      :`<span class="badge b-block">${r.finding_count} finding${r.finding_count===1?'':'s'}</span>`;
+    const findings=r.findings.map(f=>
+      `<tr><td><span class="badge ${SEV_BADGE[f.severity]||'b-info'}">${esc(f.severity)}</span></td>`+
+      `<td><b>${esc(f.issue)}</b><div class="muted">↳ ${esc(f.recommendation)}</div></td></tr>`).join("");
+    $("#auditres").innerHTML=
+      `<div style="margin-bottom:9px">${lp} <span class="muted">${esc(r.explanation)}</span></div>`+
+      (findings?`<table style="width:100%">${findings}</table>`:'');
+    $("#auditmeta").textContent=`${r.provider} · ${r.by_severity.high} high / ${r.by_severity.medium} med / ${r.by_severity.low} low · ${r.latency_ms}ms`;
+    if(!opts.silent)toast(r.least_privilege?"Least-privilege grant":`${r.finding_count} over-permission finding(s)`,r.least_privilege?"ok":"bad");
+  }catch(e){$("#auditres").textContent="audit failed";if(!opts.silent)toast("Audit failed","bad");}
+  finally{btn.classList.remove("loading")}
+}
+$("#audit").onclick=()=>auditGrant();
+async function loadLlm(){
+  try{const s=await j("llm");const active=Object.entries(s.providers).find(e=>e[1]);
+    $("#llmstat").textContent=active?active[0]:"offline (deterministic)";}catch{}
+}
 
 function renderAdv(a){
   const pill=$("#advpill");

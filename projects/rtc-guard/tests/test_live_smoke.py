@@ -153,3 +153,36 @@ def test_regression_threat_model_covers_agent_path(client):
 
 def test_regression_unknown_template_rejected(client):
     assert client.post("/v1/token", json={"template": "root"}).status_code == 422
+
+
+def test_regression_grant_auditor_flags_over_permissioned(client):
+    # the LLM grant auditor (or its deterministic fallback) must flag an
+    # over-permissioned viewer; the security core is untouched by this layer.
+    r = client.post("/grant/audit", json={
+        "identity": "eve", "room": "", "role": "viewer", "ttl": 86_400,
+        "roomJoin": True, "canSubscribe": True, "canPublish": True,
+        "canPublishData": True})
+    b = r.json()
+    assert b["least_privilege"] is False
+    assert b["by_severity"]["high"] >= 1
+    assert b["explanation"]
+
+
+def test_regression_grant_auditor_passes_clean_viewer(client):
+    r = client.post("/grant/audit", json={
+        "identity": "alice", "room": "room-a", "role": "viewer", "ttl": 300,
+        "roomJoin": True, "canSubscribe": True})
+    assert r.json()["least_privilege"] is True
+
+
+def test_regression_evals_recall(client):
+    b = client.get("/evals").json()
+    assert b["recall"] == 1.0 and b["false_negatives"] == 0
+
+
+def test_smoke_llm_status_no_secrets(client):
+    b = client.get("/llm").json()
+    assert b["offline_fallback"] is True
+    assert set(b["providers"]) == {"anthropic", "openai", "ollama", "openrouter"}
+    # status reports booleans only — never a key value
+    assert all(isinstance(v, bool) for v in b["providers"].values())
