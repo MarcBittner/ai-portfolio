@@ -66,6 +66,12 @@ export default function Dashboard() {
         <p className="mt-2 text-[--color-accent]">
           👉 New here? Open <b>INV-1010</b> — a padded bill with ~$1,090 in overcharges.
         </p>
+        <button
+          onClick={() => seed()}
+          className="mt-3 rounded-md border border-[--color-line] px-3 py-1.5 text-sm hover:border-[--color-accent]"
+        >
+          Load sample invoices
+        </button>
       </section>
 
       <section className="grid gap-3 sm:grid-cols-4">

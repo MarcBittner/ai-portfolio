@@ -136,7 +136,16 @@ export default function InvoiceReview() {
           </thead>
           <tbody>
             {lines.map((l) => (
-              <tr key={l._id} className="border-b border-[--color-line]/50 align-top">
+              <tr
+                key={l._id}
+                className={`border-b border-[--color-line]/50 align-top ${
+                  l.flag === "red"
+                    ? "bg-[--color-bad]/10"
+                    : l.flag === "yellow"
+                      ? "bg-[--color-warn]/10"
+                      : "bg-[--color-ok]/5"
+                }`}
+              >
                 <td className="p-3">
                   <div className="font-medium">{l.description}</div>
                   <div className="text-xs text-[--color-muted]">
@@ -152,15 +161,34 @@ export default function InvoiceReview() {
                   )}
                 </td>
                 <td className="p-3 whitespace-nowrap">
-                  {l.quantity} {l.unit} × {usd(l.unitPrice)}
+                  {l.quantity} {l.unit} ×{" "}
+                  <span
+                    className={
+                      l.flag === "red"
+                        ? "font-semibold text-[--color-bad]"
+                        : l.flag === "yellow"
+                          ? "text-[--color-warn]"
+                          : ""
+                    }
+                  >
+                    {usd(l.unitPrice)}
+                  </span>
                 </td>
-                <td className="p-3 whitespace-nowrap">{usd(l.claimedExtension)}</td>
+                <td
+                  className={`p-3 whitespace-nowrap ${l.flag === "red" ? "font-semibold text-[--color-bad]" : ""}`}
+                >
+                  {usd(l.claimedExtension)}
+                </td>
                 <td className={`p-3 whitespace-nowrap ${l.mathOk ? "" : "text-[--color-bad]"}`}>
                   {usd(l.computedExtension)}
                   {!l.mathOk && <span className="ml-1 text-xs">math!</span>}
                 </td>
-                <td className="p-3 whitespace-nowrap">{usd(l.poUnitPrice)}</td>
-                <td className="p-3 whitespace-nowrap">{usd(l.catalogPrice)}</td>
+                <td className="p-3 whitespace-nowrap text-[--color-ok]" title="agreed PO price">
+                  {usd(l.poUnitPrice)}
+                </td>
+                <td className="p-3 whitespace-nowrap text-[--color-ok]" title="market/catalog rate">
+                  {usd(l.catalogPrice)}
+                </td>
                 <td className="p-3 whitespace-nowrap">
                   {l.varianceVsPoPct !== undefined ? `${l.varianceVsPoPct > 0 ? "+" : ""}${l.varianceVsPoPct}%` : "—"}
                 </td>
