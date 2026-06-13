@@ -13,3 +13,12 @@ services:
     envVars:
       - key: PERSONA_TWIN_ROUTE_OBJECTIVE
         value: cost
+  # maskline — warehouse data-access governance + masking-policy-as-code.
+  # Runs fully offline (deterministic classifier + Snowflake-compatible SQL on DuckDB).
+  - type: web
+    name: maskline
+    runtime: docker
+    plan: free
+    dockerfilePath: ./projects/maskline/Dockerfile
+    dockerContext: ./projects/maskline
+    healthCheckPath: /health
