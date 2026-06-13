@@ -8,13 +8,13 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Deploy: Argo GitOps](https://img.shields.io/badge/deploy-Argo%20GitOps-success)](ROADMAP.md)
 [![Live demos: Render](https://img.shields.io/badge/live%20demos-Render-46E3B7?logo=render&logoColor=white)](#live-demos)
-[![Projects: 19](https://img.shields.io/badge/projects-19-blueviolet)](#live-demos)
+[![Projects: 20](https://img.shields.io/badge/projects-20-blueviolet)](#live-demos)
 
 Production-grade AI engineering projects. Each project is self-contained,
 source-available (proprietary), and runnable with **zero paid accounts** — offline fallbacks
 (in-memory vector store, deterministic mock LLM) are first-class, and real
 providers (Ollama, MongoDB Atlas, OpenAI, OpenRouter) switch on via
-environment variables. All nineteen services run as free
+environment variables. All twenty services run as free
 **[live demos on Render](#live-demos)**; the core nine also deploy to Kubernetes
 via Argo CD.
 
@@ -22,15 +22,16 @@ via Argo CD.
 
 ## Live demos
 
-All nineteen services run as **free live demos on Render**. The LLM-backed demos route
+All twenty services run as **free live demos on Render**. The LLM-backed demos route
 to **live free models** (OpenRouter free tier) by default, and each lets you switch
 **offline / free / paid** from its config panel; the deterministic SRE/security/data
 demos have no model by design. In-memory stores, no accounts, no cost. Free instances
 sleep after ~15 min idle, so the **first request cold-starts in ~30–60s** (a heavier
 app like persona-twin toward the upper end, and a free model can add a few seconds);
 just reload if it stalls. Each **Live** link opens the app's UI — #2
-(tanglement-showcase) is the Next.js marketing teaser site, the rest are the
-offline-first API services.
+(tanglement-showcase) is a Next.js marketing teaser and #20 (trueline) is a full
+Next.js + Convex + Clerk app (sign in to try); the rest are the offline-first API
+services.
 
 | # | Project | What it is | Stack | Live | Docs |
 |---|---|---|---|---|---|
@@ -53,6 +54,7 @@ offline-first API services.
 | 17 | **attack-surface** | CT-log enumeration → service fingerprint → SOC 2 / ISO 27001 control-mapped exposure report | FastAPI · UI | [open ↗](https://attack-surface.onrender.com) | [README](projects/attack-surface/README.md) |
 | 18 | **txn-ledger** | High-volume contributions store — partitioned schema, query-plan tuning, FEC rollups, surge load test | FastAPI · SQLite · UI | [open ↗](https://txn-ledger.onrender.com) | [README](projects/txn-ledger/README.md) |
 | 19 | **agent-factory** | Build a tool-using agent from a declarative spec — template-simple or deep (prompt/tools/planner/model/guardrails); LLM or rule planner | FastAPI · UI | [open ↗](https://agent-factory-ov8r.onrender.com) | [README](projects/agent-factory/README.md) |
+| 20 | **trueline** | Invoice line-item verification — LLM extract → verify math in code → reconcile vs PO + catalog → flag recoverable $ → review → eval. Realtime, multi-tenant. *(sign in to try)* | Next.js · Convex · Clerk · LLM | [open ↗](https://trueline-moys.onrender.com) | [README](projects/trueline/README.md) |
 
 > Verify a deployment's contract any time with the smoke suite:
 > `cd projects/<name> && ./run.sh smoke --url <live-url>` (see [CONV-5](docs/spec/spec.md)).
