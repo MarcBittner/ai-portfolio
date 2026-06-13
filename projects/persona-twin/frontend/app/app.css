@@ -41,20 +41,15 @@ html.dark { color-scheme: dark; }
 /* anchor offset so Help deep-links don't tuck under surrounding chrome */
 [data-help-section] { scroll-margin-top: 1rem; }
 
-/* A calm, cohesive "aurora" backdrop (generated in CSS — no external asset),
-   fixed to the viewport, so the translucent frosted panes have something to
-   reveal. Cohesive blue → violet → cyan rather than four clashing corners. */
+/* A bundled abstract backdrop (bokeh orbs + crisp dots/rings) fixed to the
+   viewport. The crisp detail is the point: a frosted pane visibly blurs the
+   dots/rings behind it, which is what makes the transparency read. One asset
+   works on both themes — the theme background-color shows between the shapes. */
 body {
-  background-attachment: fixed;
   background-color: var(--color-background);
-  background-image:
-    radial-gradient(1100px 760px at 16% 4%, oklch(0.82 0.1 264 / 0.6), transparent 62%),
-    radial-gradient(1000px 720px at 92% 22%, oklch(0.85 0.09 310 / 0.5), transparent 60%),
-    radial-gradient(1200px 820px at 60% 108%, oklch(0.86 0.09 205 / 0.55), transparent 64%);
-}
-.dark body {
-  background-image:
-    radial-gradient(1100px 760px at 16% 4%, oklch(0.62 0.17 264 / 0.6), transparent 62%),
-    radial-gradient(1000px 720px at 92% 22%, oklch(0.56 0.17 308 / 0.5), transparent 60%),
-    radial-gradient(1200px 820px at 60% 108%, oklch(0.62 0.15 205 / 0.55), transparent 64%);
+  background-image: url("/bg.svg");
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  background-repeat: no-repeat;
 }
