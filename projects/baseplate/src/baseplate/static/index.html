@@ -4,167 +4,585 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>baseplate — platform console</title>
+<!-- POLISH KIT: theme-init (apply before paint, no flash) -->
+<script>
+(function(){
+  try{
+    var t=localStorage.getItem("theme")||"system";
+    var dark = t==="dark" || (t==="system" && !window.matchMedia("(prefers-color-scheme: light)").matches);
+    if(!dark) document.documentElement.classList.add("light");
+  }catch(e){}
+})();
+</script>
 <style>
-  :root { --bg:#0d1117; --panel:#161b22; --line:#30363d; --fg:#e6edf3;
-          --dim:#8b949e; --accent:#58a6ff; --good:#3fb950; --bad:#f85149;
-          --mono:"SF Mono",ui-monospace,Menlo,Consolas,monospace; }
-  * { box-sizing:border-box; }
-  body { margin:0; background:var(--bg); color:var(--fg);
-         font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif; }
-  header { padding:20px 24px; border-bottom:1px solid var(--line); }
-  h1 { margin:0; font-size:20px; }
-  h1 span { color:var(--accent); }
-  .sub { color:var(--dim); font-size:13px; margin-top:4px; }
-  main { max-width:1080px; margin:0 auto; padding:24px; display:grid;
-         grid-template-columns:1fr 1fr; gap:20px; }
-  .card { background:var(--panel); border:1px solid var(--line); border-radius:10px;
-          padding:18px; }
-  .card.wide { grid-column:1 / -1; }
-  h2 { margin:0 0 12px; font-size:15px; }
-  label { display:block; font-size:12px; color:var(--dim); margin:10px 0 4px; }
-  input[type=text], textarea, select { width:100%; background:var(--bg);
-          border:1px solid var(--line); color:var(--fg); border-radius:6px;
-          padding:8px; font:13px var(--mono); }
-  textarea { resize:vertical; min-height:60px; }
-  .row { display:flex; gap:16px; align-items:center; margin-top:8px; }
-  .row label { margin:0; }
-  button { margin-top:14px; background:var(--accent); color:#0d1117; border:0;
-           border-radius:6px; padding:9px 16px; font-weight:600; cursor:pointer; }
-  button.ghost { background:transparent; color:var(--accent);
-                 border:1px solid var(--line); }
-  pre { background:var(--bg); border:1px solid var(--line); border-radius:6px;
-        padding:10px; overflow:auto; font:12px/1.45 var(--mono); max-height:340px; }
-  .tabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
-  .tab { font:12px var(--mono); padding:4px 8px; border:1px solid var(--line);
-         border-radius:5px; cursor:pointer; color:var(--dim); }
-  .tab.active { color:var(--accent); border-color:var(--accent); }
-  table { width:100%; border-collapse:collapse; font-size:13px; }
-  th,td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); }
-  th { color:var(--dim); font-weight:600; font-size:11px; text-transform:uppercase; }
-  .pill { font:11px var(--mono); padding:2px 6px; border-radius:4px;
-          border:1px solid var(--line); }
-  .good { color:var(--good); } .bad { color:var(--bad); }
-  .gauge { font-size:34px; font-weight:700; }
-  .note { color:var(--dim); font-size:12px; margin-top:8px; }
-  code { font:12px var(--mono); color:var(--accent); }
+  /* ============================ design system ============================ */
+  :root{
+    --bg:#0a0d14; --bg-grad-1:#0e1322; --bg-grad-2:#0a0d14;
+    --surface:#131826; --surface-2:#1a2032; --surface-3:#212a40;
+    --line:#263149; --line-2:#33405d;
+    --ink:#e9eef7; --ink-dim:#97a3ba; --ink-faint:#67728a;
+    --accent:#6aa1ff; --accent-2:#9b86ff; --accent-ink:#06101f;
+    --ok:#43c98a; --warn:#e6ad52; --bad:#f15b6c; --info:#6aa1ff; --violet:#9b86ff;
+    --r:15px; --r-sm:10px; --r-xs:7px;
+    --sh:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.5);
+    --sh-lg:0 1px 2px rgba(0,0,0,.4), 0 24px 64px -24px rgba(0,0,0,.7);
+    --grad:linear-gradient(135deg,var(--accent),var(--accent-2));
+    --ease:cubic-bezier(.22,.61,.36,1);
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+    --header-bg:rgba(10,13,20,.72);
+    --bg-radial-1:rgba(107,130,255,.10); --bg-radial-2:rgba(67,201,138,.05);
+    --mark-bg:#ffd54f; --mark-ink:#111;
+  }
+  /* POLISH KIT: theme toggle — LIGHT palette overrides (same accents, light surfaces, dark ink) */
+  html.light{
+    --bg:#f4f6fb; --bg-grad-1:#eef2fb; --bg-grad-2:#f4f6fb;
+    --surface:#ffffff; --surface-2:#f1f4fa; --surface-3:#e6ebf5;
+    --line:#d8dfec; --line-2:#c2ccde;
+    --ink:#16203a; --ink-dim:#566184; --ink-faint:#8b95ad;
+    --accent:#3a6ff0; --accent-2:#7c5cf5; --accent-ink:#ffffff;
+    --ok:#1f9d63; --warn:#b9791f; --bad:#d83a4d; --info:#3a6ff0; --violet:#6f53d6;
+    --sh:0 1px 2px rgba(20,32,58,.06), 0 8px 24px -14px rgba(20,32,58,.18);
+    --sh-lg:0 1px 2px rgba(20,32,58,.08), 0 24px 64px -28px rgba(20,32,58,.28);
+    --header-bg:rgba(255,255,255,.78);
+    --bg-radial-1:rgba(58,111,240,.10); --bg-radial-2:rgba(31,157,99,.06);
+    --mark-bg:#ffe08a; --mark-ink:#3a2c00;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;
+    font:15px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Inter,sans-serif;
+    background-image:radial-gradient(1200px 600px at 80% -10%,var(--bg-radial-1),transparent 60%),
+      radial-gradient(900px 500px at 0% 0%,var(--bg-radial-2),transparent 55%);
+    background-attachment:fixed;min-height:100vh;transition:background-color .25s var(--ease),color .25s var(--ease)}
+  ::selection{background:rgba(106,161,255,.3)}
+  a{color:var(--accent);text-decoration:none}
+  /* header */
+  header{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:14px;
+    padding:14px 24px;border-bottom:1px solid var(--line);
+    background:var(--header-bg);backdrop-filter:blur(14px) saturate(140%)}
+  .brand{display:flex;align-items:center;gap:11px;font-weight:650;font-size:16px;letter-spacing:.2px}
+  .logo{width:30px;height:30px;border-radius:9px;background:var(--grad);position:relative;
+    box-shadow:0 4px 16px -4px rgba(106,161,255,.6);flex:none}
+  .logo::after{content:"";position:absolute;inset:7px;border-radius:5px;
+    border:2px solid rgba(255,255,255,.85);border-right-color:transparent;
+    animation:spin 3.5s linear infinite}
+  .brand .tag{color:var(--ink-dim);font-size:12.5px;font-weight:400}
+  .spacer{flex:1}
+  .status{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--ink-dim);
+    padding:5px 11px;border:1px solid var(--line);border-radius:999px;background:var(--surface)}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--ink-faint)}
+  .dot.ok{background:var(--ok);box-shadow:0 0 0 0 rgba(67,201,138,.5);animation:pulse 2s infinite}
+  .pill{font-size:12px;color:var(--ink-dim);border:1px solid var(--line);border-radius:999px;
+    padding:5px 12px;background:var(--surface);white-space:nowrap}
+  .iconbtn{width:36px;height:36px;border-radius:10px;border:1px solid var(--line);background:var(--surface);
+    color:var(--ink-dim);cursor:pointer;display:grid;place-items:center;transition:.18s var(--ease)}
+  .iconbtn:hover{color:var(--ink);border-color:var(--line-2);transform:translateY(-1px);background:var(--surface-2)}
+  .iconbtn svg{width:18px;height:18px}
+  /* layout */
+  main{max-width:1160px;margin:0 auto;padding:26px 24px 64px;display:grid;gap:18px;
+    grid-template-columns:1fr 1fr}
+  .full{grid-column:1/-1}
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+    box-shadow:var(--sh);overflow:hidden;transition:.25s var(--ease)}
+  .panel:hover{border-color:var(--line-2)}
+  .panel h2{margin:0;padding:14px 18px;font-size:11.5px;font-weight:600;letter-spacing:.7px;
+    text-transform:uppercase;color:var(--ink-dim);border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:10px}
+  .panel .body{padding:18px}
+  /* controls */
+  textarea,select,input{font:inherit;color:var(--ink);background:var(--surface-2);
+    border:1px solid var(--line);border-radius:var(--r-sm);padding:11px 13px;transition:.16s var(--ease);width:100%}
+  textarea:focus,select:focus,input:focus{outline:none;border-color:var(--accent);
+    box-shadow:0 0 0 3px rgba(106,161,255,.16)}
+  textarea{min-height:88px;resize:vertical;font-family:var(--mono);font-size:13px;line-height:1.5}
+  .btn{font:inherit;font-weight:600;cursor:pointer;border-radius:var(--r-sm);padding:11px 17px;
+    border:1px solid var(--line);background:var(--surface-2);color:var(--ink);
+    transition:.16s var(--ease);display:inline-flex;align-items:center;gap:8px;position:relative}
+  .btn:hover{transform:translateY(-1px);border-color:var(--line-2)}
+  .btn:active{transform:translateY(0)}
+  .btn.primary{background:var(--grad);border:none;color:#06101f;
+    box-shadow:0 6px 20px -8px rgba(106,161,255,.7)}
+  .btn.primary:hover{box-shadow:0 10px 28px -8px rgba(106,161,255,.8)}
+  .btn[disabled]{opacity:.6;pointer-events:none}
+  .btn .spin{width:14px;height:14px;border:2px solid rgba(6,16,31,.35);border-top-color:#06101f;
+    border-radius:50%;animation:spin .7s linear infinite;display:none}
+  .btn.loading .spin{display:block}.btn.loading .lbl{opacity:.7}
+  .chip{font:inherit;font-size:12px;cursor:pointer;border:1px dashed var(--line);background:transparent;
+    color:var(--ink-dim);border-radius:999px;padding:5px 12px;transition:.16s var(--ease)}
+  .chip:hover{color:var(--ink);border-color:var(--accent);border-style:solid;
+    background:rgba(106,161,255,.08)}
+  .row{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+  .check{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-dim);cursor:pointer;
+    padding:11px 13px;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm)}
+  .check input{width:auto}
+  /* badges */
+  .badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:700;
+    text-transform:uppercase;letter-spacing:.3px}
+  .b-good{background:rgba(67,201,138,.16);color:var(--ok)}
+  .b-bad{background:rgba(241,91,108,.18);color:var(--bad)}
+  .b-info{background:rgba(106,161,255,.15);color:var(--info)}
+  .mono{font-family:var(--mono);font-size:12px}
+  .good{color:var(--ok)} .bad{color:var(--bad)}
+  /* tabs (generated files) */
+  .tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+  .tab{font-family:var(--mono);font-size:12px;padding:5px 10px;border:1px solid var(--line);
+    border-radius:var(--r-xs);cursor:pointer;color:var(--ink-dim);background:var(--surface-2);
+    transition:.16s var(--ease)}
+  .tab:hover{color:var(--ink);border-color:var(--line-2)}
+  .tab.active{color:var(--accent-ink);border-color:transparent;background:var(--grad);font-weight:600}
+  pre{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);
+    padding:12px 14px;overflow:auto;font:12px/1.5 var(--mono);max-height:360px;margin:0;color:var(--ink)}
+  /* gauge */
+  .gauge{font-size:38px;font-weight:750;letter-spacing:-.5px}
+  /* table */
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th,td{text-align:left;padding:9px 14px;border-bottom:1px solid var(--line);white-space:nowrap}
+  th{color:var(--ink-faint);font-size:11px;font-weight:600;letter-spacing:.4px;text-transform:uppercase}
+  tbody tr{transition:.14s var(--ease)}tbody tr:hover{background:var(--surface-2)}
+  .muted{color:var(--ink-dim);font-size:12.5px}
+  code{background:var(--surface-2);padding:1px 6px;border-radius:6px;font-family:var(--mono);font-size:12px;color:var(--accent)}
+  .note{color:var(--ink-dim);font-size:12.5px;margin-top:10px}
+  /* reveal on load */
+  .reveal{opacity:0;transform:translateY(14px)}
+  .reveal.in{opacity:1;transform:none;transition:.55s var(--ease)}
+  /* settings drawer */
+  .scrim{position:fixed;inset:0;background:rgba(5,8,14,.55);backdrop-filter:blur(2px);z-index:50;
+    opacity:0;pointer-events:none;transition:.25s var(--ease)}
+  .scrim.open{opacity:1;pointer-events:auto}
+  .drawer{position:fixed;top:0;right:0;height:100%;width:380px;max-width:92vw;z-index:60;
+    background:var(--surface);border-left:1px solid var(--line);box-shadow:var(--sh-lg);
+    transform:translateX(100%);transition:transform .3s var(--ease);display:flex;flex-direction:column}
+  .drawer.open{transform:none}
+  .drawer header{position:static;background:none;backdrop-filter:none;border-bottom:1px solid var(--line)}
+  .drawer h3{margin:0;font-size:15px;font-weight:650}
+  .drawer .body{padding:20px;overflow:auto;display:grid;gap:18px}
+  .field{display:grid;gap:7px}
+  .field label{font-size:12px;color:var(--ink-dim);font-weight:600;display:flex;justify-content:space-between}
+  .field .hint{font-size:11.5px;color:var(--ink-faint);font-weight:400}
+  .seg{display:flex;gap:6px;flex-wrap:wrap}
+  /* POLISH KIT: segmented control (theme + routing mode) */
+  .seg .segbtn{font:inherit;font-size:12px;cursor:pointer;border:1px solid var(--line);background:var(--surface-2);
+    color:var(--ink-dim);border-radius:var(--r-sm);padding:7px 11px;transition:.16s var(--ease)}
+  .seg .segbtn:hover{color:var(--ink);border-color:var(--line-2)}
+  .seg .segbtn[aria-pressed="true"]{background:var(--grad);border-color:transparent;color:var(--accent-ink);font-weight:600}
+  .pstat{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12.5px;
+    padding:7px 11px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface-2)}
+  .pstat .pdot{width:8px;height:8px;border-radius:50%;background:var(--ink-faint);flex:none}
+  .pstat .pdot.on{background:var(--ok);box-shadow:0 0 0 3px rgba(67,201,138,.18)}
+  .chainline{font-family:var(--mono);font-size:11.5px;color:var(--ink-dim);
+    background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);padding:8px 11px;word-break:break-word}
+  .drawer .foot{margin-top:auto;padding:16px 20px;border-top:1px solid var(--line);display:flex;gap:10px}
+  /* POLISH KIT: help modal (centered dialog, reuses scrim) */
+  #help{position:fixed;top:50%;left:50%;transform:translate(-50%,calc(-50% + 12px));z-index:70;
+    width:560px;max-width:94vw;max-height:86vh;overflow:auto;opacity:0;pointer-events:none;
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh-lg);
+    transition:opacity .25s var(--ease),transform .25s var(--ease)}
+  #help.open{opacity:1;pointer-events:auto;transform:translate(-50%,-50%)}
+  #help header{position:static;background:none;backdrop-filter:none;border-bottom:1px solid var(--line)}
+  #help .body{padding:20px;display:grid;gap:16px}
+  #help h4{margin:0 0 6px;font-size:11.5px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--ink-dim)}
+  #help p{margin:0;color:var(--ink-dim);font-size:13.5px}
+  #help ol{margin:0;padding-left:20px;color:var(--ink-dim);font-size:13.5px;display:grid;gap:4px}
+  #help .kbd{font-family:var(--mono);font-size:11.5px;background:var(--surface-2);border:1px solid var(--line);
+    border-bottom-width:2px;border-radius:6px;padding:1px 7px;color:var(--ink)}
+  #help .eps{display:flex;gap:7px;flex-wrap:wrap}
+  /* toast */
+  #toasts{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:80;
+    display:flex;flex-direction:column;gap:10px;align-items:center}
+  .toast{background:var(--surface-3);border:1px solid var(--line-2);border-radius:11px;padding:11px 16px;
+    box-shadow:var(--sh-lg);font-size:13px;display:flex;align-items:center;gap:10px;
+    animation:toastIn .3s var(--ease)}
+  .toast .tdot{width:8px;height:8px;border-radius:50%}
+  .toast.ok .tdot{background:var(--ok)}.toast.bad .tdot{background:var(--bad)}.toast.info .tdot{background:var(--info)}
+  /* cold-start overlay */
+  #boot{position:fixed;inset:0;z-index:90;background:var(--bg);display:grid;place-items:center;
+    transition:opacity .5s var(--ease)}
+  #boot.hide{opacity:0;pointer-events:none}
+  .boot-card{text-align:center;display:grid;gap:18px;justify-items:center}
+  .boot-card .logo{width:54px;height:54px}
+  .boot-card .ring{width:38px;height:38px;border:3px solid var(--line);border-top-color:var(--accent);
+    border-radius:50%;animation:spin .8s linear infinite}
+  .boot-card .msg{color:var(--ink-dim);font-size:13.5px}
+  .boot-card .sub{color:var(--ink-faint);font-size:12px;max-width:280px}
+  /* keyframes */
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(67,201,138,.5)}70%{box-shadow:0 0 0 6px rgba(67,201,138,0)}100%{box-shadow:0 0 0 0 rgba(67,201,138,0)}}
+  @keyframes toastIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  @media(max-width:860px){main{grid-template-columns:1fr}}
+  @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 </style>
 </head>
 <body>
+<div id="boot"><div class="boot-card">
+  <div class="logo"></div><div class="ring"></div>
+  <div><div class="msg" id="bootmsg">Waking the demo…</div>
+  <div class="sub">Free-tier instances sleep when idle — first load takes ~30–60s.</div></div>
+</div></div>
+
 <header>
-  <h1><span>baseplate</span> — platform console</h1>
-  <div class="sub">The paved road: scaffold a service, see its generated IaC / k8s /
-    CI / SLO, watch it onboard, and read the example workload's data-quality SLI.
-    Illustrative IaC; synthetic data; offline by default.</div>
+  <div class="brand"><span class="logo"></span> baseplate
+    <span class="tag">platform paved-road · self-service service scaffolder</span></div>
+  <span class="spacer"></span>
+  <span class="status"><span class="dot" id="hdot"></span><span id="hstat">connecting…</span></span>
+  <span class="pill" id="catpill">catalog</span>
+  <!-- POLISH KIT: theme toggle -->
+  <button class="iconbtn" id="themebtn" title="Toggle theme" aria-label="Toggle light/dark theme"><span id="themeicon">☾</span></button>
+  <!-- POLISH KIT: help modal trigger -->
+  <button class="iconbtn" id="helpbtn" title="Help (?)" aria-label="Help">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 1 1 4.6 3c-.8.6-1.7 1-1.7 2.2"/><line x1="12" y1="17.5" x2="12" y2="17.51"/></svg>
+  </button>
+  <button class="iconbtn" id="gear" title="Settings" aria-label="Settings">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+  </button>
 </header>
 
 <main>
-  <section class="card">
-    <h2>Scaffold a service</h2>
-    <label>Describe the service (free text → the LLM/offline parser extracts a spec)</label>
-    <textarea id="desc">A Python FastAPI service called rate-ingest that reads rates from Postgres and serves them over HTTP</textarea>
-    <div class="row">
-      <label><input type="checkbox" id="onboard" checked /> onboard to catalog</label>
+  <div class="panel reveal">
+    <h2>Scaffold a service <span class="muted" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">free text → spec → paved-road files · routing <span id="llmstat">offline</span></span></h2>
+    <div class="body">
+      <label class="ctl" style="display:block">
+        <span class="muted">Describe the service (the LLM/offline parser extracts a spec)</span>
+        <textarea id="desc" style="margin-top:6px">A Python FastAPI service called rate-ingest that reads rates from Postgres and serves them over HTTP</textarea>
+      </label>
+      <div class="row" style="margin-top:10px">
+        <span class="muted">examples:</span>
+        <button class="chip" data-desc="A Python FastAPI service called rate-ingest that reads rates from Postgres and serves them over HTTP">python + db + http</button>
+        <button class="chip" data-desc="A Go worker called event-fanout with no database that does not expose HTTP">go worker, no db</button>
+        <button class="chip" data-desc="A TypeScript service named claim-gateway backed by a database exposing HTTP">typescript gateway</button>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <label class="check"><input type="checkbox" id="onboard" checked> onboard to catalog</label>
+        <button class="btn primary" id="scaffoldbtn" style="margin-left:auto"><span class="spin"></span><span class="lbl">Generate paved-road files</span></button>
+      </div>
+      <div id="routing" class="note">Generate a service to see its routing telemetry + spec.</div>
     </div>
-    <button onclick="scaffold()">Generate paved-road files</button>
-    <div id="routing" class="note"></div>
-  </section>
+  </div>
 
-  <section class="card">
-    <h2>Data-quality SLI (example ingest workload)</h2>
-    <div id="gauge" class="gauge">—</div>
-    <div class="note" id="dqnote">Run the synthetic price-transparency rate file
-      through validation.</div>
-    <button class="ghost" onclick="loadQuality()">Run ingest</button>
-    <pre id="dq" style="margin-top:10px;display:none"></pre>
-  </section>
+  <div class="panel reveal">
+    <h2>Data-quality SLI <span class="muted" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">example ingest workload</span></h2>
+    <div class="body">
+      <div id="gauge" class="gauge">—</div>
+      <div class="note" id="dqnote">Run the synthetic price-transparency rate file through validation.</div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn" id="ingestbtn"><span class="spin"></span><span class="lbl">Run ingest</span></button>
+      </div>
+      <pre id="dq" style="margin-top:12px;display:none"></pre>
+    </div>
+  </div>
 
-  <section class="card wide">
-    <h2>Generated files</h2>
-    <div class="tabs" id="tabs"></div>
-    <pre id="files">// Generate a service to see its Dockerfile, k8s manifest,
+  <div class="panel full reveal">
+    <h2>Generated files <span class="muted" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">Dockerfile · k8s · Terraform · golden CI · SLO</span></h2>
+    <div class="body">
+      <div class="tabs" id="tabs"></div>
+      <pre id="files">// Generate a service to see its Dockerfile, k8s manifest,
 // Terraform module invocation, golden CI workflow, and SLO stub.</pre>
-  </section>
+    </div>
+  </div>
 
-  <section class="card">
-    <h2>Service catalog (on the paved road)</h2>
-    <table id="catalog"><thead><tr><th>service</th><th>lang</th><th>db</th>
-      <th>http</th><th>role</th><th>via</th></tr></thead><tbody></tbody></table>
-  </section>
+  <div class="panel reveal">
+    <h2>Service catalog <span class="muted" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">on the paved road</span></h2>
+    <div class="body" style="padding:0;overflow-x:auto">
+      <table id="catalog"><thead><tr><th>service</th><th>lang</th><th>db</th>
+        <th>http</th><th>role</th><th>via</th></tr></thead><tbody></tbody></table>
+    </div>
+  </div>
 
-  <section class="card">
-    <h2>SLOs (Datadog-style)</h2>
-    <table id="slo"><thead><tr><th>slo</th><th>objective</th>
-      <th>budget /30d</th><th>current</th></tr></thead><tbody></tbody></table>
-  </section>
+  <div class="panel reveal">
+    <h2>SLOs <span class="muted" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">Datadog-style</span></h2>
+    <div class="body" style="padding:0;overflow-x:auto">
+      <table id="slo"><thead><tr><th>slo</th><th>objective</th>
+        <th>budget /30d</th><th>current</th></tr></thead><tbody></tbody></table>
+    </div>
+  </div>
 </main>
 
-<script>
-let GENERATED = {};
-async function jget(u){ return (await fetch(u)).json(); }
-async function jpost(u,b){ return (await fetch(u,{method:'POST',
-  headers:{'content-type':'application/json'},body:JSON.stringify(b||{})})).json(); }
+<!-- settings drawer -->
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-hidden="true">
+  <header><div class="brand" style="font-size:15px"><span class="logo" style="width:24px;height:24px"></span> Settings</div>
+    <span class="spacer"></span><button class="iconbtn" id="closedrawer" aria-label="Close">✕</button></header>
+  <div class="body">
+    <div class="muted" style="font-size:11.5px">The platform is the paved road: a free-text description becomes a
+      ServiceSpec, which templates Terraform / k8s / golden CI / SLO files, then optionally onboards to the catalog.
+      Illustrative IaC; synthetic data; runs fully offline by default.</div>
 
+    <!-- POLISH KIT: theme segmented control -->
+    <div class="field">
+      <label>Theme <span class="hint">appearance</span></label>
+      <div class="seg" id="themeseg">
+        <button type="button" class="segbtn" data-theme="dark">Dark</button>
+        <button type="button" class="segbtn" data-theme="light">Light</button>
+        <button type="button" class="segbtn" data-theme="system">System</button>
+      </div>
+    </div>
+
+    <!-- POLISH KIT: routing config -->
+    <div class="field">
+      <label>Routing mode <span class="hint">which provider a scaffold uses</span></label>
+      <div class="seg" id="modeseg">
+        <button type="button" class="segbtn" data-mode="auto">auto</button>
+        <button type="button" class="segbtn" data-mode="local">local</button>
+        <button type="button" class="segbtn" data-mode="free">free</button>
+        <button type="button" class="segbtn" data-mode="paid">paid</button>
+        <button type="button" class="segbtn" data-mode="offline">offline</button>
+      </div>
+      <div class="hint" id="modeblurb">auto = paid if keyed, else local, else free, else offline.</div>
+    </div>
+    <div class="field">
+      <label for="cfgModel">Model override <span class="hint">optional</span></label>
+      <input id="cfgModel" type="text" placeholder="provider default" />
+    </div>
+    <div class="field">
+      <label>Provider status <span class="hint" id="modeactive">active: auto</span></label>
+      <div style="display:grid;gap:6px" id="provrows"></div>
+    </div>
+    <div class="field">
+      <label>Fallback chain <span class="hint">→ on failure</span></label>
+      <div class="chainline" id="chainline">offline (deterministic)</div>
+    </div>
+    <div class="muted" style="font-size:11.5px">Provider keys live server-side; this selects which available provider a
+      scaffold uses. <code>offline</code> uses the deterministic spec parser (no LLM call).</div>
+  </div>
+  <div class="foot">
+    <button class="btn" id="resetcfg">Reset</button>
+    <button class="btn primary" id="savecfg" style="flex:1"><span class="lbl">Save</span></button>
+  </div>
+</aside>
+
+<!-- POLISH KIT: help modal -->
+<aside id="help" role="dialog" aria-modal="true" aria-labelledby="helptitle" aria-hidden="true">
+  <header><div class="brand" style="font-size:15px"><span class="logo" style="width:24px;height:24px"></span>
+    <span id="helptitle">Help · baseplate</span></div>
+    <span class="spacer"></span><button class="iconbtn" id="closehelp" aria-label="Close help">✕</button></header>
+  <div class="body">
+    <div><h4>What it is</h4><p>A platform paved-road console: a self-service LLM <b>service scaffolder</b> that turns a
+      free-text description into a ServiceSpec, then generates Terraform / k8s / golden CI / SLO files and onboards the
+      service to a catalog — plus an example ingest workload with a data-quality SLI and an SLO view.</p></div>
+    <div><h4>How to use</h4><ol>
+      <li><b>Scaffold a service</b> — describe it in <i>Scaffold a service</i> (or click an example), choose whether to
+        onboard, and click <i>Generate paved-road files</i>.</li>
+      <li><b>View generated files</b> — switch tabs in <i>Generated files</i> to read each templated paved-road artifact.</li>
+      <li><b>The catalog</b> — onboarded services appear in <i>Service catalog</i> with how they were routed.</li>
+      <li><b>Run ingest</b> — click <i>Run ingest</i> to score the synthetic rate file's data-quality SLI.</li>
+      <li><b>SLOs</b> — the <i>SLOs</i> panel shows objectives, error budgets, and the live data-quality SLI.</li>
+    </ol></div>
+    <div><h4>Endpoints</h4><div class="eps">
+      <code>/scaffold</code><code>/catalog</code><code>/ingest</code><code>/quality</code>
+      <code>/slo</code><code>/evals</code><code>/llm</code><code>/health</code></div></div>
+    <div><h4>Keyboard shortcuts</h4><p><span class="kbd">?</span> open this help · <span class="kbd">Esc</span> close any overlay</p></div>
+    <div><p class="muted" style="font-size:11.5px">IaC is <b>illustrative</b> and all rate data is <b>synthetic</b> — no real
+      infrastructure or secrets.</p></div>
+  </div>
+</aside>
+
+<div id="toasts"></div>
+
+<script>
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const jget=async u=>(await fetch(u)).json();
+const jpost=async(u,b)=>(await fetch(u,{method:'POST',headers:{'content-type':'application/json'},
+  body:JSON.stringify(b||{})})).json();
+const CFG_KEY="baseplate.cfg";
+let cfg={mode:"auto",model:""};
+let llmProviders={};   // last GET /llm providers map
+let GENERATED={};
+
+function toast(msg,type="info"){
+  const t=document.createElement("div");t.className=`toast ${type}`;
+  t.innerHTML=`<span class="tdot"></span>${msg}`;$("#toasts").appendChild(t);
+  setTimeout(()=>{t.style.opacity="0";t.style.transition="opacity .3s";setTimeout(()=>t.remove(),300)},2600);
+}
+function loadCfg(){try{cfg={...cfg,...JSON.parse(localStorage.getItem(CFG_KEY)||"{}")}}catch{}}
+function applyCfgToForm(){
+  $("#cfgModel").value=cfg.model||"";
+  selectMode(cfg.mode||"auto");
+  syncThemeSeg();
+}
+function openDrawer(){applyCfgToForm();$("#scrim").classList.add("open");$("#drawer").classList.add("open");$("#drawer").setAttribute("aria-hidden","false")}
+function closeDrawer(){$("#scrim").classList.remove("open");$("#drawer").classList.remove("open");$("#drawer").setAttribute("aria-hidden","true")}
+$("#gear").onclick=openDrawer;$("#closedrawer").onclick=closeDrawer;
+$("#savecfg").onclick=()=>{cfg={mode:currentMode(),model:$("#cfgModel").value.trim()};
+  localStorage.setItem(CFG_KEY,JSON.stringify(cfg));renderRouting();closeDrawer();toast("Settings saved","ok")};
+$("#resetcfg").onclick=()=>{cfg={mode:"auto",model:""};localStorage.removeItem(CFG_KEY);applyCfgToForm();renderRouting();toast("Reset to defaults","info")};
+
+/* ===================== domain: scaffolder ===================== */
 async function scaffold(){
-  const desc = document.getElementById('desc').value;
-  const onboard = document.getElementById('onboard').checked;
-  const r = await jpost('/scaffold', {description: desc, onboard});
-  if (r.error){ document.getElementById('routing').textContent = r.error; return; }
-  GENERATED = r.files;
-  const s = r.spec, rt = r.routing;
-  document.getElementById('routing').innerHTML =
-    `spec: <code>${s.name}</code> · ${s.language} · db=${s.needs_db} · `+
-    `http=${s.exposes_http} &nbsp;|&nbsp; via ${rt.provider}/${rt.model}`;
-  renderTabs();
-  loadCatalog();
+  const btn=$("#scaffoldbtn");btn.classList.add("loading");
+  const desc=$("#desc").value;
+  const onboard=$("#onboard").checked;
+  // wire cfg.mode into the scaffold request (ScaffoldRequest accepts `mode`)
+  const body={description:desc,onboard,mode:cfg.mode||null};
+  if(cfg.model)body.model=cfg.model;  // informational; server uses provider default if unsupported
+  try{
+    const r=await jpost('/scaffold',body);
+    if(r.error){$("#routing").textContent=r.error;toast("Scaffold failed","bad");btn.classList.remove("loading");return;}
+    GENERATED=r.files;
+    const s=r.spec, rt=r.routing;
+    $("#routing").innerHTML=
+      `spec: <code>${s.name}</code> · ${s.language} · db=${s.needs_db} · `+
+      `http=${s.exposes_http} &nbsp;|&nbsp; via <b>${rt.provider}</b>/${rt.model}`+
+      (rt.fallbacks&&rt.fallbacks.length?` · fell back through ${rt.fallbacks.join(", ")}`:"");
+    renderTabs();
+    toast(`Scaffolded ${s.name} via ${rt.provider}`,"ok");
+    loadCatalog();
+  }catch(e){$("#routing").textContent="scaffold failed";toast("Scaffold failed","bad");}
+  btn.classList.remove("loading");
 }
 function renderTabs(){
-  const tabs = document.getElementById('tabs');
-  tabs.innerHTML = '';
-  const paths = Object.keys(GENERATED).sort();
+  const tabs=$("#tabs");tabs.innerHTML='';
+  const paths=Object.keys(GENERATED).sort();
   paths.forEach((p,i)=>{
-    const t = document.createElement('span');
-    t.className = 'tab' + (i===0?' active':'');
-    t.textContent = p;
-    t.onclick = ()=>{ document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
-      t.classList.add('active'); show(p); };
+    const t=document.createElement('span');
+    t.className='tab'+(i===0?' active':'');
+    t.textContent=p;
+    t.onclick=()=>{$$('.tab').forEach(x=>x.classList.remove('active'));t.classList.add('active');show(p);};
     tabs.appendChild(t);
   });
-  if (paths.length) show(paths[0]);
+  if(paths.length)show(paths[0]);
 }
-function show(p){ document.getElementById('files').textContent = GENERATED[p]; }
+function show(p){$("#files").textContent=GENERATED[p];}
+$("#scaffoldbtn").onclick=scaffold;
+$$(".chip[data-desc]").forEach(b=>b.onclick=()=>{$("#desc").value=b.dataset.desc;scaffold();});
 
+/* ===================== domain: ingest / quality ===================== */
 async function loadQuality(){
-  const q = await jget('/quality');
-  const pct = (q.data_quality_pass_rate*100).toFixed(1)+'%';
-  const g = document.getElementById('gauge');
-  g.textContent = pct;
-  g.className = 'gauge ' + (q.data_quality_pass_rate>=0.98?'good':'bad');
-  document.getElementById('dqnote').textContent =
-    `${q.valid}/${q.rows} rows valid · defects: `+
-    Object.entries(q.defects).map(([k,v])=>`${k}×${v}`).join(', ');
-  const dq = document.getElementById('dq');
-  dq.style.display='block';
-  dq.textContent = JSON.stringify(q, null, 2);
+  const btn=$("#ingestbtn");btn.classList.add("loading");
+  try{
+    const q=await jget('/quality');
+    const pct=(q.data_quality_pass_rate*100).toFixed(1)+'%';
+    const g=$("#gauge");g.textContent=pct;
+    g.className='gauge '+(q.data_quality_pass_rate>=0.98?'good':'bad');
+    $("#dqnote").textContent=`${q.valid}/${q.rows} rows valid · defects: `+
+      (Object.entries(q.defects).map(([k,v])=>`${k}×${v}`).join(', ')||'none');
+    const dq=$("#dq");dq.style.display='block';dq.textContent=JSON.stringify(q,null,2);
+    loadSlo();
+  }catch{$("#dqnote").textContent="ingest failed";toast("Ingest failed","bad");}
+  btn.classList.remove("loading");
+}
+$("#ingestbtn").onclick=loadQuality;
+
+/* ===================== domain: catalog ===================== */
+async function loadCatalog(){
+  try{
+    const c=await jget('/catalog');
+    const tb=$("#catalog tbody");
+    tb.innerHTML=c.services.map(s=>`<tr><td><code>${s.name}</code></td>`+
+      `<td>${s.language}</td><td>${s.needs_db}</td><td>${s.exposes_http}</td>`+
+      `<td>${s.role}</td><td><span class="pill">${s.onboarded_via}</span></td></tr>`).join('');
+    $("#catpill").textContent=`catalog · ${c.count}`;
+  }catch{}
+}
+
+/* ===================== domain: SLO ===================== */
+async function loadSlo(){
+  try{
+    const v=await jget('/slo');
+    const tb=$("#slo tbody");
+    tb.innerHTML=v.slos.map(s=>{
+      const cur=('current_sli_pct' in s)
+        ? `<span class="badge ${s.meeting_objective?'b-good':'b-bad'}">${s.current_sli_pct}%</span>` : '—';
+      return `<tr><td>${s.name}</td><td>${s.objective_pct}%</td>`+
+        `<td>${s.error_budget_minutes_30d}min</td><td>${cur}</td></tr>`;
+    }).join('');
+  }catch{}
+}
+
+/* ===================== domain: llm status ===================== */
+async function loadLlm(){
+  try{const s=await jget('/llm');llmProviders=s.providers||{};
+    const active=Object.entries(llmProviders).find(e=>e[1]);
+    $("#llmstat").textContent=active?active[0]:"offline (deterministic)";
+    renderRouting();}catch{}
+}
+
+/* ===================== POLISH KIT: theme toggle ===================== */
+const THEME_KEY="theme";
+function getTheme(){try{return localStorage.getItem(THEME_KEY)||"system"}catch{return "system"}}
+function effectiveDark(t){
+  if(t==="dark")return true; if(t==="light")return false;
+  return !window.matchMedia("(prefers-color-scheme: light)").matches;
+}
+function applyTheme(t){
+  const dark=effectiveDark(t);
+  document.documentElement.classList.toggle("light",!dark);
+  $("#themeicon").textContent=dark?"☾":"☀";
+  $("#themebtn").title=`Theme: ${t}`;
+}
+function setTheme(t){try{localStorage.setItem(THEME_KEY,t)}catch{} applyTheme(t); syncThemeSeg();}
+function syncThemeSeg(){const cur=getTheme();
+  $$("#themeseg .segbtn").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.theme===cur)));}
+$("#themebtn").onclick=()=>{const cur=getTheme();const next=effectiveDark(cur)?"light":"dark";setTheme(next);};
+$$("#themeseg .segbtn").forEach(b=>b.onclick=()=>setTheme(b.dataset.theme));
+window.matchMedia("(prefers-color-scheme: light)").addEventListener?.("change",()=>{if(getTheme()==="system")applyTheme("system");});
+applyTheme(getTheme());
+
+/* ===================== POLISH KIT: help modal ===================== */
+function openHelp(){$("#scrim").classList.add("open");$("#help").classList.add("open");
+  $("#help").setAttribute("aria-hidden","false");$("#closehelp").focus();}
+function closeHelp(){$("#scrim").classList.remove("open");$("#help").classList.remove("open");
+  $("#help").setAttribute("aria-hidden","true");}
+$("#helpbtn").onclick=openHelp;$("#closehelp").onclick=closeHelp;
+$("#scrim").onclick=()=>{closeDrawer();closeHelp();};
+document.addEventListener("keydown",e=>{
+  const typing=/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName||"")||document.activeElement?.isContentEditable;
+  if(e.key==="Escape"){closeDrawer();closeHelp();}
+  else if(e.key==="?"&&!typing&&!$("#help").classList.contains("open")){e.preventDefault();openHelp();}
+});
+
+/* ===================== POLISH KIT: routing config ===================== */
+const MODE_BLURBS={
+  auto:"auto = paid if keyed, else local, else free, else offline.",
+  local:"local = Ollama only (on-box, zero cost).",
+  free:"free = OpenRouter free models only.",
+  paid:"paid = Anthropic, then OpenAI.",
+  offline:"offline = deterministic spec parser only (no LLM call).",
+};
+const MODE_CHAIN={
+  auto:["anthropic","openai","ollama","openrouter"],
+  paid:["anthropic","openai"], local:["ollama"], free:["openrouter"], offline:[],
+};
+const PROVIDERS=["anthropic","openai","ollama","openrouter"];
+function selectMode(m){
+  $$("#modeseg .segbtn").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.mode===m)));
+  $("#modeblurb").textContent=MODE_BLURBS[m]||"";
+  $("#modeactive").textContent=`active: ${m}`;
+}
+function currentMode(){return $("#modeseg").querySelector('[aria-pressed="true"]')?.dataset.mode||"auto";}
+function renderRouting(){
+  const m=currentMode();
+  $("#modeactive").textContent=`active: ${m}`;
+  const rows=PROVIDERS.map(p=>{
+    const on=!!llmProviders[p];
+    return `<div class="pstat"><span>${p}</span><span class="pdot ${on?'on':''}" title="${on?'available':'not configured'}"></span></div>`;
+  }).join("")+
+    `<div class="pstat"><span>offline (deterministic)</span><span class="pdot on" title="always available"></span></div>`;
+  $("#provrows").innerHTML=rows;
+  const chain=(MODE_CHAIN[m]||[]).filter(p=>llmProviders[p]);
+  const display=[...chain,"offline (deterministic)"];
+  $("#chainline").textContent=display.join("  →  ");
+}
+$$("#modeseg .segbtn").forEach(b=>b.onclick=()=>{selectMode(b.dataset.mode);renderRouting();});
+
+/* ===================== boot ===================== */
+async function boot(){
+  loadCfg();
+  selectMode(cfg.mode||"auto");
+  let ready=false;
+  for(let i=0;i<60 && !ready;i++){
+    try{const r=await fetch("health");if(r.ok){ready=true;break}}catch{}
+    if(i===4)$("#bootmsg").textContent="Still waking up…";
+    await new Promise(r=>setTimeout(r,1500));
+  }
+  $("#hdot").className="dot ok";$("#hstat").textContent="live";
+  $("#boot").classList.add("hide");setTimeout(()=>$("#boot").remove(),600);
+  $$(".reveal").forEach((el,i)=>setTimeout(()=>el.classList.add("in"),90*i));
+  loadLlm();
+  await scaffold();
+  loadQuality();
+  loadCatalog();
   loadSlo();
 }
-async function loadCatalog(){
-  const c = await jget('/catalog');
-  const tb = document.querySelector('#catalog tbody');
-  tb.innerHTML = c.services.map(s=>`<tr><td><code>${s.name}</code></td>`+
-    `<td>${s.language}</td><td>${s.needs_db}</td><td>${s.exposes_http}</td>`+
-    `<td>${s.role}</td><td><span class="pill">${s.onboarded_via}</span></td></tr>`).join('');
-}
-async function loadSlo(){
-  const v = await jget('/slo');
-  const tb = document.querySelector('#slo tbody');
-  tb.innerHTML = v.slos.map(s=>{
-    const cur = ('current_sli_pct' in s)
-      ? `<span class="${s.meeting_objective?'good':'bad'}">${s.current_sli_pct}%</span>` : '—';
-    return `<tr><td>${s.name}</td><td>${s.objective_pct}%</td>`+
-      `<td>${s.error_budget_minutes_30d}min</td><td>${cur}</td></tr>`;
-  }).join('');
-}
-scaffold(); loadQuality(); loadCatalog(); loadSlo();
+boot();
 </script>
 </body>
 </html>
