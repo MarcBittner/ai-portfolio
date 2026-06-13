@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>maskline — masking-policy-as-code governance</title>
+<style>
+  :root{
+    --bg:#0a0d14; --surface:#131826; --surface-2:#1a2032; --surface-3:#212a40;
+    --line:#263149; --line-2:#33405d;
+    --ink:#e9eef7; --ink-dim:#97a3ba; --ink-faint:#67728a;
+    --accent:#6aa1ff; --accent-2:#9b86ff;
+    --ok:#43c98a; --warn:#e6ad52; --bad:#f15b6c; --info:#6aa1ff; --violet:#9b86ff;
+    --r:15px; --r-sm:10px;
+    --sh:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.5);
+    --sh-lg:0 1px 2px rgba(0,0,0,.4), 0 24px 64px -24px rgba(0,0,0,.7);
+    --grad:linear-gradient(135deg,var(--accent),var(--accent-2));
+    --ease:cubic-bezier(.22,.61,.36,1);
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;
+    font:15px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Inter,sans-serif;
+    background-image:radial-gradient(1200px 600px at 80% -10%,rgba(107,130,255,.10),transparent 60%),
+      radial-gradient(900px 500px at 0% 0%,rgba(67,201,138,.05),transparent 55%);
+    background-attachment:fixed;min-height:100vh}
+  ::selection{background:rgba(106,161,255,.3)}
+  a{color:var(--accent);text-decoration:none}
+  header{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:14px;
+    padding:14px 24px;border-bottom:1px solid var(--line);
+    background:rgba(10,13,20,.72);backdrop-filter:blur(14px) saturate(140%)}
+  .brand{display:flex;align-items:center;gap:11px;font-weight:650;font-size:16px;letter-spacing:.2px}
+  .logo{width:30px;height:30px;border-radius:9px;background:var(--grad);position:relative;
+    box-shadow:0 4px 16px -4px rgba(106,161,255,.6);flex:none}
+  .logo::after{content:"";position:absolute;inset:7px;border-radius:5px;
+    border:2px solid rgba(255,255,255,.85);border-right-color:transparent;
+    animation:spin 3.5s linear infinite}
+  .brand .tag{color:var(--ink-dim);font-size:12.5px;font-weight:400}
+  .spacer{flex:1}
+  .status{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--ink-dim);
+    padding:5px 11px;border:1px solid var(--line);border-radius:999px;background:var(--surface)}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--ink-faint)}
+  .dot.ok{background:var(--ok);box-shadow:0 0 0 0 rgba(67,201,138,.5);animation:pulse 2s infinite}
+  .pill{font-size:12px;color:var(--ink-dim);border:1px solid var(--line);border-radius:999px;
+    padding:5px 12px;background:var(--surface);white-space:nowrap}
+  main{max-width:1180px;margin:0 auto;padding:26px 24px 64px;display:grid;gap:18px;
+    grid-template-columns:1fr 1fr}
+  .full{grid-column:1/-1}
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+    box-shadow:var(--sh);overflow:hidden;transition:.25s var(--ease)}
+  .panel:hover{border-color:var(--line-2)}
+  .panel h2{margin:0;padding:14px 18px;font-size:11.5px;font-weight:600;letter-spacing:.7px;
+    text-transform:uppercase;color:var(--ink-dim);border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:10px}
+  .panel .body{padding:18px}
+  .muted{color:var(--ink-dim);font-size:12.5px}
+  .hint{margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400;color:var(--ink-dim)}
+  .badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:700;
+    text-transform:uppercase;letter-spacing:.3px}
+  .b-pass{background:rgba(67,201,138,.16);color:var(--ok)}
+  .b-fail{background:rgba(241,91,108,.18);color:var(--bad)}
+  .b-warn{background:rgba(230,173,82,.16);color:var(--warn)}
+  .b-info{background:rgba(106,161,255,.15);color:var(--info)}
+  .b-direct{background:rgba(241,91,108,.16);color:var(--bad)}
+  .b-quasi{background:rgba(230,173,82,.16);color:var(--warn)}
+  .b-clinical{background:rgba(106,161,255,.15);color:var(--info)}
+  .b-financial{background:rgba(155,134,255,.15);color:var(--violet)}
+  .mono{font-family:var(--mono);font-size:12px}
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th,td{text-align:left;padding:9px 14px;border-bottom:1px solid var(--line);white-space:nowrap}
+  th{color:var(--ink-faint);font-size:11px;font-weight:600;letter-spacing:.4px;text-transform:uppercase}
+  tbody tr{transition:.14s var(--ease)}tbody tr:hover{background:var(--surface-2)}
+  tr.gap{background:rgba(241,91,108,.07)}
+  pre{margin:0;padding:16px;background:#0c0f18;border-radius:var(--r-sm);overflow:auto;
+    max-height:340px;font-family:var(--mono);font-size:12px;line-height:1.55;color:#cfe0ff}
+  .tabs{display:flex;gap:6px;padding:0 18px 0;margin-top:-6px}
+  .tab{font:inherit;font-size:12px;cursor:pointer;border:1px solid var(--line);border-bottom:none;
+    background:var(--surface-2);color:var(--ink-dim);border-radius:8px 8px 0 0;padding:7px 14px}
+  .tab.on{color:var(--ink);background:#0c0f18;border-color:var(--line-2)}
+  .gate{display:flex;align-items:center;gap:14px;padding:16px 18px;border-radius:var(--r-sm);
+    border:1px solid var(--line);background:var(--surface-2)}
+  .gate.pass{border-color:rgba(67,201,138,.4);background:rgba(67,201,138,.05)}
+  .gate.fail{border-color:rgba(241,91,108,.4);background:rgba(241,91,108,.05)}
+  .gate .big{font-size:22px;font-weight:700}
+  .scorering{--p:0;width:96px;height:96px;border-radius:50%;flex:none;
+    background:conic-gradient(var(--rc,var(--accent)) calc(var(--p)*1%),var(--surface-3) 0);
+    display:grid;place-items:center;position:relative}
+  .scorering::before{content:"";position:absolute;inset:9px;border-radius:50%;background:var(--surface)}
+  .scorering .v{position:relative;text-align:center;line-height:1.1}
+  .scorering .v b{font-size:24px}.scorering .v span{font-size:11px;color:var(--ink-dim)}
+  .ctlrow{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+  .ctlrow:last-child{border-bottom:none}
+  .ctlrow .id{font-family:var(--mono);font-size:12px;min-width:140px}
+  .ctlrow .d{color:var(--ink-dim);font-size:12px;margin-left:auto;text-align:right}
+  code{background:var(--surface-2);padding:1px 6px;border-radius:6px;font-family:var(--mono);font-size:12px}
+  .reveal{opacity:0;transform:translateY(14px)}
+  .reveal.in{opacity:1;transform:none;transition:.55s var(--ease)}
+  #boot{position:fixed;inset:0;z-index:90;background:var(--bg);display:grid;place-items:center;
+    transition:opacity .5s var(--ease)}
+  #boot.hide{opacity:0;pointer-events:none}
+  .boot-card{text-align:center;display:grid;gap:18px;justify-items:center}
+  .boot-card .logo{width:54px;height:54px}
+  .boot-card .ring{width:38px;height:38px;border:3px solid var(--line);border-top-color:var(--accent);
+    border-radius:50%;animation:spin .8s linear infinite}
+  .boot-card .msg{color:var(--ink-dim);font-size:13.5px}
+  .boot-card .sub{color:var(--ink-faint);font-size:12px;max-width:300px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(67,201,138,.5)}70%{box-shadow:0 0 0 6px rgba(67,201,138,0)}100%{box-shadow:0 0 0 0 rgba(67,201,138,0)}}
+  @media(max-width:880px){main{grid-template-columns:1fr}}
+  @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+<div id="boot"><div class="boot-card">
+  <div class="logo"></div><div class="ring"></div>
+  <div><div class="msg" id="bootmsg">Scanning the warehouse…</div>
+  <div class="sub">Free-tier instances sleep when idle — first load takes ~30–60s.</div></div>
+</div></div>
+
+<header>
+  <div class="brand"><span class="logo"></span> maskline
+    <span class="tag">masking-policy-as-code · re-id risk · SOC 2 / HIPAA posture</span></div>
+  <span class="spacer"></span>
+  <span class="status"><span class="dot" id="hdot"></span><span id="hstat">connecting…</span></span>
+  <span class="pill" id="enginepill">Snowflake-compatible SQL · DuckDB</span>
+  <span class="pill" id="llmpill">routing: offline</span>
+</header>
+
+<main>
+  <div class="panel full reveal">
+    <h2>CI gate <span class="hint">guardrail in the pipeline — an unmasked sensitive column fails the build</span></h2>
+    <div class="body"><div class="gate" id="gate"><span class="muted">scanning…</span></div></div>
+  </div>
+
+  <div class="panel reveal">
+    <h2>Control posture <span class="hint">SOC 2 · HIPAA</span></h2>
+    <div class="body" style="display:flex;gap:20px;align-items:flex-start">
+      <div class="scorering" id="ring"><div class="v"><b id="score">–</b><span>/100</span></div></div>
+      <div style="flex:1" id="controls"><span class="muted">loading…</span></div>
+    </div>
+  </div>
+
+  <div class="panel reveal">
+    <h2>Re-identification risk <span class="hint">k-anonymity</span></h2>
+    <div class="body"><div id="risk"><span class="muted">loading…</span></div></div>
+  </div>
+
+  <div class="panel full reveal">
+    <h2>Sensitive columns <span class="hint">name/type heuristics + LLM for free-text PHI · <span id="llmstat">offline</span></span></h2>
+    <div class="body" style="padding:0;overflow-x:auto"><table id="cols"></table></div>
+  </div>
+
+  <div class="panel full reveal">
+    <h2>Policy-as-code <span class="hint">generated for Snowflake — targets a real account in prod</span></h2>
+    <div class="tabs"><button class="tab on" data-t="ddl">Snowflake DDL</button><button class="tab" data-t="tf">Terraform</button></div>
+    <div class="body" style="padding:18px"><pre id="poly">loading…</pre></div>
+  </div>
+
+  <div class="panel full reveal">
+    <h2>Executive risk summary <span class="hint">security-as-enabler · <span id="narprov">offline</span></span></h2>
+    <div class="body"><div id="narrative" style="line-height:1.65">loading…</div></div>
+  </div>
+</main>
+
+<script>
+const $=s=>document.querySelector(s);
+const j=async u=>(await fetch(u)).json();
+const txt=async u=>(await fetch(u)).text();
+const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;");
+let DDL="", TF="";
+
+function renderGate(g){
+  const el=$("#gate"); el.className="gate "+(g.pass?"pass":"fail");
+  if(g.pass){
+    el.innerHTML=`<span class="big">✓ PASS</span><div><b>${esc(g.reason)}</b>
+      <div class="muted">exit 0 — safe to merge</div></div>`;
+  }else{
+    el.innerHTML=`<span class="big" style="color:var(--bad)">✕ FAIL</span><div><b>${esc(g.reason)}</b>
+      <div class="muted">exit ${g.exit_code} — the build blocks until every sensitive column has a masking policy</div></div>`;
+  }
+}
+function renderControls(p){
+  const rc=p.posture_score>=80?"var(--ok)":p.posture_score>=60?"var(--warn)":"var(--bad)";
+  const ring=$("#ring"); ring.style.setProperty("--p",p.posture_score); ring.style.setProperty("--rc",rc);
+  $("#score").textContent=p.posture_score; $("#score").nextElementSibling.textContent=" "+p.grade;
+  $("#controls").innerHTML=p.controls.map(c=>`<div class="ctlrow">
+    <span class="badge ${c.status==='pass'?'b-pass':'b-fail'}">${c.status}</span>
+    <span class="id">${c.id}</span>
+    <span class="d">${esc(c.detail)}</span></div>`).join("")+
+    `<div class="muted" style="margin-top:10px">${p.passed}/${p.passed+p.failed} controls pass across ${p.frameworks.join(" + ")}.</div>`;
+}
+function renderRisk(r){
+  const k=r.kanon, rows=r.sweep.map(s=>`<tr><td>${esc(s.generalization)}</td>
+    <td style="text-align:right"><b>${s.k_min}</b></td><td style="text-align:right">${s.singletons}</td></tr>`).join("");
+  $("#risk").innerHTML=`<p style="margin:0 0 10px">Quasi-identifiers <code>${k.quasi_identifiers.join(", ")}</code>
+    → minimum <b>k = ${k.k_min}</b>; <b>${k.singleton_count}/${k.records}</b> rows are singletons,
+    re-identifiable by linkage even with direct identifiers masked.</p>
+    <table><thead><tr><th>generalization</th><th style="text-align:right">k_min</th><th style="text-align:right">singletons</th></tr></thead>
+    <tbody>${rows}</tbody></table>
+    <p class="muted" style="margin:8px 0 0">Coarser generalization raises k — the privacy/utility lever.</p>`;
+}
+function renderCols(data,cov){
+  const gap=new Set(cov.uncovered_columns.map(u=>u.table+"."+u.column));
+  const cols=data.sensitive;
+  $("#cols").innerHTML=`<thead><tr><th>table.column</th><th>type</th><th>class</th><th>via</th><th>PHI found</th><th>masked?</th></tr></thead><tbody>`+
+    cols.map(c=>{
+      const id=c.table+"."+c.column, isgap=gap.has(id);
+      const masked=isgap?`<span class="badge b-fail">no policy</span>`:
+        (c.class==='clinical'||c.class==='financial')?`<span class="badge b-info">visible (row-access)</span>`:`<span class="badge b-pass">masked</span>`;
+      return `<tr class="${isgap?'gap':''}"><td class="mono">${id}</td><td class="mono">${c.type}</td>
+        <td><span class="badge b-${c.class}">${c.class}</span></td>
+        <td>${c.method==='llm'?'<span class="badge b-warn">LLM</span>':'rule'}</td>
+        <td class="mono">${c.phi_types.join(", ")||'—'}</td><td>${masked}</td></tr>`;
+    }).join("")+`</tbody>`;
+}
+document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
+  document.querySelectorAll(".tab").forEach(x=>x.classList.remove("on")); t.classList.add("on");
+  $("#poly").textContent = t.dataset.t==="ddl"?DDL:TF;
+});
+
+async function boot(){
+  let ready=false;
+  for(let i=0;i<60 && !ready;i++){
+    try{const r=await fetch("health");if(r.ok){ready=true;break}}catch{}
+    if(i===4)$("#bootmsg").textContent="Still waking up…";
+    await new Promise(r=>setTimeout(r,1500));
+  }
+  $("#hdot").className="dot ok";$("#hstat").textContent="live";
+  $("#boot").classList.add("hide");setTimeout(()=>$("#boot").remove(),600);
+  document.querySelectorAll(".reveal").forEach((el,i)=>setTimeout(()=>el.classList.add("in"),80*i));
+  try{
+    const s=await j("scan?narrative=1");
+    renderGate(s.gate); renderControls(s.controls); renderRisk(s.risk);
+    renderCols({sensitive:s.sensitive}, s.coverage);
+    if(s.narrative){$("#narrative").textContent=s.narrative.summary;$("#narprov").textContent=s.narrative.provider;}
+    $("#enginepill").textContent=s.engine;
+  }catch(e){$("#gate").innerHTML='<span class="muted">scan failed</span>';}
+  try{const ll=await j("llm");const a=Object.entries(ll.providers).find(e=>e[1]);
+    const name=a?a[0]:"offline (deterministic)";$("#llmstat").textContent=name;$("#llmpill").textContent="routing: "+name;}catch{}
+  try{DDL=await txt("policy/ddl");TF=await txt("policy/terraform");$("#poly").textContent=DDL;}catch{}
+}
+boot();
+</script>
+</body>
+</html>
