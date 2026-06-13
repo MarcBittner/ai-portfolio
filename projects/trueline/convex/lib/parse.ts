@@ -12,6 +12,35 @@ export interface ExtractedLine {
   sourceQuote: string;
 }
 
+export interface ParsedPoLine {
+  sku?: string;
+  description: string;
+  unit: string;
+  quantity: number;
+  unitPrice: number;
+}
+
+// Parse an uploaded purchase-order / contract:
+//   SKU | Description | Qty | Unit | Unit Price
+export function parsePoText(rawText: string): ParsedPoLine[] {
+  return rawText
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l.includes("|"))
+    .map((l) => l.split("|").map((c) => c.trim()))
+    .filter((c) => c.length >= 5 && !/^sku$/i.test(c[0]))
+    .map((c) => {
+      const n = (x: string) => parseFloat((x || "0").replace(/[$,]/g, "")) || 0;
+      return {
+        sku: c[0] || undefined,
+        description: c[1],
+        quantity: n(c[2]),
+        unit: c[3] || "ea",
+        unitPrice: n(c[4]),
+      };
+    });
+}
+
 // Parse our seeded invoice text:
 //   SKU | Description | Qty | Unit | Unit Price | Extension
 // Used by the seed (so demo data is populated instantly) and as the LLM's

@@ -8,7 +8,7 @@ import {
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { reconcileLine } from "./lib/reconcile";
-import { parsePipeInvoice, type ExtractedLine } from "./lib/parse";
+import { parsePipeInvoice, parsePoText, type ExtractedLine } from "./lib/parse";
 import {
   DEMO_CATALOG,
   DEMO_INVOICES,
@@ -224,6 +224,78 @@ export const createInvoiceFromText = mutation({
     // hand off the external LLM work to an action (the only place I/O is legal)
     await ctx.scheduler.runAfter(0, internal.extract.run, { invoiceId, orgId });
     return invoiceId;
+  },
+});
+
+// Whether a baseline contract (PO) has been uploaded yet — drives the guided UI.
+export const baseline = query({
+  args: {},
+  handler: async (ctx) => {
+    const orgId = await optionalOrg(ctx);
+    if (!orgId) return { hasPo: false, poLines: 0, poNumber: null, vendor: null };
+    const po = await ctx.db
+      .query("purchaseOrders")
+      .withIndex("by_org", (q) => q.eq("orgId", orgId))
+      .first();
+    return po
+      ? { hasPo: true, poLines: po.lines.length, poNumber: po.poNumber, vendor: po.vendor }
+      : { hasPo: false, poLines: 0, poNumber: null, vendor: null };
+  },
+});
+
+// Upload a contract / purchase order: parse it, make it the baseline, and seed
+// the market-rate reference catalog if one isn't present.
+export const setBaselineFromText = mutation({
+  args: { rawText: v.string(), poNumber: v.optional(v.string()) },
+  handler: async (ctx, { rawText, poNumber }) => {
+    const { orgId } = await requireOrg(ctx);
+    const lines = parsePoText(rawText);
+    if (lines.length === 0) throw new Error("No line items found in the contract file.");
+    const existing = await ctx.db
+      .query("purchaseOrders")
+      .withIndex("by_org", (q) => q.eq("orgId", orgId))
+      .collect();
+    for (const p of existing) await ctx.db.delete(p._id);
+    await ctx.db.insert("purchaseOrders", {
+      orgId,
+      poNumber: poNumber ?? DEMO_PO_NUMBER,
+      vendor: DEMO_VENDOR,
+      lines,
+    });
+    const cat = await ctx.db
+      .query("catalog")
+      .withIndex("by_org", (q) => q.eq("orgId", orgId))
+      .first();
+    if (!cat) for (const c of DEMO_CATALOG) await ctx.db.insert("catalog", { orgId, ...c });
+    return { poLines: lines.length };
+  },
+});
+
+// Clear the tenant so the guided demo can start from empty.
+export const resetDemo = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const { orgId } = await requireOrg(ctx);
+    const invs = await ctx.db
+      .query("invoices")
+      .withIndex("by_org", (q) => q.eq("orgId", orgId))
+      .collect();
+    for (const inv of invs) {
+      const ls = await ctx.db
+        .query("invoiceLines")
+        .withIndex("by_invoice", (q) => q.eq("invoiceId", inv._id))
+        .collect();
+      for (const l of ls) await ctx.db.delete(l._id);
+      await ctx.db.delete(inv._id);
+    }
+    for (const t of ["purchaseOrders", "catalog", "evalRuns"] as const) {
+      const rows = await ctx.db
+        .query(t)
+        .withIndex("by_org", (q) => q.eq("orgId", orgId))
+        .collect();
+      for (const r of rows) await ctx.db.delete(r._id);
+    }
+    return { cleared: true };
   },
 });
 
