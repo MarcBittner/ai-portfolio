@@ -209,8 +209,16 @@ export const seedIfEmpty = mutation({
 });
 
 export const createInvoiceFromText = mutation({
-  args: { invoiceNumber: v.string(), rawText: v.string(), poNumber: v.optional(v.string()) },
-  handler: async (ctx, { invoiceNumber, rawText, poNumber }) => {
+  // deferServer: the client will try host-local Ollama in the browser first and
+  // submit the result via submitExtraction; only schedule the server action if
+  // that doesn't happen (see scheduleExtract).
+  args: {
+    invoiceNumber: v.string(),
+    rawText: v.string(),
+    poNumber: v.optional(v.string()),
+    deferServer: v.optional(v.boolean()),
+  },
+  handler: async (ctx, { invoiceNumber, rawText, poNumber, deferServer }) => {
     const { orgId, who } = await requireOrg(ctx);
     const invoiceId = await ctx.db.insert("invoices", {
       orgId,
@@ -225,11 +233,70 @@ export const createInvoiceFromText = mutation({
       orgId,
       level: "info",
       event: "upload",
-      detail: `${invoiceNumber} uploaded — extraction scheduled`,
+      detail: `${invoiceNumber} uploaded${deferServer ? " — trying local Ollama in browser" : " — extraction scheduled"}`,
     });
-    // hand off the external LLM work to an action (the only place I/O is legal)
-    await ctx.scheduler.runAfter(0, internal.extract.run, { invoiceId, orgId });
+    if (!deferServer) {
+      await ctx.scheduler.runAfter(0, internal.extract.run, { invoiceId, orgId });
+    }
     return invoiceId;
+  },
+});
+
+// Fallback: the client calls this if host-local Ollama wasn't reachable, so the
+// server action (paid → free → offline) takes over.
+export const scheduleExtract = mutation({
+  args: { invoiceId: v.id("invoices") },
+  handler: async (ctx, { invoiceId }) => {
+    const { orgId } = await requireOrg(ctx);
+    const inv = await ctx.db.get(invoiceId);
+    if (!inv || inv.orgId !== orgId) throw new Error("not found");
+    await ctx.scheduler.runAfter(0, internal.extract.run, { invoiceId, orgId });
+  },
+});
+
+// Accept line items extracted in the browser (by the host's local Ollama),
+// reconcile + write them. Lets a cloud-hosted backend use a model running on the
+// user's machine — the browser reaches localhost, the cloud action cannot.
+export const submitExtraction = mutation({
+  args: {
+    invoiceId: v.id("invoices"),
+    provider: v.string(),
+    model: v.string(),
+    latencyMs: v.optional(v.number()),
+    lines: v.array(
+      v.object({
+        description: v.string(),
+        sku: v.optional(v.string()),
+        quantity: v.number(),
+        unit: v.string(),
+        unitPrice: v.number(),
+        extension: v.number(),
+        confidence: v.number(),
+        sourceQuote: v.string(),
+      }),
+    ),
+  },
+  handler: async (ctx, { invoiceId, provider, model, latencyMs, lines }) => {
+    const { orgId } = await requireOrg(ctx);
+    const inv = await ctx.db.get(invoiceId);
+    if (!inv || inv.orgId !== orgId) throw new Error("not found");
+    const rollup = await insertReconciledLines(ctx, { orgId, invoiceId, extracted: lines });
+    await ctx.db.patch(invoiceId, {
+      status: "needs_review",
+      extractionProvider: provider,
+      extractionModel: model,
+      latencyMs,
+      costUsd: 0,
+      error: undefined,
+      ...rollup,
+    });
+    await ctx.db.insert("logs", {
+      orgId,
+      level: "info",
+      event: "extract",
+      detail: `${inv.invoiceNumber}: ${provider}/${model} · ${lines.length} lines (browser→host)`,
+      latencyMs,
+    });
   },
 });
 

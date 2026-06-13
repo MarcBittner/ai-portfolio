@@ -272,6 +272,14 @@ is set (`keyStatus()`). `model` overrides the chosen provider's default. Default
 `OLLAMA_MODEL=llama3.1:8b`, `OPENROUTER_MODEL=google/gemma-4-31b-it:free`,
 `ANTHROPIC_MODEL=claude-haiku-4-5-20251001`. Keys/URLs are **Convex deployment env vars**
 (server-side), never in the browser bundle.
+
+**Host Ollama with a cloud backend.** A cloud-hosted action can't reach your `localhost`,
+so local Ollama is *also* wired **client-side**: in `auto`/`local` mode the browser (which
+is on your machine) probes `localhost:11434`, and if it answers it extracts there and
+submits the lines via `submitExtraction` — so even a cloud Convex deployment uses the model
+on your machine. It falls back to the server action (paid → free → offline) when Ollama
+isn't reachable. One host-side requirement: let the app origin call Ollama —
+`OLLAMA_ORIGINS=* ollama serve` (or set it to the app's URL).
 OpenRouter free tier is 50 req/day; past that a run resolves to the mock (shown on the
 review header + Diagnostics).
 

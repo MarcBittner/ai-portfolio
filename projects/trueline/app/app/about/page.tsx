@@ -29,6 +29,7 @@ const STACK: { group: string; items: [string, string][] }[] = [
   {
     group: "AI / LLM",
     items: [
+      ["Local Ollama (browser→host)", "your machine's model, used even with a cloud backend"],
       ["Anthropic (Claude)", "paid path — best structured-extraction quality"],
       ["OpenRouter free models", "zero-cost default (gemma-4-31b-it:free)"],
       ["Deterministic offline engine", "no-model fallback; runs with zero keys"],

@@ -6,6 +6,7 @@ import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Nav } from "@/app/components/nav";
 import { FlagBadge, StatusBadge, usd } from "@/app/components/ui";
+import { extractWithOllama, probeOllama } from "@/app/lib/ollama";
 
 // ---- the downloadable sample files (match the reconcile engine's expectations) ----
 const CONTRACT = {
@@ -150,6 +151,9 @@ export default function Dashboard() {
   const reset = useMutation(api.invoices.resetDemo);
   const seedAll = useMutation(api.invoices.seedIfEmpty);
   const runEval = useMutation(api.evals.runEval);
+  const routingCfg = useQuery(api.routing.get);
+  const submitExtraction = useMutation(api.invoices.submitExtraction);
+  const scheduleExtract = useMutation(api.invoices.scheduleExtract);
   const [msg, setMsg] = useState<string | null>(null);
 
   if (!isAuthenticated || baseline === undefined || invoices === undefined) {
@@ -177,12 +181,44 @@ export default function Dashboard() {
   async function uploadInvoice(text: string, filename: string) {
     setMsg(null);
     const m = (filename + " " + text).match(/INV-\d+/);
+    const invoiceNumber = m?.[0] ?? filename.replace(/\.\w+$/, "");
+    const mode = routingCfg?.mode ?? "auto";
+    const tryLocal = mode === "auto" || mode === "local";
+    let invoiceId;
     try {
-      await createInvoice({ invoiceNumber: m?.[0] ?? filename.replace(/\.\w+$/, ""), rawText: text });
-      setMsg("✓ Invoice uploaded — extracting + reconciling now…");
+      invoiceId = await createInvoice({ invoiceNumber, rawText: text, deferServer: tryLocal });
     } catch (e) {
       setMsg("Upload failed: " + (e as Error).message);
+      return;
     }
+    if (!tryLocal) {
+      setMsg("✓ Uploaded — extracting on the server…");
+      return;
+    }
+    // Host-local Ollama, via the browser (the cloud action can't reach localhost).
+    try {
+      if (await probeOllama()) {
+        const model = routingCfg?.model || routingCfg?.defaultLocalModel || "llama3.1:8b";
+        setMsg(`Extracting on your machine via Ollama (${model})…`);
+        const t0 = performance.now();
+        const lines = await extractWithOllama(text, model);
+        if (lines.length) {
+          await submitExtraction({
+            invoiceId,
+            provider: "ollama (browser→host)",
+            model,
+            latencyMs: Math.round(performance.now() - t0),
+            lines,
+          });
+          setMsg(`✓ Extracted on your machine via Ollama (${model}).`);
+          return;
+        }
+      }
+    } catch {
+      /* unreachable / CORS / parse failure → fall through to the server */
+    }
+    await scheduleExtract({ invoiceId });
+    setMsg("✓ Uploaded — no local Ollama reachable; using server (paid → free → offline).");
   }
 
   return (
