@@ -4,12 +4,22 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>quorum — governed multi-agent orchestration</title>
+<!-- POLISH KIT: theme-init (apply before paint, no flash) -->
+<script>
+(function(){
+  try{
+    var t=localStorage.getItem("theme")||"system";
+    var dark = t==="dark" || (t==="system" && !window.matchMedia("(prefers-color-scheme: light)").matches);
+    if(!dark) document.documentElement.classList.add("light");
+  }catch(e){}
+})();
+</script>
 <style>
   :root{
     --bg:#0a0d14; --surface:#131826; --surface-2:#1a2032; --surface-3:#212a40;
     --line:#263149; --line-2:#33405d;
     --ink:#e9eef7; --ink-dim:#97a3ba; --ink-faint:#67728a;
-    --accent:#6aa1ff; --accent-2:#9b86ff;
+    --accent:#6aa1ff; --accent-2:#9b86ff; --accent-ink:#06101f;
     --ok:#43c98a; --warn:#e6ad52; --bad:#f15b6c; --info:#6aa1ff; --violet:#9b86ff;
     --r:15px; --r-sm:10px; --r-xs:7px;
     --sh:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.5);
@@ -17,19 +27,33 @@
     --grad:linear-gradient(135deg,var(--accent),var(--accent-2));
     --ease:cubic-bezier(.22,.61,.36,1);
     --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+    --header-bg:rgba(10,13,20,.72);
+    --bg-radial-1:rgba(107,130,255,.10); --bg-radial-2:rgba(155,134,255,.06);
+  }
+  /* POLISH KIT: theme toggle — LIGHT palette overrides (same accents, light surfaces, dark ink) */
+  html.light{
+    --bg:#f4f6fb; --surface:#ffffff; --surface-2:#f1f4fa; --surface-3:#e6ebf5;
+    --line:#d8dfec; --line-2:#c2ccde;
+    --ink:#16203a; --ink-dim:#566184; --ink-faint:#8b95ad;
+    --accent:#3a6ff0; --accent-2:#7c5cf5; --accent-ink:#ffffff;
+    --ok:#1f9d63; --warn:#b9791f; --bad:#d83a4d; --info:#3a6ff0; --violet:#6f53d6;
+    --sh:0 1px 2px rgba(20,32,58,.06), 0 8px 24px -14px rgba(20,32,58,.18);
+    --sh-lg:0 1px 2px rgba(20,32,58,.08), 0 24px 64px -28px rgba(20,32,58,.28);
+    --header-bg:rgba(255,255,255,.78);
+    --bg-radial-1:rgba(58,111,240,.10); --bg-radial-2:rgba(111,83,214,.07);
   }
   *{box-sizing:border-box}
   html{scroll-behavior:smooth}
   body{margin:0;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;
     font:15px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Inter,sans-serif;
-    background-image:radial-gradient(1200px 600px at 80% -10%,rgba(107,130,255,.10),transparent 60%),
-      radial-gradient(900px 500px at 0% 0%,rgba(155,134,255,.06),transparent 55%);
-    background-attachment:fixed;min-height:100vh}
+    background-image:radial-gradient(1200px 600px at 80% -10%,var(--bg-radial-1),transparent 60%),
+      radial-gradient(900px 500px at 0% 0%,var(--bg-radial-2),transparent 55%);
+    background-attachment:fixed;min-height:100vh;transition:background-color .25s var(--ease),color .25s var(--ease)}
   ::selection{background:rgba(106,161,255,.3)}
   a{color:var(--accent);text-decoration:none}
   header{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:14px;
     padding:14px 24px;border-bottom:1px solid var(--line);
-    background:rgba(10,13,20,.72);backdrop-filter:blur(14px) saturate(140%)}
+    background:var(--header-bg);backdrop-filter:blur(14px) saturate(140%)}
   .brand{display:flex;align-items:center;gap:11px;font-weight:650;font-size:16px;letter-spacing:.2px}
   .logo{width:30px;height:30px;border-radius:9px;background:var(--grad);position:relative;
     box-shadow:0 4px 16px -4px rgba(106,161,255,.6);flex:none}
@@ -44,6 +68,10 @@
   .dot.ok{background:var(--ok);animation:pulse 2s infinite}
   .pill{font-size:12px;color:var(--ink-dim);border:1px solid var(--line);border-radius:999px;
     padding:5px 12px;background:var(--surface);white-space:nowrap}
+  .iconbtn{width:36px;height:36px;border-radius:10px;border:1px solid var(--line);background:var(--surface);
+    color:var(--ink-dim);cursor:pointer;display:grid;place-items:center;transition:.18s var(--ease)}
+  .iconbtn:hover{color:var(--ink);border-color:var(--line-2);transform:translateY(-1px);background:var(--surface-2)}
+  .iconbtn svg{width:18px;height:18px}
   main{max-width:1160px;margin:0 auto;padding:26px 24px 64px;display:grid;gap:18px;
     grid-template-columns:1fr 1fr}
   .full{grid-column:1/-1}
@@ -63,10 +91,10 @@
     border:1px solid var(--line);background:var(--surface-2);color:var(--ink);
     transition:.16s var(--ease);display:inline-flex;align-items:center;gap:8px;position:relative}
   .btn:hover{transform:translateY(-1px);border-color:var(--line-2)}
-  .btn.primary{background:var(--grad);border:none;color:#06101f;
+  .btn.primary{background:var(--grad);border:none;color:var(--accent-ink);
     box-shadow:0 6px 20px -8px rgba(106,161,255,.7)}
   .btn[disabled]{opacity:.6;pointer-events:none}
-  .btn .spin{width:14px;height:14px;border:2px solid rgba(6,16,31,.35);border-top-color:#06101f;
+  .btn .spin{width:14px;height:14px;border:2px solid rgba(127,127,127,.35);border-top-color:var(--accent-ink);
     border-radius:50%;animation:spin .7s linear infinite;display:none}
   .btn.loading .spin{display:block}.btn.loading .lbl{opacity:.7}
   .chip{font:inherit;font-size:12px;cursor:pointer;border:1px dashed var(--line);background:transparent;
@@ -121,8 +149,58 @@
   .boot-card .ring{width:38px;height:38px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
   .boot-card .msg{color:var(--ink-dim);font-size:13.5px}
   .boot-card .sub{color:var(--ink-faint);font-size:12px;max-width:300px}
+  /* settings drawer */
+  .scrim{position:fixed;inset:0;background:rgba(5,8,14,.55);backdrop-filter:blur(2px);z-index:50;
+    opacity:0;pointer-events:none;transition:.25s var(--ease)}
+  .scrim.open{opacity:1;pointer-events:auto}
+  .drawer{position:fixed;top:0;right:0;height:100%;width:380px;max-width:92vw;z-index:60;
+    background:var(--surface);border-left:1px solid var(--line);box-shadow:var(--sh-lg);
+    transform:translateX(100%);transition:transform .3s var(--ease);display:flex;flex-direction:column}
+  .drawer.open{transform:none}
+  .drawer header{position:static;background:none;backdrop-filter:none;border-bottom:1px solid var(--line)}
+  .drawer h3{margin:0;font-size:15px;font-weight:650}
+  .drawer .body{padding:20px;overflow:auto;display:grid;gap:18px}
+  .field{display:grid;gap:7px}
+  .field label{font-size:12px;color:var(--ink-dim);font-weight:600;display:flex;justify-content:space-between}
+  .field .hint{font-size:11.5px;color:var(--ink-faint);font-weight:400}
+  .seg{display:flex;gap:6px;flex-wrap:wrap}
+  /* POLISH KIT: segmented control (theme + routing mode) */
+  .seg .segbtn{font:inherit;font-size:12px;cursor:pointer;border:1px solid var(--line);background:var(--surface-2);
+    color:var(--ink-dim);border-radius:var(--r-sm);padding:7px 11px;transition:.16s var(--ease)}
+  .seg .segbtn:hover{color:var(--ink);border-color:var(--line-2)}
+  .seg .segbtn[aria-pressed="true"]{background:var(--grad);border-color:transparent;color:var(--accent-ink);font-weight:600}
+  .pstat{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12.5px;
+    padding:7px 11px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface-2)}
+  .pstat .pdot{width:8px;height:8px;border-radius:50%;background:var(--ink-faint);flex:none}
+  .pstat .pdot.on{background:var(--ok);box-shadow:0 0 0 3px rgba(67,201,138,.18)}
+  .chainline{font-family:var(--mono);font-size:11.5px;color:var(--ink-dim);
+    background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);padding:8px 11px;word-break:break-word}
+  .drawer .foot{margin-top:auto;padding:16px 20px;border-top:1px solid var(--line);display:flex;gap:10px}
+  /* POLISH KIT: help modal (centered dialog, reuses scrim) */
+  #help{position:fixed;top:50%;left:50%;transform:translate(-50%,calc(-50% + 12px));z-index:70;
+    width:560px;max-width:94vw;max-height:86vh;overflow:auto;opacity:0;pointer-events:none;
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh-lg);
+    transition:opacity .25s var(--ease),transform .25s var(--ease)}
+  #help.open{opacity:1;pointer-events:auto;transform:translate(-50%,-50%)}
+  #help header{position:static;background:none;backdrop-filter:none;border-bottom:1px solid var(--line)}
+  #help .body{padding:20px;display:grid;gap:16px}
+  #help h4{margin:0 0 6px;font-size:11.5px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--ink-dim)}
+  #help p{margin:0;color:var(--ink-dim);font-size:13.5px}
+  #help ol{margin:0;padding-left:20px;color:var(--ink-dim);font-size:13.5px;display:grid;gap:4px}
+  #help .kbd{font-family:var(--mono);font-size:11.5px;background:var(--surface-2);border:1px solid var(--line);
+    border-bottom-width:2px;border-radius:6px;padding:1px 7px;color:var(--ink)}
+  #help .eps{display:flex;gap:7px;flex-wrap:wrap}
+  /* toast */
+  #toasts{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:80;
+    display:flex;flex-direction:column;gap:10px;align-items:center}
+  .toast{background:var(--surface-3);border:1px solid var(--line-2);border-radius:11px;padding:11px 16px;
+    box-shadow:var(--sh-lg);font-size:13px;display:flex;align-items:center;gap:10px;
+    animation:toastIn .3s var(--ease)}
+  .toast .tdot{width:8px;height:8px;border-radius:50%}
+  .toast.ok .tdot{background:var(--ok)}.toast.bad .tdot{background:var(--bad)}.toast.info .tdot{background:var(--info)}
   @keyframes spin{to{transform:rotate(360deg)}}
   @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(67,201,138,.5)}70%{box-shadow:0 0 0 6px rgba(67,201,138,0)}100%{box-shadow:0 0 0 0 rgba(67,201,138,0)}}
+  @keyframes toastIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
   @media(max-width:860px){main{grid-template-columns:1fr}}
   @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 </style>
@@ -140,6 +218,15 @@
   <span class="spacer"></span>
   <span class="status"><span class="dot" id="hdot"></span><span id="hstat">connecting…</span></span>
   <span class="pill" id="llmpill">routing: offline</span>
+  <!-- POLISH KIT: theme toggle -->
+  <button class="iconbtn" id="themebtn" title="Toggle theme" aria-label="Toggle light/dark theme"><span id="themeicon">☾</span></button>
+  <!-- POLISH KIT: help modal trigger -->
+  <button class="iconbtn" id="helpbtn" title="Help (?)" aria-label="Help">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 1 1 4.6 3c-.8.6-1.7 1-1.7 2.2"/><line x1="12" y1="17.5" x2="12" y2="17.51"/></svg>
+  </button>
+  <button class="iconbtn" id="gear" title="Settings" aria-label="Settings">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+  </button>
 </header>
 
 <main>
@@ -206,13 +293,106 @@
   </div>
 </main>
 
+<!-- settings drawer -->
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-hidden="true">
+  <header><div class="brand" style="font-size:15px"><span class="logo" style="width:24px;height:24px"></span> Settings</div>
+    <span class="spacer"></span><button class="iconbtn" id="closedrawer" aria-label="Close">✕</button></header>
+  <div class="body">
+    <!-- POLISH KIT: theme segmented control -->
+    <div class="field">
+      <label>Theme <span class="hint">appearance</span></label>
+      <div class="seg" id="themeseg">
+        <button type="button" class="segbtn" data-theme="dark">Dark</button>
+        <button type="button" class="segbtn" data-theme="light">Light</button>
+        <button type="button" class="segbtn" data-theme="system">System</button>
+      </div>
+    </div>
+
+    <!-- POLISH KIT: routing config -->
+    <div class="field">
+      <label>Routing mode <span class="hint">which provider a run uses</span></label>
+      <div class="seg" id="modeseg">
+        <button type="button" class="segbtn" data-mode="auto">auto</button>
+        <button type="button" class="segbtn" data-mode="local">local</button>
+        <button type="button" class="segbtn" data-mode="free">free</button>
+        <button type="button" class="segbtn" data-mode="paid">paid</button>
+        <button type="button" class="segbtn" data-mode="offline">offline</button>
+      </div>
+      <div class="hint" id="modeblurb">auto = paid, then local, then free, then offline.</div>
+    </div>
+    <div class="field">
+      <label for="cfgModel">Model override <span class="hint">optional</span></label>
+      <input id="cfgModel" type="text" placeholder="provider default" />
+    </div>
+    <div class="field">
+      <label>Provider status <span class="hint" id="modeactive">active: auto</span></label>
+      <div style="display:grid;gap:6px" id="provrows"></div>
+    </div>
+    <div class="field">
+      <label>Fallback chain <span class="hint">→ on failure</span></label>
+      <div class="chainline" id="chainline">offline (deterministic)</div>
+    </div>
+    <div class="muted" style="font-size:11.5px">Provider keys live server-side; this selects which available provider a run uses.
+      The selected mode is sent to <code>/review</code> and <code>/run</code>.</div>
+  </div>
+  <div class="foot">
+    <button class="btn" id="resetcfg">Reset</button>
+    <button class="btn primary" id="savecfg" style="flex:1"><span class="lbl">Save</span></button>
+  </div>
+</aside>
+
+<!-- POLISH KIT: help modal -->
+<aside id="help" role="dialog" aria-modal="true" aria-labelledby="helptitle" aria-hidden="true">
+  <header><div class="brand" style="font-size:15px"><span class="logo" style="width:24px;height:24px"></span>
+    <span id="helptitle">Help · quorum</span></div>
+    <span class="spacer"></span><button class="iconbtn" id="closehelp" aria-label="Close help">✕</button></header>
+  <div class="body">
+    <div><h4>What it is</h4><p>A vendor-neutral multi-agent orchestrator with governance baked in: declarative
+      workflow specs run through one governed engine, every step records its routing tier, PII is redacted before the
+      model and the audit, and each run produces a tamper-evident, hash-chained audit.</p></div>
+    <div><h4>How to use</h4><ol>
+      <li><b>Run a workflow</b> — pick a contract (or paste text) and a routing mode in <i>Run a governed workflow</i>, then <i>Review contract</i>.</li>
+      <li><b>View the agent trace</b> — watch the <i>Agent pipeline</i> DAG light up and read the <i>Per-step trace</i> (provider · model · latency · cost).</li>
+      <li><b>See the audit</b> — the <i>Tamper-evident audit chain</i> shows the hash-chained, PII-redacted steps and the verify result.</li>
+      <li><b>Try the pattern</b> — the same engine runs <i>policy-qa</i> from a different spec in <i>Replicable pattern</i>.</li>
+    </ol></div>
+    <div><h4>Endpoints</h4><div class="eps">
+      <code>/review</code><code>/run</code><code>/trace/{run_id}</code>
+      <code>/workflows</code><code>/contracts</code><code>/evals</code><code>/llm</code></div></div>
+    <div><h4>Keyboard shortcuts</h4><p><span class="kbd">?</span> open this help · <span class="kbd">Esc</span> close any overlay</p></div>
+    <div><p class="muted" style="font-size:11.5px">All contracts, clauses and policy docs are <b>synthetic</b> — no real data, no secrets.</p></div>
+  </div>
+</aside>
+
+<div id="toasts"></div>
+
 <script>
 const $=s=>document.querySelector(s);
+const $$=s=>[...document.querySelectorAll(s)];
 const j=async(u,o)=>(await fetch(u,o)).json();
 const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 const sevBadge=s=>`<span class="badge ${s==='high'?'b-high':s==='medium'?'b-med':'b-low'}">${s}</span>`;
 const tierName=p=>p==='offline'?'offline':p;
 let lastRunId=null;
+
+const CFG_KEY="quorum.cfg";
+let cfg={mode:"auto",model:""};
+let llmProviders={};  // last GET /llm providers map
+
+function toast(msg,type="info"){
+  const t=document.createElement("div");t.className=`toast ${type}`;
+  t.innerHTML=`<span class="tdot"></span>${msg}`;$("#toasts").appendChild(t);
+  setTimeout(()=>{t.style.opacity="0";t.style.transition="opacity .3s";setTimeout(()=>t.remove(),300)},2600);
+}
+function loadCfg(){try{cfg={...cfg,...JSON.parse(localStorage.getItem(CFG_KEY)||"{}")}}catch{}}
+// resolved mode for a run: drawer cfg default, but the in-page select overrides when set.
+function runMode(){return $("#mode").value||cfg.mode||"auto";}
+function applyCfgToConsole(){
+  // seed the in-page routing select from the saved default (empty value = auto/chain)
+  const m=cfg.mode||"auto";
+  $("#mode").value=(m==="auto")?"":m;
+}
 
 function renderPipe(trace){
   // group into stages: extractor | [risk_*] | drafter (generic-ish)
@@ -268,7 +448,8 @@ async function renderAudit(runId){
 }
 async function review(){
   const btn=$("#go");btn.classList.add("loading");
-  const body={mode:$("#mode").value||null};
+  const m=runMode();
+  const body={mode:(m==="auto")?null:m};
   const txt=$("#text").value.trim();
   if(txt){body.text=txt;}else{body.contract_id=$("#contract").value;}
   try{
@@ -281,7 +462,9 @@ async function review(){
       <span>across <b>${Object.keys(r.risk_report.by_class).length}</b> class(es)</span>
       <span>audit <b>${r.audit_verified?'verified':'BROKEN'}</b></span>
       <span>cost <b>$${(r.rollup.total_cost_usd||0).toFixed(6)}</b></span>`;
-  }catch(e){$("#pipe").innerHTML='<span class="muted">run failed</span>';}
+    toast(`Review complete · ${r.risk_report.count} risk(s) · audit ${r.audit_verified?'verified':'BROKEN'}`,
+      r.audit_verified?"ok":"bad");
+  }catch(e){$("#pipe").innerHTML='<span class="muted">run failed</span>';toast("Review failed","bad");}
   btn.classList.remove("loading");
 }
 $("#go").onclick=review;
@@ -290,8 +473,9 @@ $("#contract").onchange=()=>{$("#text").value="";};
 async function ask(){
   const btn=$("#askbtn");btn.classList.add("loading");
   try{
+    const m=runMode();
     const r=await j("run",{method:"POST",headers:{"content-type":"application/json"},
-      body:JSON.stringify({workflow:"policy-qa",payload:{question:$("#q").value}})});
+      body:JSON.stringify({workflow:"policy-qa",mode:(m==="auto")?null:m,payload:{question:$("#q").value}})});
     const steps=r.trace.map(s=>`<span class="tier">${esc(s.step)} · ${tierName(s.provider)}</span>`).join(" → ");
     $("#qares").innerHTML=`<div class="muted" style="margin-bottom:8px">${steps}</div>
       <div class="summary">${esc(r.result.answer||'—')}</div>
@@ -305,10 +489,97 @@ async function ask(){
 $("#askbtn").onclick=ask;
 
 async function loadLlm(){
-  try{const s=await j("llm");const active=Object.entries(s.providers).find(e=>e[1]);
-    $("#llmpill").textContent=`routing: ${active?active[0]:"offline (deterministic)"}`;}catch{}
+  try{const s=await j("llm");llmProviders=s.providers||{};
+    const active=Object.entries(llmProviders).find(e=>e[1]);
+    $("#llmpill").textContent=`routing: ${active?active[0]:"offline (deterministic)"}`;
+    renderRouting();}catch{}
 }
+
+/* ===================== POLISH KIT: settings drawer ===================== */
+function applyCfgToForm(){
+  $("#cfgModel").value=cfg.model||"";
+  selectMode(cfg.mode||"auto");
+  syncThemeSeg();
+}
+function openDrawer(){applyCfgToForm();$("#scrim").classList.add("open");$("#drawer").classList.add("open");$("#drawer").setAttribute("aria-hidden","false")}
+function closeDrawer(){$("#scrim").classList.remove("open");$("#drawer").classList.remove("open");$("#drawer").setAttribute("aria-hidden","true")}
+$("#gear").onclick=openDrawer;$("#closedrawer").onclick=closeDrawer;
+$("#savecfg").onclick=()=>{cfg={mode:currentMode(),model:$("#cfgModel").value.trim()};
+  localStorage.setItem(CFG_KEY,JSON.stringify(cfg));applyCfgToConsole();renderRouting();closeDrawer();toast("Settings saved","ok")};
+$("#resetcfg").onclick=()=>{cfg={mode:"auto",model:""};localStorage.removeItem(CFG_KEY);applyCfgToForm();applyCfgToConsole();renderRouting();toast("Reset to defaults","info")};
+
+/* ===================== POLISH KIT: theme toggle ===================== */
+const THEME_KEY="theme";
+function getTheme(){try{return localStorage.getItem(THEME_KEY)||"system"}catch{return "system"}}
+function effectiveDark(t){
+  if(t==="dark")return true; if(t==="light")return false;
+  return !window.matchMedia("(prefers-color-scheme: light)").matches;
+}
+function applyTheme(t){
+  const dark=effectiveDark(t);
+  document.documentElement.classList.toggle("light",!dark);
+  $("#themeicon").textContent=dark?"☾":"☀";
+  $("#themebtn").title=`Theme: ${t}`;
+}
+function setTheme(t){try{localStorage.setItem(THEME_KEY,t)}catch{} applyTheme(t); syncThemeSeg();}
+function syncThemeSeg(){const cur=getTheme();
+  $$("#themeseg .segbtn").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.theme===cur)));}
+$("#themebtn").onclick=()=>{const cur=getTheme();const next=effectiveDark(cur)?"light":"dark";setTheme(next);};
+$$("#themeseg .segbtn").forEach(b=>b.onclick=()=>setTheme(b.dataset.theme));
+window.matchMedia("(prefers-color-scheme: light)").addEventListener?.("change",()=>{if(getTheme()==="system")applyTheme("system");});
+applyTheme(getTheme());
+
+/* ===================== POLISH KIT: help modal ===================== */
+function openHelp(){$("#scrim").classList.add("open");$("#help").classList.add("open");
+  $("#help").setAttribute("aria-hidden","false");$("#closehelp").focus();}
+function closeHelp(){$("#scrim").classList.remove("open");$("#help").classList.remove("open");
+  $("#help").setAttribute("aria-hidden","true");}
+$("#helpbtn").onclick=openHelp;$("#closehelp").onclick=closeHelp;
+$("#scrim").onclick=()=>{closeDrawer();closeHelp();};
+document.addEventListener("keydown",e=>{
+  const typing=/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName||"")||document.activeElement?.isContentEditable;
+  if(e.key==="Escape"){closeDrawer();closeHelp();}
+  else if(e.key==="?"&&!typing&&!$("#help").classList.contains("open")){e.preventDefault();openHelp();}
+});
+
+/* ===================== POLISH KIT: routing config ===================== */
+const MODE_BLURBS={
+  auto:"auto = paid, then local, then free, then offline.",
+  local:"local = Ollama only (on-box, zero cost).",
+  free:"free = OpenRouter free models only.",
+  paid:"paid = Anthropic, then OpenAI.",
+  offline:"offline = deterministic agents only (no LLM call).",
+};
+const MODE_CHAIN={
+  auto:["anthropic","openai","ollama","openrouter"],
+  local:["ollama"], free:["openrouter"], paid:["anthropic","openai"], offline:[],
+};
+const PROVIDERS=["anthropic","openai","ollama","openrouter"];
+function selectMode(m){
+  $$("#modeseg .segbtn").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.mode===m)));
+  $("#modeblurb").textContent=MODE_BLURBS[m]||"";
+  $("#modeactive").textContent=`active: ${m}`;
+}
+function currentMode(){return $("#modeseg").querySelector('[aria-pressed="true"]')?.dataset.mode||"auto";}
+function renderRouting(){
+  const m=currentMode();
+  $("#modeactive").textContent=`active: ${m}`;
+  const rows=PROVIDERS.map(p=>{
+    const on=!!llmProviders[p];
+    return `<div class="pstat"><span>${p}</span><span class="pdot ${on?'on':''}" title="${on?'available':'not configured'}"></span></div>`;
+  }).join("")+
+    `<div class="pstat"><span>offline (deterministic)</span><span class="pdot on" title="always available"></span></div>`;
+  $("#provrows").innerHTML=rows;
+  const chain=(MODE_CHAIN[m]||[]).filter(p=>llmProviders[p]);
+  const display=[...chain,"offline (deterministic)"];
+  $("#chainline").textContent=display.join("  →  ");
+}
+$$("#modeseg .segbtn").forEach(b=>b.onclick=()=>{selectMode(b.dataset.mode);renderRouting();});
+
 async function boot(){
+  loadCfg();
+  selectMode(cfg.mode||"auto");  // seed routing segment so renderRouting has a mode before drawer opens
+  applyCfgToConsole();           // seed the in-page routing select from saved default
   let ready=false;
   for(let i=0;i<60 && !ready;i++){
     try{const r=await fetch("health");if(r.ok){ready=true;break}}catch{}
