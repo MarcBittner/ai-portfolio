@@ -1,7 +1,7 @@
-# Render Blueprint — one-click free deploy of the persona-twin demo.
-# Steps: render.com → New → Blueprint → connect this repo (MarcBittner/ai-portfolio) → Apply.
-# Public https URL in ~3-5 min. Runs fully OFFLINE (mock LLM + in-memory vector store);
-# no API keys, no cost. Free tier sleeps after ~15 min idle and cold-starts in ~30-60s.
+# Render Blueprint — the Blueprint-managed free Docker services for this repo.
+# Other demos (and postureline/burnrate/baseplate) are managed via the Render API,
+# not this Blueprint — keep them OUT of here to avoid duplicate blueprint services.
+# Free tier sleeps after ~15 min idle and cold-starts in ~30-60s; runs fully offline.
 services:
   - type: web
     name: persona-twin
@@ -13,15 +13,6 @@ services:
     envVars:
       - key: PERSONA_TWIN_ROUTE_OBJECTIVE
         value: cost
-  # postureline — one posture/compliance engine, two scanners (warehouse + exposure).
-  # Folds the former maskline + perimeter. Runs fully offline.
-  - type: web
-    name: postureline
-    runtime: docker
-    plan: free
-    dockerfilePath: ./projects/postureline/Dockerfile
-    dockerContext: ./projects/postureline
-    healthCheckPath: /health
   # relaytoken — scoped WebRTC room access tokens (Go) + adversarial breaker suite.
   - type: web
     name: relaytoken
@@ -56,22 +47,6 @@ services:
     plan: free
     dockerfilePath: ./projects/quorum/Dockerfile
     dockerContext: ./projects/quorum
-    healthCheckPath: /health
-  # burnrate — instrumented Flask SRE service (Prometheus + SLO burn rate + GitOps).
-  - type: web
-    name: burnrate
-    runtime: docker
-    plan: free
-    dockerfilePath: ./projects/burnrate/Dockerfile
-    dockerContext: ./projects/burnrate
-    healthCheckPath: /healthz
-  # baseplate — platform paved-road (IaC/GitOps/SLOs) + self-service service scaffolder.
-  - type: web
-    name: baseplate
-    runtime: docker
-    plan: free
-    dockerfilePath: ./projects/baseplate/Dockerfile
-    dockerContext: ./projects/baseplate
     healthCheckPath: /health
 
 databases:
