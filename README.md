@@ -281,6 +281,257 @@ cd projects/multimodal-ocr
 
 ![multimodal-ocr UI](projects/multimodal-ocr/docs/screenshot.png)
 
+### [reconcile](projects/reconcile/) — v0.1.0
+
+**Document line-item reconciliation** — extract line items, diff them against a
+baseline and market rates, surface recoverable dollars, and queue exceptions for
+review.
+
+- **Deterministic core** — extraction → normalize → diff → recoverable-$ math, with
+  an LLM extraction path that falls back to the rule parser offline
+- **Review queue** — every flagged line carries its evidence and the target value
+
+```sh
+cd projects/reconcile
+./run.sh setup && ./run.sh serve   # API + UI at http://localhost:8009
+```
+
+![reconcile UI](projects/reconcile/docs/screenshot.png)
+
+### [llm-gateway](projects/llm-gateway/) — v0.1.0
+
+A **provider-agnostic LLM gateway** that puts governance *on the request path* —
+firewall → PII/secret redaction → vendor-neutral routing → firewall → tamper-evident
+audit.
+
+- **Routing** — Anthropic/OpenAI → Ollama → OpenRouter → deterministic offline, a
+  provider used only when its key is set
+- **Governance by construction** — redaction before the model and before logging; a
+  hash-chained audit that `verify()` can prove untampered
+
+```sh
+cd projects/llm-gateway
+./run.sh setup && ./run.sh serve   # API + UI at http://localhost:8010
+```
+
+![llm-gateway UI](projects/llm-gateway/docs/screenshot.png)
+
+### [slo-kit](projects/slo-kit/) — v0.1.0
+
+An **instrumented SRE reference service** — RED metrics, SLIs/SLOs + error budgets,
+OTel-shaped traces, and an injectable incident that burns the budget on demand.
+
+- **Burn rate as a ship/freeze signal** — multi-window burn driving release policy
+- **Runbook + smoke-gated deploy** — incident response as an executable artifact
+
+```sh
+cd projects/slo-kit
+./run.sh setup && ./run.sh serve   # API + UI at http://localhost:8011
+```
+
+![slo-kit UI](projects/slo-kit/docs/screenshot.png)
+
+### [field-vault](projects/field-vault/) — v0.1.0
+
+**Field-level de-identification + least-privilege access + a tamper-evident audit**
+for regulated records — plus LLM PHI detection in free-text notes and a k-anonymity
+re-identification view.
+
+- **Read vs re-identify are distinct, purpose-gated actions**; the audit is value-free
+- **LLM finds PHI in prose** that column rules miss; deterministic code redacts + logs
+
+```sh
+cd projects/field-vault
+./run.sh setup && ./run.sh serve   # API + UI at http://localhost:8012
+```
+
+![field-vault UI](projects/field-vault/docs/screenshot.png)
+
+### [rtc-guard](projects/rtc-guard/) — v0.1.0
+
+**Scoped WebRTC access tokens** + an adversarial test suite + an AV-pipeline threat
+model — a builder+breaker take on real-time-media auth.
+
+- **Least-privilege grants** bound to a room with short TTLs; never branches on `alg`
+- **Adversarial suite** proves forged/escalated/replayed tokens are blocked
+
+```sh
+cd projects/rtc-guard
+./run.sh setup && ./run.sh serve   # API + UI at http://localhost:8013
+```
+
+![rtc-guard UI](projects/rtc-guard/docs/screenshot.png)
+
+### [rate-atlas](projects/rate-atlas/) — v0.1.0
+
+Normalize **inconsistent price-transparency files** into one model and compare
+negotiated rates across payers and hospitals.
+
+- **Shape detection → per-shape adapters → one canonical record**; LLM-assisted
+  mapping for unknown file formats
+- **Outlier flags** (z-score) on the canonical surface
+
+```sh
+cd projects/rate-atlas
+./run.sh setup && ./run.sh serve   # API + UI at http://localhost:8014
+```
+
+![rate-atlas UI](projects/rate-atlas/docs/screenshot.png)
+
+### [attack-surface](projects/attack-surface/) — v0.1.0
+
+**CT-log enumeration → service fingerprint → control-mapped exposure report** —
+findings bound to SOC 2 / ISO 27001 controls with a severity-weighted posture and an
+LLM exec narrative.
+
+- **Findings → controls → pass/fail roll-up** an auditor can trace to evidence
+- **Remediation diff** shows posture moving as criticals are fixed
+
+```sh
+cd projects/attack-surface
+./run.sh setup && ./run.sh serve   # API + UI at http://localhost:8015
+```
+
+![attack-surface UI](projects/attack-surface/docs/screenshot.png)
+
+### [txn-ledger](projects/txn-ledger/) — v0.1.0
+
+A **high-volume contributions store** — partitioned schema, query-plan-as-artifact,
+FEC rollups at the $200 threshold, a surge load test, and an NL→SQL copilot.
+
+- **EXPLAIN captured before/after the index** and served as a reviewable artifact
+- **NL→SQL behind a read-only guard** that rejects non-SELECT/DDL/injection
+
+```sh
+cd projects/txn-ledger
+./run.sh setup && ./run.sh serve   # API + UI at http://localhost:8016
+```
+
+![txn-ledger UI](projects/txn-ledger/docs/screenshot.png)
+
+### [agent-factory](projects/agent-factory/) — v0.1.0
+
+**Build a tool-using agent from a declarative spec** — template-simple or deep
+(prompt / tools / planner / model / guardrails), with an LLM or rule planner.
+
+- **Spec-driven** — the same engine runs many agents; swap the spec, not the code
+- **Safe tools + guardrails**; deterministic rule planner offline
+
+```sh
+cd projects/agent-factory
+./run.sh setup && ./run.sh serve   # API + UI at http://localhost:8017
+```
+
+![agent-factory UI](projects/agent-factory/docs/screenshot.png)
+
+### [trueline](projects/trueline/) — v0.1.0
+
+**Invoice line-item verification** — LLM extract → verify the math in code →
+reconcile vs PO + catalog → flag recoverable $ → human review → eval. Realtime,
+multi-tenant.
+
+- **The LLM only reads; verification is deterministic, idempotent, and measured**
+- **Full reactive SaaS** — Next.js + Convex + Clerk; extraction can pipe through a
+  host's local Ollama from the browser
+
+```sh
+# Live (sign in) is linked in the table above; to run locally:
+cd projects/trueline    # see README — needs Convex + Clerk env (Next.js app)
+```
+
+![trueline UI](projects/trueline/docs/screenshot.png)
+
+---
+
+**Stack-matched interview builds (#21–26)** — each net-new, built on a specific
+target stack to show "I can build your product on your stack."
+
+### [postureline](projects/postureline/) — v0.1.0
+
+**Security posture & compliance** — one engine, two scanners: a **warehouse** scan
+(Snowflake masking-policy-as-code + Terraform, LLM PHI classification, k-anonymity,
+CI gate) and an **internet-exposure** scan (SOC 2/HIPAA/ISO 27001/NIST/CMMC crosswalk
++ board report). Folds the former maskline + perimeter.
+
+- **Findings → multi-framework control crosswalk → posture → LLM narrative → diff**
+- **Generates real Snowflake `MASKING`/`ROW ACCESS POLICY` DDL + Terraform**
+
+```sh
+cd projects/postureline
+./run.sh setup && ./run.sh serve   # API + UI at http://localhost:8025
+```
+
+### [relaytoken](projects/relaytoken/) — Go
+
+**Scoped WebRTC room access tokens in Go**, built on the open-source
+`livekit/protocol` auth library — mint/verify real JWT grants, an 8/8 adversarial
+breaker suite, and an LLM grant-risk linter.
+
+- **Real go-jose JWTs**, room-scoped, TTL-clamped; never trusts the header `alg`
+- **Breaker proves** forged/escalated/replayed/cross-room tokens are rejected
+
+```sh
+cd projects/relaytoken
+./run.sh build && ./run.sh run   # http://localhost:8080  (./run.sh demo for offline)
+```
+
+### [cycleledger](projects/cycleledger/) — Ruby on Rails
+
+A **high-volume contributions data layer** in Rails — PostgreSQL declarative
+cycle-partitioning, FEC rollups, EXPLAIN-as-artifact, Sidekiq ingest, and an NL→SQL
+copilot behind a read-only SQL guard.
+
+- **Partition pruning + covering index** surfaced via `EXPLAIN (ANALYZE, FORMAT JSON)`
+- **NL→SQL guard** rejects non-SELECT / multi-statement / DDL injection (HTTP 422)
+
+```sh
+cd projects/cycleledger
+./run.sh setup && ./run.sh serve   # needs PostgreSQL; see README for DATABASE_URL
+```
+
+### [quorum](projects/quorum/) — v0.1.0
+
+A **vendor-neutral multi-agent orchestrator** — runs a declarative workflow DAG with
+parallel fan-out, with PII redaction + a tamper-evident audit baked into the engine
+(not per workflow).
+
+- **Replicable pattern** — new use case = new WorkflowSpec, same governed engine
+- **Ships contract-review + policy-QA workflows**; routes across any provider or offline
+
+```sh
+cd projects/quorum
+./run.sh setup && ./run.sh serve   # API + UI at http://localhost:8021
+```
+
+### [burnrate](projects/burnrate/) — v0.1.0
+
+An **instrumented Flask SRE service** — real `prometheus_client` RED metrics,
+multi-window SLO burn rate, TaskTiger-shaped Redis tasks, GitOps smoke-gated
+rollback, and an LLM incident summary.
+
+- **`/metrics`** is genuine Prometheus exposition; burn rate drives page-vs-ticket
+- **ArgoCD + k8s + GitHub Actions** merge→prod→rollback artifacts included
+
+```sh
+cd projects/burnrate
+./run.sh setup && ./run.sh serve   # API + dashboard at http://localhost:8023
+```
+
+### [baseplate](projects/baseplate/) — v0.1.0
+
+A **platform paved-road** — reusable Terraform (EKS/RDS/IRSA) + ArgoCD + a golden
+CI/CD, a self-service **LLM service-scaffolder**, and a price-transparency ingest with
+**data-quality as an SLI**.
+
+- **Scaffolder** turns a free-text service description into paved-road files
+  (Dockerfile / k8s / Terraform / ArgoCD / CI / SLO)
+- **IaC is illustrative** ("what the platform provides"), clearly marked
+
+```sh
+cd projects/baseplate
+./run.sh setup && ./run.sh serve   # API + UI at http://localhost:8024
+```
+
 ## Roadmap
 
 See [ROADMAP.md](ROADMAP.md) for the prioritized cross-cutting plan and each
