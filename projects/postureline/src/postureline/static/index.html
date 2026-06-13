@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>postureline — one posture engine, two surfaces</title>
+<style>
+  :root{
+    --bg:#0a0d14; --surface:#131826; --surface-2:#1a2032; --surface-3:#212a40;
+    --line:#263149; --line-2:#33405d;
+    --ink:#e9eef7; --ink-dim:#97a3ba; --ink-faint:#67728a;
+    --accent:#6aa1ff; --accent-2:#9b86ff;
+    --ok:#43c98a; --warn:#e6ad52; --bad:#f15b6c; --info:#6aa1ff; --violet:#9b86ff;
+    --crit:#f15b6c; --high:#e0673f; --med:#e6ad52; --low:#6aa1ff;
+    --r:15px; --r-sm:10px; --r-xs:7px;
+    --sh:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.5);
+    --grad:linear-gradient(135deg,var(--accent),var(--accent-2));
+    --ease:cubic-bezier(.22,.61,.36,1);
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;
+    font:15px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Inter,sans-serif;
+    background-image:radial-gradient(1200px 600px at 80% -10%,rgba(107,130,255,.10),transparent 60%),
+      radial-gradient(900px 500px at 0% 0%,rgba(67,201,138,.05),transparent 55%);
+    background-attachment:fixed;min-height:100vh}
+  ::selection{background:rgba(106,161,255,.3)}
+  a{color:var(--accent);text-decoration:none}
+  header{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:14px;
+    padding:14px 24px;border-bottom:1px solid var(--line);
+    background:rgba(10,13,20,.72);backdrop-filter:blur(14px) saturate(140%)}
+  .brand{display:flex;align-items:center;gap:11px;font-weight:650;font-size:16px;letter-spacing:.2px}
+  .logo{width:30px;height:30px;border-radius:9px;background:var(--grad);position:relative;
+    box-shadow:0 4px 16px -4px rgba(106,161,255,.6);flex:none}
+  .logo::after{content:"";position:absolute;inset:7px;border-radius:5px;
+    border:2px solid rgba(255,255,255,.85);border-right-color:transparent;animation:spin 3.5s linear infinite}
+  .brand .tag{color:var(--ink-dim);font-size:12.5px;font-weight:400}
+  .spacer{flex:1}
+  .status{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--ink-dim);
+    padding:5px 11px;border:1px solid var(--line);border-radius:999px;background:var(--surface)}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--ink-faint)}
+  .dot.ok{background:var(--ok);box-shadow:0 0 0 0 rgba(67,201,138,.5);animation:pulse 2s infinite}
+  .pill{font-size:12px;color:var(--ink-dim);border:1px solid var(--line);border-radius:999px;
+    padding:5px 12px;background:var(--surface);white-space:nowrap}
+  .pill.g-ok{color:var(--ok);border-color:rgba(67,201,138,.4);background:rgba(67,201,138,.08)}
+  .pill.g-warn{color:var(--warn);border-color:rgba(230,173,82,.4);background:rgba(230,173,82,.08)}
+  .pill.g-bad{color:var(--bad);border-color:rgba(241,91,108,.4);background:rgba(241,91,108,.08)}
+  /* surface tabs */
+  .surftabs{display:flex;gap:8px;padding:14px 24px 0;max-width:1160px;margin:0 auto}
+  .surftab{font:inherit;font-weight:600;font-size:14px;cursor:pointer;border:1px solid var(--line);
+    background:var(--surface);color:var(--ink-dim);border-radius:var(--r-sm) var(--r-sm) 0 0;
+    padding:11px 20px;display:flex;align-items:center;gap:9px;transition:.16s var(--ease);border-bottom:none}
+  .surftab:hover{color:var(--ink)}
+  .surftab.on{color:var(--ink);background:var(--surface-2);border-color:var(--line-2)}
+  .surftab .sub{font-weight:400;font-size:11.5px;color:var(--ink-faint)}
+  main{max-width:1160px;margin:0 auto;padding:0 24px 64px;display:grid;gap:18px}
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+    box-shadow:var(--sh);overflow:hidden;transition:.25s var(--ease)}
+  .panel:first-child{border-top-left-radius:0}
+  .panel h2{margin:0;padding:14px 18px;font-size:11.5px;font-weight:600;letter-spacing:.7px;
+    text-transform:uppercase;color:var(--ink-dim);border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:10px}
+  .panel .body{padding:18px}
+  .hint{margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400;color:var(--ink-dim);font-size:12px}
+  .btn{font:inherit;font-weight:600;cursor:pointer;border-radius:var(--r-sm);padding:9px 15px;
+    border:1px solid var(--line);background:var(--surface-2);color:var(--ink);transition:.16s var(--ease)}
+  .btn:hover{border-color:var(--line-2)}
+  .row{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+  .posture{display:grid;grid-template-columns:auto 1fr;gap:18px;align-items:center}
+  .gradecard{width:140px;border-radius:var(--r);border:1px solid var(--line);background:var(--surface-2);
+    padding:16px 10px;text-align:center;display:grid;gap:4px;justify-items:center}
+  .gradecard .g{font-size:60px;font-weight:800;line-height:.95}
+  .gradecard .glbl{font-size:10.5px;letter-spacing:.6px;text-transform:uppercase;color:var(--ink-faint)}
+  .gA,.g-ok .g{color:var(--ok)} .gB{color:#8ad17a} .gC{color:var(--med)} .gD{color:var(--high)} .gF{color:var(--crit)}
+  .gradecard.gA{border-color:rgba(67,201,138,.4)} .gradecard.gB{border-color:rgba(138,209,122,.4)}
+  .gradecard.gC{border-color:rgba(230,166,74,.4)} .gradecard.gD{border-color:rgba(224,103,63,.45)}
+  .gradecard.gF{border-color:rgba(241,91,108,.45)}
+  .scorebig{font-size:34px;font-weight:750;line-height:1}
+  .scorebig span{font-size:18px;color:var(--ink-faint);font-weight:500}
+  .meta{color:var(--ink-dim);font-size:13px;margin-top:6px} .meta b{color:var(--ink)}
+  .sev{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px}
+  .sevcard{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);padding:12px 8px;text-align:center}
+  .sevcard .n{font-size:26px;font-weight:750;line-height:1}
+  .sevcard .l{font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-faint);margin-top:4px}
+  .sevcard.critical{border-color:rgba(241,91,108,.35)} .sevcard.critical .n{color:var(--crit)}
+  .sevcard.high{border-color:rgba(224,103,63,.35)} .sevcard.high .n{color:var(--high)}
+  .sevcard.medium{border-color:rgba(230,166,74,.35)} .sevcard.medium .n{color:var(--med)}
+  .sevcard.low{border-color:rgba(106,161,255,.35)} .sevcard.low .n{color:var(--low)}
+  .badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:700;
+    text-transform:uppercase;letter-spacing:.3px}
+  .b-pass{background:rgba(67,201,138,.16);color:var(--ok)}
+  .b-fail{background:rgba(241,91,108,.18);color:var(--bad)}
+  .b-critical{background:rgba(241,91,108,.18);color:var(--bad)}
+  .b-high{background:rgba(224,103,63,.18);color:var(--high)}
+  .b-medium{background:rgba(230,173,82,.16);color:var(--warn)}
+  .b-low{background:rgba(106,161,255,.15);color:var(--info)}
+  .b-direct{background:rgba(241,91,108,.16);color:var(--bad)}
+  .b-quasi{background:rgba(230,173,82,.16);color:var(--warn)}
+  .b-clinical{background:rgba(106,161,255,.15);color:var(--info)}
+  .b-financial{background:rgba(155,134,255,.15);color:var(--violet)}
+  .b-warn{background:rgba(230,173,82,.16);color:var(--warn)}
+  .b-info{background:rgba(106,161,255,.15);color:var(--info)}
+  .mono{font-family:var(--mono);font-size:12px;color:var(--ink-dim)}
+  .ctlchip{display:inline-block;font-size:11px;font-family:var(--mono);padding:2px 8px;border-radius:6px;
+    background:rgba(155,134,255,.14);color:var(--violet);margin:2px 3px 0 0}
+  .rem{color:var(--ink-faint);font-size:12px;margin-top:3px}
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th,td{text-align:left;padding:9px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--ink-faint);font-size:11px;font-weight:600;letter-spacing:.4px;text-transform:uppercase}
+  tbody tr{transition:.14s var(--ease)}tbody tr:hover{background:var(--surface-2)}
+  tr.gap{background:rgba(241,91,108,.07)}
+  .muted{color:var(--ink-dim);font-size:12.5px}
+  code{background:var(--surface-2);padding:1px 6px;border-radius:6px;font-family:var(--mono);font-size:12px}
+  pre{margin:0;padding:16px;background:#0c0f18;border-radius:var(--r-sm);overflow:auto;max-height:340px;
+    font-family:var(--mono);font-size:12px;line-height:1.55;color:#cfe0ff}
+  .tabs{display:flex;gap:6px}
+  .tab{font:inherit;font-size:12px;cursor:pointer;border:1px solid var(--line);background:var(--surface-2);
+    color:var(--ink-dim);border-radius:8px;padding:6px 13px}
+  .tab.on{color:var(--ink);background:#0c0f18;border-color:var(--line-2)}
+  .fwgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+  .fwcard{border:1px solid var(--line);border-radius:var(--r-sm);padding:13px 15px;background:var(--surface-2)}
+  .fwcard.fail{border-color:rgba(241,91,108,.4)} .fwcard.pass{border-color:rgba(67,201,138,.4)}
+  .fwcard .fwname{font-weight:650;font-size:13.5px;margin-bottom:6px;display:flex;align-items:center;gap:8px}
+  .fwcard .fwstat{font-size:13px;color:var(--ink-dim)} .fwcard .fwstat b{color:var(--ink)}
+  .fwcard .fwids{margin-top:8px}
+  .diffrow{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .diffcard{flex:none;min-width:120px;text-align:center;border:1px solid var(--line);
+    border-radius:var(--r-sm);padding:14px 18px;background:var(--surface-2)}
+  .diffcard.ok{border-color:rgba(67,201,138,.4);background:rgba(67,201,138,.08)}
+  .diffcard .dlbl{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-faint)}
+  .diffcard .dg{font-size:30px;font-weight:700;line-height:1.1;margin:4px 0}
+  .diffcard .dmeta{font-size:12px;color:var(--ink-dim)}
+  .diffarrow{font-size:24px;color:var(--ink-faint)}
+  .diffsumm{flex:1;min-width:200px;font-size:13.5px;color:var(--ink-dim);line-height:1.5}
+  .diffsumm b{color:var(--ok)} .diffsumm .ctlchip{margin:2px}
+  .gate{display:flex;align-items:center;gap:14px;padding:16px 18px;border-radius:var(--r-sm);
+    border:1px solid var(--line);background:var(--surface-2)}
+  .gate.pass{border-color:rgba(67,201,138,.4);background:rgba(67,201,138,.05)}
+  .gate.fail{border-color:rgba(241,91,108,.4);background:rgba(241,91,108,.05)}
+  .gate .big{font-size:22px;font-weight:700}
+  .narr-summary{margin:0 0 14px;font-size:14.5px;line-height:1.6;color:var(--ink)}
+  .narr-rems{display:grid;gap:10px}
+  .narr-rem{border:1px solid var(--line);border-radius:var(--r-sm);padding:11px 13px;background:var(--surface-2)}
+  .narr-rem .rid{display:inline-block;font:600 11px/1 var(--mono);color:var(--accent);
+    border:1px solid var(--line-2);border-radius:999px;padding:4px 9px;margin-bottom:6px}
+  .narr-rem .rf{font-weight:600;margin-left:8px;color:var(--ink)}
+  .narr-rem .rs{color:var(--ink-dim);font-size:13.5px;line-height:1.5}
+  .narr-foot{margin-top:14px;display:grid;gap:10px}
+  .narr-block{border-left:2px solid var(--line-2);padding:2px 0 2px 13px}
+  .narr-block .nl{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-faint);margin-bottom:3px}
+  .narr-block .nt{font-size:13.5px;color:var(--ink-dim);line-height:1.55}
+  .hide{display:none!important}
+  .reveal{opacity:0;transform:translateY(14px)}
+  .reveal.in{opacity:1;transform:none;transition:.55s var(--ease)}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(67,201,138,.5)}70%{box-shadow:0 0 0 6px rgba(67,201,138,0)}100%{box-shadow:0 0 0 0 rgba(67,201,138,0)}}
+  #boot{position:fixed;inset:0;z-index:90;background:var(--bg);display:grid;place-items:center;transition:opacity .5s var(--ease)}
+  #boot.hide{opacity:0;pointer-events:none}
+  .boot-card{text-align:center;display:grid;gap:18px;justify-items:center}
+  .boot-card .logo{width:54px;height:54px} .boot-card .ring{width:38px;height:38px;border:3px solid var(--line);
+    border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+  .boot-card .msg{color:var(--ink-dim);font-size:13.5px} .boot-card .sub{color:var(--ink-faint);font-size:12px;max-width:300px}
+  @media(max-width:860px){.posture{grid-template-columns:1fr}}
+  @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+<div id="boot" style="display:grid"><div class="boot-card">
+  <div class="logo"></div><div class="ring"></div>
+  <div><div class="msg" id="bootmsg">Waking the demo…</div>
+  <div class="sub">Free-tier instances sleep when idle — first load takes ~30–60s.</div></div>
+</div></div>
+
+<header>
+  <div class="brand"><span class="logo"></span> postureline
+    <span class="tag">one posture &amp; compliance engine · two exposure surfaces</span></div>
+  <span class="spacer"></span>
+  <span class="status"><span class="dot" id="hdot"></span><span id="hstat">connecting…</span></span>
+  <span class="pill" id="posturepill">posture …</span>
+  <span class="pill" id="llmpill">routing: offline</span>
+</header>
+
+<div class="surftabs" id="surftabs">
+  <button class="surftab on" data-s="warehouse">Warehouse <span class="sub">masking-policy-as-code · k-anon</span></button>
+  <button class="surftab" data-s="exposure">Exposure <span class="sub">internet-intel · crosswalk</span></button>
+</div>
+
+<main>
+  <!-- shared: posture -->
+  <div class="panel reveal">
+    <h2>Posture <span class="hint" id="poscaption"></span></h2>
+    <div class="body">
+      <div class="posture">
+        <div class="gradecard" id="gradecard"><div class="g" id="grade">—</div><div class="glbl">grade</div></div>
+        <div>
+          <div class="scorebig"><span id="score">—</span><span>/100</span></div>
+          <div class="meta" id="ctrlfail">—</div>
+          <div class="meta" id="subject"></div>
+          <div class="row" style="margin-top:14px">
+            <button class="btn" id="rescan">Re-run scan</button>
+            <span class="muted" id="inv"></span>
+          </div>
+        </div>
+      </div>
+      <div class="sev" id="sev"></div>
+    </div>
+  </div>
+
+  <!-- warehouse only: CI gate -->
+  <div class="panel reveal whonly">
+    <h2>CI gate <span class="hint">guardrail in the pipeline — an unmasked sensitive column fails the build</span></h2>
+    <div class="body"><div class="gate" id="gate"><span class="muted">scanning…</span></div></div>
+  </div>
+
+  <!-- shared: multi-framework control coverage -->
+  <div class="panel reveal">
+    <h2>Compliance crosswalk <span class="hint">one finding · six frameworks (SOC 2 · HIPAA · ISO 27001 · NIST 800-53/171 · CMMC)</span></h2>
+    <div class="body">
+      <div class="fwgrid" id="fwgrid"></div>
+      <div class="tabs" id="fwtabs" style="margin-top:16px"></div>
+      <div style="border:1px solid var(--line);border-radius:var(--r-sm);overflow:hidden;margin-top:8px">
+        <table id="controls"></table>
+      </div>
+    </div>
+  </div>
+
+  <!-- shared: findings -->
+  <div class="panel reveal">
+    <h2 id="findingsTitle">Findings → controls <span class="hint">governed evidence</span></h2>
+    <div class="body" style="padding:0;overflow-x:auto"><table id="findings"></table></div>
+  </div>
+
+  <!-- warehouse only: policy-as-code -->
+  <div class="panel reveal whonly">
+    <h2>Policy-as-code <span class="hint">generated for Snowflake — targets a real account in prod</span></h2>
+    <div class="row" style="padding:0 18px"><div class="tabs"><button class="tab on" data-t="ddl">Snowflake DDL</button><button class="tab" data-t="tf">Terraform</button></div></div>
+    <div class="body"><pre id="poly">loading…</pre></div>
+  </div>
+
+  <!-- warehouse only: k-anon -->
+  <div class="panel reveal whonly">
+    <h2>Re-identification risk <span class="hint">k-anonymity over quasi-identifiers</span></h2>
+    <div class="body"><div id="privacy"><span class="muted">loading…</span></div></div>
+  </div>
+
+  <!-- shared: remediation diff -->
+  <div class="panel reveal">
+    <h2>Remediation diff <span class="hint">close the top risks → posture lift</span></h2>
+    <div class="body">
+      <div class="diffrow">
+        <div class="diffcard"><div class="dlbl">before</div><div class="dg" id="diffBG">—</div><div class="dmeta" id="diffBM"></div></div>
+        <div class="diffarrow">→</div>
+        <div class="diffcard ok"><div class="dlbl">after</div><div class="dg" id="diffAG">—</div><div class="dmeta" id="diffAM"></div></div>
+        <div class="diffsumm" id="diffSumm"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- shared: narrative -->
+  <div class="panel reveal">
+    <h2>Board / exec risk report <span class="hint" id="narrprov"></span></h2>
+    <div class="body">
+      <p id="narrsummary" class="narr-summary"></p>
+      <div class="narr-rems" id="narrrems"></div>
+      <div class="narr-foot">
+        <div class="narr-block"><div class="nl">What remediation buys</div><div class="nt" id="narrrem"></div></div>
+        <div class="narr-block"><div class="nl">Residual risk</div><div class="nt" id="narrres"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- exposure only: evidence export -->
+  <div class="panel reveal exonly">
+    <h2>Auditor evidence export <span class="hint">per-control finding bundle + six-framework crosswalk</span></h2>
+    <div class="body">
+      <div class="row" style="margin-bottom:12px">
+        <span class="muted">Export the governed evidence an auditor can trace from finding → control across all six frameworks.</span>
+        <span class="spacer"></span>
+        <a class="btn" id="evJson" target="_blank" rel="noopener">JSON</a>
+        <a class="btn" id="evCsv" target="_blank" rel="noopener">CSV</a>
+      </div>
+      <div style="border:1px solid var(--line);border-radius:var(--r-sm);overflow:hidden"><table id="evidence"></table></div>
+    </div>
+  </div>
+</main>
+
+<script>
+const $=s=>document.querySelector(s);
+const j=async(u,o)=>(await fetch(u,o)).json();
+const txt=async u=>(await fetch(u)).text();
+const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;");
+const gradeClass=g=>g==="A"||g==="B"?"g-ok":g==="C"?"g-warn":"g-bad";
+let SURFACE="warehouse", FW="SOC 2", CONTROLS=[], DDL="", TF="";
+
+function setSurfaceUI(){
+  document.querySelectorAll(".whonly").forEach(e=>e.classList.toggle("hide",SURFACE!=="warehouse"));
+  document.querySelectorAll(".exonly").forEach(e=>e.classList.toggle("hide",SURFACE!=="exposure"));
+  $("#findingsTitle").firstChild.textContent="Findings → controls ";
+}
+
+function renderPosture(p,sev,extras){
+  $("#gradecard").className="gradecard g"+p.grade;
+  $("#grade").textContent=p.grade; $("#grade").className="g g"+p.grade;
+  $("#score").textContent=p.score;
+  $("#ctrlfail").innerHTML=`<b>${p.controls_failing}</b>/${p.controls_total} controls · `+
+    `<b>${p.frameworks_failing}</b>/${p.frameworks_total} frameworks failing · ${p.findings_count} findings`;
+  $("#poscaption").textContent="severity-weighted, saturating posture";
+  $("#posturepill").textContent=`${SURFACE}: ${p.grade} (${p.score}/100)`;
+  $("#posturepill").className="pill "+gradeClass(p.grade);
+  $("#sev").innerHTML=["critical","high","medium","low"].map(s=>
+    `<div class="sevcard ${s}"><div class="n">${sev[s]??0}</div><div class="l">${s}</div></div>`).join("");
+  if(SURFACE==="warehouse"){
+    const x=extras;
+    $("#subject").innerHTML=`warehouse <code>${esc(x.warehouse)}</code> · ${x.classified.length} columns, ${x.sensitive.length} sensitive`;
+    $("#inv").innerHTML=`engine: <b>${esc(x.engine)}</b>`;
+  }else{
+    const i=extras.inventory;
+    $("#subject").innerHTML=`estate <code>${esc(extras.estate)}</code> · ${i.internet_open_services} internet-open services`;
+    $("#inv").innerHTML=`<b>${i.hosts}</b> hosts · <b>${i.services}</b> services · ${i.asns.length} ASNs`;
+  }
+}
+
+function renderFrameworks(rows){
+  $("#fwgrid").innerHTML=rows.map(r=>
+    `<div class="fwcard ${r.status}"><div class="fwname">${esc(r.framework)}
+      <span class="badge b-${r.status==="fail"?"fail":"pass"}">${r.status}</span></div>
+      <div class="fwstat"><b>${r.controls_failing}</b>/${r.controls_total} controls failing</div>
+      <div class="fwids">${r.failing_control_ids.map(i=>`<span class="ctlchip">${esc(i)}</span>`).join("")||'<span class="muted">all passing</span>'}</div>
+    </div>`).join("");
+  if(!rows.some(r=>r.framework===FW)) FW=rows[0].framework;
+  $("#fwtabs").innerHTML=rows.map(r=>
+    `<button class="tab ${r.framework===FW?"on":""}" data-fw="${esc(r.framework)}">${esc(r.framework)}</button>`).join("");
+  $("#fwtabs").querySelectorAll(".tab").forEach(b=>b.onclick=()=>{FW=b.dataset.fw;renderControls();
+    $("#fwtabs").querySelectorAll(".tab").forEach(x=>x.classList.toggle("on",x.dataset.fw===FW))});
+}
+function renderControls(){
+  $("#controls").innerHTML=`<thead><tr><th>${esc(FW)} control</th><th>title</th><th>status</th><th>findings</th></tr></thead><tbody>`+
+    CONTROLS.map(c=>`<tr><td><span class="ctlchip">${esc(c.frameworks[FW]||c.id)}</span></td>
+      <td>${esc(c.title)}</td><td><span class="badge b-${c.status}">${c.status}</span></td>
+      <td>${c.finding_count}</td></tr>`).join("")+`</tbody>`;
+}
+
+function renderFindings(findings){
+  $("#findings").innerHTML=`<thead><tr><th>severity</th><th>finding</th><th>resource</th><th>controls</th></tr></thead><tbody>`+
+    (findings.length?findings.map(f=>`<tr><td><span class="badge b-${f.severity}">${f.severity}</span></td>
+      <td><b>${esc(f.title)}</b><div class="rem">↳ ${esc(f.remediation)}</div></td>
+      <td><span class="mono">${esc(f.resource)}</span></td>
+      <td>${f.control_ids.map(c=>`<span class="ctlchip">${esc(c)}</span>`).join("")}</td></tr>`).join("")
+      :`<tr><td colspan="4" class="muted" style="padding:16px">No open findings.</td></tr>`)+`</tbody>`;
+}
+
+function renderGate(g){
+  const el=$("#gate"); el.className="gate "+(g.pass?"pass":"fail");
+  el.innerHTML=g.pass
+    ?`<span class="big" style="color:var(--ok)">✓ PASS</span><div><b>${esc(g.reason)}</b><div class="muted">exit 0 — safe to merge</div></div>`
+    :`<span class="big" style="color:var(--bad)">✕ FAIL</span><div><b>${esc(g.reason)}</b><div class="muted">exit ${g.exit_code} — the build blocks until every sensitive column has a masking policy</div></div>`;
+}
+
+function renderPrivacy(p){
+  const k=p.kanon;
+  const rows=p.sweep.map(s=>`<tr><td>${esc(s.generalization)}</td><td style="text-align:right"><b>${s.k_min}</b></td><td style="text-align:right">${s.singletons}</td></tr>`).join("");
+  $("#privacy").innerHTML=`<p style="margin:0 0 10px">Quasi-identifiers <code>${k.quasi_identifiers.join(", ")}</code>
+    → minimum <b>k = ${k.k_min}</b> (threshold k≥${k.k_threshold}); <b>${k.singleton_count}/${k.records}</b> rows are singletons,
+    re-identifiable by linkage even with direct identifiers masked.</p>
+    <table><thead><tr><th>generalization</th><th style="text-align:right">k_min</th><th style="text-align:right">singletons</th></tr></thead><tbody>${rows}</tbody></table>
+    <p class="muted" style="margin:8px 0 0">Coarser generalization raises k — the privacy/utility lever.</p>`;
+}
+
+function renderDiff(d){
+  const b=d.before.posture,a=d.after.posture;
+  $("#diffBG").textContent=`${b.grade} ${b.score}`;
+  $("#diffBM").innerHTML=`${b.controls_failing}/${b.controls_total} controls failing`;
+  $("#diffAG").textContent=`${a.grade} ${a.score}`;
+  $("#diffAM").innerHTML=`${a.controls_failing}/${a.controls_total} controls failing`;
+  $("#diffSumm").innerHTML=`Closing the top risks <span class="mono">${d.fixed_findings.map(esc).join(", ")||'—'}</span> `+
+    `moves posture <b>${b.grade} → ${a.grade}</b> (+${d.score_delta} points) and remediates `+
+    `<b>${d.controls_remediated.length}</b> control(s): `+
+    (d.controls_remediated.map(c=>`<span class="ctlchip">${esc(c)}</span>`).join("")||'—');
+}
+
+function renderNarrative(n){
+  $("#narrprov").textContent=`via ${n.provider} · ${n.mode} mode`;
+  $("#narrsummary").textContent=n.summary;
+  $("#narrrems").innerHTML=n.top_risks.map(r=>
+    `<div class="narr-rem"><span class="rid">${esc(r.id)}</span><span class="rf">${esc(r.risk)}</span><div class="rs">${esc(r.impact)}</div></div>`).join("");
+  $("#narrrem").textContent=n.remediation;
+  $("#narrres").textContent=n.residual_risk;
+}
+
+function renderEvidence(b){
+  $("#evidence").innerHTML=`<thead><tr><th>control</th><th>crosswalk</th><th>status</th><th>findings</th></tr></thead><tbody>`+
+    b.controls.map(c=>{
+      const cw=Object.entries(c.frameworks).map(([k,v])=>`${k} <span class="mono">${esc(v)}</span>`).join(" · ");
+      return `<tr><td><span class="ctlchip">${esc(c.control)}</span><div class="muted">${esc(c.title)}</div></td>
+        <td style="font-size:11.5px">${cw}</td><td><span class="badge b-${c.status}">${c.status}</span></td>
+        <td>${c.finding_count}${c.evidence.length?`<div class="rem">${c.evidence.map(e=>esc(e.resource)).join(", ")}</div>`:""}</td></tr>`;
+    }).join("")+`</tbody>`;
+}
+
+document.querySelectorAll(".tab[data-t]").forEach(t=>t.onclick=()=>{
+  document.querySelectorAll(".tab[data-t]").forEach(x=>x.classList.remove("on")); t.classList.add("on");
+  $("#poly").textContent=t.dataset.t==="ddl"?DDL:TF;
+});
+
+async function loadSurface(){
+  setSurfaceUI();
+  const p=await j(`posture?surface=${SURFACE}`);
+  renderPosture(p.posture,p.severity_counts,p.extras);
+  renderFindings(p.findings);
+  const c=await j(`controls?surface=${SURFACE}`); CONTROLS=c.controls; renderFrameworks(c.framework_rollup); renderControls();
+  renderDiff(await j(`diff?surface=${SURFACE}`));
+  $("#narrsummary").textContent="Generating board-ready risk report…"; $("#narrrems").innerHTML="";
+  j(`report`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({surface:SURFACE})}).then(renderNarrative).catch(()=>{$("#narrsummary").textContent="Board report unavailable."});
+  if(SURFACE==="warehouse"){
+    renderGate(p.extras.gate);
+    renderPrivacy({kanon:p.extras.kanon,sweep:p.extras.sweep});
+    DDL=p.extras.policy.snowflake_ddl; TF=p.extras.policy.terraform; $("#poly").textContent=DDL;
+    document.querySelectorAll(".tab[data-t]").forEach(x=>x.classList.toggle("on",x.dataset.t==="ddl"));
+  }else{
+    $("#evJson").href=`evidence?surface=exposure&format=json`; $("#evCsv").href=`evidence?surface=exposure&format=csv`;
+    j(`evidence?surface=exposure`).then(renderEvidence).catch(()=>{});
+  }
+}
+
+$("#surftabs").querySelectorAll(".surftab").forEach(b=>b.onclick=()=>{
+  SURFACE=b.dataset.s;
+  $("#surftabs").querySelectorAll(".surftab").forEach(x=>x.classList.toggle("on",x.dataset.s===SURFACE));
+  loadSurface();
+});
+$("#rescan").onclick=loadSurface;
+
+async function boot(){
+  let ready=false;
+  for(let i=0;i<60 && !ready;i++){
+    try{const r=await fetch("health");if(r.ok){ready=true;break}}catch{}
+    if(i===4)$("#bootmsg").textContent="Still waking up…";
+    await new Promise(r=>setTimeout(r,1500));
+  }
+  $("#hdot").className="dot ok";$("#hstat").textContent="live";
+  $("#boot").classList.add("hide");setTimeout(()=>$("#boot").remove(),600);
+  document.querySelectorAll(".reveal").forEach((el,i)=>setTimeout(()=>el.classList.add("in"),80*i));
+  try{const ll=await j("llm");const a=Object.entries(ll.providers).find(e=>e[1]);
+    const name=a?a[0]:"offline (deterministic)";$("#llmpill").textContent="routing: "+name;}catch{}
+  try{await loadSurface();}catch(e){}
+}
+boot();
+</script>
+</body>
+</html>
