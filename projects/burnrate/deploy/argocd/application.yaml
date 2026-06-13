@@ -1,0 +1,41 @@
+# ArgoCD Application — GitOps source of truth for burnrate (illustrative reference).
+#
+# The cluster's desired state lives in git; ArgoCD reconciles the EKS workload to
+# match. A merge to main updates the manifests under deploy/k8s, ArgoCD syncs them,
+# and a bad rollout is undone by reverting the commit (or `argocd app rollback`) —
+# the merge→production→rolled-back-in-10-minutes story, with git as the audit log.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: burnrate
+  namespace: argocd
+  annotations:
+    # Notify on degraded/health-check failure so a bad sync pages fast.
+    notifications.argoproj.io/subscribe.on-health-degraded.slack: sre-oncall
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/example-org/platform.git   # company-neutral placeholder
+    targetRevision: main
+    path: deploy/k8s
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: burnrate
+  syncPolicy:
+    automated:
+      prune: true          # remove resources git no longer declares
+      selfHeal: true       # revert manual drift back to git
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 1m
+  # A sync is healthy only when the Deployment's readiness probe passes; ArgoCD
+  # surfaces Degraded if the new ReplicaSet never becomes Ready, which is the
+  # signal to roll back (revert the commit or `argocd app rollback burnrate`).
+  revisionHistoryLimit: 10

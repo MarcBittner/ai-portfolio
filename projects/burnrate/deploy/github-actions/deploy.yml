@@ -1,0 +1,72 @@
+# burnrate — CD pipeline (illustrative reference).
+# merge → test → build → push → ArgoCD sync → POST-DEPLOY SMOKE GATE → rollback.
+#
+# This encodes the merge→production→rolled-back-in-10-minutes pattern: the same
+# smoke suite that runs locally verifies the LIVE deployment's contract before the
+# rollout is "done"; a failed smoke check rolls the ArgoCD app back to the previous
+# healthy revision automatically — no human in the 3am loop.
+name: deploy
+on:
+  push:
+    branches: [main]
+    paths: ["projects/burnrate/**"]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  ship:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: projects/burnrate
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Setup
+        run: ./run.sh setup --no-venv
+
+      - name: Lint + test
+        run: ./run.sh check --no-venv         # ruff + offline unit suite
+
+      - name: Build + push image (immutable :sha)
+        run: |
+          IMAGE=ghcr.io/${{ github.repository_owner }}/burnrate:${{ github.sha }}
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+          docker build -t "$IMAGE" .
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          docker push "$IMAGE"
+
+      # GitOps: bump the image in deploy/k8s and let ArgoCD reconcile EKS to it.
+      - name: Sync via ArgoCD
+        env:
+          ARGOCD_SERVER: ${{ secrets.ARGOCD_SERVER }}
+          ARGOCD_AUTH_TOKEN: ${{ secrets.ARGOCD_AUTH_TOKEN }}
+        run: |
+          argocd app set burnrate --helm-set image.tag=${{ github.sha }} || true
+          argocd app sync burnrate --timeout 300
+          argocd app wait burnrate --health --timeout 300   # waits on readiness probe
+
+      # The gate: the live deployment must pass the same contract suite as local.
+      - name: Post-deploy smoke gate
+        id: smoke
+        env:
+          DEPLOY_URL: ${{ secrets.BURNRATE_URL }}
+        run: ./run.sh smoke --no-venv --url "$DEPLOY_URL"
+
+      # 10-minute rollback: a failed smoke gate (or failed health wait) reverts the
+      # ArgoCD app to the last-known-good revision. The deploy is only "done" when
+      # the live contract verifies.
+      - name: Roll back on failed gate
+        if: failure() && steps.smoke.outcome == 'failure'
+        env:
+          ARGOCD_SERVER: ${{ secrets.ARGOCD_SERVER }}
+          ARGOCD_AUTH_TOKEN: ${{ secrets.ARGOCD_AUTH_TOKEN }}
+        run: |
+          echo "::error::post-deploy smoke gate failed — rolling back to previous revision"
+          argocd app rollback burnrate          # previous healthy revision
+          argocd app wait burnrate --health --timeout 300

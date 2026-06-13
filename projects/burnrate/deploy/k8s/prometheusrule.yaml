@@ -1,0 +1,56 @@
+# PrometheusRule — multiwindow, multi-burn-rate error-budget alerts (the canonical
+# SRE Workbook policy), as code. This is the cluster-side twin of slo.py's
+# alert_policy(): the same fast-burn-pages / slow-burn-tickets decision, expressed
+# against the burnrate_requests_total counter Prometheus scrapes off /metrics.
+#
+# A page requires BOTH a long and a short window to clear the threshold, which is
+# what kills the flapping pages a single threshold produces.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: burnrate-error-budget
+  namespace: burnrate
+  labels: { app: burnrate, role: alert-rules }
+spec:
+  groups:
+    - name: burnrate.slo
+      rules:
+        # error ratio over a window: 5xx / total
+        - record: job:burnrate_error_ratio:rate1h
+          expr: |
+            sum(rate(burnrate_requests_total{status=~"5.."}[1h]))
+            / sum(rate(burnrate_requests_total[1h]))
+        - record: job:burnrate_error_ratio:rate5m
+          expr: |
+            sum(rate(burnrate_requests_total{status=~"5.."}[5m]))
+            / sum(rate(burnrate_requests_total[5m]))
+        - record: job:burnrate_error_ratio:rate6h
+          expr: |
+            sum(rate(burnrate_requests_total{status=~"5.."}[6h]))
+            / sum(rate(burnrate_requests_total[6h]))
+        - record: job:burnrate_error_ratio:rate30m
+          expr: |
+            sum(rate(burnrate_requests_total{status=~"5.."}[30m]))
+            / sum(rate(burnrate_requests_total[30m]))
+
+        # FAST burn → page: 14.4x the 0.5% budget = 7.2% errors, over 1h AND 5m.
+        - alert: BurnrateErrorBudgetFastBurn
+          expr: |
+            job:burnrate_error_ratio:rate1h > (14.4 * 0.005)
+            and job:burnrate_error_ratio:rate5m > (14.4 * 0.005)
+          for: 2m
+          labels: { severity: page }
+          annotations:
+            summary: "burnrate error budget burning >14.4x (1h+5m) — page on-call"
+            runbook_url: "https://github.com/example-org/platform/blob/main/projects/burnrate/docs/runbook.md"
+
+        # SLOW burn → ticket: 3x the budget = 1.5% errors, over 6h AND 30m.
+        - alert: BurnrateErrorBudgetSlowBurn
+          expr: |
+            job:burnrate_error_ratio:rate6h > (3 * 0.005)
+            and job:burnrate_error_ratio:rate30m > (3 * 0.005)
+          for: 15m
+          labels: { severity: ticket }
+          annotations:
+            summary: "burnrate error budget chronically eroding >3x (6h+30m) — file a ticket"
+            runbook_url: "https://github.com/example-org/platform/blob/main/projects/burnrate/docs/runbook.md"

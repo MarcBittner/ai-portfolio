@@ -1,0 +1,87 @@
+# Deployment + Service + HPA for burnrate on EKS (illustrative reference).
+#
+# RollingUpdate with maxUnavailable=0 means a bad image never takes capacity down
+# while it fails its readiness probe — the new pods simply never go Ready, the old
+# ReplicaSet stays serving, and ArgoCD reports Degraded. That, plus the post-deploy
+# smoke gate in the GitHub Actions pipeline, is the merge→prod→rollback-in-10-min
+# guardrail: nothing shifts traffic until /healthz is green.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: burnrate
+  namespace: burnrate
+  labels: { app: burnrate }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: burnrate }
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0      # never drop capacity for a failing rollout
+      maxSurge: 1
+  template:
+    metadata:
+      labels: { app: burnrate }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: /metrics
+    spec:
+      containers:
+        - name: burnrate
+          image: ghcr.io/example-org/burnrate:latest   # set to the immutable :sha at deploy
+          ports:
+            - containerPort: 8080
+          env:
+            - name: PORT
+              value: "8080"
+            # REDIS_URL wires the TaskTiger-shaped queue; omit to run tasks inline.
+            - name: REDIS_URL
+              value: redis://burnrate-redis:6379
+          readinessProbe:                # gates traffic: not Ready → no Service endpoints
+            httpGet: { path: /healthz, port: 8080 }
+            initialDelaySeconds: 3
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:                 # restarts a wedged pod
+            httpGet: { path: /healthz, port: 8080 }
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            failureThreshold: 3
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits:   { cpu: 500m, memory: 256Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: burnrate
+  namespace: burnrate
+  labels: { app: burnrate }
+spec:
+  selector: { app: burnrate }
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: burnrate
+  namespace: burnrate
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: burnrate
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70   # scale out the slow path before latency SLO breaks

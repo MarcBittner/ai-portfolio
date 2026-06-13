@@ -1,0 +1,35 @@
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+[project]
+name = "burnrate"
+version = "0.1.0"
+description = "Flask outreach service with SLOs, multiwindow burn-rate error-budget policy, TaskTiger/Redis background tasks, and smoke-gated GitOps"
+readme = "README.md"
+license = "LicenseRef-Proprietary"
+requires-python = ">=3.11"
+dependencies = [
+    "flask>=3.0",
+    "gunicorn>=21",
+    "prometheus-client>=0.20",
+]
+
+[project.optional-dependencies]
+# redis + tasktiger enable the deferred background-task path; absent, tasks run
+# inline. dev tools for lint/test.
+redis = ["redis>=5", "tasktiger>=0.18"]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/burnrate"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 90
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]

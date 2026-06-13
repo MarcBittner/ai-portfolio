@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>burnrate — SLOs, error budget & multiwindow burn rate</title>
+<style>
+  :root{
+    --bg:#0b0e16; --surface:#141927; --surface-2:#1b2233; --line:#27324a;
+    --ink:#e9eef7; --dim:#98a4bb; --faint:#677288;
+    --accent:#ff8a5c; --accent-2:#ffd166; --accent-ink:#180a04;
+    --ok:#43c98a; --warn:#e6ad52; --bad:#f15b6c;
+    --r:14px; --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    --grad:linear-gradient(135deg,var(--accent),var(--accent-2));
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);min-height:100vh;
+    font:15px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Inter,sans-serif;
+    background-image:radial-gradient(1100px 520px at 85% -10%,rgba(255,138,92,.10),transparent 60%);}
+  a{color:var(--accent);text-decoration:none}
+  header{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:14px;
+    padding:13px 22px;border-bottom:1px solid var(--line);background:rgba(11,14,22,.8);
+    backdrop-filter:blur(12px)}
+  .logo{width:28px;height:28px;border-radius:8px;background:var(--grad);flex:none}
+  .brand{font-weight:650;font-size:16px}
+  .brand .tag{color:var(--dim);font-size:12.5px;font-weight:400;margin-left:6px}
+  .spacer{flex:1}
+  .pill{font-size:12px;color:var(--dim);border:1px solid var(--line);border-radius:999px;
+    padding:5px 12px;background:var(--surface);white-space:nowrap}
+  .pill.ok{color:var(--ok);border-color:rgba(67,201,138,.4)}
+  .pill.bad{color:var(--bad);border-color:rgba(241,91,108,.45)}
+  .pill.warn{color:var(--warn);border-color:rgba(230,173,82,.45)}
+  main{max-width:1140px;margin:0 auto;padding:22px;display:grid;gap:16px;
+    grid-template-columns:1fr 1fr}
+  .full{grid-column:1/-1}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+    padding:18px}
+  .card h2{margin:0 0 4px;font-size:13px;letter-spacing:.4px;text-transform:uppercase;
+    color:var(--dim)}
+  .card .sub{color:var(--faint);font-size:12.5px;margin-bottom:12px}
+  .row{display:flex;gap:18px;flex-wrap:wrap}
+  .stat{flex:1;min-width:120px}
+  .stat .n{font-size:26px;font-weight:680;font-variant-numeric:tabular-nums}
+  .stat .l{color:var(--faint);font-size:12px;margin-top:2px}
+  .bar{height:9px;border-radius:6px;background:var(--surface-2);overflow:hidden;margin-top:10px}
+  .bar > i{display:block;height:100%;background:var(--ok);transition:width .4s ease,background .4s}
+  button{font:inherit;cursor:pointer;border-radius:10px;border:1px solid var(--line);
+    background:var(--surface-2);color:var(--ink);padding:8px 13px;transition:.15s}
+  button:hover{border-color:var(--accent);transform:translateY(-1px)}
+  button.primary{background:var(--grad);color:var(--accent-ink);border:none;font-weight:620}
+  .btns{display:flex;gap:9px;flex-wrap:wrap;margin-top:6px}
+  pre{margin:10px 0 0;background:#0a0d15;border:1px solid var(--line);border-radius:10px;
+    padding:12px;font:12.5px/1.5 var(--mono);color:#cfe;overflow:auto;max-height:340px;white-space:pre-wrap}
+  .kv{font:12.5px var(--mono);color:var(--dim)}
+  .kv b{color:var(--ink)}
+  .tag-page{color:var(--bad);font-weight:650}
+  .tag-ticket{color:var(--warn);font-weight:650}
+  .tag-none{color:var(--ok);font-weight:650}
+  footer{grid-column:1/-1;color:var(--faint);font-size:12px;text-align:center;padding:8px}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"></div>
+  <div class="brand">burnrate<span class="tag">Flask · RED metrics · multiwindow burn rate · TaskTiger/Redis</span></div>
+  <div class="spacer"></div>
+  <span class="pill" id="p-backend">tasks: …</span>
+  <span class="pill" id="p-llm">llm: …</span>
+  <span class="pill" id="p-status">…</span>
+</header>
+
+<main>
+  <section class="card">
+    <h2>Availability SLO</h2>
+    <div class="sub">target 99.5% · error budget 0.5%</div>
+    <div class="row">
+      <div class="stat"><div class="n" id="avail">—</div><div class="l">SLI (non-5xx)</div></div>
+      <div class="stat"><div class="n" id="budget">—</div><div class="l">budget remaining</div></div>
+    </div>
+    <div class="bar"><i id="budget-bar" style="width:100%"></i></div>
+  </section>
+
+  <section class="card">
+    <h2>Latency SLO</h2>
+    <div class="sub">target 95% of requests under 250 ms</div>
+    <div class="row">
+      <div class="stat"><div class="n" id="lat">—</div><div class="l">SLI (fast enough)</div></div>
+      <div class="stat"><div class="n" id="p95">—</div><div class="l">p95 (ms)</div></div>
+    </div>
+  </section>
+
+  <section class="card full">
+    <h2>Multiwindow burn-rate policy</h2>
+    <div class="sub">canonical SRE alerting: 14.4× (long+short) → <b>page</b> · 3× → <b>ticket</b></div>
+    <div class="row">
+      <div class="stat"><div class="n" id="burn">—</div><div class="l">burn rate (instant)</div></div>
+      <div class="stat"><div class="n" id="burn-long">—</div><div class="l">long window</div></div>
+      <div class="stat"><div class="n" id="burn-short">—</div><div class="l">short window</div></div>
+      <div class="stat"><div class="n" id="action">—</div><div class="l">policy action</div></div>
+    </div>
+  </section>
+
+  <section class="card full">
+    <h2>Operator controls</h2>
+    <div class="sub">inject a deterministic incident, drive load, recover — byte-reproducible</div>
+    <div class="btns">
+      <button class="primary" onclick="loadtest(300)">Drive load (300)</button>
+      <button onclick="batch()">Background batch task</button>
+      <button onclick="inject(0.08,450)">Inject fast burn (8% + 450ms)</button>
+      <button onclick="inject(0.02,0)">Inject slow burn (2%)</button>
+      <button onclick="reset()">Recover / reset</button>
+      <button onclick="summary()">Generate incident summary (LLM)</button>
+    </div>
+    <pre id="out">Ready. Drive load, then inject an incident to watch the budget burn.</pre>
+  </section>
+
+  <footer>Single-instance demo · synthetic & deterministic · no secrets · <a href="/metrics">/metrics</a> · <a href="/slo">/slo</a> · <a href="/tasks">/tasks</a></footer>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const j = (m,u,b) => fetch(u,{method:m,headers:{'content-type':'application/json'},
+  body:b?JSON.stringify(b):undefined}).then(r=>r.json());
+const pct = x => (x*100).toFixed(2)+'%';
+
+async function refresh(){
+  const s = await j('GET','/slo');
+  const a = s.availability, l = s.latency, p = s.burn_policy;
+  $('avail').textContent = pct(a.sli);
+  $('budget').textContent = pct(a.budget_remaining);
+  $('lat').textContent = pct(l.sli);
+  $('p95').textContent = l.p95_ms;
+  $('burn').textContent = a.burn_rate+'×';
+  $('burn-long').textContent = p.long_window_burn+'×';
+  $('burn-short').textContent = p.short_window_burn+'×';
+  const act = $('action'); act.textContent = p.action;
+  act.className = 'n tag-'+p.action;
+  const bar = $('budget-bar'); bar.style.width = Math.max(2,a.budget_remaining*100)+'%';
+  bar.style.background = a.budget_remaining>0.5?'var(--ok)':a.budget_remaining>0?'var(--warn)':'var(--bad)';
+  const st = $('p-status');
+  st.textContent = s.overall_status;
+  st.className = 'pill '+(s.overall_status==='healthy'?'ok':'bad');
+}
+async function badges(){
+  const h = await j('GET','/healthz'); $('p-backend').textContent='tasks: '+h.task_backend;
+  const lm = await j('GET','/llm');
+  const active = Object.entries(lm.providers).find(([,v])=>v);
+  $('p-llm').textContent='llm: '+(active?active[0]:'offline');
+}
+async function loadtest(n){ $('out').textContent='driving '+n+' requests…';
+  await j('POST','/admin/loadtest',{n}); await refresh(); $('out').textContent='load done.'; }
+async function batch(){ $('out').textContent='enqueuing background batch task…';
+  const r = await j('POST','/tasks/process_batch',{n:200}); await refresh();
+  $('out').textContent='task '+r.task+' backend='+r.backend+' deferred='+r.deferred+' drained='+r.drained; }
+async function inject(er,lm){ $('out').textContent='injecting fault…';
+  await j('POST','/admin/inject',{error_rate:er,latency_ms:lm});
+  await j('POST','/admin/loadtest',{n:300}); await refresh();
+  $('out').textContent='fault injected + 300 requests driven — watch the budget burn.'; }
+async function reset(){ await j('POST','/admin/reset'); await j('POST','/admin/loadtest',{n:300});
+  await refresh(); $('out').textContent='recovered: fault cleared, fresh window.'; }
+async function summary(){ $('out').textContent='generating incident summary…';
+  const r = await j('POST','/incident/summary',{});
+  $('out').textContent = '['+r.severity.toUpperCase()+'] action='+r.action+'  provider='+r.provider+
+    '\n\n'+r.summary+'\n\nNext steps:\n'+r.suggested_steps.map((s,i)=>(i+1)+'. '+s).join('\n'); }
+
+badges(); refresh(); setInterval(refresh, 4000);
+</script>
+</body>
+</html>
