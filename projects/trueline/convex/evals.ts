@@ -71,7 +71,11 @@ export const runEval = mutation({
 export const listEvals = query({
   args: {},
   handler: async (ctx) => {
-    const { orgId } = await requireOrg(ctx);
+    const id = (await ctx.auth.getUserIdentity()) as
+      | { subject: string; org_id?: string }
+      | null;
+    if (!id) return [];
+    const orgId = id.org_id ?? `user:${id.subject}`;
     return ctx.db
       .query("evalRuns")
       .withIndex("by_org", (q) => q.eq("orgId", orgId))

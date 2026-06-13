@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useMutation, useQuery } from "convex/react";
+import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Nav } from "@/app/components/nav";
 import { FlagBadge, StatusBadge, usd } from "@/app/components/ui";
@@ -25,10 +25,11 @@ export default function Dashboard() {
   const [num, setNum] = useState("");
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
+  const { isAuthenticated } = useConvexAuth();
 
   useEffect(() => {
-    seed().catch(() => {});
-  }, [seed]);
+    if (isAuthenticated) seed().catch(() => {});
+  }, [isAuthenticated, seed]);
 
   async function submit() {
     if (!text.trim() || busy) return;

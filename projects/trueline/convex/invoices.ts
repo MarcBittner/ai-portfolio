@@ -29,6 +29,17 @@ async function requireOrg(ctx: { auth: MutationCtx["auth"] }) {
   return { orgId, who };
 }
 
+// Like requireOrg but never throws — returns null when the request isn't
+// authenticated yet (Convex auth can lag a render behind Clerk). Read queries
+// use this so a transient unauthenticated render shows an empty state instead
+// of throwing (which would crash the client with a white screen).
+async function optionalOrg(ctx: { auth: MutationCtx["auth"] }): Promise<string | null> {
+  const id = await ctx.auth.getUserIdentity();
+  if (!id) return null;
+  const claims = id as unknown as { org_id?: string };
+  return claims.org_id ?? `user:${id.subject}`;
+}
+
 // Reconcile a set of extracted lines against the org's PO + catalog and write
 // them, returning the invoice rollups. Shared by the seed and the extract action.
 async function insertReconciledLines(
@@ -87,7 +98,8 @@ async function insertReconciledLines(
 export const listInvoices = query({
   args: {},
   handler: async (ctx) => {
-    const { orgId } = await requireOrg(ctx);
+    const orgId = await optionalOrg(ctx);
+    if (!orgId) return [];
     const invoices = await ctx.db
       .query("invoices")
       .withIndex("by_org", (q) => q.eq("orgId", orgId))
@@ -115,7 +127,8 @@ export const listInvoices = query({
 export const getInvoice = query({
   args: { invoiceId: v.id("invoices") },
   handler: async (ctx, { invoiceId }) => {
-    const { orgId } = await requireOrg(ctx);
+    const orgId = await optionalOrg(ctx);
+    if (!orgId) return null;
     const invoice = await ctx.db.get(invoiceId);
     if (!invoice || invoice.orgId !== orgId) return null;
     const lines = await ctx.db
@@ -130,7 +143,9 @@ export const getInvoice = query({
 export const stats = query({
   args: {},
   handler: async (ctx) => {
-    const { orgId } = await requireOrg(ctx);
+    const orgId = await optionalOrg(ctx);
+    if (!orgId)
+      return { invoices: 0, recoverableUsd: 0, needsReview: 0, latestEval: null };
     const invoices = await ctx.db
       .query("invoices")
       .withIndex("by_org", (q) => q.eq("orgId", orgId))
