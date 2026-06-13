@@ -8,8 +8,9 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 
-from rate_atlas import __version__, outliers, store
-from rate_atlas.models import HealthResponse
+from rate_atlas import __version__, assist, llm, outliers, store
+from rate_atlas.data import UNKNOWN_HOSPITAL, UNKNOWN_SAMPLE
+from rate_atlas.models import AssistRequest, HealthResponse
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -55,6 +56,35 @@ def get_outliers(threshold: float = 2.0) -> dict:
 @app.get("/search")
 def search(q: str = "") -> dict:
     return {"results": store.search(q)}
+
+
+@app.post("/normalize/assist")
+def normalize_assist(req: AssistRequest) -> dict:
+    """LLM-assisted ingest of an UNKNOWN-format file: map its columns to the
+    canonical schema (routing chain → deterministic offline matcher), then apply
+    the mapping deterministically. With ``ingest`` true, load the rows so they
+    immediately appear in ``/compare`` / ``/outliers`` alongside the known shapes.
+    """
+    sample = req.sample if req.sample and req.sample.strip() else UNKNOWN_SAMPLE
+    hospital = req.hospital or UNKNOWN_HOSPITAL
+    result = assist.assist(hospital, sample, mode=req.mode)
+    if req.ingest and result["records"]:
+        source = hospital.lower().replace(" ", "-")
+        ingested = store.ingest_records(source, hospital, result["records"])
+        result["ingested"] = ingested
+    return result
+
+
+@app.get("/evals")
+def evals(mode: str | None = None) -> dict:
+    """Column-mapping precision/recall over the labeled unknown-format header set."""
+    return assist.evaluate(mode=mode)
+
+
+@app.get("/llm")
+def llm_status() -> dict:
+    """Which providers are configured/reachable + the active routing mode."""
+    return llm.status()
 
 
 @app.post("/admin/reingest")

@@ -138,3 +138,25 @@ def test_regression_outliers_have_z(client):
 
 def test_regression_unknown_code_404(client):
     assert client.get("/compare/00000").status_code == 404
+
+
+def test_smoke_llm_status(client):
+    b = client.get("/llm").json()
+    assert set(b["providers"]) == {"anthropic", "openai", "ollama", "openrouter"}
+    assert b["offline_fallback"] is True
+
+
+def test_smoke_evals_reproduce_offline(client):
+    b = client.get("/evals?mode=offline").json()
+    assert b["recall"] == 1.0 and b["precision"] == 1.0
+
+
+def test_regression_assist_maps_unknown_format(client):
+    # the LLM-assisted path maps an unknown-format file's columns to the canonical
+    # schema; offline mode keeps this deterministic on any instance
+    b = client.post("/normalize/assist", json={"mode": "offline"}).json()
+    assert b["rows_mapped"] > 0
+    assert "code" in b["mapping"].values() and "rate" in b["mapping"].values()
+    canon = {"hospital", "code", "code_type", "description", "payer", "plan", "rate"}
+    for r in b["records"]:
+        assert set(r) == canon

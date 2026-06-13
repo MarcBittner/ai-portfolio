@@ -1,0 +1,22 @@
+# Argo CD Application — ILLUSTRATIVE. GitOps: the repo is the source of truth,
+# the cluster follows. Apply with:  kubectl apply -f deploy/argocd/application.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: rate-atlas
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/MarcBittner/ai-portfolio.git
+    targetRevision: main
+    path: projects/rate-atlas/deploy/k8s
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: rate-atlas
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

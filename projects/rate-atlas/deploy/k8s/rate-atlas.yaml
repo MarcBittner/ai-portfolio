@@ -1,0 +1,98 @@
+# Kubernetes manifests for rate-atlas — ILLUSTRATIVE ("what I'd build").
+# The live portfolio demo runs on Render's free tier; this is the platform
+# wrapper a Platform Ops role would own. Apply with:
+#
+#   kubectl apply -f deploy/k8s/rate-atlas.yaml
+#   kubectl -n rate-atlas rollout status deployment/rate-atlas
+#
+# Offline by default (no provider keys / no DB → deterministic matcher + the
+# in-memory SQLite stand-in). For a real deployment, point DATABASE_URL at the
+# RDS instance the Terraform module provisions and add provider keys as a Secret.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: rate-atlas
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rate-atlas
+  namespace: rate-atlas
+  labels: { app: rate-atlas }
+spec:
+  replicas: 2                      # stateless API; HPA scales it on load
+  selector:
+    matchLabels: { app: rate-atlas }
+  template:
+    metadata:
+      labels: { app: rate-atlas }
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+      containers:
+        - name: api
+          image: ghcr.io/marcbittner/rate-atlas:v0.1.0   # illustrative tag
+          ports:
+            - containerPort: 8080
+          env:
+            - name: PORT
+              value: "8080"
+            # Routing tier; offline (deterministic matcher) when unset.
+            - name: LLM_MODE
+              value: auto
+            # Postgres (from the RDS module). Unset → in-memory SQLite stand-in.
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: rate-atlas-db
+                  key: DATABASE_URL
+                  optional: true
+            # Provider key for the assisted column-mapping. Optional: the chain
+            # falls back to the deterministic synonym matcher without it.
+            - name: OPENROUTER_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: rate-atlas-providers
+                  key: OPENROUTER_API_KEY
+                  optional: true
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits:   { cpu: "1",  memory: 256Mi }
+          readinessProbe:
+            httpGet: { path: /health, port: 8080 }
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /health, port: 8080 }
+            initialDelaySeconds: 10
+            periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rate-atlas
+  namespace: rate-atlas
+spec:
+  selector: { app: rate-atlas }
+  ports:
+    - port: 80
+      targetPort: 8080
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: rate-atlas
+  namespace: rate-atlas
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: rate-atlas
+  minReplicas: 2
+  maxReplicas: 8
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: 65 }

@@ -43,6 +43,24 @@ def ingest() -> dict:
     return {"sources": list(_shapes.values()), "total_rows": _row_count()}
 
 
+def ingest_records(source: str, hospital: str, records: list[dict],
+                   shape: str = "llm_assisted") -> dict:
+    """Append already-canonical records (e.g. from an LLM-assisted mapping of an
+    unknown-format file) into the same table, then register the source. The rows
+    are identical in shape to the adapter output, so everything downstream
+    (compare/outliers) treats them no differently."""
+    db = _db()
+    if records:
+        db.executemany(
+            "INSERT INTO rates VALUES(:hospital,:code,:code_type,:description,"
+            ":payer,:plan,:rate)", records)
+        db.commit()
+    _shapes[source] = {"source": source, "hospital": hospital, "shape": shape,
+                       "rows": len(records)}
+    return {"source": source, "hospital": hospital, "shape": shape,
+            "rows": len(records), "total_rows": _row_count()}
+
+
 def _row_count() -> int:
     return _db().execute("SELECT COUNT(*) FROM rates").fetchone()[0]
 

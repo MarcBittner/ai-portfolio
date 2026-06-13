@@ -36,3 +36,29 @@ def test_outliers():
 
 def test_search():
     assert client.get("/search?q=CT").json()["results"]
+
+
+def test_llm_status():
+    b = client.get("/llm").json()
+    assert set(b["providers"]) == {"anthropic", "openai", "ollama", "openrouter"}
+    assert b["offline_fallback"] is True
+
+
+def test_evals_offline_recall():
+    b = client.get("/evals?mode=offline").json()
+    assert b["recall"] == 1.0 and b["precision"] == 1.0
+    assert b["headers"] >= 3
+
+
+def test_assist_maps_unknown_format_and_ingests():
+    b = client.post("/normalize/assist", json={"mode": "offline"}).json()
+    assert b["provider"] == "offline"
+    assert b["rows_mapped"] > 0
+    # mapped columns include the essentials
+    assert "code" in b["mapping"].values()
+    assert "rate" in b["mapping"].values()
+    # ingested rows show up as an llm_assisted source
+    assert b["ingested"]["shape"] == "llm_assisted"
+    shapes = {s["shape"] for s in client.get("/sources").json()["sources"]}
+    assert "llm_assisted" in shapes
+    client.post("/admin/reingest")  # restore the deterministic baseline

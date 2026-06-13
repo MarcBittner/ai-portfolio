@@ -215,8 +215,35 @@
   </div>
 
   <div class="panel reveal">
-    <h2>Sources — three shapes, one model</h2>
+    <h2>Sources — many shapes, one model</h2>
     <div class="body" style="padding:0"><table id="sources"></table></div>
+  </div>
+
+  <div class="panel full reveal">
+    <h2>LLM-assisted mapping — an unknown-format file
+      <span class="badge b-info" id="llmmode" style="margin-left:auto">offline</span></h2>
+    <div class="body">
+      <div class="muted" style="margin-bottom:10px">
+        The three adapters are hand-written per known shape. Paste a <b>4th file in an
+        unknown format</b> (JSON array, or CSV/pipe/TSV with a header) — the model maps
+        each column to the canonical schema (<code>code · code_type · payer · plan ·
+        rate · hospital · description</code>), then it's applied <b>deterministically</b>
+        to ingest. Routes Anthropic/OpenAI → Ollama → OpenRouter → a deterministic
+        synonym matcher, so it works with zero keys.
+      </div>
+      <div class="row" style="margin-bottom:10px">
+        <button class="chip" id="loadsample">Load bundled unknown-format sample</button>
+      </div>
+      <textarea id="sample" spellcheck="false"
+        placeholder="billing_cpt,insurer,network,allowed_amt,facility,proc_desc&#10;99213,Humana,PPO,137.00,Delta Regional Hospital,Office visit"></textarea>
+      <div class="row" style="margin-top:10px">
+        <input id="ahospital" placeholder="Hospital name (optional)" style="max-width:280px">
+        <button class="btn primary" id="amap"><span class="spin"></span>
+          <span class="lbl">Map &amp; ingest →</span></button>
+        <span class="muted" id="ameta"></span>
+      </div>
+      <div id="amapout" style="margin-top:14px;display:none"></div>
+    </div>
   </div>
 </main>
 
@@ -292,10 +319,46 @@ async function boot(){
   try{const ss=(await j("sources")).sources;nSources=ss.length;renderSources(ss)}catch{toast("Could not load sources","bad")}
   // header pill
   $("#srcpill").innerHTML=`<b>${nSources}</b> sources · <b>${nProcedures}</b> procedures`;
+  // llm routing mode badge
+  try{const l=await j("llm");$("#llmmode").textContent=l.mode||"offline"}catch{}
   // outliers + first comparison
   await loadOutliers();
   await compare();
 }
+
+const SAMPLE=`billing_cpt,insurer,network,allowed_amt,facility,proc_desc
+99213,Humana,PPO,137.00,Delta Regional Hospital,Office visit established L3
+70450,Humana,PPO,559.00,Delta Regional Hospital,CT head without contrast
+80053,Kaiser,HMO,35.50,Delta Regional Hospital,Comprehensive metabolic panel`;
+$("#loadsample").onclick=()=>{$("#sample").value=SAMPLE;
+  $("#ahospital").value="Delta Regional Hospital";toast("Sample loaded","info")};
+
+async function assistMap(){
+  const btn=$("#amap");btn.classList.add("loading");
+  try{
+    const body={sample:$("#sample").value||null,
+      hospital:$("#ahospital").value||null,ingest:true};
+    const a=await j("normalize/assist",{method:"POST",
+      headers:{"content-type":"application/json"},body:JSON.stringify(body)});
+    $("#ameta").innerHTML=`detected <code>${esc(a.detected_kind)}</code> · mapped via
+      <b>${esc(a.provider)}</b> (${esc(a.model)}) · ${a.rows_mapped}/${a.rows_in} rows`;
+    const rows=Object.entries(a.mapping).map(([src,canon])=>
+      `<tr><td><code>${esc(src)}</code></td><td><span class="arrow">→</span></td>
+       <td>${canon?`<span class="badge b-allow">${esc(canon)}</span>`
+        :`<span class="badge b-block">dropped</span>`}</td></tr>`).join("");
+    $("#amapout").style.display="block";
+    $("#amapout").innerHTML=
+      `<div class="muted" style="margin-bottom:8px">Proposed column → canonical mapping
+        (applied deterministically):</div>
+       <table style="max-width:520px"><tbody>${rows}</tbody></table>`;
+    toast(`Ingested ${a.rows_mapped} rows for ${esc(a.hospital)}`,"ok");
+    // refresh sources + the procedure picker so the new rows are visible
+    try{renderSources((await j("sources")).sources)}catch{}
+    await loadOutliers();await compare();
+  }catch(e){toast("Assisted mapping failed — try again","bad")}
+  btn.classList.remove("loading");
+}
+$("#amap").onclick=assistMap;
 
 async function compare(){
   const btn=$("#go");btn.classList.add("loading");
