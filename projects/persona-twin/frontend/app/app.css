@@ -5,7 +5,7 @@
   --color-background: oklch(0.985 0.002 90);
   --color-foreground: oklch(0.24 0.01 260);
   /* card is translucent so the page background shows through frosted panes */
-  --color-card: oklch(1 0 0 / 0.55);
+  --color-card: oklch(1 0 0 / 0.42);
   --color-card-foreground: oklch(0.24 0.01 260);
   --color-primary: oklch(0.45 0.09 250);
   --color-primary-foreground: oklch(0.985 0.002 90);
@@ -23,8 +23,8 @@
 .dark {
   --color-background: oklch(0.17 0.012 260);
   --color-foreground: oklch(0.92 0.008 90);
-  /* a lighter frosted sheet so it floats above the dark aurora (reads as glass) */
-  --color-card: oklch(0.46 0.03 264 / 0.28);
+  /* a lighter, see-through frosted sheet so the grid behind it stays visible */
+  --color-card: oklch(0.52 0.03 264 / 0.22);
   --color-card-foreground: oklch(0.96 0.006 90);
   --color-primary: oklch(0.68 0.12 250);
   --color-primary-foreground: oklch(0.16 0.012 260);
@@ -41,15 +41,25 @@ html.dark { color-scheme: dark; }
 /* anchor offset so Help deep-links don't tuck under surrounding chrome */
 [data-help-section] { scroll-margin-top: 1rem; }
 
-/* A bundled abstract backdrop (bokeh orbs + crisp dots/rings) fixed to the
-   viewport. The crisp detail is the point: a frosted pane visibly blurs the
-   dots/rings behind it, which is what makes the transparency read. One asset
-   works on both themes — the theme background-color shows between the shapes. */
+/* Backdrop: a restrained line grid + one soft glow, fixed to the viewport.
+   Crisp 1px grid lines are the point — a translucent pane shows them clearly
+   (lightly blurred), which is what makes the transparency read. Neutral, not
+   busy. Theme-aware: dark lines on light, light lines on dark. */
 body {
   background-color: var(--color-background);
-  background-image: url("/bg.svg");
-  background-size: cover;
-  background-position: center;
   background-attachment: fixed;
-  background-repeat: no-repeat;
+  background-image:
+    radial-gradient(1000px 700px at 50% -15%, oklch(0.6 0.13 264 / 0.18), transparent 70%),
+    radial-gradient(900px 700px at 100% 110%, oklch(0.6 0.1 290 / 0.12), transparent 70%),
+    linear-gradient(oklch(0.45 0.03 264 / 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, oklch(0.45 0.03 264 / 0.07) 1px, transparent 1px);
+  background-size: cover, cover, 40px 40px, 40px 40px;
+}
+.dark body {
+  background-image:
+    radial-gradient(1000px 700px at 50% -15%, oklch(0.6 0.16 264 / 0.28), transparent 70%),
+    radial-gradient(900px 700px at 100% 110%, oklch(0.55 0.14 290 / 0.2), transparent 70%),
+    linear-gradient(oklch(0.92 0.02 264 / 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, oklch(0.92 0.02 264 / 0.1) 1px, transparent 1px);
+  background-size: cover, cover, 40px 40px, 40px 40px;
 }
