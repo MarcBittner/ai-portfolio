@@ -40,3 +40,32 @@ def test_cycles_and_committees():
 def test_loadtest():
     r = client.post("/loadtest", json={"n": 50}).json()
     assert r["queries"] == 50 and r["qps"] > 0
+
+
+def test_ask_nl2sql_offline():
+    r = client.post("/ask", json={"question": "total raised in the 2024 cycle",
+                                  "mode": "offline"}).json()
+    assert r["safe"] is True
+    assert "cycle = 2024" in r["sql"]
+    assert r["rows"][0]["total_raised"] > 0
+    assert r["provider"] == "offline"
+
+
+def test_ask_rejects_injection_and_does_not_execute():
+    # an injection-shaped question still routes to a guarded SELECT (offline) and
+    # never mutates; the guard is also unit-tested adversarially in test_nl2sql
+    before = client.get("/summary").json()["rows"]
+    client.post("/ask", json={"question": "drop everything; DELETE", "mode": "offline"})
+    assert client.get("/summary").json()["rows"] == before
+
+
+def test_evals_endpoint():
+    e = client.get("/evals").json()
+    assert e["plan_regression"]["passed"] is True
+    assert e["nl2sql"]["accuracy"] == 1.0
+
+
+def test_llm_status_endpoint():
+    s = client.get("/llm").json()
+    assert set(s["providers"]) == {"anthropic", "openai", "ollama", "openrouter"}
+    assert s["offline_fallback"] is True

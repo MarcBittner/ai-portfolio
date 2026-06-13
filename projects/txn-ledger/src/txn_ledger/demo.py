@@ -4,7 +4,7 @@ run an FEC-style rollup, and simulate an end-of-quarter surge.
 Run: python -m txn_ledger.demo   (no network required)
 """
 
-from txn_ledger import db, loadtest, queries
+from txn_ledger import db, loadtest, nl2sql, queries
 
 
 def main() -> None:
@@ -32,6 +32,21 @@ def main() -> None:
     print(f"\nEnd-of-quarter surge — {lt['queries']:,} aggregation queries:")
     print(f"  {lt['qps']:,} qps · p50 {lt['p50_ms']}ms · p95 {lt['p95_ms']}ms · "
           f"p99 {lt['p99_ms']}ms · max {lt['max_ms']}ms")
+
+    print("\nNatural-language → SQL (the model writes SQL; the guard runs it):")
+    for q in ("total raised in the 2024 cycle",
+              "top 5 committees by itemized total in 2024",
+              "how many donors gave under 200 in 2026"):
+        out = nl2sql.ask(q)
+        print(f"  Q: {q}  [{out['provider']}]")
+        print(f"     SQL: {out.get('sql') or out['generated_sql']}")
+        print(f"     →    {out['rows']}")
+
+    print("\nSafety guard — generated SQL that injects a write is rejected, not run:")
+    try:
+        nl2sql.guard_sql("SELECT 1 FROM contributions; DROP TABLE contributions")
+    except nl2sql.UnsafeSQLError as exc:
+        print(f"  guard_sql('SELECT ...; DROP TABLE ...') → rejected: {exc}")
 
 
 if __name__ == "__main__":

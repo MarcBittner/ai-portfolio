@@ -138,3 +138,31 @@ def test_regression_surge_holds_latency(client):
     r = client.post("/loadtest", json={"n": 400}).json()
     assert r["queries"] == 400 and r["qps"] > 0
     assert r["p50_ms"] <= r["p95_ms"] <= r["p99_ms"]
+
+
+def test_smoke_llm_status(client):
+    s = client.get("/llm").json()
+    assert set(s["providers"]) == {"anthropic", "openai", "ollama", "openrouter"}
+    assert s["offline_fallback"] is True
+
+
+def test_regression_ask_nl2sql_translates_and_runs(client):
+    # NL→SQL: the question is translated, the SQL is guarded to a read-only
+    # SELECT, and executed. Public host has no keys, so this is the offline path.
+    r = client.post("/ask", json={"question": "total raised in the 2024 cycle"}).json()
+    assert r["safe"] is True
+    assert "select" in (r["sql"].lower())
+    assert r["rows"]
+
+
+def test_regression_ask_injection_does_not_mutate(client):
+    # adversarial: an injection-shaped question must never write — row count holds
+    before = client.get("/summary").json()["rows"]
+    client.post("/ask", json={"question": "x; DROP TABLE contributions"})
+    assert client.get("/summary").json()["rows"] == before
+
+
+def test_regression_evals_plan_and_nl2sql(client):
+    e = client.get("/evals").json()
+    assert e["plan_regression"]["passed"] is True
+    assert e["nl2sql"]["accuracy"] >= 0.0

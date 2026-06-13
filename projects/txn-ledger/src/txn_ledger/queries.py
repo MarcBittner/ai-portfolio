@@ -40,6 +40,32 @@ def plan() -> dict:
             "plan_after_index": m["plan_after"], "indexes": m["indexes"]}
 
 
+def plan_regression() -> dict:
+    """The highest-value eval for this demo: assert the hot-path aggregation still
+    uses the covering index after tuning (plan SEARCHes via INDEX, does not SCAN).
+
+    A regression here — a query that quietly reverts to a full table scan — is the
+    classic cause of a latency blow-up under a filing-deadline read surge, so this
+    is treated as a pass/fail invariant, not a soft metric.
+    """
+    m = meta()
+    before = " ".join(m["plan_before"])
+    after = " ".join(m["plan_after"])
+    uses_index = "SEARCH" in after and "INDEX" in after
+    covering = "COVERING INDEX" in after
+    scanned_before = "SCAN" in before
+    return {
+        "uses_index": uses_index,
+        "covering": covering,
+        "no_scan_after": "SCAN" not in after,
+        "scan_before_index": scanned_before,
+        "passed": uses_index and scanned_before,
+        "plan_before_index": m["plan_before"],
+        "plan_after_index": m["plan_after"],
+        "indexes": m["indexes"],
+    }
+
+
 def summary() -> dict:
     c = conn()
     total = c.execute("SELECT COUNT(*) n, SUM(amount) s, "

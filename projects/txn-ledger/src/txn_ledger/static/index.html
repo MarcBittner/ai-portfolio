@@ -247,6 +247,24 @@
       <div id="surgewrap"><div class="muted" style="margin-top:14px">Fire a burst of aggregation queries to see throughput and tail latency.</div></div>
     </div>
   </div>
+
+  <div class="panel full reveal">
+    <h2>Ask in plain English — natural-language → guarded SQL</h2>
+    <div class="body">
+      <div class="muted" style="margin-bottom:12px">A model translates your question to SQL; a safety guard runs it only if it is a single read-only <code>SELECT</code> (no writes, DDL, multiple statements, or comment-smuggling). On this host with no keys, the deterministic offline matcher answers.</div>
+      <div class="ctl" style="margin-bottom:10px;flex-wrap:wrap">
+        <input id="askq" type="text" placeholder="total raised in the 2024 cycle" style="flex:1;min-width:280px">
+        <button class="btn primary" id="askbtn"><span class="spin"></span><span class="lbl">Ask →</span></button>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+        <button class="chip ex" data-q="total raised in the 2024 cycle">total raised in 2024</button>
+        <button class="chip ex" data-q="top 5 committees by itemized total in 2024">top 5 by itemized</button>
+        <button class="chip ex" data-q="how many donors gave under 200 in 2026">donors under $200 in 2026</button>
+        <button class="chip ex" data-q="itemized vs unitemized total in 2024">itemized vs unitemized</button>
+      </div>
+      <div id="askwrap"></div>
+    </div>
+  </div>
 </main>
 
 <!-- settings drawer -->
@@ -394,6 +412,50 @@ $("#surge").onclick=async()=>{
   }
   btn.classList.remove("loading");
 };
+
+const escHtml=s=>String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+
+function renderRows(rows){
+  if(!rows||!rows.length) return `<div class="muted">no rows</div>`;
+  const cols=Object.keys(rows[0]);
+  return `<table style="margin-top:10px"><thead><tr>`+
+    cols.map(c=>`<th class="num">${escHtml(c)}</th>`).join("")+`</tr></thead><tbody>`+
+    rows.slice(0,12).map((r,i)=>`<tr class="fresh" style="animation-delay:${i*30}ms">`+
+      cols.map(c=>{const v=r[c];const n=typeof v==="number";
+        return `<td class="num">${n?num(Math.round(v*100)/100):escHtml(v)}</td>`;}).join("")+
+      `</tr>`).join("")+`</tbody>`;
+}
+
+async function ask(q){
+  const btn=$("#askbtn");btn.classList.add("loading");
+  $("#askwrap").innerHTML=`<div class="muted" style="margin-top:12px">Translating to SQL…</div>`;
+  try{
+    const r=await j("ask",{method:"POST",headers:{"content-type":"application/json"},
+      body:JSON.stringify({question:q})});
+    if(!r.safe){
+      $("#askwrap").innerHTML=`<div class="planbox before" style="margin-top:12px">`+
+        `<div class="h"><span class="tag">rejected by guard</span></div>`+
+        `<div class="mono"><span class="scan">${escHtml(r.error)}</span></div>`+
+        `<div class="mono" style="margin-top:8px;opacity:.7">${escHtml(r.generated_sql||"")}</div></div>`;
+      toast("Query rejected by the SQL safety guard","bad");
+      btn.classList.remove("loading");return;
+    }
+    $("#askwrap").innerHTML=
+      `<div class="planbox after" style="margin-top:12px"><div class="h">`+
+      `<span class="tag">read-only SELECT · passed guard</span>`+
+      `<span class="pill" style="margin-left:auto">${escHtml(r.provider)} · ${r.latency_ms} ms</span></div>`+
+      `<div class="mono search">${escHtml(r.sql)}</div></div>`+
+      renderRows(r.rows);
+    toast(`Answered via ${r.provider} — ${num(r.row_count)} row(s)`,"ok");
+  }catch(e){
+    $("#askwrap").innerHTML=`<div class="muted" style="margin-top:12px">Error — try again.</div>`;
+    toast("Ask failed","bad");
+  }
+  btn.classList.remove("loading");
+}
+$("#askbtn").onclick=()=>ask($("#askq").value.trim()||$("#askq").placeholder);
+$("#askq").addEventListener("keydown",e=>{if(e.key==="Enter")$("#askbtn").click();});
+$$(".chip.ex").forEach(c=>c.onclick=()=>{$("#askq").value=c.dataset.q;ask(c.dataset.q);});
 
 boot();
 </script>

@@ -26,6 +26,13 @@ def test_aggregate_rollup_and_itemization():
     assert "elapsed_ms" in a
 
 
+def test_plan_regression_passes():
+    db.build(5000, seed=1)
+    pr = queries.plan_regression()
+    assert pr["passed"] is True
+    assert pr["uses_index"] and pr["covering"] and pr["scan_before_index"]
+
+
 def test_aggregate_single_committee():
     db.build(8000, seed=2)
     a = queries.aggregate(2026, committee="C-0001")

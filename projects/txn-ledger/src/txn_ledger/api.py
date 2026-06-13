@@ -9,9 +9,9 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 
-from txn_ledger import __version__, db, loadtest, queries
+from txn_ledger import __version__, db, llm, loadtest, nl2sql, queries
 from txn_ledger.generate import COMMITTEES, CYCLES
-from txn_ledger.models import HealthResponse, LoadRequest
+from txn_ledger.models import AskRequest, HealthResponse, LoadRequest
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -72,6 +72,31 @@ def plan() -> dict:
 @app.post("/loadtest")
 def run_loadtest(req: LoadRequest) -> dict:
     return loadtest.surge(req.n)
+
+
+@app.post("/ask")
+def ask(req: AskRequest) -> dict:
+    """Natural-language → SQL: translate the question via the routing chain,
+    guard the generated SQL to a single read-only SELECT, run it, and return the
+    rows plus the generated SQL and provider telemetry. A guard rejection returns
+    ``safe: false`` with the offending SQL and is never executed."""
+    return nl2sql.ask(req.question, mode=req.mode)
+
+
+@app.get("/evals")
+def evals() -> dict:
+    """Plan-regression (hot path still uses the covering index) + NL→SQL accuracy
+    over the labeled question set."""
+    return {
+        "plan_regression": queries.plan_regression(),
+        "nl2sql": nl2sql.evaluate(),
+    }
+
+
+@app.get("/llm")
+def llm_status() -> dict:
+    """Which providers are configured/reachable + the active routing mode."""
+    return llm.status()
 
 
 @app.get("/", include_in_schema=False)
