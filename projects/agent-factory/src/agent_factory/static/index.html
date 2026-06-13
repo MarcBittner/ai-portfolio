@@ -4,26 +4,53 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>agent-factory</title>
+<!-- POLISH KIT: theme-init (apply before paint, no flash) -->
+<script>
+(function(){
+  try{
+    var t=localStorage.getItem("theme")||"system";
+    var dark = t==="dark" || (t==="system" && !window.matchMedia("(prefers-color-scheme: light)").matches);
+    if(!dark) document.documentElement.classList.add("light");
+  }catch(e){}
+})();
+</script>
 <style>
   :root{
-    --bg:#0a0d14; --surface:#131826; --surface-2:#0e1320; --line:#263149;
+    --bg:#0a0d14; --surface:#131826; --surface-2:#0e1320; --surface-3:#212a40; --line:#263149;
     --ink:#e9eef7; --muted:#93a0b8; --faint:#5e6b85;
-    --accent:#6aa1ff; --accent-2:#9b86ff; --ok:#43c98a; --warn:#e6ad52; --bad:#f15b6c;
+    --accent:#6aa1ff; --accent-2:#9b86ff; --accent-ink:#06101f;
+    --ok:#43c98a; --warn:#e6ad52; --bad:#f15b6c;
     --grad:linear-gradient(135deg,var(--accent),var(--accent-2));
     --ease:cubic-bezier(.22,.61,.36,1);
+    --header-bg:rgba(12,16,26,.72);
+    --bg-radial:rgba(106,161,255,.10);
+    --primary-ink:#06101f;
+    --code-bg:rgba(106,161,255,.1);
+  }
+  /* POLISH KIT: theme toggle — LIGHT palette overrides (same accents, light surfaces, dark ink) */
+  html.light{
+    --bg:#f4f6fb; --surface:#ffffff; --surface-2:#f1f4fa; --surface-3:#e6ebf5; --line:#d8dfec;
+    --ink:#16203a; --muted:#566184; --faint:#8b95ad;
+    --accent:#3a6ff0; --accent-2:#7c5cf5; --accent-ink:#ffffff;
+    --ok:#1f9d63; --warn:#b9791f; --bad:#d83a4d;
+    --header-bg:rgba(255,255,255,.78);
+    --bg-radial:rgba(58,111,240,.10);
+    --primary-ink:#ffffff;
+    --code-bg:rgba(58,111,240,.10);
   }
   *{box-sizing:border-box}
   html{scroll-behavior:smooth}
-  body{margin:0;background:radial-gradient(1200px 600px at 80% -10%,rgba(106,161,255,.10),transparent 60%),var(--bg);
+  body{margin:0;background:radial-gradient(1200px 600px at 80% -10%,var(--bg-radial),transparent 60%),var(--bg);
     color:var(--ink);font:14.5px/1.6 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
-    -webkit-font-smoothing:antialiased}
+    -webkit-font-smoothing:antialiased;background-attachment:fixed;
+    transition:background-color .25s var(--ease),color .25s var(--ease)}
   a{color:var(--accent);text-decoration:none}
   .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
   .muted{color:var(--muted)} .faint{color:var(--faint)}
 
   /* header */
   header.bar{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:14px;
-    padding:13px 22px;background:rgba(12,16,26,.72);backdrop-filter:blur(14px);
+    padding:13px 22px;background:var(--header-bg);backdrop-filter:blur(14px) saturate(140%);
     border-bottom:1px solid var(--line)}
   .logo{display:flex;align-items:center;gap:10px;font-weight:680;letter-spacing:-.02em}
   .logo .mark{width:24px;height:24px;border-radius:7px;background:var(--grad);
@@ -75,13 +102,13 @@
   .btn{appearance:none;border:1px solid var(--line);background:var(--surface-2);color:var(--ink);
     border-radius:10px;padding:10px 18px;font:inherit;font-weight:600;cursor:pointer;transition:.18s var(--ease)}
   .btn:hover{transform:translateY(-1px);border-color:var(--accent)}
-  .btn.primary{background:var(--grad);border-color:transparent;color:#06101f;
+  .btn.primary{background:var(--grad);border-color:transparent;color:var(--primary-ink);
     box-shadow:0 8px 22px rgba(106,161,255,.32)}
   .btn.primary:hover{box-shadow:0 12px 30px rgba(106,161,255,.45)}
   .btn[disabled]{opacity:.55;cursor:not-allowed;transform:none}
   .btn.loading{position:relative;color:transparent}
   .btn.loading::after{content:"";position:absolute;inset:0;margin:auto;width:16px;height:16px;
-    border:2px solid rgba(6,16,31,.4);border-top-color:#06101f;border-radius:50%;animation:spin .7s linear infinite}
+    border:2px solid rgba(6,16,31,.4);border-top-color:var(--primary-ink);border-radius:50%;animation:spin .7s linear infinite}
   @keyframes spin{to{transform:rotate(360deg)}}
 
   /* result */
@@ -133,11 +160,44 @@
   .chk input{width:auto}
   .seg{display:flex;gap:0;border:1px solid var(--line);border-radius:9px;overflow:hidden}
   .seg button{flex:1;background:var(--surface-2);border:0;color:var(--muted);padding:8px;cursor:pointer;font:inherit;font-size:12.5px}
-  .seg button.on{background:var(--grad);color:#06101f;font-weight:620}
+  .seg button.on{background:var(--grad);color:var(--accent-ink);font-weight:620}
   .range{display:flex;align-items:center;gap:10px}
   .range input{flex:1}
   .range b{min-width:30px;text-align:right;color:var(--ink)}
   .twocol{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+
+  /* POLISH KIT: segmented control (theme + routing mode) — spaced pill variant */
+  .segp{display:flex;gap:6px;flex-wrap:wrap}
+  .segp .segbtn{font:inherit;font-size:12px;cursor:pointer;border:1px solid var(--line);background:var(--surface-2);
+    color:var(--muted);border-radius:9px;padding:7px 11px;transition:.16s var(--ease)}
+  .segp .segbtn:hover{color:var(--ink);border-color:var(--accent)}
+  .segp .segbtn[aria-pressed="true"]{background:var(--grad);border-color:transparent;color:var(--accent-ink);font-weight:600}
+  /* POLISH KIT: provider status rows + resolved chain */
+  .pstat{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12.5px;
+    padding:7px 11px;border:1px solid var(--line);border-radius:9px;background:var(--surface-2)}
+  .pstat .pdot{width:8px;height:8px;border-radius:50%;background:var(--faint);flex:none}
+  .pstat .pdot.on{background:var(--ok);box-shadow:0 0 0 3px rgba(67,201,138,.18)}
+  .chainline{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;color:var(--muted);
+    background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 11px;word-break:break-word}
+  /* POLISH KIT: help modal (centered dialog, reuses scrim) */
+  #help{position:fixed;top:50%;left:50%;transform:translate(-50%,calc(-50% + 12px));z-index:70;
+    width:560px;max-width:94vw;max-height:86vh;overflow:auto;opacity:0;pointer-events:none;
+    background:var(--surface);border:1px solid var(--line);border-radius:14px;
+    box-shadow:0 24px 64px -24px rgba(0,0,0,.7);
+    transition:opacity .25s var(--ease),transform .25s var(--ease)}
+  #help.open{opacity:1;pointer-events:auto;transform:translate(-50%,-50%)}
+  #help header{display:flex;align-items:center;gap:10px;padding:16px 18px;border-bottom:1px solid var(--line)}
+  #help h3{margin:0;font-size:15px;font-weight:650}
+  #help .body{padding:18px;display:grid;gap:16px}
+  #help h4{margin:0 0 6px;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  #help p{margin:0;color:var(--muted);font-size:13.5px}
+  #help ol{margin:0;padding-left:20px;color:var(--muted);font-size:13.5px;display:grid;gap:4px}
+  #help b{color:var(--ink)}
+  #help .kbd{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;background:var(--surface-2);
+    border:1px solid var(--line);border-bottom-width:2px;border-radius:6px;padding:1px 7px;color:var(--ink)}
+  #help .eps{display:flex;gap:7px;flex-wrap:wrap}
+  #help .eps code{background:var(--code-bg);border:1px solid var(--line);padding:2px 8px;border-radius:7px;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:var(--ink)}
 
   /* boot overlay */
   #boot{position:fixed;inset:0;z-index:80;display:grid;place-items:center;background:var(--bg);
@@ -165,6 +225,12 @@
   <span class="status"><span class="dot" id="dot"></span><span id="statusTxt">connecting</span></span>
   <span class="spacer"></span>
   <span class="pill" id="modePill" title="active model tier"><b id="modeName">—</b></span>
+  <!-- POLISH KIT: theme toggle -->
+  <button class="iconbtn" id="themebtn" title="Toggle theme" aria-label="Toggle light/dark theme"><span id="themeicon">☾</span></button>
+  <!-- POLISH KIT: help modal trigger -->
+  <button class="iconbtn" id="helpbtn" title="Help (?)" aria-label="Help">
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 1 1 4.6 3c-.8.6-1.7 1-1.7 2.2"/><line x1="12" y1="17.5" x2="12" y2="17.51"/></svg>
+  </button>
   <button class="iconbtn" id="gear" title="Agent spec (advanced)" aria-label="Agent spec">⚙</button>
 </header>
 
@@ -203,19 +269,36 @@
       <textarea id="sPrompt" style="min-height:96px"></textarea></div>
     <div><label>Tools <span class="hint">— the agent's allowlist</span></label>
       <div class="toolgrid" id="sTools"></div></div>
-    <div class="twocol">
-      <div><label>Planner</label>
-        <div class="seg" id="sPlanner" data-k="planner">
-          <button data-v="auto">Auto</button><button data-v="llm">LLM</button>
-          <button data-v="rule">Rule</button></div></div>
-      <div><label>Model tier</label>
-        <div class="seg" id="sMode" data-k="model_mode">
-          <button data-v="auto">Auto</button><button data-v="free">Free</button>
-          <button data-v="offline">Offline</button><button data-v="paid">Paid</button></div></div>
-    </div>
-    <div id="modeHint" class="hint" style="font-size:11.5px;margin-top:-6px"></div>
-    <div><label>Model override <span class="hint">— blank = tier default</span></label>
+    <div><label>Planner</label>
+      <div class="seg" id="sPlanner" data-k="planner">
+        <button data-v="auto">Auto</button><button data-v="llm">LLM</button>
+        <button data-v="rule">Rule</button></div></div>
+
+    <!-- POLISH KIT: routing config -->
+    <div><label>Routing mode <span class="hint">— which provider a run uses</span></label>
+      <div class="segp" id="modeseg">
+        <button type="button" class="segbtn" data-mode="auto">auto</button>
+        <button type="button" class="segbtn" data-mode="local">local</button>
+        <button type="button" class="segbtn" data-mode="free">free</button>
+        <button type="button" class="segbtn" data-mode="paid">paid</button>
+        <button type="button" class="segbtn" data-mode="offline">offline</button>
+      </div>
+      <div class="hint" id="modeblurb" style="font-size:11.5px;margin-top:7px"></div></div>
+    <div><label for="sModel">Model override <span class="hint">— blank = tier default</span></label>
       <input id="sModel" placeholder="(default)" /></div>
+    <div><label>Provider status <span class="hint" id="modeactive">active: auto</span></label>
+      <div style="display:grid;gap:6px" id="provrows"></div></div>
+    <div><label>Fallback chain <span class="hint">— → on failure</span></label>
+      <div class="chainline" id="chainline">mock (deterministic)</div></div>
+    <div class="hint" style="font-size:11.5px">Provider keys live server-side; this selects which available provider a run uses.</div>
+
+    <!-- POLISH KIT: theme toggle -->
+    <div><label>Theme <span class="hint">— appearance</span></label>
+      <div class="segp" id="themeseg">
+        <button type="button" class="segbtn" data-theme="dark">Dark</button>
+        <button type="button" class="segbtn" data-theme="light">Light</button>
+        <button type="button" class="segbtn" data-theme="system">System</button>
+      </div></div>
     <div class="twocol">
       <div><label>Max steps <span class="hint" id="sStepsV"></span></label>
         <div class="range"><input type="range" id="sSteps" min="1" max="12" /></div></div>
@@ -236,6 +319,33 @@
   </div>
 </aside>
 
+<!-- POLISH KIT: help modal -->
+<aside id="help" role="dialog" aria-modal="true" aria-labelledby="helptitle" aria-hidden="true">
+  <header><h3 id="helptitle">Help · agent-factory</h3><span class="spacer"></span>
+    <button class="iconbtn" id="closehelp" aria-label="Close help">✕</button></header>
+  <div class="body">
+    <div><h4>What it is</h4><p>Build a tool-using agent from a declarative <b>spec</b> — system prompt,
+      tool allowlist, planner, model tier, step budget, and guardrails — then run a task and watch the
+      thought → action → observation trace. The deterministic core runs fully offline; a free model
+      sharpens planning and the final answer.</p></div>
+    <div><h4>How to use</h4><ol>
+      <li><b>Pick a template</b> — choose one of the cards (assistant, calculator, researcher, analyst)
+        to seed the spec.</li>
+      <li><b>Enter a task</b> — type into the <i>Task</i> box (or click a sample), then <i>Run agent</i>.</li>
+      <li><b>Go deep</b> — open the gear to edit the spec: prompt, tools, planner, routing mode, model
+        override, max steps, temperature, answer style, and guardrails.</li>
+      <li><b>Run your spec</b> — tick <i>Run with this custom spec</i> in the drawer footer to run the
+        edited spec instead of the template.</li>
+    </ol></div>
+    <div><h4>Endpoints</h4><div class="eps">
+      <code>GET /health</code><code>GET /providers</code><code>GET /tools</code>
+      <code>GET /templates</code><code>POST /spec/validate</code><code>POST /run</code></div></div>
+    <div><h4>Keyboard shortcuts</h4><p><span class="kbd">?</span> open this help · <span class="kbd">Esc</span> close any overlay</p></div>
+    <div><p class="muted" style="font-size:11.5px">Tools, templates, and sample tasks are <b>synthetic</b> —
+      a self-contained sandbox, no external data or accounts.</p></div>
+  </div>
+</aside>
+
 <div id="toast"></div>
 
 <script>
@@ -247,6 +357,13 @@ function shortModel(m){return String(m||"").split("/").pop().replace(":free","")
 
 let TEMPLATES={}, TOOLS=[], FREE=[], PROV={}, sel="assistant", spec=null;
 const LSKEY="agent_factory_spec_v1";
+
+// POLISH KIT: routing/theme config persisted to <proj>.cfg
+const CFG_KEY="agent-factory.cfg";
+let cfg={mode:"auto", model:""};
+function loadCfg(){try{cfg={...cfg,...JSON.parse(localStorage.getItem(CFG_KEY)||"{}")}}catch{}}
+function saveCfg(){cfg={mode:currentMode(), model:$("#sModel").value.trim()};
+  try{localStorage.setItem(CFG_KEY,JSON.stringify(cfg))}catch{}}
 
 function defaultSpec(name){const t=TEMPLATES[name]; return t?JSON.parse(JSON.stringify(t.spec)):null}
 
@@ -263,7 +380,7 @@ function renderTemplates(){
 function updateSummary(){
   const custom=$("#useCustom").checked;
   $("#specSummary").textContent = custom
-    ? `custom spec “${$("#sName").value||'agent'}” · ${(currentSpec().tools||[]).length} tools · ${currentSpec().planner}/${currentSpec().model_mode}`
+    ? `custom spec “${$("#sName").value||'agent'}” · ${(currentSpec().tools||[]).length} tools · ${currentSpec().planner}/${currentMode()}`
     : `template: ${sel}`;
 }
 
@@ -276,7 +393,7 @@ function currentSpec(){
     system_prompt:$("#sPrompt").value,
     tools,
     planner:$("#sPlanner .on")?.dataset.v||"auto",
-    model_mode:$("#sMode .on")?.dataset.v||"auto",
+    model_mode:backendMode(currentMode()),
     model:$("#sModel").value.trim()||null,
     max_steps:+$("#sSteps").value,
     temperature:(+$("#sTemp").value)/100,
@@ -292,19 +409,12 @@ function fillDrawer(){
   $("#sName").value=s.name; $("#sPrompt").value=s.system_prompt;
   $("#sTools").innerHTML=TOOLS.map(t=>`<label class="chk" title="${esc(t.description)}">
     <input type="checkbox" value="${t.name}" ${s.tools.includes(t.name)?'checked':''}/> ${t.name}</label>`).join("");
-  seg("sPlanner",s.planner); seg("sMode",s.model_mode); seg("sStyle",s.answer_style);
-  $("#sModel").value=s.model||""; $("#sSteps").value=s.max_steps; $("#sTemp").value=Math.round(s.temperature*100);
+  seg("sPlanner",s.planner); seg("sStyle",s.answer_style);
+  // routing mode comes from cfg, not the template's model_mode — keep them in sync on first fill
+  $("#sModel").value=(cfg.model||s.model||""); $("#sSteps").value=s.max_steps; $("#sTemp").value=Math.round(s.temperature*100);
   $("#sGin").checked=s.guardrails.input; $("#sGout").checked=s.guardrails.output;
   $("#sStepsV").textContent=s.max_steps; $("#sTempV").textContent=(s.temperature).toFixed(2);
-  modeHint();
-}
-function modeHint(){
-  const m=$("#sMode .on")?.dataset.v||"auto";
-  const map={auto:`Auto resolves to “${PROV.active_mode||'offline'}” here`,
-    free:`Free · ${shortModel(FREE[0])||'OpenRouter'} (rate-limited)`,
-    offline:"Offline · deterministic planner + mock (no network)",
-    paid:PROV.available?.paid?"Paid · your provider key":"Paid · needs your own key (self-host)"};
-  $("#modeHint").textContent=map[m]||"";
+  selectMode(cfg.mode||uiMode(s.model_mode)); renderRouting();
 }
 
 const SAMPLES=[
@@ -371,13 +481,92 @@ $("#closeDrawer").onclick=closeDrawer; $("#scrim").onclick=closeDrawer;
 $("#run").onclick=run;
 $$(".seg").forEach(g=>g.querySelectorAll("button").forEach(b=>b.onclick=()=>{
   g.querySelectorAll("button").forEach(x=>x.classList.remove("on"));b.classList.add("on");
-  if(g.id==="sMode")modeHint(); updateSummary()}));
+  updateSummary()}));
 $("#sSteps").oninput=e=>$("#sStepsV").textContent=e.target.value;
 $("#sTemp").oninput=e=>$("#sTempV").textContent=(e.target.value/100).toFixed(2);
 $("#useCustom").onchange=()=>{spec=currentSpec();updateSummary();toast($("#useCustom").checked?"Using custom spec":"Using template: "+sel)};
 $("#resetSpec").onclick=()=>{spec=defaultSpec(sel);fillDrawer();$("#useCustom").checked=false;updateSummary();toast("Spec reset to "+sel)};
 
+/* ===================== POLISH KIT: theme toggle ===================== */
+const THEME_KEY="theme";
+function getTheme(){try{return localStorage.getItem(THEME_KEY)||"system"}catch{return "system"}}
+function effectiveDark(t){
+  if(t==="dark")return true; if(t==="light")return false;
+  return !window.matchMedia("(prefers-color-scheme: light)").matches;
+}
+function applyTheme(t){
+  const dark=effectiveDark(t);
+  document.documentElement.classList.toggle("light",!dark);
+  $("#themeicon").textContent=dark?"☾":"☀";
+  $("#themebtn").title=`Theme: ${t}`;
+}
+function setTheme(t){try{localStorage.setItem(THEME_KEY,t)}catch{} applyTheme(t); syncThemeSeg();}
+function syncThemeSeg(){const cur=getTheme();
+  $$("#themeseg .segbtn").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.theme===cur)));}
+$("#themebtn").onclick=()=>{const cur=getTheme();const next=effectiveDark(cur)?"light":"dark";setTheme(next);};
+$$("#themeseg .segbtn").forEach(b=>b.onclick=()=>setTheme(b.dataset.theme));
+window.matchMedia("(prefers-color-scheme: light)").addEventListener?.("change",()=>{if(getTheme()==="system")applyTheme("system");});
+applyTheme(getTheme()); syncThemeSeg();
+
+/* ===================== POLISH KIT: help modal ===================== */
+function openHelp(){$("#scrim").classList.add("open");$("#help").classList.add("open");
+  $("#help").setAttribute("aria-hidden","false");$("#closehelp").focus();}
+function closeHelp(){$("#scrim").classList.remove("open");$("#help").classList.remove("open");
+  $("#help").setAttribute("aria-hidden","true");}
+$("#helpbtn").onclick=openHelp;$("#closehelp").onclick=closeHelp;
+$("#scrim").onclick=()=>{closeDrawer();closeHelp();};
+document.addEventListener("keydown",e=>{
+  const typing=/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName||"")||document.activeElement?.isContentEditable;
+  if(e.key==="Escape"){closeDrawer();closeHelp();}
+  else if(e.key==="?"&&!typing&&!$("#help").classList.contains("open")){e.preventDefault();openHelp();}
+});
+
+/* ===================== POLISH KIT: routing config ===================== */
+// UI exposes 5 modes; the backend AgentSpec.model_mode accepts auto|free|paid|offline.
+// "local" is a UI label for the local-first (Ollama) path the backend calls "offline".
+const MODE_BLURBS={
+  auto:"auto = OpenRouter (free) if keyed, else paid, else local Ollama, else mock.",
+  local:"local = local Ollama if reachable, else deterministic mock (zero cost).",
+  free:"free = OpenRouter free models, else mock.",
+  paid:"paid = your Anthropic key, then OpenAI, else mock.",
+  offline:"offline = deterministic mock only (local Ollama if up, no paid call).",
+};
+const MODE_CHAIN={
+  auto:["openrouter","anthropic","openai","ollama"],
+  local:["ollama"], free:["openrouter"], paid:["anthropic","openai"], offline:["ollama"],
+};
+const PROVIDERS=["ollama","anthropic","openrouter","openai"];
+const PLABEL={ollama:"ollama (local)",anthropic:"anthropic",openrouter:"openrouter (free)",openai:"openai"};
+// map UI mode <-> backend model_mode
+function backendMode(m){return m==="local"?"offline":m;}
+function uiMode(m){return m==="offline"?"offline":m;}  // backend offline shows as offline by default
+function selectMode(m){
+  $$("#modeseg .segbtn").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.mode===m)));
+  $("#modeblurb").textContent=MODE_BLURBS[m]||"";
+  $("#modeactive").textContent=`active: ${m}`;
+}
+function currentMode(){return $("#modeseg").querySelector('[aria-pressed="true"]')?.dataset.mode||"auto";}
+function provOn(p){const a=PROV.available||{}; return p==="ollama"?!!a.ollama:!!a[p];}
+function renderRouting(){
+  const m=currentMode();
+  $("#modeblurb").textContent=MODE_BLURBS[m]||"";
+  $("#modeactive").textContent=`active: ${m}`;
+  const rows=PROVIDERS.map(p=>{
+    const on=provOn(p);
+    return `<div class="pstat"><span>${PLABEL[p]}</span><span class="pdot ${on?'on':''}" title="${on?'available':'not configured'}"></span></div>`;
+  }).join("")+
+    `<div class="pstat"><span>mock (deterministic)</span><span class="pdot on" title="always available"></span></div>`;
+  $("#provrows").innerHTML=rows;
+  const chain=(MODE_CHAIN[m]||[]).filter(p=>provOn(p));
+  const display=[...chain,"mock (deterministic)"];
+  $("#chainline").textContent=display.join("  →  ");
+}
+$$("#modeseg .segbtn").forEach(b=>b.onclick=()=>{selectMode(b.dataset.mode);renderRouting();saveCfg();updateSummary();});
+$("#sModel").oninput=()=>saveCfg();
+
 async function boot(){
+  loadCfg();
+  selectMode(cfg.mode||"auto");  // seed routing segment before drawer opens
   try{
     for(let i=0;i<40;i++){try{await j("/health");break}catch{await new Promise(r=>setTimeout(r,800))}}
     [TOOLS,PROV]=await Promise.all([j("/tools"),j("/providers")]);
@@ -386,9 +575,9 @@ async function boot(){
     spec=defaultSpec(sel);
     $("#dot").classList.add("live"); $("#statusTxt").textContent="live";
     $("#modeName").textContent = PROV.active_mode==='free'?('free · '+(shortModel(FREE[0])||'OpenRouter')) : PROV.active_mode;
-    renderTemplates(); renderSamples(); updateSummary();
+    renderTemplates(); renderSamples(); renderRouting(); updateSummary();
   }catch(e){ $("#statusTxt").textContent="offline"; toast("Could not reach the API"); }
-  finally{ $("#boot").classList.add("gone"); }
+  finally{ renderRouting(); $("#boot").classList.add("gone"); }
 }
 boot();
 </script>
