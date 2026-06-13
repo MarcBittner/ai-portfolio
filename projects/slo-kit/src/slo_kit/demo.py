@@ -4,7 +4,7 @@ budget, then recover — printing the SLO snapshot at each step.
 Run: python -m slo_kit.demo   (no network required)
 """
 
-from slo_kit import service
+from slo_kit import incident, llm, service
 from slo_kit.metrics import registry
 from slo_kit.slo import compute
 
@@ -27,6 +27,19 @@ def main() -> None:
     service.set_fault(error_rate=0.06, latency_ms=450)
     service.loadtest(400)
     _line("during incident")
+
+    print("\n-- on-call: compress the telemetry into an incident summary (LLM) --")
+    s = llm.status()
+    active = next((p for p, ok in s["providers"].items() if ok), "offline")
+    print(f"   routing mode={s['mode']}  active={active}  "
+          f"(chain: Anthropic/OpenAI → Ollama → OpenRouter → offline)")
+    summ = incident.summarize()
+    print(f"   severity={summ['severity']}  situation={summ['situation']}  "
+          f"provider={summ['provider']}  latency={summ['latency_ms']}ms")
+    print(f"   summary : {summ['summary']}")
+    print("   suggested next steps (from docs/runbook.md):")
+    for i, step in enumerate(summ["suggested_steps"], 1):
+        print(f"     {i}. {step}")
 
     print("\n-- mitigation: fault cleared, fresh window --")
     service.reset()

@@ -18,6 +18,12 @@ class LoadRequest(BaseModel):
     n: int = Field(default=200, ge=1, le=5000)
 
 
+class IncidentRequest(BaseModel):
+    # None → summarize the live state; pin a routing tier with `mode`.
+    mode: str | None = Field(
+        default=None, description="auto | paid | local | free | offline")
+
+
 class HealthResponse(BaseModel):
     status: str
     version: str

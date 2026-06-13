@@ -8,9 +8,15 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 
-from slo_kit import __version__, service, slo
+from slo_kit import __version__, incident, llm, service, slo
 from slo_kit.metrics import registry
-from slo_kit.models import FaultRequest, HealthResponse, LoadRequest, SendRequest
+from slo_kit.models import (
+    FaultRequest,
+    HealthResponse,
+    IncidentRequest,
+    LoadRequest,
+    SendRequest,
+)
 from slo_kit.tracing import tracer
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -65,6 +71,30 @@ def slo_status() -> dict:
 @app.get("/traces")
 def traces(limit: int = 25) -> dict:
     return {"spans": tracer.recent(limit)}
+
+
+# ---- on-call: compress telemetry into an incident summary (LLM) --------------
+
+@app.post("/incident/summary")
+def incident_summary(req: IncidentRequest) -> dict:
+    """Compress the current SLO snapshot + error spans into an on-call incident
+    summary, a deterministically-classified severity, and the matching runbook
+    steps. Routes through the LLM chain; the offline drafter is the terminal,
+    zero-key fallback."""
+    return incident.summarize(mode=req.mode)
+
+
+@app.get("/evals")
+def evals() -> dict:
+    """Score the incident-summary generator (severity/situation accuracy) over a
+    set of labeled snapshots, computed from the deterministic SLO math."""
+    return incident.evaluate()
+
+
+@app.get("/llm")
+def llm_status() -> dict:
+    """Which providers are configured/reachable + the active routing mode."""
+    return llm.status()
 
 
 # ---- operator controls (the incident demo) -----------------------------------

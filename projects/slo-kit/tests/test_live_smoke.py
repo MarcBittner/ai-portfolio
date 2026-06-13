@@ -130,6 +130,18 @@ def test_smoke_traffic_produces_traces(client):
     assert client.get("/traces").json()["spans"]
 
 
+def test_smoke_llm_status_shape(client):
+    s = client.get("/llm").json()
+    assert set(s["providers"]) == {"anthropic", "openai", "ollama", "openrouter"}
+    assert s["offline_fallback"] is True
+
+
+def test_smoke_evals_shape(client):
+    e = client.get("/evals").json()
+    assert {"severity_accuracy", "situation_accuracy", "steps_actionable"} <= set(e)
+    assert e["severity_accuracy"] == 1.0  # deterministic offline path is exact
+
+
 # ----------------------------- REGRESSION ----------------------------
 
 def test_regression_steady_traffic_is_healthy(client):
@@ -156,6 +168,29 @@ def test_regression_recovers_after_reset(client):
     recovered = _reset(client)
     assert recovered["slo"]["overall_status"] == "healthy"
     assert _loadtest(client, 200)["overall_status"] == "healthy"
+
+
+def test_regression_incident_summary_during_burn(client):
+    # the LLM feature: during a real burn the summary picks the top severity and
+    # returns actionable runbook steps; offline drafter is the zero-key fallback.
+    _reset(client)
+    client.post("/admin/fault", json={"error_rate": 0.5, "latency_ms": 500})
+    _loadtest(client, 300)
+    out = client.post("/incident/summary", json={}).json()
+    assert out["severity"] == "sev1"
+    assert out["situation"] == "both"
+    assert len(out["suggested_steps"]) >= 3
+    assert out["summary"].strip()
+    _reset(client)
+
+
+def test_regression_incident_summary_when_healthy(client):
+    _reset(client)
+    _loadtest(client, 200)
+    out = client.post("/incident/summary", json={}).json()
+    assert out["severity"] == "none"
+    assert out["situation"] == "healthy"
+    _reset(client)
 
 
 def test_regression_fault_validation(client):

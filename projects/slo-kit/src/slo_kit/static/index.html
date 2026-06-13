@@ -255,6 +255,18 @@
   </div>
 
   <div class="panel full reveal">
+    <h2>Incident summary <span class="muted" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">compress telemetry into an on-call summary · routing <span id="llmstat">offline</span></span></h2>
+    <div class="body" style="padding:16px">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button class="btn primary" id="summ"><span class="spin"></span><span class="lbl">Generate incident summary</span></button>
+        <span class="muted" style="font-size:12.5px">reads the live SLO snapshot, error spans &amp; events → summary + runbook steps</span>
+        <span id="summmeta" class="muted" style="margin-left:auto">—</span>
+      </div>
+      <div id="summres" style="margin-top:12px"><span class="muted">Generate a summary to compress the current state into a severity, an on-call narrative, and the matching runbook steps. The model only writes prose; severity is classified deterministically from the SLO numbers.</span></div>
+    </div>
+  </div>
+
+  <div class="panel full reveal">
     <h2>Recent traces <span class="muted" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">OpenTelemetry-style spans</span></h2>
     <div class="body" style="padding:0;max-height:360px;overflow:auto">
       <table><thead><tr><th>trace_id</th><th>span</th><th class="num">duration</th><th>status</th></tr></thead>
@@ -395,6 +407,32 @@ $("#reset").onclick=()=>withLoad($("#reset"),async()=>{
   await post("admin/reset");await refresh();toast("Recovered — fault cleared","ok");
 });
 
+// ---- incident summary (LLM) --------------------------------------------------
+const SEVCLASS={none:"b-allow",sev3:"b-flag",sev2:"b-block",sev1:"b-block"};
+async function summarize(){
+  const btn=$("#summ");btn.classList.add("loading");
+  $("#summres").innerHTML='<span class="muted">summarizing…</span>';
+  try{
+    const r=await post("incident/summary",{});
+    const badge=SEVCLASS[r.severity]||"b-info";
+    const esc=s=>s.replace(/&/g,"&amp;").replace(/</g,"&lt;");
+    const steps=r.suggested_steps.map(s=>`<li style="margin:4px 0">${esc(s)}</li>`).join("");
+    $("#summres").innerHTML=
+      `<div class="row" style="margin-bottom:8px"><span class="badge ${badge}">${r.severity}</span>`+
+      `<span class="muted" style="font-size:12px">situation: ${r.situation} · burn ${r.burn_rate}× · budget left ${pct(r.budget_remaining)}</span></div>`+
+      `<p style="margin:0 0 12px;line-height:1.55">${esc(r.summary)}</p>`+
+      `<div class="barlabel" style="margin:0 0 6px">Suggested next steps · from docs/runbook.md</div>`+
+      `<ol style="margin:0;padding-left:20px;font-size:13px;color:var(--ink-dim)">${steps}</ol>`;
+    $("#summmeta").textContent=`${r.provider} · ${r.latency_ms}ms`;
+  }catch(e){$("#summres").innerHTML='<span class="muted">summary failed</span>';toast("Summary failed","bad");}
+  btn.classList.remove("loading");
+}
+$("#summ").onclick=summarize;
+async function loadLlm(){
+  try{const s=await j("llm");const active=Object.entries(s.providers).find(e=>e[1]);
+    $("#llmstat").textContent=active?active[0]:"offline (deterministic)";}catch{}
+}
+
 // ---- cold-start boot ---------------------------------------------------------
 async function boot(){
   loadCfg();applyCfgToInline();
@@ -410,6 +448,7 @@ async function boot(){
   // seed a steady load so the dashboard shows healthy populated SLOs immediately
   try{await post("admin/loadtest",{n:cfg.n});}catch{}
   await refresh();
+  loadLlm();
 }
 boot();
 </script>

@@ -35,6 +35,7 @@ Commands:
   lint        Run ruff
   check       lint + test
   demo        Run the offline SLO incident-burn demo
+  eval        Run the SLO-invariant + incident-summary eval (writes eval-report.md)
   smoke       Run the live smoke/regression suite (local server, or --url <deploy>)
   doctor      Report Python / venv / Ollama status
   help        Show this help
@@ -73,9 +74,9 @@ cmd_doctor() {
   check_python && grn "python3: $(python3 --version 2>&1) (>= ${MIN_PY_MAJOR}.${MIN_PY_MINOR} ok)"
   if (( USE_VENV )) && [[ -x "$VENV/bin/python" ]]; then grn "venv: $VENV ready"; else dim "venv: not created (run setup)"; fi
   if command -v ollama >/dev/null 2>&1 || curl -sf -m 1 "${OLLAMA_BASE_URL:-http://localhost:11434}/api/tags" >/dev/null 2>&1; then
-    grn "ollama: reachable (local LLM extraction available)"
+    grn "ollama: reachable (local LLM incident summaries available)"
   else
-    dim "ollama: not reachable (extraction falls back to the deterministic parser)"
+    dim "ollama: not reachable (summaries fall back to the deterministic drafter)"
   fi
 }
 
@@ -128,6 +129,7 @@ cmd_serve() { ensure_installed; tool uvicorn "$APP" --host "$HOST" --port "$PORT
 cmd_test()  { ensure_installed; py -m pytest -q "$@"; }
 cmd_lint()  { ensure_installed; tool ruff check src tests; }
 cmd_demo()  { ensure_installed; py -m slo_kit.demo; }
+cmd_eval()  { ensure_installed; py -m slo_kit.evaluate "$@"; }
 
 CMD=""
 while (( $# )); do
@@ -140,7 +142,7 @@ while (( $# )); do
     --url=*) SMOKE_URL="${1#*=}"; shift;;
     --no-venv) USE_VENV=0; shift;;
     -h|--help) usage; exit 0;;
-    setup|serve|test|lint|check|demo|smoke|doctor|help) CMD="$1"; shift;;
+    setup|serve|test|lint|check|demo|eval|smoke|doctor|help) CMD="$1"; shift;;
     *) die "unknown argument: $1  (run './run.sh --help')";;
   esac
 done
@@ -153,6 +155,7 @@ case "$CMD" in
   lint)  cmd_lint;;
   check) cmd_lint; cmd_test;;
   demo)  cmd_demo;;
+  eval)  cmd_eval "$@";;
   smoke) cmd_smoke;;
   doctor) cmd_doctor;;
   help)  usage;;

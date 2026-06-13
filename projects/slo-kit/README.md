@@ -1,5 +1,11 @@
 # slo-kit
 
+[![CI](https://github.com/MarcBittner/ai-portfolio/actions/workflows/projects-ci.yml/badge.svg)](https://github.com/MarcBittner/ai-portfolio/actions/workflows/projects-ci.yml)
+[![License: Proprietary](https://img.shields.io/badge/license-proprietary-red.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org)
+[![Ruff](https://img.shields.io/badge/lint-ruff-261230.svg)](https://github.com/astral-sh/ruff)
+[![FastAPI](https://img.shields.io/badge/api-FastAPI-009688.svg)](https://fastapi.tiangolo.com)
+
 ![slo-kit dashboard](docs/screenshot.png)
 
 **[▶ Live demo](https://slo-kit.onrender.com)**
@@ -11,6 +17,14 @@ error budget and burn rate**, and **OpenTelemetry-style traces**; an on-demand
 service sit the artifacts that make reliability shippable: **Terraform multiwindow
 burn-rate alerts**, a **GitHub Actions** pipeline gated on a post-deploy smoke
 check, and a one-page **runbook**.
+
+The dashboards already expose the raw telemetry; the job an on-call engineer
+actually has is *compressing* it into a sentence. So slo-kit adds an **LLM
+incident-summary generator** — `POST /incident/summary` reads the live SLO
+snapshot, RED metrics, and recent error spans and returns a concise on-call
+summary, a severity, and the matching runbook steps. The model writes the
+narrative; the **severity is classified deterministically from the SLO numbers**,
+and the chain falls back to a deterministic drafter so it runs with zero keys.
 
 Reliability is treated as an artifact, not an afterthought. Everything is offline,
 deterministic, and secret-free — traffic and faults are simulated, so the SLO math
@@ -31,9 +45,12 @@ what a production handler would look like.
 | `tracing.py` | OTel-shaped `Span` (trace/span id, name, duration, status, attributes) in a fixed-size ring buffer (`deque`, maxlen 200). |
 | `slo.py` | Pure function: turns a metrics snapshot into SLIs, error budget consumed/remaining, burn rate, and per-SLO + overall status. |
 | `service.py` | The instrumented "outreach-API". Simulates a send, instruments it (metric + span), applies a **deterministic** fault, and provides a load generator. |
+| `incident.py` | LLM incident-summary generator: deterministic severity from the SLO numbers + on-call narrative + matching runbook steps; offline drafter is the terminal fallback. |
+| `llm.py` | Multi-provider routing (paid → local → free → deterministic offline); stdlib HTTP, self-selecting from the environment. |
+| `evaluate.py` | Reproducible eval → `eval-report.md` (`./run.sh eval`): SLO invariants + incident-summary accuracy. |
 | `models.py` | Pydantic request/response models for the API. |
 | `api.py` | FastAPI app: business endpoints, observability surfaces, operator controls, dashboard. |
-| `demo.py` | Offline script: steady traffic → injected incident → recovery, printing the SLO snapshot at each step. |
+| `demo.py` | Offline script: steady traffic → injected incident → incident summary → recovery, printing the SLO snapshot at each step. |
 
 ### Request path and the fault → burn → recover loop
 
@@ -163,6 +180,86 @@ zero requests. Latency is `healthy`/`violated` against the 95% target. `overall`
 - Faults are deterministic and stateless across resets; `reset()` returns the service
   to a clean window with no fault.
 
+## Incident summary (LLM)
+
+`/slo`, `/metrics/snapshot`, and `/traces` expose the raw telemetry. At 3am the
+on-call engineer's real job is compressing it: *what's burning, how bad, who's
+affected, what to do next.* `POST /incident/summary` is that capability — it reads
+the current state and returns a structured on-call summary:
+
+```
+current state ─┬─ /slo snapshot (availability, burn rate, budget, latency)
+               ├─ /metrics/snapshot (error_rate, p95, by_status)
+               └─ recent error spans (/traces)
+                      │
+                      ▼
+        incident.classify(state)   ── DETERMINISTIC severity from the SLO numbers
+                      │  burn rate + budget + latency → none | sev3 | sev2 | sev1
+                      ▼
+        llm.complete(SYSTEM, state, json_mode)
+            Anthropic / OpenAI → Ollama → OpenRouter → deterministic drafter
+                      │
+                      ▼
+        { summary, severity, suggested_steps[] }   ── steps mirror docs/runbook.md
+```
+
+The **severity decision never depends on the LLM** — it is computed in
+`incident.classify()` from the same SLO math as the dashboard, then handed to the
+model as context. The model only writes the narrative; the offline drafter
+templates the same `{summary, severity, suggested_steps}` from the snapshot, so the
+capability (and its eval) reproduce exactly with zero keys, while the live model
+turns the snapshot into fluent on-call prose. The suggested steps are pulled from
+`docs/runbook.md`, so the draft a responder gets matches the page they would open.
+
+In the **demo flow**: steady state (SLOs green) → inject an incident (availability
+exhausted, burn rate > 1×, budget drains) → open the runbook → **generate the
+incident summary** (the on-call narrative + runbook steps) → reset and recover.
+
+## Routing
+
+The LLM layer (`llm.py`) is the portfolio-standard chain, identical in shape to the
+other demos: a provider is *available* only when its key is set (or, for Ollama,
+when a probe to `/api/tags` succeeds), so the chain self-selects from the
+environment and `complete()` returns the first success, recording which providers
+it fell through.
+
+| mode | order |
+|---|---|
+| `auto` (default) | Anthropic → OpenAI → Ollama → OpenRouter → offline |
+| `paid` | Anthropic → OpenAI → offline |
+| `local` | Ollama → offline |
+| `free` | OpenRouter → offline |
+| `offline` | deterministic drafter only |
+
+`GET /llm` reports which providers are reachable and the active mode. The offline
+drafter is always terminal, so the service never fails for lack of a key — it
+degrades to deterministic, not to an error.
+
+## Evals
+
+`./run.sh eval` (or `GET /evals`) writes `eval-report.md`. Two evals, both
+reproducible offline:
+
+- **SLO invariants** — the deterministic core. Driving 1000 requests at a fixed
+  **5%** injected error rate against the 0.5% budget, the SLO math lands on the same
+  numbers every run: steady → `healthy` (budget intact); during fault → `exhausted`,
+  burn rate ≈ **10×**; after reset → `healthy`. This is the burn/recover loop as a
+  reproducible assertion, not a claim.
+- **Incident-summary accuracy** — over a set of labeled incident snapshots, does the
+  generator pick the **right severity** and **runbook situation** with a non-empty
+  summary and actionable steps? Severity is classified deterministically, so it is
+  exact on either path (`1.0` offline); set provider keys or `LLM_MODE` to score a
+  live model's narrative on the same snapshots.
+
+| labeled snapshot | expected severity | situation |
+|---|---|---|
+| steady / healthy | none | healthy |
+| budget draining but SLO still met | none | healthy |
+| fast burn (budget exhausted) | sev1 | availability |
+| latency violation only | sev3 | latency |
+| availability + latency | sev1 | both |
+| no data | none | no_data |
+
 ## API
 
 | Method | Path | Purpose |
@@ -174,6 +271,9 @@ zero requests. Latency is `healthy`/`violated` against the 95% target. `overall`
 | GET | `/metrics/snapshot` | JSON metrics for the dashboard |
 | GET | `/slo` | SLIs, SLOs, error budget, budget remaining, burn rate, status |
 | GET | `/traces` | recent spans (bounded buffer) |
+| POST | `/incident/summary` | LLM on-call summary + severity + runbook steps from the live state |
+| GET | `/evals` | incident-summary severity/situation accuracy over labeled snapshots |
+| GET | `/llm` | configured/reachable providers + active routing mode |
 | POST | `/admin/fault` | inject error rate + added latency (the incident) |
 | POST | `/admin/loadtest` | fire N synthetic requests |
 | POST | `/admin/reset` | clear metrics/traces/fault |
@@ -183,15 +283,33 @@ zero requests. Latency is `healthy`/`violated` against the 95% target. `overall`
 ```sh
 cd projects/slo-kit
 ./run.sh setup
-./run.sh demo            # offline: steady traffic → incident burn → recovery
+./run.sh demo            # offline: steady → incident burn → incident summary → recovery
+./run.sh eval            # SLO invariants + incident-summary accuracy → eval-report.md
 ./run.sh serve           # dashboard at http://127.0.0.1:8011
 ./run.sh test            # unit suite
 ./run.sh smoke           # live smoke/regression (local server, or --url <deploy>)
 ```
 
+## Env
+
+Runs fully offline with no `.env` (the incident-summary chain falls back to a
+deterministic drafter; the SLO math, metrics, and traces never depend on a
+provider). Set any of these to route the summary to a real model; never commit
+real keys, and leave them unset on a public host. See `.env.example`.
+
+| var | purpose |
+|---|---|
+| `LLM_MODE` | `auto` (default) · `paid` · `local` · `free` · `offline` |
+| `ANTHROPIC_API_KEY` / `ANTHROPIC_MODEL` | paid path (tried first in `auto`) |
+| `OPENAI_API_KEY` / `OPENAI_MODEL` | paid path |
+| `OLLAMA_BASE_URL` / `OLLAMA_MODEL` | local models, autodetected via `/api/tags` |
+| `OPENROUTER_API_KEY` / `OPENROUTER_MODEL` | free-tier models |
+
 In the dashboard: **Run load** for steady traffic, **Inject incident + load** to
-burn the budget (availability goes `burning`/`exhausted`, latency `violated`), then
-**Reset** to recover. The deploy/alerting artifacts live in `deploy/terraform/`
+burn the budget (availability goes `burning`/`exhausted`, latency `violated`),
+**Generate incident summary** to compress the live state into an on-call summary +
+runbook steps, then **Reset** to recover. The deploy/alerting artifacts live in
+`deploy/terraform/`
 (burn-rate alerts), `deploy/github-actions/` (smoke-gated pipeline), and
 `docs/runbook.md` (incident runbook).
 
