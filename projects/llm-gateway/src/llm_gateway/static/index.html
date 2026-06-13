@@ -4,6 +4,16 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>llm-gateway — governed LLM access</title>
+<!-- POLISH KIT: theme-init (apply before paint, no flash) -->
+<script>
+(function(){
+  try{
+    var t=localStorage.getItem("theme")||"system";
+    var dark = t==="dark" || (t==="system" && !window.matchMedia("(prefers-color-scheme: light)").matches);
+    if(!dark) document.documentElement.classList.add("light");
+  }catch(e){}
+})();
+</script>
 <style>
   /* ============================ design system ============================ */
   :root{
@@ -19,20 +29,35 @@
     --grad:linear-gradient(135deg,var(--accent),var(--accent-2));
     --ease:cubic-bezier(.22,.61,.36,1);
     --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+    --header-bg:rgba(10,13,20,.72);
+    --bg-radial-1:rgba(107,130,255,.10); --bg-radial-2:rgba(67,201,138,.05);
+  }
+  /* POLISH KIT: theme toggle — LIGHT palette overrides (same accents, light surfaces, dark ink) */
+  html.light{
+    --bg:#f4f6fb; --bg-grad-1:#eef2fb; --bg-grad-2:#f4f6fb;
+    --surface:#ffffff; --surface-2:#f1f4fa; --surface-3:#e6ebf5;
+    --line:#d8dfec; --line-2:#c2ccde;
+    --ink:#16203a; --ink-dim:#566184; --ink-faint:#8b95ad;
+    --accent:#3a6ff0; --accent-2:#7c5cf5; --accent-ink:#ffffff;
+    --ok:#1f9d63; --warn:#b9791f; --bad:#d83a4d; --info:#3a6ff0; --violet:#6f53d6;
+    --sh:0 1px 2px rgba(20,32,58,.06), 0 8px 24px -14px rgba(20,32,58,.18);
+    --sh-lg:0 1px 2px rgba(20,32,58,.08), 0 24px 64px -28px rgba(20,32,58,.28);
+    --header-bg:rgba(255,255,255,.78);
+    --bg-radial-1:rgba(58,111,240,.10); --bg-radial-2:rgba(31,157,99,.06);
   }
   *{box-sizing:border-box}
   html{scroll-behavior:smooth}
   body{margin:0;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;
     font:15px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Inter,sans-serif;
-    background-image:radial-gradient(1200px 600px at 80% -10%,rgba(107,130,255,.10),transparent 60%),
-      radial-gradient(900px 500px at 0% 0%,rgba(67,201,138,.05),transparent 55%);
-    background-attachment:fixed;min-height:100vh}
+    background-image:radial-gradient(1200px 600px at 80% -10%,var(--bg-radial-1),transparent 60%),
+      radial-gradient(900px 500px at 0% 0%,var(--bg-radial-2),transparent 55%);
+    background-attachment:fixed;min-height:100vh;transition:background-color .25s var(--ease),color .25s var(--ease)}
   ::selection{background:rgba(106,161,255,.3)}
   a{color:var(--accent);text-decoration:none}
   /* header */
   header{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:14px;
     padding:14px 24px;border-bottom:1px solid var(--line);
-    background:rgba(10,13,20,.72);backdrop-filter:blur(14px) saturate(140%)}
+    background:var(--header-bg);backdrop-filter:blur(14px) saturate(140%)}
   .brand{display:flex;align-items:center;gap:11px;font-weight:650;font-size:16px;letter-spacing:.2px}
   .logo{width:30px;height:30px;border-radius:9px;background:var(--grad);position:relative;
     box-shadow:0 4px 16px -4px rgba(106,161,255,.6);flex:none}
@@ -139,7 +164,32 @@
   .field label{font-size:12px;color:var(--ink-dim);font-weight:600;display:flex;justify-content:space-between}
   .field .hint{font-size:11.5px;color:var(--ink-faint);font-weight:400}
   .seg{display:flex;gap:6px;flex-wrap:wrap}
+  /* POLISH KIT: segmented control (theme + routing mode) */
+  .seg .segbtn{font:inherit;font-size:12px;cursor:pointer;border:1px solid var(--line);background:var(--surface-2);
+    color:var(--ink-dim);border-radius:var(--r-sm);padding:7px 11px;transition:.16s var(--ease)}
+  .seg .segbtn:hover{color:var(--ink);border-color:var(--line-2)}
+  .seg .segbtn[aria-pressed="true"]{background:var(--grad);border-color:transparent;color:var(--accent-ink);font-weight:600}
+  .pstat{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12.5px;
+    padding:7px 11px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface-2)}
+  .pstat .pdot{width:8px;height:8px;border-radius:50%;background:var(--ink-faint);flex:none}
+  .pstat .pdot.on{background:var(--ok);box-shadow:0 0 0 3px rgba(67,201,138,.18)}
+  .chainline{font-family:var(--mono);font-size:11.5px;color:var(--ink-dim);
+    background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);padding:8px 11px;word-break:break-word}
   .drawer .foot{margin-top:auto;padding:16px 20px;border-top:1px solid var(--line);display:flex;gap:10px}
+  /* POLISH KIT: help modal (centered dialog, reuses scrim) */
+  #help{position:fixed;top:50%;left:50%;transform:translate(-50%,calc(-50% + 12px));z-index:70;
+    width:560px;max-width:94vw;max-height:86vh;overflow:auto;opacity:0;pointer-events:none;
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh-lg);
+    transition:opacity .25s var(--ease),transform .25s var(--ease)}
+  #help.open{opacity:1;pointer-events:auto;transform:translate(-50%,-50%)}
+  #help header{position:static;background:none;backdrop-filter:none;border-bottom:1px solid var(--line)}
+  #help .body{padding:20px;display:grid;gap:16px}
+  #help h4{margin:0 0 6px;font-size:11.5px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--ink-dim)}
+  #help p{margin:0;color:var(--ink-dim);font-size:13.5px}
+  #help ol{margin:0;padding-left:20px;color:var(--ink-dim);font-size:13.5px;display:grid;gap:4px}
+  #help .kbd{font-family:var(--mono);font-size:11.5px;background:var(--surface-2);border:1px solid var(--line);
+    border-bottom-width:2px;border-radius:6px;padding:1px 7px;color:var(--ink)}
+  #help .eps{display:flex;gap:7px;flex-wrap:wrap}
   /* toast */
   #toasts{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:80;
     display:flex;flex-direction:column;gap:10px;align-items:center}
@@ -181,6 +231,12 @@
   <span class="spacer"></span>
   <span class="status"><span class="dot" id="hdot"></span><span id="hstat">connecting…</span></span>
   <span class="pill" id="evalpill">firewall eval …</span>
+  <!-- POLISH KIT: theme toggle -->
+  <button class="iconbtn" id="themebtn" title="Toggle theme" aria-label="Toggle light/dark theme"><span id="themeicon">☾</span></button>
+  <!-- POLISH KIT: help modal trigger -->
+  <button class="iconbtn" id="helpbtn" title="Help (?)" aria-label="Help">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 1 1 4.6 3c-.8.6-1.7 1-1.7 2.2"/><line x1="12" y1="17.5" x2="12" y2="17.51"/></svg>
+  </button>
   <button class="iconbtn" id="gear" title="Configuration" aria-label="Configuration">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
   </button>
@@ -227,14 +283,41 @@
   <header><div class="brand" style="font-size:15px"><span class="logo" style="width:24px;height:24px"></span> Configuration</div>
     <span class="spacer"></span><button class="iconbtn" id="closedrawer" aria-label="Close">✕</button></header>
   <div class="body">
+    <!-- POLISH KIT: theme segmented control -->
     <div class="field">
-      <label>Provider <span class="hint">routing chain entry</span></label>
-      <select id="cfgProvider"></select>
+      <label>Theme <span class="hint">appearance</span></label>
+      <div class="seg" id="themeseg">
+        <button type="button" class="segbtn" data-theme="dark">Dark</button>
+        <button type="button" class="segbtn" data-theme="light">Light</button>
+        <button type="button" class="segbtn" data-theme="system">System</button>
+      </div>
+    </div>
+
+    <!-- POLISH KIT: routing config -->
+    <div class="field">
+      <label>Routing mode <span class="hint">which provider a run uses</span></label>
+      <div class="seg" id="modeseg">
+        <button type="button" class="segbtn" data-mode="auto">auto</button>
+        <button type="button" class="segbtn" data-mode="local">local</button>
+        <button type="button" class="segbtn" data-mode="free">free</button>
+        <button type="button" class="segbtn" data-mode="paid">paid</button>
+        <button type="button" class="segbtn" data-mode="offline">offline</button>
+      </div>
+      <div class="hint" id="modeblurb">auto = paid if keyed, else local, else free, else offline.</div>
     </div>
     <div class="field">
-      <label>Model <span class="hint">blank = provider default</span></label>
-      <input id="cfgModel" placeholder="(default)">
+      <label for="cfgModel">Model override <span class="hint">optional</span></label>
+      <input id="cfgModel" type="text" placeholder="provider default" />
     </div>
+    <div class="field">
+      <label>Provider status <span class="hint" id="modeactive">active: auto</span></label>
+      <div style="display:grid;gap:6px" id="provrows"></div>
+    </div>
+    <div class="field">
+      <label>Fallback chain <span class="hint">→ on failure</span></label>
+      <div class="chainline" id="chainline">offline (deterministic)</div>
+    </div>
+    <div class="muted" style="font-size:11.5px">Provider keys live server-side; this selects which available provider a run uses.</div>
     <div class="field">
       <label>System prompt</label>
       <textarea id="cfgSystem" style="min-height:70px">You are a precise assistant.</textarea>
@@ -244,14 +327,33 @@
       <div class="pchips" id="cfgPolicy"></div>
       <div class="muted" style="font-size:11.5px">Layers are default-ON and enforced server-side (firewall in/out, redact in/out, audit). Set via <code>GATEWAY_*</code> env on the deployment.</div>
     </div>
-    <div class="field">
-      <label>Provider availability</label>
-      <div class="pchips" id="cfgAvail"></div>
-    </div>
   </div>
   <div class="foot">
     <button class="btn" id="resetcfg">Reset</button>
     <button class="btn primary" id="savecfg" style="flex:1"><span class="lbl">Save</span></button>
+  </div>
+</aside>
+
+<!-- POLISH KIT: help modal -->
+<aside id="help" role="dialog" aria-modal="true" aria-labelledby="helptitle" aria-hidden="true">
+  <header><div class="brand" style="font-size:15px"><span class="logo" style="width:24px;height:24px"></span>
+    <span id="helptitle">Help · llm-gateway</span></div>
+    <span class="spacer"></span><button class="iconbtn" id="closehelp" aria-label="Close help">✕</button></header>
+  <div class="body">
+    <div><h4>What it is</h4><p>A provider-agnostic LLM gateway that puts governance on the request path: every
+      completion runs <b>firewall → redact → route → output firewall → redact → tamper-evident audit</b>. The deterministic
+      guardrails need no model; routing falls back to an offline mock when no provider is reachable.</p></div>
+    <div><h4>How to use</h4><ol>
+      <li><b>Send a prompt</b> — type or pick an example (benign · PII · injection) in <i>Policy</i>, then click <i>Send through gateway</i>.</li>
+      <li><b>Watch the path</b> — the <i>Request path</i> panel shows each stage: input scan, redact, route, output scan, result.</li>
+      <li><b>Pick routing</b> — open <span class="kbd">⚙</span> Configuration to set the routing mode and an optional model override.</li>
+      <li><b>Verify the audit</b> — click <i>Verify chain</i>; try <i>Tamper</i> to break it, then re-verify.</li>
+    </ol></div>
+    <div><h4>Endpoints</h4><div class="eps">
+      <code>/v1/complete</code><code>/v1/extract</code><code>/providers</code><code>/policy</code>
+      <code>/rules</code><code>/v1/audit</code><code>/v1/audit/verify</code><code>/eval</code></div></div>
+    <div><h4>Keyboard shortcuts</h4><p><span class="kbd">?</span> open this help · <span class="kbd">Esc</span> close any overlay</p></div>
+    <div><p class="muted" style="font-size:11.5px">All example prompts are <b>synthetic</b> — no real client data.</p></div>
   </div>
 </aside>
 
@@ -262,7 +364,8 @@ const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const j=async(u,o)=>(await fetch(u,o)).json();
 const badge=v=>`<span class="badge b-${v}">${v}</span>`;
 const CFG_KEY="llmgw.cfg";
-let cfg={provider:"auto",model:"",system:"You are a precise assistant."};
+let cfg={mode:"auto",model:"",system:"You are a precise assistant."};
+let provStatus={};  // last GET /providers .available map
 
 function toast(msg,type="info"){
   const t=document.createElement("div");t.className=`toast ${type}`;
@@ -270,17 +373,18 @@ function toast(msg,type="info"){
   setTimeout(()=>{t.style.opacity="0";t.style.transition="opacity .3s";setTimeout(()=>t.remove(),300)},2600);
 }
 function loadCfg(){try{cfg={...cfg,...JSON.parse(localStorage.getItem(CFG_KEY)||"{}")}}catch{}}
-function applyCfgToForm(){$("#cfgModel").value=cfg.model;$("#cfgSystem").value=cfg.system;
-  if($("#cfgProvider").querySelector(`option[value="${cfg.provider}"]`))$("#cfgProvider").value=cfg.provider;}
+function applyCfgToForm(){$("#cfgModel").value=cfg.model||"";$("#cfgSystem").value=cfg.system;
+  selectMode(cfg.mode||"auto");syncThemeSeg();}
 function openDrawer(){applyCfgToForm();$("#scrim").classList.add("open");$("#drawer").classList.add("open");$("#drawer").setAttribute("aria-hidden","false")}
 function closeDrawer(){$("#scrim").classList.remove("open");$("#drawer").classList.remove("open");$("#drawer").setAttribute("aria-hidden","true")}
-$("#gear").onclick=openDrawer;$("#closedrawer").onclick=closeDrawer;$("#scrim").onclick=closeDrawer;
-$("#savecfg").onclick=()=>{cfg={provider:$("#cfgProvider").value,model:$("#cfgModel").value.trim(),system:$("#cfgSystem").value};
-  localStorage.setItem(CFG_KEY,JSON.stringify(cfg));closeDrawer();toast("Configuration saved","ok")};
-$("#resetcfg").onclick=()=>{cfg={provider:"auto",model:"",system:"You are a precise assistant."};localStorage.removeItem(CFG_KEY);applyCfgToForm();toast("Reset to defaults","info")};
+$("#gear").onclick=openDrawer;$("#closedrawer").onclick=closeDrawer;
+$("#savecfg").onclick=()=>{cfg={mode:currentMode(),model:$("#cfgModel").value.trim(),system:$("#cfgSystem").value};
+  localStorage.setItem(CFG_KEY,JSON.stringify(cfg));renderRouting();closeDrawer();toast("Configuration saved","ok")};
+$("#resetcfg").onclick=()=>{cfg={mode:"auto",model:"",system:"You are a precise assistant."};localStorage.removeItem(CFG_KEY);applyCfgToForm();renderRouting();toast("Reset to defaults","info")};
 
 async function boot(){
   loadCfg();
+  selectMode(cfg.mode||"auto");  // seed routing segment so renderRouting has a mode before drawer opens
   // cold-start: poll health until ready, then reveal
   let ready=false;
   for(let i=0;i<60 && !ready;i++){
@@ -300,26 +404,9 @@ async function boot(){
   }catch{}
   try{
     const pr=await j("providers");
-    const shortName=s=>(s||"").split("/").pop().replace(/:free$/,"");
-    const freeShort=pr.free_models&&pr.free_models.length?shortName(pr.free_models[0]):"";
-    const opts=[
-      {v:"auto",   label:"Auto (recommended)"},
-      ...(pr.available.paid?[{v:"paid",label:"Paid (your key)"}]:[]),
-      ...(pr.available.local?[{v:"local",label:"Local (Ollama)"}]:[]),
-      {v:"free",   label:`Free · ${freeShort}`},
-      {v:"offline",label:"Offline (deterministic)"},
-    ];
-    $("#cfgProvider").innerHTML=opts.map(o=>`<option value="${o.v}">${o.label}</option>`).join("");
-    const liveHint=pr.active_mode==="free"&&freeShort
-      ?`Live: ${pr.active_mode} · ${freeShort}`
-      :`Live: ${pr.active_mode||pr.mode}`;
-    const providerLabel=$("#drawer").querySelector("#cfgProvider").closest(".field").querySelector("label");
-    let hintEl=providerLabel.querySelector(".live-hint");
-    if(!hintEl){hintEl=document.createElement("span");hintEl.className="hint live-hint";providerLabel.appendChild(hintEl);}
-    hintEl.textContent=liveHint;
-    $("#cfgAvail").innerHTML=Object.entries(pr.available).map(([k,v])=>
-      `<span class="pchip ${v?'on':''}">${k} ${v?'✓':'·'}</span>`).join("");
-    applyCfgToForm();
+    provStatus=pr.available||{};
+    liveActive=pr.active_mode||pr.mode||"";
+    renderRouting();
   }catch{}
   try{const e=await j("eval");const s=e.summary;
     $("#evalpill").innerHTML=`firewall · <b>${(s.input_detection_rate*100)|0}%</b> caught · <b>${(s.input_false_positive_rate*100)|0}%</b> FP`;
@@ -333,7 +420,7 @@ $("#send").onclick=async()=>{
   $("#path").innerHTML=`<div class="muted">Running the governed pipeline…</div>`;
   try{
     const r=await j("v1/complete",{method:"POST",headers:{"content-type":"application/json"},
-      body:JSON.stringify({prompt:$("#prompt").value,provider:cfg.provider,model:cfg.model||null,system:cfg.system})});
+      body:JSON.stringify({prompt:$("#prompt").value,provider:cfg.mode,model:cfg.model||null,system:cfg.system})});
     const redin=r.redactions.input.map(x=>`<span class="redchip">${x.type}×${x.count}</span>`).join("")||'<span class="muted">none</span>';
     const fb=r.routing_fallbacks.length?` · fallbacks: ${r.routing_fallbacks.join(", ")}`:"";
     const stages=[
@@ -368,6 +455,77 @@ $("#verify").onclick=async()=>{const v=await j("v1/audit/verify");
 $("#tamper").onclick=async()=>{await j("v1/audit/_demo_tamper?seq=0",{method:"POST"});const v=await j("v1/audit/verify");
   $("#verres").innerHTML=v.ok?`${badge('allow')} verified`:`${badge('block')} tamper detected at #${v.broken_at}`;
   toast(v.ok?"No change":"Tamper detected — chain integrity broken","bad")};
+
+/* ===================== POLISH KIT: theme toggle ===================== */
+const THEME_KEY="theme";
+function getTheme(){try{return localStorage.getItem(THEME_KEY)||"system"}catch{return "system"}}
+function effectiveDark(t){
+  if(t==="dark")return true; if(t==="light")return false;
+  return !window.matchMedia("(prefers-color-scheme: light)").matches;
+}
+function applyTheme(t){
+  const dark=effectiveDark(t);
+  document.documentElement.classList.toggle("light",!dark);
+  $("#themeicon").textContent=dark?"☾":"☀";
+  $("#themebtn").title=`Theme: ${t}`;
+}
+function setTheme(t){try{localStorage.setItem(THEME_KEY,t)}catch{} applyTheme(t); syncThemeSeg();}
+function syncThemeSeg(){const cur=getTheme();
+  $$("#themeseg .segbtn").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.theme===cur)));}
+$("#themebtn").onclick=()=>{const cur=getTheme();const next=effectiveDark(cur)?"light":"dark";setTheme(next);};
+$$("#themeseg .segbtn").forEach(b=>b.onclick=()=>setTheme(b.dataset.theme));
+window.matchMedia("(prefers-color-scheme: light)").addEventListener?.("change",()=>{if(getTheme()==="system")applyTheme("system");});
+applyTheme(getTheme());
+
+/* ===================== POLISH KIT: help modal ===================== */
+function openHelp(){$("#scrim").classList.add("open");$("#help").classList.add("open");
+  $("#help").setAttribute("aria-hidden","false");$("#closehelp").focus();}
+function closeHelp(){$("#scrim").classList.remove("open");$("#help").classList.remove("open");
+  $("#help").setAttribute("aria-hidden","true");}
+$("#helpbtn").onclick=openHelp;$("#closehelp").onclick=closeHelp;
+$("#scrim").onclick=()=>{closeDrawer();closeHelp();};
+document.addEventListener("keydown",e=>{
+  const typing=/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName||"")||document.activeElement?.isContentEditable;
+  if(e.key==="Escape"){closeDrawer();closeHelp();}
+  else if(e.key==="?"&&!typing&&!$("#help").classList.contains("open")){e.preventDefault();openHelp();}
+});
+
+/* ===================== POLISH KIT: routing config ===================== */
+let liveActive="";
+const MODE_BLURBS={
+  auto:"auto = paid if keyed, else local, else free, else offline.",
+  local:"local = Ollama only (on-box, zero cost).",
+  free:"free = OpenRouter free models only.",
+  paid:"paid = Anthropic, then OpenAI.",
+  offline:"offline = deterministic mock only (no LLM call).",
+};
+const MODE_CHAIN={
+  auto:["paid","local","free"],
+  local:["local"], free:["free"], paid:["paid"], offline:[],
+};
+const ROUTE_TIERS=["paid","local","free"];
+function selectMode(m){
+  $$("#modeseg .segbtn").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.mode===m)));
+  $("#modeblurb").textContent=MODE_BLURBS[m]||"";
+  $("#modeactive").textContent=`active: ${m}`;
+}
+function currentMode(){return $("#modeseg").querySelector('[aria-pressed="true"]')?.dataset.mode||"auto";}
+function renderRouting(){
+  const m=currentMode();
+  $("#modeactive").textContent=liveActive?`active: ${m} · live: ${liveActive}`:`active: ${m}`;
+  // provider/tier status rows + always-on offline row
+  const rows=ROUTE_TIERS.map(p=>{
+    const on=!!provStatus[p];
+    return `<div class="pstat"><span>${p}</span><span class="pdot ${on?'on':''}" title="${on?'available':'not configured'}"></span></div>`;
+  }).join("")+
+    `<div class="pstat"><span>offline (deterministic)</span><span class="pdot on" title="always available"></span></div>`;
+  $("#provrows").innerHTML=rows;
+  // resolved fallback chain for the selected mode (available tiers, then offline)
+  const chain=(MODE_CHAIN[m]||[]).filter(p=>provStatus[p]);
+  const display=[...chain,"offline (deterministic)"];
+  $("#chainline").textContent=display.join("  →  ");
+}
+$$("#modeseg .segbtn").forEach(b=>b.onclick=()=>{selectMode(b.dataset.mode);renderRouting();});
 
 boot();
 </script>
