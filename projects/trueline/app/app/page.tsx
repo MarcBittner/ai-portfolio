@@ -72,10 +72,12 @@ function UploadButton({
   label,
   onText,
   primary,
+  multiple,
 }: {
   label: string;
   onText: (text: string, filename: string) => void;
   primary?: boolean;
+  multiple?: boolean;
 }) {
   return (
     <label
@@ -88,11 +90,12 @@ function UploadButton({
       {label}
       <input
         type="file"
+        multiple={multiple}
         accept=".txt,.csv,text/plain"
         className="hidden"
         onChange={async (e) => {
-          const f = e.target.files?.[0];
-          if (f) onText(await f.text(), f.name);
+          const files = Array.from(e.target.files ?? []);
+          for (const f of files) onText(await f.text(), f.name);
           e.target.value = "";
         }}
       />
@@ -266,7 +269,7 @@ export default function Dashboard() {
               and market rates. Start with the padded one.
             </p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
-              <UploadButton label="⬆ Upload invoice file" onText={uploadInvoice} primary />
+              <UploadButton label="⬆ Upload invoice file(s)" onText={uploadInvoice} primary multiple />
               <span className="text-xs text-[--color-muted]">
                 (need the files?{" "}
                 {INVOICES.map((inv, i) => (
@@ -347,7 +350,7 @@ export default function Dashboard() {
             <aside className="space-y-4">
               <section className="glass p-4">
                 <h2 className="mb-2 text-sm font-semibold">Add another invoice</h2>
-                <UploadButton label="⬆ Upload invoice" onText={uploadInvoice} />
+                <UploadButton label="⬆ Upload invoice(s)" onText={uploadInvoice} multiple />
                 <div className="mt-2 text-xs text-[--color-muted]">
                   {INVOICES.map((inv, i) => (
                     <button
