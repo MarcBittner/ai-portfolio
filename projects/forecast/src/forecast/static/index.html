@@ -1,199 +1,627 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>forecast</title>
-    <style>
-      :root {
-        --bg: #0b0e14; --panel: #131722; --border: #232838; --fg: #e6e9ef;
-        --muted: #8b93a7; --accent: #6ea8fe; --fc: #63e6be; --bad: #ff6b6b;
-      }
-      * { box-sizing: border-box; }
-      body { margin: 0; background: var(--bg); color: var(--fg);
-        font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
-      main { max-width: 900px; margin: 0 auto; padding: 28px 20px 60px; }
-      h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -0.01em; }
-      p.lede { color: var(--muted); margin: 0 0 16px; }
-      textarea { width: 100%; min-height: 80px; resize: vertical; background: #0e1320; color: var(--fg);
-        border: 1px solid var(--border); border-radius: 8px; padding: 10px;
-        font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
-      .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 10px 0; }
-      .spacer { flex: 1; }
-      label { font-size: 13px; color: var(--muted); }
-      select, input, button { background: #1b2230; color: var(--fg); border: 1px solid var(--border);
-        border-radius: 7px; padding: 6px 10px; font-size: 13px; }
-      input[type=number] { width: 80px; }
-      button { cursor: pointer; }
-      button.primary { background: var(--accent); color: #07101f; border-color: var(--accent); font-weight: 600; }
-      .samples button { font-size: 12px; }
-      .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-top: 14px; }
-      .legend { display: flex; gap: 16px; font-size: 12px; color: var(--muted); margin-bottom: 8px; }
-      .legend i { display: inline-block; width: 14px; height: 3px; vertical-align: middle; margin-right: 5px; }
-      .meta { display: flex; gap: 18px; flex-wrap: wrap; font-size: 13px; margin-top: 10px; }
-      .meta b { color: var(--fg); }
-      .empty { color: var(--muted); }
-      a { color: var(--accent); }
-      .small { color: var(--muted); font-size: 12px; }
-    </style>
-  </head>
-  <body>
-    <main>
-      <h1>forecast</h1>
-      <p class="lede">
-        Classic time-series forecasting + anomaly detection — pure-Python, no
-        model. Auto-selects the best method by backtest, with a 95% band.
-      </p>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>forecast — time-series forecasting + anomaly detection</title>
+<!-- POLISH KIT: theme-init (apply before paint, no flash) -->
+<script>
+(function(){
+  try{
+    var t=localStorage.getItem("theme")||"system";
+    var dark = t==="dark" || (t==="system" && !window.matchMedia("(prefers-color-scheme: light)").matches);
+    if(!dark) document.documentElement.classList.add("light");
+  }catch(e){}
+})();
+</script>
+<style>
+  /* ============================ design system ============================ */
+  :root{
+    --bg:#0a0d14; --bg-grad-1:#0e1322; --bg-grad-2:#0a0d14;
+    --surface:#131826; --surface-2:#1a2032; --surface-3:#212a40;
+    --line:#263149; --line-2:#33405d;
+    --ink:#e9eef7; --ink-dim:#97a3ba; --ink-faint:#67728a;
+    --accent:#6aa1ff; --accent-2:#9b86ff; --accent-ink:#06101f;
+    --ok:#43c98a; --warn:#e6ad52; --bad:#f15b6c; --info:#6aa1ff; --violet:#9b86ff;
+    --r:15px; --r-sm:10px; --r-xs:7px;
+    --sh:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.5);
+    --sh-lg:0 1px 2px rgba(0,0,0,.4), 0 24px 64px -24px rgba(0,0,0,.7);
+    --grad:linear-gradient(135deg,var(--accent),var(--accent-2));
+    --ease:cubic-bezier(.22,.61,.36,1);
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+    --header-bg:rgba(10,13,20,.72);
+    --bg-radial-1:rgba(107,130,255,.10); --bg-radial-2:rgba(67,201,138,.05);
+    --mark-bg:#ffd54f; --mark-ink:#111;
+    /* chart palette */
+    --c-hist:#6aa1ff; --c-fc:#43c98a; --c-band:rgba(106,161,255,.20); --c-anom:#f15b6c;
+  }
+  /* POLISH KIT: theme toggle — LIGHT palette overrides (same accents, light surfaces, dark ink) */
+  html.light{
+    --bg:#f4f6fb; --bg-grad-1:#eef2fb; --bg-grad-2:#f4f6fb;
+    --surface:#ffffff; --surface-2:#f1f4fa; --surface-3:#e6ebf5;
+    --line:#d8dfec; --line-2:#c2ccde;
+    --ink:#16203a; --ink-dim:#566184; --ink-faint:#8b95ad;
+    --accent:#3a6ff0; --accent-2:#7c5cf5; --accent-ink:#ffffff;
+    --ok:#1f9d63; --warn:#b9791f; --bad:#d83a4d; --info:#3a6ff0; --violet:#6f53d6;
+    --sh:0 1px 2px rgba(20,32,58,.06), 0 8px 24px -14px rgba(20,32,58,.18);
+    --sh-lg:0 1px 2px rgba(20,32,58,.08), 0 24px 64px -28px rgba(20,32,58,.28);
+    --header-bg:rgba(255,255,255,.78);
+    --bg-radial-1:rgba(58,111,240,.10); --bg-radial-2:rgba(31,157,99,.06);
+    --mark-bg:#ffe08a; --mark-ink:#3a2c00;
+    --c-hist:#3a6ff0; --c-fc:#1f9d63; --c-band:rgba(58,111,240,.16); --c-anom:#d83a4d;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;
+    font:15px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Inter,sans-serif;
+    background-image:radial-gradient(1200px 600px at 80% -10%,var(--bg-radial-1),transparent 60%),
+      radial-gradient(900px 500px at 0% 0%,var(--bg-radial-2),transparent 55%);
+    background-attachment:fixed;min-height:100vh;transition:background-color .25s var(--ease),color .25s var(--ease)}
+  ::selection{background:rgba(106,161,255,.3)}
+  a{color:var(--accent);text-decoration:none}
+  /* header */
+  header{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:14px;
+    padding:14px 24px;border-bottom:1px solid var(--line);
+    background:var(--header-bg);backdrop-filter:blur(14px) saturate(140%)}
+  .brand{display:flex;align-items:center;gap:11px;font-weight:650;font-size:16px;letter-spacing:.2px}
+  .logo{width:30px;height:30px;border-radius:9px;background:var(--grad);position:relative;
+    box-shadow:0 4px 16px -4px rgba(106,161,255,.6);flex:none}
+  .logo::after{content:"";position:absolute;inset:7px;border-radius:5px;
+    border:2px solid rgba(255,255,255,.85);border-right-color:transparent;
+    animation:spin 3.5s linear infinite}
+  .brand .tag{color:var(--ink-dim);font-size:12.5px;font-weight:400}
+  .spacer{flex:1}
+  .status{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--ink-dim);
+    padding:5px 11px;border:1px solid var(--line);border-radius:999px;background:var(--surface)}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--ink-faint)}
+  .dot.ok{background:var(--ok);box-shadow:0 0 0 0 rgba(67,201,138,.5);animation:pulse 2s infinite}
+  .pill{font-size:12px;color:var(--ink-dim);border:1px solid var(--line);border-radius:999px;
+    padding:5px 12px;background:var(--surface);white-space:nowrap}
+  .iconbtn{width:36px;height:36px;border-radius:10px;border:1px solid var(--line);background:var(--surface);
+    color:var(--ink-dim);cursor:pointer;display:grid;place-items:center;transition:.18s var(--ease)}
+  .iconbtn:hover{color:var(--ink);border-color:var(--line-2);transform:translateY(-1px);background:var(--surface-2)}
+  .iconbtn svg{width:18px;height:18px}
+  /* layout */
+  main{max-width:1160px;margin:0 auto;padding:26px 24px 64px;display:grid;gap:18px;
+    grid-template-columns:1fr 1fr}
+  .full{grid-column:1/-1}
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+    box-shadow:var(--sh);overflow:hidden;transition:.25s var(--ease)}
+  .panel:hover{border-color:var(--line-2)}
+  .panel h2{margin:0;padding:14px 18px;font-size:11.5px;font-weight:600;letter-spacing:.7px;
+    text-transform:uppercase;color:var(--ink-dim);border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:10px}
+  .panel .body{padding:18px}
+  .lede{color:var(--ink-dim);font-size:13.5px;margin:0 0 14px}
+  /* controls */
+  textarea,select,input{font:inherit;color:var(--ink);background:var(--surface-2);
+    border:1px solid var(--line);border-radius:var(--r-sm);padding:11px 13px;transition:.16s var(--ease);width:100%}
+  textarea:focus,select:focus,input:focus{outline:none;border-color:var(--accent);
+    box-shadow:0 0 0 3px rgba(106,161,255,.16)}
+  textarea{min-height:88px;resize:vertical;font-family:var(--mono);font-size:13px;line-height:1.5}
+  input[type=number]{width:auto;min-width:84px}
+  .btn{font:inherit;font-weight:600;cursor:pointer;border-radius:var(--r-sm);padding:11px 17px;
+    border:1px solid var(--line);background:var(--surface-2);color:var(--ink);
+    transition:.16s var(--ease);display:inline-flex;align-items:center;gap:8px;position:relative}
+  .btn:hover{transform:translateY(-1px);border-color:var(--line-2)}
+  .btn:active{transform:translateY(0)}
+  .btn.primary{background:var(--grad);border:none;color:var(--accent-ink);
+    box-shadow:0 6px 20px -8px rgba(106,161,255,.7)}
+  .btn.primary:hover{box-shadow:0 10px 28px -8px rgba(106,161,255,.8)}
+  .btn[disabled]{opacity:.6;pointer-events:none}
+  .btn .spin{width:14px;height:14px;border:2px solid rgba(6,16,31,.35);border-top-color:var(--accent-ink);
+    border-radius:50%;animation:spin .7s linear infinite;display:none}
+  .btn.loading .spin{display:block}.btn.loading .lbl{opacity:.7}
+  .chip{font:inherit;font-size:12px;cursor:pointer;border:1px dashed var(--line);background:transparent;
+    color:var(--ink-dim);border-radius:999px;padding:5px 12px;transition:.16s var(--ease)}
+  .chip:hover{color:var(--ink);border-color:var(--accent);border-style:solid;
+    background:rgba(106,161,255,.08)}
+  .row{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+  /* labeled field control */
+  .ctl{display:flex;flex-direction:column;gap:6px}
+  .ctl>span{font-size:11px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:var(--ink-faint)}
+  .ctls{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:13px;align-items:end}
+  .check{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-dim);cursor:pointer;
+    padding:11px 13px;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm)}
+  .check input{width:auto}
+  /* badges */
+  .badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:700;
+    text-transform:uppercase;letter-spacing:.3px}
+  .b-ok{background:rgba(67,201,138,.16);color:var(--ok)}
+  .b-info{background:rgba(106,161,255,.15);color:var(--info)}
+  .b-warn{background:rgba(230,173,82,.16);color:var(--warn)}
+  .mono{font-family:var(--mono);font-size:12px}
+  .muted{color:var(--ink-dim);font-size:12.5px}
+  code{background:var(--surface-2);padding:1px 6px;border-radius:6px;font-family:var(--mono);font-size:12px}
+  /* chart + meta */
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--ink-dim);margin-bottom:10px}
+  .legend i{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;margin-right:6px}
+  #chart{display:block;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm)}
+  .meta{display:flex;gap:18px;flex-wrap:wrap;font-size:13px;margin-top:14px;color:var(--ink-dim)}
+  .meta b{color:var(--ink)}
+  .summary{font-size:13.5px;color:var(--ink);background:var(--surface-2);border:1px solid var(--line);
+    border-radius:var(--r-sm);padding:12px 14px;margin-top:6px;display:flex;gap:9px;align-items:flex-start}
+  .summary:empty{display:none}
+  /* reveal on load */
+  .reveal{opacity:0;transform:translateY(14px)}
+  .reveal.in{opacity:1;transform:none;transition:.55s var(--ease)}
+  /* settings drawer */
+  .scrim{position:fixed;inset:0;background:rgba(5,8,14,.55);backdrop-filter:blur(2px);z-index:50;
+    opacity:0;pointer-events:none;transition:.25s var(--ease)}
+  .scrim.open{opacity:1;pointer-events:auto}
+  .drawer{position:fixed;top:0;right:0;height:100%;width:380px;max-width:92vw;z-index:60;
+    background:var(--surface);border-left:1px solid var(--line);box-shadow:var(--sh-lg);
+    transform:translateX(100%);transition:transform .3s var(--ease);display:flex;flex-direction:column}
+  .drawer.open{transform:none}
+  .drawer header{position:static;background:none;backdrop-filter:none;border-bottom:1px solid var(--line)}
+  .drawer h3{margin:0;font-size:15px;font-weight:650}
+  .drawer .body{padding:20px;overflow:auto;display:grid;gap:18px}
+  .field{display:grid;gap:7px}
+  .field label{font-size:12px;color:var(--ink-dim);font-weight:600;display:flex;justify-content:space-between}
+  .field .hint{font-size:11.5px;color:var(--ink-faint);font-weight:400}
+  .seg{display:flex;gap:6px;flex-wrap:wrap}
+  /* POLISH KIT: segmented control (theme + routing mode) */
+  .seg .segbtn{font:inherit;font-size:12px;cursor:pointer;border:1px solid var(--line);background:var(--surface-2);
+    color:var(--ink-dim);border-radius:var(--r-sm);padding:7px 11px;transition:.16s var(--ease)}
+  .seg .segbtn:hover{color:var(--ink);border-color:var(--line-2)}
+  .seg .segbtn[aria-pressed="true"]{background:var(--grad);border-color:transparent;color:var(--accent-ink);font-weight:600}
+  .pstat{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12.5px;
+    padding:7px 11px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface-2)}
+  .pstat .pdot{width:8px;height:8px;border-radius:50%;background:var(--ink-faint);flex:none}
+  .pstat .pdot.on{background:var(--ok);box-shadow:0 0 0 3px rgba(67,201,138,.18)}
+  .chainline{font-family:var(--mono);font-size:11.5px;color:var(--ink-dim);
+    background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);padding:8px 11px;word-break:break-word}
+  .drawer .foot{margin-top:auto;padding:16px 20px;border-top:1px solid var(--line);display:flex;gap:10px}
+  /* POLISH KIT: help modal (centered dialog, reuses scrim) */
+  #help{position:fixed;top:50%;left:50%;transform:translate(-50%,calc(-50% + 12px));z-index:70;
+    width:560px;max-width:94vw;max-height:86vh;overflow:auto;opacity:0;pointer-events:none;
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh-lg);
+    transition:opacity .25s var(--ease),transform .25s var(--ease)}
+  #help.open{opacity:1;pointer-events:auto;transform:translate(-50%,-50%)}
+  #help header{position:static;background:none;backdrop-filter:none;border-bottom:1px solid var(--line)}
+  #help .body{padding:20px;display:grid;gap:16px}
+  #help h4{margin:0 0 6px;font-size:11.5px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--ink-dim)}
+  #help p{margin:0;color:var(--ink-dim);font-size:13.5px}
+  #help ol{margin:0;padding-left:20px;color:var(--ink-dim);font-size:13.5px;display:grid;gap:4px}
+  #help .kbd{font-family:var(--mono);font-size:11.5px;background:var(--surface-2);border:1px solid var(--line);
+    border-bottom-width:2px;border-radius:6px;padding:1px 7px;color:var(--ink)}
+  #help .eps{display:flex;gap:7px;flex-wrap:wrap}
+  /* toast */
+  #toasts{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:80;
+    display:flex;flex-direction:column;gap:10px;align-items:center}
+  .toast{background:var(--surface-3);border:1px solid var(--line-2);border-radius:11px;padding:11px 16px;
+    box-shadow:var(--sh-lg);font-size:13px;display:flex;align-items:center;gap:10px;
+    animation:toastIn .3s var(--ease)}
+  .toast .tdot{width:8px;height:8px;border-radius:50%}
+  .toast.ok .tdot{background:var(--ok)}.toast.bad .tdot{background:var(--bad)}.toast.info .tdot{background:var(--info)}
+  /* cold-start overlay */
+  #boot{position:fixed;inset:0;z-index:90;background:var(--bg);display:grid;place-items:center;
+    transition:opacity .5s var(--ease)}
+  #boot.hide{opacity:0;pointer-events:none}
+  .boot-card{text-align:center;display:grid;gap:18px;justify-items:center}
+  .boot-card .logo{width:54px;height:54px}
+  .boot-card .ring{width:38px;height:38px;border:3px solid var(--line);border-top-color:var(--accent);
+    border-radius:50%;animation:spin .8s linear infinite}
+  .boot-card .msg{color:var(--ink-dim);font-size:13.5px}
+  .boot-card .sub{color:var(--ink-faint);font-size:12px;max-width:280px}
+  /* keyframes */
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(67,201,138,.5)}70%{box-shadow:0 0 0 6px rgba(67,201,138,0)}100%{box-shadow:0 0 0 0 rgba(67,201,138,0)}}
+  @keyframes toastIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  @media(max-width:860px){main{grid-template-columns:1fr}}
+  @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+<div id="boot"><div class="boot-card">
+  <div class="logo"></div><div class="ring"></div>
+  <div><div class="msg" id="bootmsg">Waking the demo…</div>
+  <div class="sub">Free-tier instances sleep when idle — first load takes ~30–60s.</div></div>
+</div></div>
 
+<header>
+  <div class="brand"><span class="logo"></span> forecast
+    <span class="tag">classic-ML forecasting · anomaly detection · deterministic core</span></div>
+  <span class="spacer"></span>
+  <span class="status"><span class="dot" id="hdot"></span><span id="hstat">connecting…</span></span>
+  <span class="pill" id="methpill">methods</span>
+  <!-- POLISH KIT: theme toggle -->
+  <button class="iconbtn" id="themebtn" title="Toggle theme" aria-label="Toggle light/dark theme"><span id="themeicon">☾</span></button>
+  <!-- POLISH KIT: help modal trigger -->
+  <button class="iconbtn" id="helpbtn" title="Help (?)" aria-label="Help">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 1 1 4.6 3c-.8.6-1.7 1-1.7 2.2"/><line x1="12" y1="17.5" x2="12" y2="17.51"/></svg>
+  </button>
+  <button class="iconbtn" id="gear" title="Settings" aria-label="Settings">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+  </button>
+</header>
+
+<main>
+  <div class="panel full reveal">
+    <h2>Forecast console <span class="muted" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">paste a series, pick a method</span></h2>
+    <div class="body">
+      <p class="lede">Classic time-series forecasting + anomaly detection — pure-Python, no model.
+        Auto-selects the best method by backtest, with a 95% prediction band. The LLM only
+        narrates the result; the forecast and bands are deterministic.</p>
       <textarea id="series" spellcheck="false" placeholder="Numbers separated by commas, spaces, or newlines…"></textarea>
-      <div class="row">
-        <label>Method</label>
-        <select id="method"></select>
-        <label>Horizon</label>
-        <input type="number" id="horizon" value="6" min="1" max="200" />
-        <label><input type="checkbox" id="useLlm" checked /> LLM summary</label>
-        <label>provider <select id="provider"><option value="auto">Auto (recommended)</option></select></label>
-        <span id="providerState" class="small" style="display:none"></span>
-        <div class="spacer"></div>
-        <label class="csv" style="cursor:pointer">📄 CSV
+      <div class="ctls" style="margin-top:14px">
+        <label class="ctl"><span>method</span><select id="method"></select></label>
+        <label class="ctl"><span>horizon</span><input type="number" id="horizon" value="6" min="1" max="200" /></label>
+        <label class="ctl"><span>provider</span><select id="provider"><option value="auto">Auto (recommended)</option></select></label>
+        <label class="check"><input type="checkbox" id="useLlm" checked /> LLM summary</label>
+        <label class="check csv" style="cursor:pointer">📄 CSV
           <input type="file" id="csv" accept=".csv,text/csv" style="display:none" /></label>
-        <button class="primary" id="run">Forecast</button>
+        <button class="btn primary" id="run"><span class="spin"></span><span class="lbl">Forecast</span></button>
       </div>
-      <div class="row samples" id="samples"></div>
-      <div id="summary" style="font-size:13px;color:var(--fg);margin:6px 0"></div>
-
-      <div class="panel" id="out" style="display:none">
-        <div class="legend">
-          <span><i style="background:#6ea8fe"></i>history</span>
-          <span><i style="background:#63e6be"></i>forecast</span>
-          <span><i style="background:#2b3550"></i>95% band</span>
-          <span><i style="background:#ff6b6b"></i>anomaly</span>
-        </div>
-        <svg id="chart" viewBox="0 0 640 240" width="100%" preserveAspectRatio="none"></svg>
-        <div class="meta" id="meta"></div>
+      <div class="row samples" id="samples" style="margin-top:12px">
+        <span class="muted">samples:</span>
       </div>
+      <span id="providerState" class="muted" style="display:none;margin-top:8px"></span>
+      <div class="summary" id="summary"></div>
+    </div>
+  </div>
 
-      <p class="small">
-        <code>POST /forecast</code> · <code>POST /anomalies</code> ·
-        <code>GET /methods</code>. Part of the
-        <a href="https://github.com/MarcBittner/ai-portfolio">ai-portfolio</a>.
-      </p>
-    </main>
+  <div class="panel full reveal" id="out" style="display:none">
+    <h2>Forecast &amp; anomalies <span class="muted" id="metaProvider" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400"></span></h2>
+    <div class="body">
+      <div class="legend">
+        <span><i style="background:var(--c-hist)"></i>history</span>
+        <span><i style="background:var(--c-fc)"></i>forecast</span>
+        <span><i style="background:var(--c-band)"></i>95% band</span>
+        <span><i style="background:var(--c-anom)"></i>anomaly</span>
+      </div>
+      <svg id="chart" viewBox="0 0 640 240" width="100%" preserveAspectRatio="none"></svg>
+      <div class="meta" id="meta"></div>
+    </div>
+  </div>
+</main>
 
-    <script>
-      const $ = (id) => document.getElementById(id);
-      const SVGNS = "http://www.w3.org/2000/svg";
-      const W = 640, H = 240, PAD = 24;
-      const SAMPLES = {
-        "trend":   "10,12,13,15,16,18,19,21,22,24,25,27,28,30",
-        "seasonal":"8,12,20,10,9,13,21,11,10,14,22,12,11,15",
-        "spike":   "20,21,19,22,20,21,55,20,19,21,20,22,21,20",
-      };
+<!-- settings drawer -->
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-hidden="true">
+  <header><div class="brand" style="font-size:15px"><span class="logo" style="width:24px;height:24px"></span> Settings</div>
+    <span class="spacer"></span><button class="iconbtn" id="closedrawer" aria-label="Close">✕</button></header>
+  <div class="body">
+    <div class="field">
+      <label>Default horizon <span class="hint">steps to forecast</span></label>
+      <input id="cfgHorizon" type="number" min="1" max="200" value="6" />
+    </div>
+    <div class="field">
+      <label>Default method <span class="hint">prefills the console</span></label>
+      <select id="cfgMethod"></select>
+    </div>
+    <div class="muted" style="font-size:11.5px">The forecasting + anomaly core is deterministic and pure-Python —
+      no LLM is involved in the numbers. The summary below the chart is the only LLM-narrated part.</div>
 
-      async function loadMethods() {
-        const ms = await fetch("/methods").then((r) => r.json());
-        $("method").innerHTML = ms.map((m) => `<option>${m.name}</option>`).join("");
-        $("samples").innerHTML = Object.keys(SAMPLES).map((k) => `<button data-k="${k}">${k}</button>`).join("");
-        $("samples").querySelectorAll("button").forEach((b) =>
-          b.addEventListener("click", () => { $("series").value = SAMPLES[b.dataset.k]; run(); }));
-        try {
-          const p = await fetch("/providers").then((r) => r.json());
-          const shortName = (s) => (s || "").split("/").pop().replace(/:free$/, "");
-          const sel = $("provider");
-          const freeLabel = p.free_models && p.free_models[0]
-            ? "Free · " + shortName(p.free_models[0]) : "Free";
-          sel.insertAdjacentHTML("beforeend", `<option value="free">${freeLabel}</option>`);
-          sel.insertAdjacentHTML("beforeend", `<option value="offline">Offline (deterministic)</option>`);
-          if (p.available && p.available.paid)
-            sel.insertAdjacentHTML("beforeend", `<option value="paid">Paid (your key)</option>`);
-          sel.value = "auto";
-          const state = $("providerState");
-          const activeLabel = p.active_mode === "free" && p.free_models && p.free_models[0]
-            ? p.active_mode + " · " + shortName(p.free_models[0]) : (p.active_mode || "");
-          state.textContent = "Live: " + activeLabel;
-          state.style.display = "";
-        } catch { /* optional */ }
-      }
-      function parseSeries() {
-        return $("series").value.split(/[\s,]+/).map(Number).filter((x) => !Number.isNaN(x));
-      }
+    <!-- POLISH KIT: theme segmented control -->
+    <div class="field">
+      <label>Theme <span class="hint">appearance</span></label>
+      <div class="seg" id="themeseg">
+        <button type="button" class="segbtn" data-theme="dark">Dark</button>
+        <button type="button" class="segbtn" data-theme="light">Light</button>
+        <button type="button" class="segbtn" data-theme="system">System</button>
+      </div>
+    </div>
 
-      async function run() {
-        const series = parseSeries();
-        if (series.length < 2) { alert("Enter at least 2 numbers."); return; }
-        const body = { series, horizon: Number($("horizon").value), method: $("method").value,
-          use_llm: $("useLlm").checked, provider: $("provider").value };
-        const [fc, an] = await Promise.all([
-          fetch("/forecast", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }),
-          fetch("/anomalies", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ series }) }),
-        ]);
-        if (!fc.ok) { alert(await fc.text()); return; }
-        const fcData = await fc.json();
-        $("summary").textContent = fcData.summary
-          ? "📝 " + fcData.summary + (fcData.routing ? `  (via ${fcData.routing.provider})` : "") : "";
-        draw(series, fcData, await an.json());
-      }
+    <!-- POLISH KIT: routing config -->
+    <div class="field">
+      <label>Routing mode <span class="hint">which provider narrates the summary</span></label>
+      <div class="seg" id="modeseg">
+        <button type="button" class="segbtn" data-mode="auto">auto</button>
+        <button type="button" class="segbtn" data-mode="free">free</button>
+        <button type="button" class="segbtn" data-mode="paid">paid</button>
+        <button type="button" class="segbtn" data-mode="offline">offline</button>
+      </div>
+      <div class="hint" id="modeblurb">auto = free if a key is set, else paid, else local, else offline.</div>
+    </div>
+    <div class="field">
+      <label for="cfgModel">Model override <span class="hint">optional</span></label>
+      <input id="cfgModel" type="text" placeholder="provider default" />
+    </div>
+    <div class="field">
+      <label>Provider status <span class="hint" id="modeactive">active: auto</span></label>
+      <div style="display:grid;gap:6px" id="provrows"></div>
+    </div>
+    <div class="field">
+      <label>Fallback chain <span class="hint">→ on failure</span></label>
+      <div class="chainline" id="chainline">offline (deterministic)</div>
+    </div>
+    <div class="muted" style="font-size:11.5px">Provider keys live server-side; this only selects which available
+      provider narrates the summary. The forecast itself never calls an LLM.</div>
+  </div>
+  <div class="foot">
+    <button class="btn" id="resetcfg">Reset</button>
+    <button class="btn primary" id="savecfg" style="flex:1"><span class="lbl">Save</span></button>
+  </div>
+</aside>
 
-      function draw(history, f, anom) {
-        $("out").style.display = "block";
-        const n = history.length, h = f.forecast.length, total = n + h;
-        const all = [...history, ...f.forecast, ...f.upper, ...f.lower];
-        const min = Math.min(...all), max = Math.max(...all), rng = (max - min) || 1;
-        const sx = (i) => PAD + (i / (total - 1)) * (W - 2 * PAD);
-        const sy = (v) => H - PAD - ((v - min) / rng) * (H - 2 * PAD);
-        const svg = $("chart");
-        svg.innerHTML = "";
-        const add = (tag, attrs) => {
-          const e = document.createElementNS(SVGNS, tag);
-          for (const k in attrs) e.setAttribute(k, attrs[k]);
-          svg.appendChild(e); return e;
-        };
-        // CI band over the forecast region
-        const bandTop = f.upper.map((v, j) => `${sx(n + j)},${sy(v)}`);
-        const bandBot = f.lower.map((v, j) => `${sx(n + j)},${sy(v)}`).reverse();
-        add("polygon", { points: [...bandTop, ...bandBot].join(" "), fill: "#2b3550", opacity: "0.6" });
-        // history line
-        add("polyline", { points: history.map((v, i) => `${sx(i)},${sy(v)}`).join(" "),
-          fill: "none", stroke: "#6ea8fe", "stroke-width": "2" });
-        // forecast line (dashed), starting from last history point
-        const fcPts = [`${sx(n - 1)},${sy(history[n - 1])}`, ...f.forecast.map((v, j) => `${sx(n + j)},${sy(v)}`)];
-        add("polyline", { points: fcPts.join(" "), fill: "none", stroke: "#63e6be",
-          "stroke-width": "2", "stroke-dasharray": "5 4" });
-        // anomaly dots
-        for (const a of anom.anomalies)
-          add("circle", { cx: sx(a.index), cy: sy(a.value), r: "4", fill: "#ff6b6b" });
+<!-- POLISH KIT: help modal -->
+<aside id="help" role="dialog" aria-modal="true" aria-labelledby="helptitle" aria-hidden="true">
+  <header><div class="brand" style="font-size:15px"><span class="logo" style="width:24px;height:24px"></span>
+    <span id="helptitle">Help · forecast</span></div>
+    <span class="spacer"></span><button class="iconbtn" id="closehelp" aria-label="Close help">✕</button></header>
+  <div class="body">
+    <div><h4>What it is</h4><p>Classic-ML time-series forecasting and anomaly detection.
+      Seven deterministic methods (naive, mean, linear trend, SES, Holt, seasonal-naive, Holt-Winters)
+      plus <b>auto</b>, which backtests and picks the best. Every forecast ships a 95% prediction band
+      and a z-score anomaly scan. The core is <b>pure Python with no model</b> — the optional LLM only
+      writes a plain-language summary; the numbers stay deterministic.</p></div>
+    <div><h4>How to use</h4><ol>
+      <li><b>Enter a series</b> — paste numbers (commas, spaces, or newlines) or load a <i>CSV</i>; the last numeric column is used.</li>
+      <li><b>Try a sample</b> — click <i>trend</i>, <i>seasonal</i>, or <i>spike</i> to autofill and run.</li>
+      <li><b>Pick a method &amp; horizon</b> — leave method on <i>auto</i> to let the backtest choose.</li>
+      <li><b>Forecast</b> — the chart shows history (solid), forecast (dashed), the 95% band, and anomalies (red dots); the meta row reports holdout/rolling MAE.</li>
+    </ol></div>
+    <div><h4>Endpoints</h4><div class="eps">
+      <code>GET /health</code><code>GET /methods</code><code>GET /providers</code>
+      <code>POST /forecast</code><code>POST /anomalies</code></div></div>
+    <div><h4>Keyboard shortcuts</h4><p><span class="kbd">?</span> open this help · <span class="kbd">Esc</span> close any overlay</p></div>
+    <div><p class="muted" style="font-size:11.5px">Sample series are <b>synthetic</b> — there is no real-world data here.</p></div>
+  </div>
+</aside>
 
-        const bt = f.backtest, rb = f.rolling_backtest;
-        $("meta").innerHTML =
-          `<span>method <b>${f.method}</b></span>` +
-          (f.season_period ? `<span>season <b>${f.season_period}</b></span>` : "") +
-          (bt ? `<span>holdout MAE <b>${bt.mae}</b></span>` : "") +
-          (rb ? `<span>rolling MAE <b>${rb.mae}</b> (${rb.folds} folds)</span>` : "") +
-          `<span>anomalies <b>${anom.anomalies.length}</b></span>` +
-          `<span>next: <b>${f.forecast.slice(0, 5).join(", ")}${h > 5 ? "…" : ""}</b></span>`;
-      }
+<div id="toasts"></div>
 
-      // CSV upload: take the first numeric column (skips a header row if present)
-      function parseCsv(text) {
-        const out = [];
-        for (const line of text.split(/\r?\n/)) {
-          if (!line.trim()) continue;
-          const cells = line.split(",");
-          const v = Number(cells[cells.length - 1]);   // last column = value
-          if (!Number.isNaN(v)) out.push(v);
-        }
-        return out;
-      }
-      $("csv").addEventListener("change", async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        const nums = parseCsv(await file.text());
-        if (nums.length < 2) { alert("No numeric column found in the CSV."); return; }
-        $("series").value = nums.join(", "); run();
-      });
+<script>
+const $=id=>document.getElementById(id), $$=s=>[...document.querySelectorAll(s)];
+const j=async(u,o)=>(await fetch(u,o)).json();
+const SVGNS="http://www.w3.org/2000/svg";
+const W=640,H=240,PAD=24;
+const SAMPLES={
+  "trend":   "10,12,13,15,16,18,19,21,22,24,25,27,28,30",
+  "seasonal":"8,12,20,10,9,13,21,11,10,14,22,12,11,15",
+  "spike":   "20,21,19,22,20,21,55,20,19,21,20,22,21,20",
+};
+const CFG_KEY="forecast.cfg";
+let cfg={horizon:6,method:"auto",mode:"auto",model:""};
+let providerStatus={};  // last GET /providers
 
-      $("run").addEventListener("click", run);
-      loadMethods();
-    </script>
-  </body>
+function toast(msg,type="info"){
+  const t=document.createElement("div");t.className=`toast ${type}`;
+  t.innerHTML=`<span class="tdot"></span>${msg}`;$("toasts").appendChild(t);
+  setTimeout(()=>{t.style.opacity="0";t.style.transition="opacity .3s";setTimeout(()=>t.remove(),300)},2600);
+}
+
+/* ===================== settings ===================== */
+function loadCfg(){try{cfg={...cfg,...JSON.parse(localStorage.getItem(CFG_KEY)||"{}")}}catch{}}
+function applyCfgToForm(){
+  $("cfgHorizon").value=cfg.horizon;
+  if($("cfgMethod").querySelector(`option[value="${cfg.method}"]`))$("cfgMethod").value=cfg.method;
+  $("cfgModel").value=cfg.model||"";
+  selectMode(cfg.mode||"auto");
+  syncThemeSeg();
+}
+function applyCfgToConsole(){
+  $("horizon").value=cfg.horizon;
+  if($("method").querySelector(`option[value="${cfg.method}"]`))$("method").value=cfg.method;
+  if($("provider").querySelector(`option[value="${cfg.mode}"]`))$("provider").value=cfg.mode;
+}
+function openDrawer(){applyCfgToForm();$("scrim").classList.add("open");$("drawer").classList.add("open");$("drawer").setAttribute("aria-hidden","false")}
+function closeDrawer(){$("scrim").classList.remove("open");$("drawer").classList.remove("open");$("drawer").setAttribute("aria-hidden","true")}
+$("gear").onclick=openDrawer;$("closedrawer").onclick=closeDrawer;
+$("savecfg").onclick=()=>{cfg={horizon:Number($("cfgHorizon").value)||6,method:$("cfgMethod").value,
+    mode:$("modeseg").querySelector('[aria-pressed="true"]')?.dataset.mode||"auto",
+    model:$("cfgModel").value.trim()};
+  localStorage.setItem(CFG_KEY,JSON.stringify(cfg));applyCfgToConsole();renderRouting();closeDrawer();toast("Settings saved","ok")};
+$("resetcfg").onclick=()=>{cfg={horizon:6,method:"auto",mode:"auto",model:""};localStorage.removeItem(CFG_KEY);applyCfgToForm();applyCfgToConsole();renderRouting();toast("Reset to defaults","info")};
+
+/* ===================== forecast core (functionality preserved) ===================== */
+async function loadMethods(){
+  const ms=await j("/methods");
+  $("method").innerHTML=ms.map(m=>`<option>${m.name}</option>`).join("");
+  $("cfgMethod").innerHTML=ms.map(m=>`<option>${m.name}</option>`).join("");
+  $("methpill").textContent=`${ms.length} methods`;
+  const sb=$("samples");
+  Object.keys(SAMPLES).forEach(k=>{
+    const b=document.createElement("button");b.className="chip";b.dataset.k=k;b.textContent=k;
+    b.addEventListener("click",()=>{$("series").value=SAMPLES[k];run();});
+    sb.appendChild(b);
+  });
+}
+async function loadProviders(){
+  try{
+    const p=await j("/providers");providerStatus=p;
+    const shortName=s=>(s||"").split("/").pop().replace(/:free$/,"");
+    const sel=$("provider");
+    const freeLabel=p.free_models&&p.free_models[0]?"Free · "+shortName(p.free_models[0]):"Free";
+    sel.insertAdjacentHTML("beforeend",`<option value="free">${freeLabel}</option>`);
+    sel.insertAdjacentHTML("beforeend",`<option value="offline">Offline (deterministic)</option>`);
+    if(p.available&&p.available.paid)
+      sel.insertAdjacentHTML("beforeend",`<option value="paid">Paid (your key)</option>`);
+    if($("provider").querySelector(`option[value="${cfg.mode}"]`))sel.value=cfg.mode; else sel.value="auto";
+    const state=$("providerState");
+    const activeLabel=p.active_mode==="free"&&p.free_models&&p.free_models[0]
+      ? p.active_mode+" · "+shortName(p.free_models[0]):(p.active_mode||"");
+    state.textContent="Live: "+activeLabel;
+    state.style.display="";
+    renderRouting();
+  }catch{/* optional */}
+}
+function parseSeries(){
+  return $("series").value.split(/[\s,]+/).map(Number).filter(x=>!Number.isNaN(x));
+}
+
+async function run(){
+  const series=parseSeries();
+  if(series.length<2){toast("Enter at least 2 numbers.","bad");return;}
+  const btn=$("run");btn.classList.add("loading");
+  const body={series,horizon:Number($("horizon").value),method:$("method").value,
+    use_llm:$("useLlm").checked,provider:$("provider").value};
+  try{
+    const [fc,an]=await Promise.all([
+      fetch("/forecast",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)}),
+      fetch("/anomalies",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({series})}),
+    ]);
+    if(!fc.ok){toast(await fc.text(),"bad");btn.classList.remove("loading");return;}
+    const fcData=await fc.json();
+    $("summary").innerHTML=fcData.summary
+      ? `<span>📝</span><span>${fcData.summary}${fcData.routing?` <span class="muted">(via ${fcData.routing.provider}${fcData.routing.model?" · "+fcData.routing.model:""})</span>`:""}</span>` : "";
+    $("metaProvider").textContent=fcData.routing?`via ${fcData.routing.provider}`:"";
+    draw(series,fcData,await an.json());
+    toast("Forecast ready","ok");
+  }catch(e){toast("Forecast failed","bad");}
+  btn.classList.remove("loading");
+}
+
+function draw(history,f,anom){
+  $("out").style.display="block";
+  const n=history.length,h=f.forecast.length,total=n+h;
+  const all=[...history,...f.forecast,...f.upper,...f.lower];
+  const min=Math.min(...all),max=Math.max(...all),rng=(max-min)||1;
+  const sx=i=>PAD+(i/(total-1))*(W-2*PAD);
+  const sy=v=>H-PAD-((v-min)/rng)*(H-2*PAD);
+  const cs=getComputedStyle(document.documentElement);
+  const C={hist:cs.getPropertyValue("--c-hist").trim(),fc:cs.getPropertyValue("--c-fc").trim(),
+    band:cs.getPropertyValue("--c-band").trim(),anom:cs.getPropertyValue("--c-anom").trim()};
+  const svg=$("chart");svg.innerHTML="";
+  const add=(tag,attrs)=>{const e=document.createElementNS(SVGNS,tag);
+    for(const k in attrs)e.setAttribute(k,attrs[k]);svg.appendChild(e);return e;};
+  // CI band over the forecast region
+  const bandTop=f.upper.map((v,jx)=>`${sx(n+jx)},${sy(v)}`);
+  const bandBot=f.lower.map((v,jx)=>`${sx(n+jx)},${sy(v)}`).reverse();
+  add("polygon",{points:[...bandTop,...bandBot].join(" "),fill:C.band});
+  // history line
+  add("polyline",{points:history.map((v,i)=>`${sx(i)},${sy(v)}`).join(" "),
+    fill:"none",stroke:C.hist,"stroke-width":"2"});
+  // forecast line (dashed), starting from last history point
+  const fcPts=[`${sx(n-1)},${sy(history[n-1])}`,...f.forecast.map((v,jx)=>`${sx(n+jx)},${sy(v)}`)];
+  add("polyline",{points:fcPts.join(" "),fill:"none",stroke:C.fc,"stroke-width":"2","stroke-dasharray":"5 4"});
+  // anomaly dots
+  for(const a of anom.anomalies)
+    add("circle",{cx:sx(a.index),cy:sy(a.value),r:"4",fill:C.anom});
+
+  const bt=f.backtest,rb=f.rolling_backtest;
+  $("meta").innerHTML=
+    `<span>method <b>${f.method}</b></span>`+
+    (f.season_period?`<span>season <b>${f.season_period}</b></span>`:"")+
+    (bt?`<span>holdout MAE <b>${bt.mae}</b></span>`:"")+
+    (rb?`<span>rolling MAE <b>${rb.mae}</b> (${rb.folds} folds)</span>`:"")+
+    `<span>anomalies <b>${anom.anomalies.length}</b></span>`+
+    `<span>next: <b>${f.forecast.slice(0,5).join(", ")}${h>5?"…":""}</b></span>`;
+}
+
+// CSV upload: take the first numeric column (skips a header row if present)
+function parseCsv(text){
+  const out=[];
+  for(const line of text.split(/\r?\n/)){
+    if(!line.trim())continue;
+    const cells=line.split(",");
+    const v=Number(cells[cells.length-1]);   // last column = value
+    if(!Number.isNaN(v))out.push(v);
+  }
+  return out;
+}
+$("csv").addEventListener("change",async e=>{
+  const file=e.target.files[0];
+  if(!file)return;
+  const nums=parseCsv(await file.text());
+  if(nums.length<2){toast("No numeric column found in the CSV.","bad");return;}
+  $("series").value=nums.join(", ");run();
+});
+$("run").addEventListener("click",run);
+
+/* ===================== POLISH KIT: theme toggle ===================== */
+const THEME_KEY="theme";
+function getTheme(){try{return localStorage.getItem(THEME_KEY)||"system"}catch{return "system"}}
+function effectiveDark(t){
+  if(t==="dark")return true; if(t==="light")return false;
+  return !window.matchMedia("(prefers-color-scheme: light)").matches;
+}
+function applyTheme(t){
+  const dark=effectiveDark(t);
+  document.documentElement.classList.toggle("light",!dark);
+  $("themeicon").textContent=dark?"☾":"☀";
+  $("themebtn").title=`Theme: ${t}`;
+}
+function setTheme(t){try{localStorage.setItem(THEME_KEY,t)}catch{} applyTheme(t); syncThemeSeg();}
+function syncThemeSeg(){const cur=getTheme();
+  $$("#themeseg .segbtn").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.theme===cur)));}
+$("themebtn").onclick=()=>{const cur=getTheme();const next=effectiveDark(cur)?"light":"dark";setTheme(next);};
+$$("#themeseg .segbtn").forEach(b=>b.onclick=()=>setTheme(b.dataset.theme));
+// react to OS changes while in system mode
+window.matchMedia("(prefers-color-scheme: light)").addEventListener?.("change",()=>{if(getTheme()==="system")applyTheme("system");});
+applyTheme(getTheme());
+
+/* ===================== POLISH KIT: help modal ===================== */
+function openHelp(){$("scrim").classList.add("open");$("help").classList.add("open");
+  $("help").setAttribute("aria-hidden","false");$("closehelp").focus();}
+function closeHelp(){$("scrim").classList.remove("open");$("help").classList.remove("open");
+  $("help").setAttribute("aria-hidden","true");}
+$("helpbtn").onclick=openHelp;$("closehelp").onclick=closeHelp;
+$("scrim").onclick=()=>{closeDrawer();closeHelp();};
+document.addEventListener("keydown",e=>{
+  const typing=/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName||"")||document.activeElement?.isContentEditable;
+  if(e.key==="Escape"){closeDrawer();closeHelp();}
+  else if(e.key==="?"&&!typing&&!$("help").classList.contains("open")){e.preventDefault();openHelp();}
+});
+
+/* ===================== POLISH KIT: routing config ===================== */
+const MODE_BLURBS={
+  auto:"auto = free if a key is set, else paid, else local, else offline.",
+  free:"free = OpenRouter free models only.",
+  paid:"paid = Anthropic, then OpenAI.",
+  offline:"offline = local Ollama if reachable, else a deterministic template (no API call).",
+};
+const MODE_CHAIN={
+  auto:["openrouter","anthropic","openai","ollama"],
+  free:["openrouter"], paid:["anthropic","openai"], offline:["ollama"],
+};
+const PROVIDERS=["openrouter","anthropic","openai","ollama"];
+function selectMode(m){
+  $$("#modeseg .segbtn").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.mode===m)));
+  $("modeblurb").textContent=MODE_BLURBS[m]||"";
+  $("modeactive").textContent=`active: ${m}`;
+}
+function currentMode(){return $("modeseg").querySelector('[aria-pressed="true"]')?.dataset.mode||"auto";}
+function renderRouting(){
+  const m=currentMode();
+  $("modeactive").textContent=`active: ${m}`;
+  const avail=providerStatus.available||{};
+  const models=providerStatus.models||{};
+  // provider status rows + always-on offline/mock row
+  const rows=PROVIDERS.map(p=>{
+    const on=!!avail[p];
+    const mdl=models[p]?` <span class="muted">${(models[p]||"").split("/").pop()}</span>`:"";
+    return `<div class="pstat"><span>${p}${mdl}</span><span class="pdot ${on?'on':''}" title="${on?'available':'not configured'}"></span></div>`;
+  }).join("")+
+    `<div class="pstat"><span>offline (deterministic)</span><span class="pdot on" title="always available"></span></div>`;
+  $("provrows").innerHTML=rows;
+  // resolved fallback chain for the selected mode (available providers, then offline)
+  const chain=(MODE_CHAIN[m]||[]).filter(p=>avail[p]);
+  const display=[...chain,"offline (deterministic)"];
+  $("chainline").textContent=display.join("  →  ");
+}
+$$("#modeseg .segbtn").forEach(b=>b.onclick=()=>{selectMode(b.dataset.mode);renderRouting();});
+
+/* ===================== boot ===================== */
+async function boot(){
+  loadCfg();
+  selectMode(cfg.mode||"auto");  // seed routing segment before drawer opens
+  // cold-start: poll health until ready, then reveal
+  let ready=false;
+  for(let i=0;i<60 && !ready;i++){
+    try{const r=await fetch("/health");if(r.ok){ready=true;break}}catch{}
+    if(i===4)$("bootmsg").textContent="Still waking up…";
+    await new Promise(r=>setTimeout(r,1500));
+  }
+  $("hdot").className="dot ok";$("hstat").textContent="live";
+  $("boot").classList.add("hide");setTimeout(()=>$("boot").remove(),600);
+  $$(".reveal").forEach((el,i)=>setTimeout(()=>el.classList.add("in"),90*i));
+  // populate
+  try{await loadMethods();}catch{}
+  await loadProviders();
+  applyCfgToConsole();
+  // run a sample so the chart is populated on first load
+  try{$("series").value=SAMPLES.trend;await run();}catch{}
+}
+boot();
+
+// keep live-status pill honest with periodic /health polling
+setInterval(async()=>{
+  try{const r=await fetch("/health");
+    $("hdot").className=r.ok?"dot ok":"dot";$("hstat").textContent=r.ok?"live":"offline";}
+  catch{$("hdot").className="dot";$("hstat").textContent="offline";}
+},15000);
+</script>
+</body>
 </html>
