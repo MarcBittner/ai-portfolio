@@ -4,6 +4,16 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>rtc-guard — scoped real-time access tokens</title>
+<!-- POLISH KIT: theme-init (apply before paint, no flash) -->
+<script>
+(function(){
+  try{
+    var t=localStorage.getItem("theme")||"system";
+    var dark = t==="dark" || (t==="system" && !window.matchMedia("(prefers-color-scheme: light)").matches);
+    if(!dark) document.documentElement.classList.add("light");
+  }catch(e){}
+})();
+</script>
 <style>
   /* ============================ design system ============================ */
   :root{
@@ -19,20 +29,35 @@
     --grad:linear-gradient(135deg,var(--accent),var(--accent-2));
     --ease:cubic-bezier(.22,.61,.36,1);
     --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+    --header-bg:rgba(10,13,20,.72);
+    --bg-radial-1:rgba(107,130,255,.10); --bg-radial-2:rgba(67,201,138,.05);
+  }
+  /* POLISH KIT: theme toggle — LIGHT palette overrides (same accents, light surfaces, dark ink) */
+  html.light{
+    --bg:#f4f6fb; --bg-grad-1:#eef2fb; --bg-grad-2:#f4f6fb;
+    --surface:#ffffff; --surface-2:#f1f4fa; --surface-3:#e6ebf5;
+    --line:#d8dfec; --line-2:#c2ccde;
+    --ink:#16203a; --ink-dim:#566184; --ink-faint:#8b95ad;
+    --accent:#3a6ff0; --accent-2:#7c5cf5; --accent-ink:#ffffff;
+    --ok:#1f9d63; --warn:#b9791f; --bad:#d83a4d; --info:#3a6ff0; --violet:#6f53d6;
+    --sh:0 1px 2px rgba(20,32,58,.06), 0 8px 24px -14px rgba(20,32,58,.18);
+    --sh-lg:0 1px 2px rgba(20,32,58,.08), 0 24px 64px -28px rgba(20,32,58,.28);
+    --header-bg:rgba(255,255,255,.78);
+    --bg-radial-1:rgba(58,111,240,.10); --bg-radial-2:rgba(31,157,99,.06);
   }
   *{box-sizing:border-box}
   html{scroll-behavior:smooth}
   body{margin:0;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;
     font:15px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Inter,sans-serif;
-    background-image:radial-gradient(1200px 600px at 80% -10%,rgba(107,130,255,.10),transparent 60%),
-      radial-gradient(900px 500px at 0% 0%,rgba(67,201,138,.05),transparent 55%);
-    background-attachment:fixed;min-height:100vh}
+    background-image:radial-gradient(1200px 600px at 80% -10%,var(--bg-radial-1),transparent 60%),
+      radial-gradient(900px 500px at 0% 0%,var(--bg-radial-2),transparent 55%);
+    background-attachment:fixed;min-height:100vh;transition:background-color .25s var(--ease),color .25s var(--ease)}
   ::selection{background:rgba(106,161,255,.3)}
   a{color:var(--accent);text-decoration:none}
   /* header */
   header{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:14px;
     padding:14px 24px;border-bottom:1px solid var(--line);
-    background:rgba(10,13,20,.72);backdrop-filter:blur(14px) saturate(140%)}
+    background:var(--header-bg);backdrop-filter:blur(14px) saturate(140%)}
   .brand{display:flex;align-items:center;gap:11px;font-weight:650;font-size:16px;letter-spacing:.2px}
   .logo{width:30px;height:30px;border-radius:9px;background:var(--grad);position:relative;
     box-shadow:0 4px 16px -4px rgba(106,161,255,.6);flex:none}
@@ -74,11 +99,11 @@
     transition:.16s var(--ease);display:inline-flex;align-items:center;gap:8px;position:relative}
   .btn:hover{transform:translateY(-1px);border-color:var(--line-2)}
   .btn:active{transform:translateY(0)}
-  .btn.primary{background:var(--grad);border:none;color:#06101f;
+  .btn.primary{background:var(--grad);border:none;color:var(--accent-ink);
     box-shadow:0 6px 20px -8px rgba(106,161,255,.7)}
   .btn.primary:hover{box-shadow:0 10px 28px -8px rgba(106,161,255,.8)}
   .btn[disabled]{opacity:.6;pointer-events:none}
-  .btn .spin{width:14px;height:14px;border:2px solid rgba(6,16,31,.35);border-top-color:#06101f;
+  .btn .spin{width:14px;height:14px;border:2px solid rgba(127,127,127,.35);border-top-color:var(--accent-ink);
     border-radius:50%;animation:spin .7s linear infinite;display:none}
   .btn.loading .spin{display:block}.btn.loading .lbl{opacity:.7}
   .chip{font:inherit;font-size:12px;cursor:pointer;border:1px dashed var(--line);background:transparent;
@@ -137,7 +162,32 @@
   .field label{font-size:12px;color:var(--ink-dim);font-weight:600;display:flex;justify-content:space-between}
   .field .hint{font-size:11.5px;color:var(--ink-faint);font-weight:400}
   .seg{display:flex;gap:6px;flex-wrap:wrap}
+  /* POLISH KIT: segmented control (theme + routing mode) */
+  .seg .segbtn{font:inherit;font-size:12px;cursor:pointer;border:1px solid var(--line);background:var(--surface-2);
+    color:var(--ink-dim);border-radius:var(--r-sm);padding:7px 11px;transition:.16s var(--ease)}
+  .seg .segbtn:hover{color:var(--ink);border-color:var(--line-2)}
+  .seg .segbtn[aria-pressed="true"]{background:var(--grad);border-color:transparent;color:var(--accent-ink);font-weight:600}
+  .pstat{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12.5px;
+    padding:7px 11px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface-2)}
+  .pstat .pdot{width:8px;height:8px;border-radius:50%;background:var(--ink-faint);flex:none}
+  .pstat .pdot.on{background:var(--ok);box-shadow:0 0 0 3px rgba(67,201,138,.18)}
+  .chainline{font-family:var(--mono);font-size:11.5px;color:var(--ink-dim);
+    background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);padding:8px 11px;word-break:break-word}
   .drawer .foot{margin-top:auto;padding:16px 20px;border-top:1px solid var(--line);display:flex;gap:10px}
+  /* POLISH KIT: help modal (centered dialog, reuses scrim) */
+  #help{position:fixed;top:50%;left:50%;transform:translate(-50%,calc(-50% + 12px));z-index:70;
+    width:560px;max-width:94vw;max-height:86vh;overflow:auto;opacity:0;pointer-events:none;
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh-lg);
+    transition:opacity .25s var(--ease),transform .25s var(--ease)}
+  #help.open{opacity:1;pointer-events:auto;transform:translate(-50%,-50%)}
+  #help header{position:static;background:none;backdrop-filter:none;border-bottom:1px solid var(--line)}
+  #help .body{padding:20px;display:grid;gap:16px}
+  #help h4{margin:0 0 6px;font-size:11.5px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--ink-dim)}
+  #help p{margin:0;color:var(--ink-dim);font-size:13.5px}
+  #help ol{margin:0;padding-left:20px;color:var(--ink-dim);font-size:13.5px;display:grid;gap:4px}
+  #help .kbd{font-family:var(--mono);font-size:11.5px;background:var(--surface-2);border:1px solid var(--line);
+    border-bottom-width:2px;border-radius:6px;padding:1px 7px;color:var(--ink)}
+  #help .eps{display:flex;gap:7px;flex-wrap:wrap}
   /* toast */
   #toasts{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:80;
     display:flex;flex-direction:column;gap:10px;align-items:center}
@@ -179,6 +229,12 @@
   <span class="spacer"></span>
   <span class="status"><span class="dot" id="hdot"></span><span id="hstat">connecting…</span></span>
   <span class="pill" id="advpill">adversarial …</span>
+  <!-- POLISH KIT: theme toggle -->
+  <button class="iconbtn" id="themebtn" title="Toggle theme" aria-label="Toggle light/dark theme"><span id="themeicon">☾</span></button>
+  <!-- POLISH KIT: help modal trigger -->
+  <button class="iconbtn" id="helpbtn" title="Help (?)" aria-label="Help">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 1 1 4.6 3c-.8.6-1.7 1-1.7 2.2"/><line x1="12" y1="17.5" x2="12" y2="17.51"/></svg>
+  </button>
   <button class="iconbtn" id="gear" title="Settings" aria-label="Settings">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
   </button>
@@ -285,10 +341,70 @@
       <label>Signing key <span class="hint">read-only</span></label>
       <div class="muted" style="font-size:11.5px">The demo uses a default HS256 signing key. Override it on the deployment via the <code>RTC_GUARD_SIGNING_KEY</code> env var — no real secrets are required to run the demo.</div>
     </div>
+
+    <!-- POLISH KIT: theme segmented control -->
+    <div class="field">
+      <label>Theme <span class="hint">appearance</span></label>
+      <div class="seg" id="themeseg">
+        <button type="button" class="segbtn" data-theme="dark">Dark</button>
+        <button type="button" class="segbtn" data-theme="light">Light</button>
+        <button type="button" class="segbtn" data-theme="system">System</button>
+      </div>
+    </div>
+
+    <!-- POLISH KIT: routing config -->
+    <div class="field">
+      <label>Routing mode <span class="hint">which provider the grant auditor uses</span></label>
+      <div class="seg" id="modeseg">
+        <button type="button" class="segbtn" data-mode="auto">auto</button>
+        <button type="button" class="segbtn" data-mode="local">local</button>
+        <button type="button" class="segbtn" data-mode="free">free</button>
+        <button type="button" class="segbtn" data-mode="paid">paid</button>
+        <button type="button" class="segbtn" data-mode="offline">offline</button>
+      </div>
+      <div class="hint" id="modeblurb">auto = local if reachable, else paid, else free, else offline.</div>
+    </div>
+    <div class="field">
+      <label for="cfgModel">Model override <span class="hint">optional</span></label>
+      <input id="cfgModel" type="text" placeholder="provider default" />
+    </div>
+    <div class="field">
+      <label>Provider status <span class="hint" id="modeactive">active: auto</span></label>
+      <div style="display:grid;gap:6px" id="provrows"></div>
+    </div>
+    <div class="field">
+      <label>Fallback chain <span class="hint">→ on failure</span></label>
+      <div class="chainline" id="chainline">offline (deterministic)</div>
+    </div>
+    <div class="muted" style="font-size:11.5px">Provider keys live server-side; this selects which available provider the grant auditor uses (mint/verify stay deterministic, no LLM).</div>
   </div>
   <div class="foot">
     <button class="btn" id="resetcfg">Reset</button>
     <button class="btn primary" id="savecfg" style="flex:1"><span class="lbl">Save</span></button>
+  </div>
+</aside>
+
+<!-- POLISH KIT: help modal -->
+<aside id="help" role="dialog" aria-modal="true" aria-labelledby="helptitle" aria-hidden="true">
+  <header><div class="brand" style="font-size:15px"><span class="logo" style="width:24px;height:24px"></span>
+    <span id="helptitle">Help · rtc-guard</span></div>
+    <span class="spacer"></span><button class="iconbtn" id="closehelp" aria-label="Close help">✕</button></header>
+  <div class="body">
+    <div><h4>What it is</h4><p>A real-time access guard: it mints <b>scoped, signed WebRTC room tokens</b>
+      (least-privilege grants with a TTL), runs an <b>adversarial breaker suite</b> that proves common attacks
+      are rejected, and ships an <b>LLM grant auditor</b> that flags over-permissioning in plain English. The
+      security core (mint/verify) is deterministic; the model only explains and judges.</p></div>
+    <div><h4>How to use</h4><ol>
+      <li><b>Mint a token</b> — set identity, room, grant template, and TTL in <i>Mint a scoped token</i>, then <i>Mint token</i> to see the signed grant.</li>
+      <li><b>Verify a token</b> — paste a token (or use the minted one) and an expected room in <i>Verify a token</i> to check signature, TTL, and room scope.</li>
+      <li><b>Run the adversary</b> — the <i>Adversarial suite</i> panel shows each attack and why it was blocked.</li>
+      <li><b>Lint a grant</b> — toggle capabilities in <i>Least-privilege grant auditor</i> and <i>Audit grant</i> for findings + severities.</li>
+    </ol></div>
+    <div><h4>Endpoints</h4><div class="eps">
+      <code>/templates</code><code>/v1/token</code><code>/v1/verify</code><code>/adversary</code>
+      <code>/grant/audit</code><code>/threat-model</code><code>/evals</code><code>/llm</code></div></div>
+    <div><h4>Keyboard shortcuts</h4><p><span class="kbd">?</span> open this help · <span class="kbd">Esc</span> close any overlay</p></div>
+    <div><p class="muted" style="font-size:11.5px">All identities, rooms, and grants are <b>synthetic</b> — the demo uses a default HS256 key and no real secrets.</p></div>
   </div>
 </aside>
 
@@ -299,9 +415,10 @@ const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const j=async(u,o)=>(await fetch(u,o)).json();
 const esc=s=>String(s).replace(/</g,"&lt;");
 const CFG_KEY="rtcguard.cfg";
-const DEF={identity:"alice",room:"room-a",template:"viewer",ttl:300};
+const DEF={identity:"alice",room:"room-a",template:"viewer",ttl:300,mode:"auto",model:""};
 let cfg={...DEF};
 let templateKeys=[];
+let llmProviders={};  // last GET /llm providers map
 
 function toast(msg,type="info"){
   const t=document.createElement("div");t.className=`toast ${type}`;
@@ -316,6 +433,8 @@ function fillTemplateSelects(){
 function applyCfgToForm(){
   $("#cfgIdentity").value=cfg.identity;$("#cfgRoom").value=cfg.room;$("#cfgTtl").value=cfg.ttl;
   if($("#cfgTemplate").querySelector(`option[value="${cfg.template}"]`))$("#cfgTemplate").value=cfg.template;
+  $("#cfgModel").value=cfg.model||"";
+  selectMode(cfg.mode||"auto");renderRouting();syncThemeSeg();
 }
 function applyCfgToMint(){
   $("#identity").value=cfg.identity;$("#room").value=cfg.room;$("#ttl").value=cfg.ttl;
@@ -324,12 +443,13 @@ function applyCfgToMint(){
 }
 function openDrawer(){applyCfgToForm();$("#scrim").classList.add("open");$("#drawer").classList.add("open");$("#drawer").setAttribute("aria-hidden","false")}
 function closeDrawer(){$("#scrim").classList.remove("open");$("#drawer").classList.remove("open");$("#drawer").setAttribute("aria-hidden","true")}
-$("#gear").onclick=openDrawer;$("#closedrawer").onclick=closeDrawer;$("#scrim").onclick=closeDrawer;
+$("#gear").onclick=openDrawer;$("#closedrawer").onclick=closeDrawer;
 $("#savecfg").onclick=()=>{
   cfg={identity:$("#cfgIdentity").value.trim()||DEF.identity,room:$("#cfgRoom").value.trim()||DEF.room,
-    template:$("#cfgTemplate").value,ttl:+$("#cfgTtl").value||DEF.ttl};
-  localStorage.setItem(CFG_KEY,JSON.stringify(cfg));applyCfgToMint();closeDrawer();toast("Settings saved","ok")};
-$("#resetcfg").onclick=()=>{cfg={...DEF};localStorage.removeItem(CFG_KEY);applyCfgToForm();applyCfgToMint();toast("Reset to defaults","info")};
+    template:$("#cfgTemplate").value,ttl:+$("#cfgTtl").value||DEF.ttl,
+    mode:currentMode(),model:$("#cfgModel").value.trim()};
+  localStorage.setItem(CFG_KEY,JSON.stringify(cfg));applyCfgToMint();renderRouting();closeDrawer();toast("Settings saved","ok")};
+$("#resetcfg").onclick=()=>{cfg={...DEF};localStorage.removeItem(CFG_KEY);applyCfgToForm();applyCfgToMint();renderRouting();toast("Reset to defaults","info")};
 
 function grantChips(v){
   const order=["roomJoin","canSubscribe","canPublish","canPublishData"];
@@ -339,6 +459,7 @@ function grantChips(v){
 
 async function boot(){
   loadCfg();
+  selectMode(cfg.mode||"auto");  // seed routing segment so renderRouting has a mode before drawer opens
   // cold-start: poll health until ready, then reveal
   let ready=false;
   for(let i=0;i<60 && !ready;i++){
@@ -412,7 +533,7 @@ const SEV_BADGE={high:"b-block",medium:"b-flag",low:"b-info"};
 async function auditGrant(opts={}){
   const btn=$("#audit");btn.classList.add("loading");
   const body={identity:$("#aidentity").value,room:$("#aroom").value,
-    role:$("#arole").value,ttl:+$("#attl").value};
+    role:$("#arole").value,ttl:+$("#attl").value,mode:cfg.mode||null};
   AUDIT_CAPS.forEach(c=>{body[c]=$("#a"+c).classList.contains("on");});
   $("#auditres").innerHTML='<span class="muted">auditing…</span>';
   try{
@@ -433,8 +554,10 @@ async function auditGrant(opts={}){
 }
 $("#audit").onclick=()=>auditGrant();
 async function loadLlm(){
-  try{const s=await j("llm");const active=Object.entries(s.providers).find(e=>e[1]);
-    $("#llmstat").textContent=active?active[0]:"offline (deterministic)";}catch{}
+  try{const s=await j("llm");llmProviders=s.providers||{};
+    const active=Object.entries(llmProviders).find(e=>e[1]);
+    $("#llmstat").textContent=active?active[0]:"offline (deterministic)";
+    renderRouting();}catch{}
 }
 
 function renderAdv(a){
@@ -455,6 +578,77 @@ function renderThreats(ts){
       `<td class="muted">${esc(t.mitigation)}</td>`+
       `<td><span class="redchip">${esc(t.control)}</span></td></tr>`).join("")+`</tbody>`;
 }
+
+/* ===================== POLISH KIT: theme toggle ===================== */
+const THEME_KEY="theme";
+function getTheme(){try{return localStorage.getItem(THEME_KEY)||"system"}catch{return "system"}}
+function effectiveDark(t){
+  if(t==="dark")return true; if(t==="light")return false;
+  return !window.matchMedia("(prefers-color-scheme: light)").matches;
+}
+function applyTheme(t){
+  const dark=effectiveDark(t);
+  document.documentElement.classList.toggle("light",!dark);
+  $("#themeicon").textContent=dark?"☾":"☀";
+  $("#themebtn").title=`Theme: ${t}`;
+}
+function setTheme(t){try{localStorage.setItem(THEME_KEY,t)}catch{} applyTheme(t); syncThemeSeg();}
+function syncThemeSeg(){const cur=getTheme();
+  $$("#themeseg .segbtn").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.theme===cur)));}
+$("#themebtn").onclick=()=>{const cur=getTheme();const next=effectiveDark(cur)?"light":"dark";setTheme(next);};
+$$("#themeseg .segbtn").forEach(b=>b.onclick=()=>setTheme(b.dataset.theme));
+// react to OS changes while in system mode
+window.matchMedia("(prefers-color-scheme: light)").addEventListener?.("change",()=>{if(getTheme()==="system")applyTheme("system");});
+applyTheme(getTheme());
+
+/* ===================== POLISH KIT: help modal ===================== */
+function openHelp(){$("#scrim").classList.add("open");$("#help").classList.add("open");
+  $("#help").setAttribute("aria-hidden","false");$("#closehelp").focus();}
+function closeHelp(){$("#scrim").classList.remove("open");$("#help").classList.remove("open");
+  $("#help").setAttribute("aria-hidden","true");}
+$("#helpbtn").onclick=openHelp;$("#closehelp").onclick=closeHelp;
+$("#scrim").onclick=()=>{closeDrawer();closeHelp();};
+document.addEventListener("keydown",e=>{
+  const typing=/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName||"")||document.activeElement?.isContentEditable;
+  if(e.key==="Escape"){closeDrawer();closeHelp();}
+  else if(e.key==="?"&&!typing&&!$("#help").classList.contains("open")){e.preventDefault();openHelp();}
+});
+
+/* ===================== POLISH KIT: routing config ===================== */
+const MODE_BLURBS={
+  auto:"auto = local if reachable, else paid, else free, else offline.",
+  local:"local = Ollama only (on-box, zero cost).",
+  free:"free = OpenRouter free models only.",
+  paid:"paid = Anthropic, then OpenAI.",
+  offline:"offline = deterministic auditor only (no LLM call).",
+};
+const MODE_CHAIN={
+  auto:["anthropic","openai","ollama","openrouter"],
+  local:["ollama"], free:["openrouter"], paid:["anthropic","openai"], offline:[],
+};
+const PROVIDERS=["anthropic","openai","ollama","openrouter"];
+function selectMode(m){
+  $$("#modeseg .segbtn").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.mode===m)));
+  $("#modeblurb").textContent=MODE_BLURBS[m]||"";
+  $("#modeactive").textContent=`active: ${m}`;
+}
+function currentMode(){return $("#modeseg").querySelector('[aria-pressed="true"]')?.dataset.mode||"auto";}
+function renderRouting(){
+  const m=currentMode();
+  $("#modeactive").textContent=`active: ${m}`;
+  // provider status rows + always-on offline row
+  const rows=PROVIDERS.map(p=>{
+    const on=!!llmProviders[p];
+    return `<div class="pstat"><span>${p}</span><span class="pdot ${on?'on':''}" title="${on?'available':'not configured'}"></span></div>`;
+  }).join("")+
+    `<div class="pstat"><span>offline (deterministic)</span><span class="pdot on" title="always available"></span></div>`;
+  $("#provrows").innerHTML=rows;
+  // resolved fallback chain for the selected mode (available providers, then offline)
+  const chain=(MODE_CHAIN[m]||[]).filter(p=>llmProviders[p]);
+  const display=[...chain,"offline (deterministic)"];
+  $("#chainline").textContent=display.join("  →  ");
+}
+$$("#modeseg .segbtn").forEach(b=>b.onclick=()=>{selectMode(b.dataset.mode);renderRouting();});
 
 boot();
 </script>
