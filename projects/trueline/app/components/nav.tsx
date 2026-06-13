@@ -24,6 +24,12 @@ export function Nav() {
       >
         Configuration
       </Link>
+      <Link
+        href="/app/about"
+        className="rounded-md px-2 py-1 text-sm text-[--color-muted] hover:text-[--color-ink]"
+      >
+        About
+      </Link>
       <div className="ml-auto flex items-center gap-3">
         <OrganizationSwitcher
           hidePersonal={false}
