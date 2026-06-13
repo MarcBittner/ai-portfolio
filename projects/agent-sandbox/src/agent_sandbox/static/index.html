@@ -1,156 +1,556 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>agent-sandbox</title>
-    <style>
-      :root {
-        --bg: #0b0e14; --panel: #131722; --border: #232838; --fg: #e6e9ef;
-        --muted: #8b93a7; --accent: #6ea8fe; --ok: #63e6be; --bad: #ff6b6b;
-        --think: #ffd43b;
-      }
-      * { box-sizing: border-box; }
-      body { margin: 0; background: var(--bg); color: var(--fg);
-        font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
-      main { max-width: 860px; margin: 0 auto; padding: 28px 20px 60px; }
-      h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -0.01em; }
-      p.lede { color: var(--muted); margin: 0 0 18px; }
-      input[type=text] { width: 100%; background: #0e1320; color: var(--fg);
-        border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; font-size: 14px; }
-      input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
-      .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 10px 0; }
-      .spacer { flex: 1; }
-      button { background: #1b2230; color: var(--fg); border: 1px solid var(--border);
-        border-radius: 7px; padding: 6px 12px; font-size: 12px; cursor: pointer; }
-      button.primary { background: var(--accent); color: #07101f; border-color: var(--accent); font-weight: 600; font-size: 14px; }
-      button:hover { border-color: var(--accent); }
-      .samples button { font-size: 12px; }
-      .answer { background: var(--panel); border: 1px solid var(--accent); border-radius: 10px;
-        padding: 14px; margin: 16px 0; }
-      .answer .label { font-size: 11px; text-transform: uppercase; color: var(--muted); letter-spacing: .05em; }
-      .answer .val { font-size: 18px; font-weight: 600; margin-top: 4px; word-break: break-word; }
-      .step { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
-        padding: 12px 14px; margin-bottom: 10px; position: relative; }
-      .step .n { position: absolute; top: 12px; right: 14px; color: var(--muted); font-size: 12px; }
-      .step .think { color: var(--think); font-size: 13px; }
-      .step .act { margin-top: 6px; font-family: ui-monospace, Menlo, monospace; font-size: 13px; }
-      .step .act .tool { color: var(--accent); }
-      .step .obs { margin-top: 6px; font-size: 13px; }
-      .step .obs .tag { font-size: 11px; padding: 1px 6px; border-radius: 999px; border: 1px solid var(--border); margin-right: 6px; }
-      .step .obs.ok .tag { color: var(--ok); border-color: var(--ok); }
-      .step .obs.err .tag { color: var(--bad); border-color: var(--bad); }
-      .tools { color: var(--muted); font-size: 12px; margin-top: 18px; }
-      .tools code { color: var(--fg); }
-      .empty { color: var(--muted); }
-      a { color: var(--accent); }
-    </style>
-  </head>
-  <body>
-    <main>
-      <h1>agent-sandbox</h1>
-      <p class="lede">
-        A ReAct-style agent: it reasons, calls a safe tool, observes the result,
-        and repeats — chaining results across steps. Deterministic and offline
-        (an LLM planner plugs in behind the same interface). Watch the trace.
-      </p>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>agent-sandbox — ReAct agent over safe tools</title>
+<!-- POLISH KIT: theme-init (apply before paint, no flash) -->
+<script>
+(function(){
+  try{
+    var t=localStorage.getItem("theme")||"system";
+    var dark = t==="dark" || (t==="system" && !window.matchMedia("(prefers-color-scheme: light)").matches);
+    if(!dark) document.documentElement.classList.add("light");
+  }catch(e){}
+})();
+</script>
+<style>
+  /* ============================ design system ============================ */
+  :root{
+    --bg:#0a0d14; --bg-grad-1:#0e1322; --bg-grad-2:#0a0d14;
+    --surface:#131826; --surface-2:#1a2032; --surface-3:#212a40;
+    --line:#263149; --line-2:#33405d;
+    --ink:#e9eef7; --ink-dim:#97a3ba; --ink-faint:#67728a;
+    --accent:#6aa1ff; --accent-2:#9b86ff; --accent-ink:#06101f;
+    --ok:#43c98a; --warn:#e6ad52; --bad:#f15b6c; --info:#6aa1ff; --violet:#9b86ff;
+    --think:#e6ad52;
+    --r:15px; --r-sm:10px; --r-xs:7px;
+    --sh:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.5);
+    --sh-lg:0 1px 2px rgba(0,0,0,.4), 0 24px 64px -24px rgba(0,0,0,.7);
+    --grad:linear-gradient(135deg,var(--accent),var(--accent-2));
+    --ease:cubic-bezier(.22,.61,.36,1);
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+    --header-bg:rgba(10,13,20,.72);
+    --bg-radial-1:rgba(107,130,255,.10); --bg-radial-2:rgba(67,201,138,.05);
+    --mark-bg:#ffd54f; --mark-ink:#111;
+  }
+  /* POLISH KIT: theme toggle — LIGHT palette overrides (same accents, light surfaces, dark ink) */
+  html.light{
+    --bg:#f4f6fb; --bg-grad-1:#eef2fb; --bg-grad-2:#f4f6fb;
+    --surface:#ffffff; --surface-2:#f1f4fa; --surface-3:#e6ebf5;
+    --line:#d8dfec; --line-2:#c2ccde;
+    --ink:#16203a; --ink-dim:#566184; --ink-faint:#8b95ad;
+    --accent:#3a6ff0; --accent-2:#7c5cf5; --accent-ink:#ffffff;
+    --ok:#1f9d63; --warn:#b9791f; --bad:#d83a4d; --info:#3a6ff0; --violet:#6f53d6;
+    --think:#b9791f;
+    --sh:0 1px 2px rgba(20,32,58,.06), 0 8px 24px -14px rgba(20,32,58,.18);
+    --sh-lg:0 1px 2px rgba(20,32,58,.08), 0 24px 64px -28px rgba(20,32,58,.28);
+    --header-bg:rgba(255,255,255,.78);
+    --bg-radial-1:rgba(58,111,240,.10); --bg-radial-2:rgba(31,157,99,.06);
+    --mark-bg:#ffe08a; --mark-ink:#3a2c00;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;
+    font:15px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Inter,sans-serif;
+    background-image:radial-gradient(1200px 600px at 80% -10%,var(--bg-radial-1),transparent 60%),
+      radial-gradient(900px 500px at 0% 0%,var(--bg-radial-2),transparent 55%);
+    background-attachment:fixed;min-height:100vh;transition:background-color .25s var(--ease),color .25s var(--ease)}
+  ::selection{background:rgba(106,161,255,.3)}
+  a{color:var(--accent);text-decoration:none}
+  /* header */
+  header{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:14px;
+    padding:14px 24px;border-bottom:1px solid var(--line);
+    background:var(--header-bg);backdrop-filter:blur(14px) saturate(140%)}
+  .brand{display:flex;align-items:center;gap:11px;font-weight:650;font-size:16px;letter-spacing:.2px}
+  .logo{width:30px;height:30px;border-radius:9px;background:var(--grad);position:relative;
+    box-shadow:0 4px 16px -4px rgba(106,161,255,.6);flex:none}
+  .logo::after{content:"";position:absolute;inset:7px;border-radius:5px;
+    border:2px solid rgba(255,255,255,.85);border-right-color:transparent;
+    animation:spin 3.5s linear infinite}
+  .brand .tag{color:var(--ink-dim);font-size:12.5px;font-weight:400}
+  .spacer{flex:1}
+  .status{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--ink-dim);
+    padding:5px 11px;border:1px solid var(--line);border-radius:999px;background:var(--surface)}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--ink-faint)}
+  .dot.ok{background:var(--ok);box-shadow:0 0 0 0 rgba(67,201,138,.5);animation:pulse 2s infinite}
+  .pill{font-size:12px;color:var(--ink-dim);border:1px solid var(--line);border-radius:999px;
+    padding:5px 12px;background:var(--surface);white-space:nowrap}
+  .iconbtn{width:36px;height:36px;border-radius:10px;border:1px solid var(--line);background:var(--surface);
+    color:var(--ink-dim);cursor:pointer;display:grid;place-items:center;transition:.18s var(--ease)}
+  .iconbtn:hover{color:var(--ink);border-color:var(--line-2);transform:translateY(-1px);background:var(--surface-2)}
+  .iconbtn svg{width:18px;height:18px}
+  /* layout */
+  main{max-width:1160px;margin:0 auto;padding:26px 24px 64px;display:grid;gap:18px;
+    grid-template-columns:1fr 1fr}
+  .full{grid-column:1/-1}
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+    box-shadow:var(--sh);overflow:hidden;transition:.25s var(--ease)}
+  .panel:hover{border-color:var(--line-2)}
+  .panel h2{margin:0;padding:14px 18px;font-size:11.5px;font-weight:600;letter-spacing:.7px;
+    text-transform:uppercase;color:var(--ink-dim);border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:10px}
+  .panel .body{padding:18px}
+  .lede{color:var(--ink-dim);margin:0 0 16px;font-size:13.5px}
+  /* controls */
+  textarea,select,input{font:inherit;color:var(--ink);background:var(--surface-2);
+    border:1px solid var(--line);border-radius:var(--r-sm);padding:11px 13px;transition:.16s var(--ease);width:100%}
+  textarea:focus,select:focus,input:focus{outline:none;border-color:var(--accent);
+    box-shadow:0 0 0 3px rgba(106,161,255,.16)}
+  input.q{font-size:14px}
+  .btn{font:inherit;font-weight:600;cursor:pointer;border-radius:var(--r-sm);padding:11px 17px;
+    border:1px solid var(--line);background:var(--surface-2);color:var(--ink);
+    transition:.16s var(--ease);display:inline-flex;align-items:center;gap:8px;position:relative}
+  .btn:hover{transform:translateY(-1px);border-color:var(--line-2)}
+  .btn:active{transform:translateY(0)}
+  .btn.primary{background:var(--grad);border:none;color:var(--accent-ink);
+    box-shadow:0 6px 20px -8px rgba(106,161,255,.7)}
+  .btn.primary:hover{box-shadow:0 10px 28px -8px rgba(106,161,255,.8)}
+  .btn[disabled]{opacity:.6;pointer-events:none}
+  .btn .spin{width:14px;height:14px;border:2px solid rgba(6,16,31,.35);border-top-color:var(--accent-ink);
+    border-radius:50%;animation:spin .7s linear infinite;display:none}
+  .btn.loading .spin{display:block}.btn.loading .lbl{opacity:.7}
+  .chip{font:inherit;font-size:12px;cursor:pointer;border:1px dashed var(--line);background:transparent;
+    color:var(--ink-dim);border-radius:999px;padding:5px 12px;transition:.16s var(--ease)}
+  .chip:hover{color:var(--ink);border-color:var(--accent);border-style:solid;
+    background:rgba(106,161,255,.08)}
+  .row{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+  .check{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-dim);cursor:pointer;
+    padding:9px 13px;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm)}
+  .check input{width:auto}
+  .muted{color:var(--ink-dim);font-size:12.5px}
+  .mono{font-family:var(--mono);font-size:12px}
+  code{background:var(--surface-2);padding:1px 6px;border-radius:6px;font-family:var(--mono);font-size:12px}
+  /* badges */
+  .badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:700;
+    text-transform:uppercase;letter-spacing:.3px}
+  .b-info{background:rgba(106,161,255,.15);color:var(--info)}
+  .b-ok{background:rgba(67,201,138,.16);color:var(--ok)}
+  .b-warn{background:rgba(230,173,82,.16);color:var(--warn)}
+  /* answer card */
+  .answer{padding:16px;border:1px solid rgba(106,161,255,.4);border-radius:var(--r-sm);
+    background:rgba(106,161,255,.06);transition:.25s var(--ease)}
+  .answer .label{font-size:11px;text-transform:uppercase;color:var(--ink-dim);letter-spacing:.05em}
+  .answer .val{font-size:18px;font-weight:650;margin-top:5px;word-break:break-word}
+  /* ReAct trace steps */
+  .step{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);
+    padding:13px 15px;margin-bottom:10px;position:relative}
+  .step.fresh{animation:rowIn .5s var(--ease)}
+  .step .n{position:absolute;top:13px;right:15px;color:var(--ink-faint);font-size:11px;
+    text-transform:uppercase;letter-spacing:.4px}
+  .step .think{color:var(--think);font-size:13px;padding-right:54px}
+  .step .act{margin-top:7px;font-family:var(--mono);font-size:12.5px}
+  .step .act .tool{color:var(--accent);font-weight:600}
+  .step .obs{margin-top:7px;font-size:13px}
+  .step .obs .tag{font-size:10.5px;text-transform:uppercase;letter-spacing:.3px;padding:1px 8px;
+    border-radius:999px;border:1px solid var(--line);margin-right:7px;color:var(--ink-dim)}
+  .step .obs.ok .tag{color:var(--ok);border-color:rgba(67,201,138,.4)}
+  .step .obs.err .tag{color:var(--bad);border-color:rgba(241,91,108,.4)}
+  .empty{color:var(--ink-dim);font-size:13px}
+  /* tools list */
+  .toolslist{color:var(--ink-dim);font-size:12.5px;line-height:1.9}
+  .toolslist code{color:var(--ink)}
+  /* reveal on load */
+  .reveal{opacity:0;transform:translateY(14px)}
+  .reveal.in{opacity:1;transform:none;transition:.55s var(--ease)}
+  /* settings drawer */
+  .scrim{position:fixed;inset:0;background:rgba(5,8,14,.55);backdrop-filter:blur(2px);z-index:50;
+    opacity:0;pointer-events:none;transition:.25s var(--ease)}
+  .scrim.open{opacity:1;pointer-events:auto}
+  .drawer{position:fixed;top:0;right:0;height:100%;width:380px;max-width:92vw;z-index:60;
+    background:var(--surface);border-left:1px solid var(--line);box-shadow:var(--sh-lg);
+    transform:translateX(100%);transition:transform .3s var(--ease);display:flex;flex-direction:column}
+  .drawer.open{transform:none}
+  .drawer header{position:static;background:none;backdrop-filter:none;border-bottom:1px solid var(--line)}
+  .drawer h3{margin:0;font-size:15px;font-weight:650}
+  .drawer .body{padding:20px;overflow:auto;display:grid;gap:18px}
+  .field{display:grid;gap:7px}
+  .field label{font-size:12px;color:var(--ink-dim);font-weight:600;display:flex;justify-content:space-between}
+  .field .hint{font-size:11.5px;color:var(--ink-faint);font-weight:400}
+  .seg{display:flex;gap:6px;flex-wrap:wrap}
+  /* POLISH KIT: segmented control (theme + routing mode) */
+  .seg .segbtn{font:inherit;font-size:12px;cursor:pointer;border:1px solid var(--line);background:var(--surface-2);
+    color:var(--ink-dim);border-radius:var(--r-sm);padding:7px 11px;transition:.16s var(--ease)}
+  .seg .segbtn:hover{color:var(--ink);border-color:var(--line-2)}
+  .seg .segbtn[aria-pressed="true"]{background:var(--grad);border-color:transparent;color:var(--accent-ink);font-weight:600}
+  .pstat{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12.5px;
+    padding:7px 11px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface-2)}
+  .pstat .pdot{width:8px;height:8px;border-radius:50%;background:var(--ink-faint);flex:none}
+  .pstat .pdot.on{background:var(--ok);box-shadow:0 0 0 3px rgba(67,201,138,.18)}
+  .chainline{font-family:var(--mono);font-size:11.5px;color:var(--ink-dim);
+    background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);padding:8px 11px;word-break:break-word}
+  .drawer .foot{margin-top:auto;padding:16px 20px;border-top:1px solid var(--line);display:flex;gap:10px}
+  /* POLISH KIT: help modal (centered dialog, reuses scrim) */
+  #help{position:fixed;top:50%;left:50%;transform:translate(-50%,calc(-50% + 12px));z-index:70;
+    width:560px;max-width:94vw;max-height:86vh;overflow:auto;opacity:0;pointer-events:none;
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh-lg);
+    transition:opacity .25s var(--ease),transform .25s var(--ease)}
+  #help.open{opacity:1;pointer-events:auto;transform:translate(-50%,-50%)}
+  #help header{position:static;background:none;backdrop-filter:none;border-bottom:1px solid var(--line)}
+  #help .body{padding:20px;display:grid;gap:16px}
+  #help h4{margin:0 0 6px;font-size:11.5px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--ink-dim)}
+  #help p{margin:0;color:var(--ink-dim);font-size:13.5px}
+  #help ol{margin:0;padding-left:20px;color:var(--ink-dim);font-size:13.5px;display:grid;gap:4px}
+  #help .kbd{font-family:var(--mono);font-size:11.5px;background:var(--surface-2);border:1px solid var(--line);
+    border-bottom-width:2px;border-radius:6px;padding:1px 7px;color:var(--ink)}
+  #help .eps{display:flex;gap:7px;flex-wrap:wrap}
+  /* toast */
+  #toasts{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:80;
+    display:flex;flex-direction:column;gap:10px;align-items:center}
+  .toast{background:var(--surface-3);border:1px solid var(--line-2);border-radius:11px;padding:11px 16px;
+    box-shadow:var(--sh-lg);font-size:13px;display:flex;align-items:center;gap:10px;
+    animation:toastIn .3s var(--ease)}
+  .toast .tdot{width:8px;height:8px;border-radius:50%}
+  .toast.ok .tdot{background:var(--ok)}.toast.bad .tdot{background:var(--bad)}.toast.info .tdot{background:var(--info)}
+  /* cold-start overlay */
+  #boot{position:fixed;inset:0;z-index:90;background:var(--bg);display:grid;place-items:center;
+    transition:opacity .5s var(--ease)}
+  #boot.hide{opacity:0;pointer-events:none}
+  .boot-card{text-align:center;display:grid;gap:18px;justify-items:center}
+  .boot-card .logo{width:54px;height:54px}
+  .boot-card .ring{width:38px;height:38px;border:3px solid var(--line);border-top-color:var(--accent);
+    border-radius:50%;animation:spin .8s linear infinite}
+  .boot-card .msg{color:var(--ink-dim);font-size:13.5px}
+  .boot-card .sub{color:var(--ink-faint);font-size:12px;max-width:280px}
+  /* keyframes */
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(67,201,138,.5)}70%{box-shadow:0 0 0 6px rgba(67,201,138,0)}100%{box-shadow:0 0 0 0 rgba(67,201,138,0)}}
+  @keyframes rowIn{from{background:rgba(106,161,255,.14)}to{background:var(--surface-2)}}
+  @keyframes toastIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  @media(max-width:860px){main{grid-template-columns:1fr}}
+  @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+<div id="boot"><div class="boot-card">
+  <div class="logo"></div><div class="ring"></div>
+  <div><div class="msg" id="bootmsg">Waking the demo…</div>
+  <div class="sub">Free-tier instances sleep when idle — first load takes ~30–60s.</div></div>
+</div></div>
 
-      <input type="text" id="q" placeholder="Ask something the tools can answer…" />
-      <div class="row samples" id="samples"></div>
-      <div class="row">
-        <label><input type="checkbox" id="useLlm" checked /> LLM planner</label>
-        <label>provider <select id="provider"><option value="auto">auto</option></select></label>
-        <label>model <input id="model" placeholder="(default)" style="width:130px" /></label>
-        <span id="ollamaStatus" style="font-size:12px;color:var(--muted)"></span>
+<header>
+  <div class="brand"><span class="logo"></span> agent-sandbox
+    <span class="tag">ReAct agent · safe deterministic tools · rule or LLM planner</span></div>
+  <span class="spacer"></span>
+  <span class="status"><span class="dot" id="hdot"></span><span id="hstat">connecting…</span></span>
+  <span class="pill" id="modepill">routing · …</span>
+  <!-- POLISH KIT: theme toggle -->
+  <button class="iconbtn" id="themebtn" title="Toggle theme" aria-label="Toggle light/dark theme"><span id="themeicon">☾</span></button>
+  <!-- POLISH KIT: help modal trigger -->
+  <button class="iconbtn" id="helpbtn" title="Help (?)" aria-label="Help">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 1 1 4.6 3c-.8.6-1.7 1-1.7 2.2"/><line x1="12" y1="17.5" x2="12" y2="17.51"/></svg>
+  </button>
+  <button class="iconbtn" id="gear" title="Settings" aria-label="Settings">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+  </button>
+</header>
+
+<main>
+  <div class="panel full reveal">
+    <h2>Agent console <span class="muted" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">ask something the tools can answer</span></h2>
+    <div class="body">
+      <p class="lede">A ReAct-style agent: it reasons, calls a safe tool, observes the result, and repeats — chaining
+        results across steps. Deterministic and offline by default; an LLM planner plugs in behind the same interface.
+        Watch the thought → action → observation trace.</p>
+      <input type="text" class="q" id="q" placeholder="Ask something the tools can answer…" />
+      <div class="row samples" id="samples" style="margin-top:12px"></div>
+      <div class="row" style="margin-top:12px">
+        <label class="check"><input type="checkbox" id="useLlm" checked /> LLM planner</label>
+        <span class="muted" id="routenote">routing set in Settings ⚙</span>
         <div class="spacer"></div>
-        <button class="primary" id="run">Run agent</button>
+        <button class="btn primary" id="run"><span class="spin"></span><span class="lbl">Run agent</span></button>
       </div>
+    </div>
+  </div>
 
-      <div id="answer"></div>
-      <div id="trace"></div>
+  <div class="panel full reveal" id="answerPanel" style="display:none">
+    <h2>Answer</h2>
+    <div class="body"><div id="answer"></div></div>
+  </div>
 
-      <div class="tools" id="tools"></div>
+  <div class="panel full reveal">
+    <h2>Reasoning trace <span class="muted" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">thought → action → observation</span></h2>
+    <div class="body"><div id="trace"><span class="empty">Run a query to see the agent's step-by-step trace.</span></div></div>
+  </div>
 
-      <p class="tools">
-        <code>POST /run</code> · <code>GET /tools</code>. Synthetic data only.
-        Part of the <a href="https://github.com/MarcBittner/ai-portfolio">ai-portfolio</a>.
-      </p>
-    </main>
+  <div class="panel full reveal">
+    <h2>Available tools <span class="muted" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">safe, deterministic</span></h2>
+    <div class="body"><div class="toolslist" id="tools"><span class="empty">loading…</span></div></div>
+  </div>
+</main>
 
-    <script>
-      const $ = (id) => document.getElementById(id);
-      const SAMPLES = [
-        "What is 15% of 240?",
-        "Convert 10 km to miles",
-        "How many days between 2026-01-01 and 2026-03-01?",
-        "What is 20% of the days between 2026-01-01 and 2026-02-01?",
-        "Tell me about persona-twin",
-        "3 * (4 + 5)",
-      ];
-      function esc(s) {
-        return String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
-      }
+<!-- settings drawer -->
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-hidden="true">
+  <header><div class="brand" style="font-size:15px"><span class="logo" style="width:24px;height:24px"></span> Settings</div>
+    <span class="spacer"></span><button class="iconbtn" id="closedrawer" aria-label="Close">✕</button></header>
+  <div class="body">
+    <!-- POLISH KIT: theme segmented control -->
+    <div class="field">
+      <label>Theme <span class="hint">appearance</span></label>
+      <div class="seg" id="themeseg">
+        <button type="button" class="segbtn" data-theme="dark">Dark</button>
+        <button type="button" class="segbtn" data-theme="light">Light</button>
+        <button type="button" class="segbtn" data-theme="system">System</button>
+      </div>
+    </div>
 
-      async function loadTools() {
-        const tools = await fetch("/tools").then((r) => r.json());
-        $("tools").innerHTML = "<b>Tools:</b> " +
-          tools.map((t) => `<code>${t.name}</code> — ${esc(t.description)}`).join(" · ");
-        $("samples").innerHTML = SAMPLES.map(
-          (s) => `<button data-q="${esc(s)}">${esc(s)}</button>`,
-        ).join("");
-        $("samples").querySelectorAll("button").forEach((b) =>
-          b.addEventListener("click", () => { $("q").value = b.dataset.q; run(); }));
-        try {
-          const p = await fetch("/providers").then((r) => r.json());
-          const shortName = (m) => (m || "").split("/").pop().replace(/:free$/, "");
-          const sel = $("provider");
-          sel.innerHTML = "";
-          sel.insertAdjacentHTML("beforeend", `<option value="auto" selected>Auto (recommended)</option>`);
-          const freeLabel = p.free_models && p.free_models[0]
-            ? `Free · ${shortName(p.free_models[0])}` : "Free";
-          sel.insertAdjacentHTML("beforeend", `<option value="free">${freeLabel}</option>`);
-          sel.insertAdjacentHTML("beforeend", `<option value="offline">Offline (deterministic)</option>`);
-          if (p.available.paid)
-            sel.insertAdjacentHTML("beforeend", `<option value="paid">Paid (your key)</option>`);
-          const liveNote = p.active_mode === "free" && p.free_models && p.free_models[0]
-            ? `Live: ${p.active_mode} · ${shortName(p.free_models[0])}`
-            : `Live: ${p.active_mode || "unknown"}`;
-          $("ollamaStatus").textContent = liveNote;
-        } catch { /* optional */ }
-      }
+    <div class="field">
+      <label>Planner <span class="hint">LLM planner vs. rule planner</span></label>
+      <label class="check"><input type="checkbox" id="cfgUseLlm" checked /> Use LLM planner (falls back to rule planner)</label>
+      <div class="hint">When off, the agent uses the deterministic rule planner only.</div>
+    </div>
 
-      async function run() {
-        const query = $("q").value.trim();
-        if (!query) return;
-        const res = await fetch("/run", {
-          method: "POST", headers: { "content-type": "application/json" },
-          body: JSON.stringify({ query, use_llm: $("useLlm").checked,
-            provider: $("provider").value, model: $("model").value || null }),
-        });
-        if (!res.ok) { alert(await res.text()); return; }
-        render(await res.json());
-      }
+    <!-- POLISH KIT: routing config -->
+    <div class="field">
+      <label>Routing mode <span class="hint">which provider a run uses</span></label>
+      <div class="seg" id="modeseg">
+        <button type="button" class="segbtn" data-mode="auto">auto</button>
+        <button type="button" class="segbtn" data-mode="local">local</button>
+        <button type="button" class="segbtn" data-mode="free">free</button>
+        <button type="button" class="segbtn" data-mode="paid">paid</button>
+        <button type="button" class="segbtn" data-mode="offline">offline</button>
+      </div>
+      <div class="hint" id="modeblurb">auto = free if keyed, else paid, else local, else offline.</div>
+    </div>
+    <div class="field">
+      <label for="cfgModel">Model override <span class="hint">optional</span></label>
+      <input id="cfgModel" type="text" placeholder="provider default" />
+    </div>
+    <div class="field">
+      <label>Provider status <span class="hint" id="modeactive">active: auto</span></label>
+      <div style="display:grid;gap:6px" id="provrows"></div>
+    </div>
+    <div class="field">
+      <label>Fallback chain <span class="hint">→ on failure</span></label>
+      <div class="chainline" id="chainline">offline (mock)</div>
+    </div>
+    <div class="muted" style="font-size:11.5px">Provider keys live server-side; this selects which available provider a run uses.
+      The mock provider is always terminal, so the deterministic core never fails.</div>
+  </div>
+  <div class="foot">
+    <button class="btn" id="resetcfg">Reset</button>
+    <button class="btn primary" id="savecfg" style="flex:1"><span class="lbl">Save</span></button>
+  </div>
+</aside>
 
-      function render(data) {
-        const via = data.planner === "llm" && data.routing
-          ? `planner: LLM via ${data.routing.provider} (${data.routing.model})`
-          : `planner: rule${data.routing ? " (LLM unavailable → fallback)" : ""}`;
-        $("answer").innerHTML =
-          `<div class="answer"><div class="label">Answer · ${esc(via)}</div><div class="val">${esc(data.answer)}</div></div>`;
-        $("trace").innerHTML = data.steps.map((s, i) => {
-          const args = Object.entries(s.args).map(([k, v]) => `${k}=${esc(JSON.stringify(v))}`).join(", ");
-          return `<div class="step">
-            <span class="n">step ${i + 1}</span>
-            <div class="think">💭 ${esc(s.thought)}</div>
-            <div class="act">→ <span class="tool">${esc(s.tool)}</span>(${args})</div>
-            <div class="obs ${s.ok ? "ok" : "err"}"><span class="tag">${s.ok ? "observation" : "error"}</span>${esc(s.observation)}</div>
-          </div>`;
-        }).join("");
-      }
+<!-- POLISH KIT: help modal -->
+<aside id="help" role="dialog" aria-modal="true" aria-labelledby="helptitle" aria-hidden="true">
+  <header><div class="brand" style="font-size:15px"><span class="logo" style="width:24px;height:24px"></span>
+    <span id="helptitle">Help · agent-sandbox</span></div>
+    <span class="spacer"></span><button class="iconbtn" id="closehelp" aria-label="Close help">✕</button></header>
+  <div class="body">
+    <div><h4>What it is</h4><p>A ReAct-style agent over a set of safe, deterministic tools (math, unit conversion,
+      date math, project lookup). It reasons, calls one tool, observes the result, and repeats — chaining results across
+      steps. The planner is the deterministic <b>rule</b> planner by default; an <b>LLM</b> planner plugs in behind the
+      same interface and routes through a multi-provider chain.</p></div>
+    <div><h4>How to use</h4><ol>
+      <li><b>Enter a query</b> — type into the box or click a sample chip, then <i>Run agent</i> (or press Enter).</li>
+      <li><b>Watch the trace</b> — each step shows the agent's <i>thought</i>, the <i>tool call</i> it makes, and the
+        <i>observation</i> it gets back; the final <i>Answer</i> card sums it up.</li>
+      <li><b>Choose a planner</b> — toggle <i>LLM planner</i> off to force the rule planner; if the LLM is unavailable
+        the run silently falls back to rules.</li>
+      <li><b>Pick a route</b> — open <i>Settings ⚙</i> to set the routing mode + model override and see provider status.</li>
+    </ol></div>
+    <div><h4>Endpoints</h4><div class="eps">
+      <code>POST /run</code><code>GET /tools</code><code>GET /providers</code><code>GET /health</code></div></div>
+    <div><h4>Keyboard shortcuts</h4><p><span class="kbd">?</span> open this help · <span class="kbd">Enter</span> run query ·
+      <span class="kbd">Esc</span> close any overlay</p></div>
+    <div><p class="muted" style="font-size:11.5px">All tools operate on <b>synthetic</b> inputs — no real data, no side effects.</p></div>
+  </div>
+</aside>
 
-      $("run").addEventListener("click", run);
-      $("q").addEventListener("keydown", (e) => { if (e.key === "Enter") run(); });
-      loadTools();
-    </script>
-  </body>
+<div id="toasts"></div>
+
+<script>
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const j=async(u,o)=>(await fetch(u,o)).json();
+const CFG_KEY="agent-sandbox.cfg";
+const SAMPLES=[
+  "What is 15% of 240?",
+  "Convert 10 km to miles",
+  "How many days between 2026-01-01 and 2026-03-01?",
+  "What is 20% of the days between 2026-01-01 and 2026-02-01?",
+  "Tell me about persona-twin",
+  "3 * (4 + 5)",
+];
+let cfg={useLlm:true,mode:"auto",model:""};
+let provStatus={};  // last GET /providers payload
+
+function esc(s){return String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));}
+function toast(msg,type="info"){
+  const t=document.createElement("div");t.className=`toast ${type}`;
+  t.innerHTML=`<span class="tdot"></span>${msg}`;$("#toasts").appendChild(t);
+  setTimeout(()=>{t.style.opacity="0";t.style.transition="opacity .3s";setTimeout(()=>t.remove(),300)},2600);
+}
+function loadCfg(){try{cfg={...cfg,...JSON.parse(localStorage.getItem(CFG_KEY)||"{}")}}catch{}}
+function applyCfgToForm(){
+  $("#cfgUseLlm").checked=!!cfg.useLlm;
+  $("#cfgModel").value=cfg.model||"";
+  selectMode(cfg.mode||"auto");
+  syncThemeSeg();
+}
+function applyCfgToConsole(){
+  $("#useLlm").checked=!!cfg.useLlm;
+  $("#routenote").textContent=`routing: ${cfg.mode||"auto"}${cfg.model?` · ${cfg.model}`:""}`;
+  $("#modepill").textContent=`routing · ${cfg.mode||"auto"}`;
+}
+function openDrawer(){applyCfgToForm();renderRouting();$("#scrim").classList.add("open");$("#drawer").classList.add("open");$("#drawer").setAttribute("aria-hidden","false")}
+function closeDrawer(){$("#scrim").classList.remove("open");$("#drawer").classList.remove("open");$("#drawer").setAttribute("aria-hidden","true")}
+$("#gear").onclick=openDrawer;$("#closedrawer").onclick=closeDrawer;
+$("#savecfg").onclick=()=>{cfg={useLlm:$("#cfgUseLlm").checked,
+    mode:$("#modeseg").querySelector('[aria-pressed="true"]')?.dataset.mode||"auto",
+    model:$("#cfgModel").value.trim()};
+  localStorage.setItem(CFG_KEY,JSON.stringify(cfg));applyCfgToConsole();closeDrawer();toast("Settings saved","ok")};
+$("#resetcfg").onclick=()=>{cfg={useLlm:true,mode:"auto",model:""};localStorage.removeItem(CFG_KEY);applyCfgToForm();applyCfgToConsole();renderRouting();toast("Reset to defaults","info")};
+// keep the inline planner toggle in sync with cfg
+$("#useLlm").onchange=()=>{cfg.useLlm=$("#useLlm").checked;localStorage.setItem(CFG_KEY,JSON.stringify(cfg));};
+
+/* ===================== tools + samples ===================== */
+async function loadTools(){
+  try{
+    const tools=await j("tools");
+    $("#tools").innerHTML=tools.map(t=>`<code>${esc(t.name)}</code> — ${esc(t.description)}`).join("<br>");
+  }catch{$("#tools").innerHTML='<span class="empty">tools unavailable</span>';}
+  $("#samples").innerHTML=SAMPLES.map(s=>`<button class="chip" data-q="${esc(s)}">${esc(s)}</button>`).join("");
+  $$("#samples .chip").forEach(b=>b.onclick=()=>{$("#q").value=b.dataset.q;run();});
+}
+
+/* ===================== run the agent ===================== */
+// UI mode -> /run provider param. "local" pins the on-box Ollama provider;
+// the others are router modes the backend understands directly.
+function providerForMode(m){return m==="local"?"ollama":(m||"auto");}
+async function run(){
+  const query=$("#q").value.trim();
+  if(!query){toast("Enter a query first","info");return;}
+  const btn=$("#run");btn.classList.add("loading");
+  try{
+    const res=await fetch("run",{method:"POST",headers:{"content-type":"application/json"},
+      body:JSON.stringify({query,use_llm:$("#useLlm").checked,
+        provider:providerForMode(cfg.mode),model:cfg.model||null})});
+    if(!res.ok){const txt=await res.text();toast("Run failed","bad");
+      $("#trace").innerHTML=`<span class="empty">${esc(txt)}</span>`;return;}
+    render(await res.json());
+    toast("Agent finished","ok");
+  }catch(e){toast("Run failed","bad");}
+  finally{btn.classList.remove("loading");}
+}
+function render(data){
+  const via=data.planner==="llm"&&data.routing
+    ? `planner: LLM via ${esc(data.routing.provider)} (${esc(data.routing.model)})`
+    : `planner: rule${data.routing?" (LLM unavailable → fallback)":""}`;
+  $("#answerPanel").style.display="";
+  $("#answerPanel").classList.add("in");
+  $("#answer").innerHTML=
+    `<div class="answer"><div class="label">Answer · ${via}</div><div class="val">${esc(data.answer)}</div></div>`;
+  $("#trace").innerHTML=(data.steps||[]).map((s,i)=>{
+    const args=Object.entries(s.args).map(([k,v])=>`${esc(k)}=${esc(JSON.stringify(v))}`).join(", ");
+    return `<div class="step fresh">
+      <span class="n">step ${i+1}</span>
+      <div class="think">💭 ${esc(s.thought)}</div>
+      <div class="act">→ <span class="tool">${esc(s.tool)}</span>(${args})</div>
+      <div class="obs ${s.ok?"ok":"err"}"><span class="tag">${s.ok?"observation":"error"}</span>${esc(s.observation)}</div>
+    </div>`;
+  }).join("")||'<span class="empty">No steps.</span>';
+}
+$("#run").onclick=run;
+$("#q").addEventListener("keydown",e=>{if(e.key==="Enter")run();});
+
+/* ===================== POLISH KIT: theme toggle ===================== */
+const THEME_KEY="theme";
+function getTheme(){try{return localStorage.getItem(THEME_KEY)||"system"}catch{return "system"}}
+function effectiveDark(t){
+  if(t==="dark")return true; if(t==="light")return false;
+  return !window.matchMedia("(prefers-color-scheme: light)").matches;
+}
+function applyTheme(t){
+  const dark=effectiveDark(t);
+  document.documentElement.classList.toggle("light",!dark);
+  $("#themeicon").textContent=dark?"☾":"☀";
+  $("#themebtn").title=`Theme: ${t}`;
+}
+function setTheme(t){try{localStorage.setItem(THEME_KEY,t)}catch{} applyTheme(t); syncThemeSeg();}
+function syncThemeSeg(){const cur=getTheme();
+  $$("#themeseg .segbtn").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.theme===cur)));}
+$("#themebtn").onclick=()=>{const cur=getTheme();const next=effectiveDark(cur)?"light":"dark";setTheme(next);};
+$$("#themeseg .segbtn").forEach(b=>b.onclick=()=>setTheme(b.dataset.theme));
+window.matchMedia("(prefers-color-scheme: light)").addEventListener?.("change",()=>{if(getTheme()==="system")applyTheme("system");});
+applyTheme(getTheme());
+
+/* ===================== POLISH KIT: help modal ===================== */
+function openHelp(){$("#scrim").classList.add("open");$("#help").classList.add("open");
+  $("#help").setAttribute("aria-hidden","false");$("#closehelp").focus();}
+function closeHelp(){$("#scrim").classList.remove("open");$("#help").classList.remove("open");
+  $("#help").setAttribute("aria-hidden","true");}
+$("#helpbtn").onclick=openHelp;$("#closehelp").onclick=closeHelp;
+$("#scrim").onclick=()=>{closeDrawer();closeHelp();};
+document.addEventListener("keydown",e=>{
+  const typing=/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName||"")||document.activeElement?.isContentEditable;
+  if(e.key==="Escape"){closeDrawer();closeHelp();}
+  else if(e.key==="?"&&!typing&&!$("#help").classList.contains("open")){e.preventDefault();openHelp();}
+});
+
+/* ===================== POLISH KIT: routing config ===================== */
+const MODE_BLURBS={
+  auto:"auto = free if keyed, else paid, else local, else offline.",
+  local:"local = Ollama only (on-box, zero cost).",
+  free:"free = OpenRouter free models only.",
+  paid:"paid = Anthropic, then OpenAI (your key).",
+  offline:"offline = local Ollama, else deterministic mock (no hosted call).",
+};
+const MODE_CHAIN={
+  auto:["openrouter","anthropic","openai","ollama"],
+  local:["ollama"], free:["openrouter"], paid:["anthropic","openai"], offline:["ollama"],
+};
+const PROVIDERS=["ollama","anthropic","openrouter","openai"];
+function selectMode(m){
+  $$("#modeseg .segbtn").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.mode===m)));
+  $("#modeblurb").textContent=MODE_BLURBS[m]||"";
+  $("#modeactive").textContent=`active: ${m}`;
+}
+function currentMode(){return $("#modeseg").querySelector('[aria-pressed="true"]')?.dataset.mode||"auto";}
+function renderRouting(){
+  const m=currentMode();
+  $("#modeactive").textContent=`active: ${m}`;
+  const avail=provStatus.available||{};
+  const rows=PROVIDERS.map(p=>{
+    const on=!!avail[p];
+    return `<div class="pstat"><span>${p}</span><span class="pdot ${on?'on':''}" title="${on?'available':'not configured'}"></span></div>`;
+  }).join("")+
+    `<div class="pstat"><span>mock (deterministic)</span><span class="pdot on" title="always available"></span></div>`;
+  $("#provrows").innerHTML=rows;
+  const chain=(MODE_CHAIN[m]||[]).filter(p=>avail[p]);
+  const display=[...chain,"mock (deterministic)"];
+  $("#chainline").textContent=display.join("  →  ");
+}
+$$("#modeseg .segbtn").forEach(b=>b.onclick=()=>{selectMode(b.dataset.mode);renderRouting();});
+
+async function loadProviders(){
+  try{provStatus=await j("providers");
+    $("#modepill").textContent=`routing · ${cfg.mode||"auto"}`;
+    renderRouting();
+  }catch{}
+}
+
+/* ===================== boot ===================== */
+async function boot(){
+  loadCfg();
+  selectMode(cfg.mode||"auto");  // seed routing segment before drawer opens
+  applyCfgToConsole();
+  // cold-start: poll health until ready, then reveal
+  let ready=false;
+  for(let i=0;i<60 && !ready;i++){
+    try{const r=await fetch("health");if(r.ok){ready=true;break}}catch{}
+    if(i===4)$("#bootmsg").textContent="Still waking up…";
+    await new Promise(r=>setTimeout(r,1500));
+  }
+  $("#hdot").className="dot ok";$("#hstat").textContent="live";
+  $("#boot").classList.add("hide");setTimeout(()=>$("#boot").remove(),600);
+  $$(".reveal").forEach((el,i)=>setTimeout(()=>el.classList.add("in"),90*i));
+  await loadTools();
+  await loadProviders();
+}
+boot();
+</script>
+</body>
 </html>
