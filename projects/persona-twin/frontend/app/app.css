@@ -52,7 +52,7 @@ body {
   background-size: cover;
   background-repeat: no-repeat;
   background-image:
-    linear-gradient(oklch(0.985 0.002 90 / 0.62), oklch(0.985 0.002 90 / 0.74)),
+    linear-gradient(oklch(0.985 0.002 90 / 0.34), oklch(0.985 0.002 90 / 0.46)),
     url("/bg-light.jpg");
 }
 .dark body {
