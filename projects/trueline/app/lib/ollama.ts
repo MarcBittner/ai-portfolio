@@ -4,7 +4,10 @@
 // via `submitExtraction`. Requires Ollama to allow this origin, e.g.:
 //   OLLAMA_ORIGINS=* ollama serve
 
-const OLLAMA = "http://localhost:11434";
+// Try Ollama directly first (works when OLLAMA_ORIGINS allows this origin), then a
+// CORS-injecting proxy on :11435 (a host-side container) which always allows it —
+// so a cloud-served page can reach the host's Ollama without reconfiguring it.
+const CANDIDATES = ["http://localhost:11434", "http://localhost:11435"];
 
 const SYSTEM =
   "You extract line items from a vendor invoice into strict JSON. You ONLY read " +
@@ -25,21 +28,26 @@ export interface OllamaLine {
   sourceQuote: string;
 }
 
-let probe: { ok: boolean; at: number } | null = null;
+let probe: { url: string | null; at: number } | null = null;
 
-// Cached reachability check from the browser (CORS-gated by OLLAMA_ORIGINS).
-export async function probeOllama(): Promise<boolean> {
+// Returns the reachable Ollama base URL (direct, else the CORS proxy), or null.
+export async function probeOllama(): Promise<string | null> {
   const now = Date.now();
-  if (probe && now - probe.at < 30_000) return probe.ok;
-  let ok = false;
-  try {
-    const r = await fetch(`${OLLAMA}/api/tags`, { signal: AbortSignal.timeout(1500) });
-    ok = r.ok;
-  } catch {
-    ok = false;
+  if (probe && now - probe.at < 30_000) return probe.url;
+  let url: string | null = null;
+  for (const base of CANDIDATES) {
+    try {
+      const r = await fetch(`${base}/api/tags`, { signal: AbortSignal.timeout(1500) });
+      if (r.ok) {
+        url = base;
+        break;
+      }
+    } catch {
+      /* try the next candidate */
+    }
   }
-  probe = { ok, at: now };
-  return ok;
+  probe = { url, at: now };
+  return url;
 }
 
 function num(x: unknown): number {
@@ -80,8 +88,12 @@ function parseLines(text: string): OllamaLine[] {
     .filter((l) => l.description.length > 0);
 }
 
-export async function extractWithOllama(rawText: string, model: string): Promise<OllamaLine[]> {
-  const res = await fetch(`${OLLAMA}/api/chat`, {
+export async function extractWithOllama(
+  rawText: string,
+  model: string,
+  base: string,
+): Promise<OllamaLine[]> {
+  const res = await fetch(`${base}/api/chat`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({

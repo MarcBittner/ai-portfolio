@@ -197,11 +197,12 @@ export default function Dashboard() {
     }
     // Host-local Ollama, via the browser (the cloud action can't reach localhost).
     try {
-      if (await probeOllama()) {
+      const base = await probeOllama();
+      if (base) {
         const model = routingCfg?.model || routingCfg?.defaultLocalModel || "llama3.1:8b";
         setMsg(`Extracting on your machine via Ollama (${model})…`);
         const t0 = performance.now();
-        const lines = await extractWithOllama(text, model);
+        const lines = await extractWithOllama(text, model, base);
         if (lines.length) {
           await submitExtraction({
             invoiceId,
