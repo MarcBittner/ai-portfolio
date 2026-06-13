@@ -21,6 +21,7 @@ import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
 
+LLM_MODE = os.environ.get("LLM_MODE", "auto").lower()  # auto|free|paid|offline
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
 ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001")
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
@@ -28,8 +29,18 @@ OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.1:8b")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
-OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "meta-llama/llama-3.1-8b-instruct")
-LLM_TIMEOUT = float(os.environ.get("LLM_TIMEOUT", "30"))
+# Default to a *free* model; OpenRouter routes across the fallback list on 429.
+OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "google/gemma-4-31b-it:free")
+# OpenRouter caps the `models` fallback array at 3 entries.
+OPENROUTER_FREE_FALLBACKS = [
+    m.strip() for m in os.environ.get(
+        "OPENROUTER_FREE_FALLBACKS",
+        "google/gemma-4-31b-it:free,"
+        "nvidia/nemotron-3-super-120b-a12b:free,"
+        "nvidia/nemotron-3-nano-30b-a3b:free",
+    ).split(",") if m.strip()
+][:3]
+LLM_TIMEOUT = float(os.environ.get("LLM_TIMEOUT", "45"))
 BREAKER_THRESHOLD = int(os.environ.get("LLM_BREAKER_THRESHOLD", "3"))
 BREAKER_COOLDOWN = float(os.environ.get("LLM_BREAKER_COOLDOWN", "30"))
 
@@ -114,12 +125,17 @@ def _anthropic(system: str, prompt: str, model: str) -> str:
     return data["content"][0]["text"]
 
 
-def _openai_compatible(base: str, key: str, model: str, system: str, prompt: str) -> str:
-    data = _post(f"{base}/chat/completions", {
+def _openai_compatible(base: str, key: str, model: str, system: str, prompt: str,
+                       models: list[str] | None = None) -> str:
+    payload = {
         "model": model,
         "messages": [{"role": "system", "content": system},
                      {"role": "user", "content": prompt}],
-    }, headers={"authorization": f"Bearer {key}"})
+    }
+    if models:  # OpenRouter: try these in order if `model` is unavailable/limited
+        payload["models"] = models
+    data = _post(f"{base}/chat/completions", payload,
+                 headers={"authorization": f"Bearer {key}"})
     return data["choices"][0]["message"]["content"]
 
 
@@ -128,16 +144,31 @@ def _mock(system: str, prompt: str, model: str) -> str:
 
 
 def _resolve_order(provider: str | None) -> list[str]:
-    if provider and provider not in ("auto", None):
+    """Concrete provider name pins it; a mode (free/paid/offline) selects a chain;
+    auto/None → free-first when keyed, else paid, else local, else mock."""
+    if provider and provider not in ("auto", "free", "paid", "offline", None):
         return [provider]
-    order = ["ollama"]
-    if ANTHROPIC_API_KEY:
-        order.append("anthropic")
+    mode = provider if provider in ("free", "paid", "offline") else LLM_MODE
+    if mode == "offline":
+        return ["ollama", "mock"]
+    if mode == "free":
+        return ["openrouter", "mock"]
+    if mode == "paid":
+        order = []
+        if ANTHROPIC_API_KEY:
+            order.append("anthropic")
+        if OPENAI_API_KEY:
+            order.append("openai")
+        order.append("mock")
+        return order
+    order = []
     if OPENROUTER_API_KEY:
         order.append("openrouter")
+    if ANTHROPIC_API_KEY:
+        order.append("anthropic")
     if OPENAI_API_KEY:
         order.append("openai")
-    order.append("mock")
+    order += ["ollama", "mock"]
     return order
 
 
@@ -157,8 +188,9 @@ def _call(provider: str, system: str, prompt: str, model: str) -> str:
         return _openai_compatible("https://api.openai.com/v1", OPENAI_API_KEY,
                                   model, system, prompt)
     if provider == "openrouter" and OPENROUTER_API_KEY:
+        models = OPENROUTER_FREE_FALLBACKS if model.endswith(":free") else None
         return _openai_compatible("https://openrouter.ai/api/v1", OPENROUTER_API_KEY,
-                                  model, system, prompt)
+                                  model, system, prompt, models)
     if provider == "mock":
         return _mock(system, prompt, model)
     raise RuntimeError(f"provider {provider} unavailable")
@@ -220,10 +252,26 @@ def reachable(timeout: float = 1.5) -> bool:
         return False
 
 
+def active_mode() -> str:
+    """The effective mode the next ``auto`` call will use (for the UI)."""
+    if LLM_MODE in ("free", "paid", "offline"):
+        return LLM_MODE
+    if OPENROUTER_API_KEY:
+        return "free"
+    if ANTHROPIC_API_KEY or OPENAI_API_KEY:
+        return "paid"
+    return "offline"
+
+
 def providers_status() -> dict:
     return {
+        "mode": LLM_MODE,
+        "active_mode": active_mode(),
         "default_order": _resolve_order("auto"),
         "available": {
+            "free": bool(OPENROUTER_API_KEY),
+            "paid": bool(ANTHROPIC_API_KEY or OPENAI_API_KEY),
+            "offline": True,
             "ollama": reachable(),
             "anthropic": bool(ANTHROPIC_API_KEY),
             "openrouter": bool(OPENROUTER_API_KEY),
@@ -234,5 +282,6 @@ def providers_status() -> dict:
             "ollama": OLLAMA_MODEL, "anthropic": ANTHROPIC_MODEL,
             "openrouter": OPENROUTER_MODEL, "openai": OPENAI_MODEL, "mock": "mock",
         },
+        "free_models": OPENROUTER_FREE_FALLBACKS,
         "breaker": breaker.state(),
     }
