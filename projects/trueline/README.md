@@ -147,6 +147,45 @@ also callable over HTTP:
 `Authorization: Bearer <Clerk JWT from the "convex" template>`. Response is
 `{"status":"success","value":…}` or `{"status":"error","errorMessage":…}`.
 
+**Calls & status codes** — live examples (`CONVEX=https://<deployment>.convex.cloud`):
+
+```bash
+# query · reactive read — no auth degrades to empty, not an error
+curl -s $CONVEX/api/query -d '{"path":"invoices:listInvoices","args":{},"format":"json"}'
+# 200  {"status":"success","value":[]}
+
+curl -s $CONVEX/api/query -d '{"path":"invoices:stats","args":{},"format":"json"}'
+# 200  {"status":"success","value":{"invoices":0,"recoverableUsd":0,"needsReview":0,"latestEval":null}}
+
+# query · cross-tenant / not found → null value (still 200/success)
+curl -s $CONVEX/api/query -d '{"path":"invoices:getInvoice","args":{"invoiceId":"<id>"},"format":"json"}'
+# 200  {"status":"success","value":null}
+
+# action · runs the model across modes
+curl -s $CONVEX/api/action -d '{"path":"diagnostics:benchmark","args":{"invoiceText":"X | item | 1 | ea | 5 | 5"},"format":"json"}'
+# 200  {"status":"success","value":[{"mode":"offline","provider":"mock","model":"deterministic","latencyMs":1,"lines":1,"error":null}, …]}
+
+# mutation requiring auth, no token → thrown error (message masked in prod)
+curl -s $CONVEX/api/mutation -d '{"path":"invoices:seedIfEmpty","args":{},"format":"json"}'
+# 200  {"status":"error","errorMessage":"[Request ID: …] Server Error"}
+
+# authenticated call
+curl -s $CONVEX/api/mutation -H "Authorization: Bearer <clerk-jwt>" \
+  -d '{"path":"routing:set","args":{"mode":"local"},"format":"json"}'
+# 200  {"status":"success","value":{"ok":true}}
+
+# unknown / internal-only function path
+curl -s $CONVEX/api/query -d '{"path":"nope:nope","args":{},"format":"json"}'
+# 404  {"code":"FunctionPathNotFound","message":"Could not find public function for 'nope:nope'."}
+```
+
+**Status codes.** `200` = the call *completed* — body is `{"status":"success","value":…}` or,
+for a thrown function error, `{"status":"error","errorMessage":…}` (the message is masked to
+`Server Error` in production; the real text — e.g. `Not authenticated`, `ArgumentValidationError`
+— is in `npx convex logs`). `404 FunctionPathNotFound` for an unknown or `internal*` path.
+`4xx` for malformed JSON / missing `path`. Auth: add `-H "Authorization: Bearer <Clerk JWT
+(convex template)>"`; reads degrade to empty without it, writes return the masked error.
+
 ### `invoices.ts`
 
 **`query listInvoices() → InvoiceRow[]`** — newest-first invoices for the tenant, each
