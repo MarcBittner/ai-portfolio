@@ -30,6 +30,17 @@ TypeScript.
 | LLM | Anthropic · OpenRouter (free) · deterministic mock — selected by routing config |
 | Host | Render (Next) + Convex Cloud + Clerk |
 
+## Managed services — role & value
+
+| Service | What it does here | Value it adds (vs rolling your own) |
+|---|---|---|
+| **Convex** | Document DB + serverless TS functions + **realtime subscriptions** + scheduler. Stores invoices/lines/PO/catalog/evals/logs/settings; runs the queries, mutations, and the extract action. | One TS-native platform in place of Postgres + an ORM + an API server + a websocket layer + a job queue. Reactive `useQuery` makes the review UI update live with zero polling; mutations are ACID with auto-retry; `action` + `scheduler` give a managed async job for the LLM call. No connection pools, migrations, or socket plumbing. |
+| **Clerk** | Sign-in/sessions, **multi-tenant organizations**, billing; mints the JWT that Convex trusts. | Production auth (social, MFA, sessions) + a tenant model + a billing surface, drop-in. The org id rides in the JWT and scopes every Convex row — no hand-rolled auth/session/RBAC. |
+| **OpenRouter** | One OpenAI-compatible endpoint onto many models, including a **free tier** (`gemma-4-31b-it:free`). | Zero-cost default for the public demo; swap models by changing a string (no SDK/code change); one key + billing surface across providers. |
+| **Anthropic (Claude)** | The **paid** extraction model — highest structured-output fidelity for the money path. | Best accuracy when it matters; same `fetch` shape, chosen by routing config. |
+| **Next.js / React / Tailwind** | App Router + RSC render the shell; client components subscribe to Convex; edge middleware gates `/app`. | One framework for routing + SSR + API + middleware; server components keep the bundle lean while live data stays client-side. |
+| **Render** | Hosts the Next app: git-push build/deploy, managed TLS + CDN, env injection. | No servers to manage; an identical deploy story to Vercel (the canonical host for this stack). |
+
 ## Request lifecycle
 
 ```
