@@ -79,8 +79,7 @@ export default function InvoiceReview() {
         <h1 className="text-xl font-semibold">{invoice.invoiceNumber}</h1>
         <StatusBadge status={invoice.status} />
         <span className="text-sm text-[--color-muted]">
-          {invoice.vendor} · vs {invoice.poNumber} · extracted by{" "}
-          {invoice.extractionProvider}/{invoice.extractionModel}
+          {invoice.vendor} · vs {invoice.poNumber} · {providerLabel(invoice.extractionProvider, invoice.extractionModel)}
         </span>
         <div className="ml-auto flex items-center gap-3">
           <div className="text-right">
@@ -251,4 +250,15 @@ export default function InvoiceReview() {
       </div>
     </main>
   );
+}
+
+function providerLabel(provider?: string, model?: string): string {
+  const short = (model ?? "").split("/").pop()?.replace(":free", "") || model || "";
+  if (!provider) return "not yet extracted";
+  if (provider === "openrouter") return `extracted by free model (${short})`;
+  if (provider === "anthropic") return `extracted by Claude (${short})`;
+  if (provider === "openai") return `extracted by OpenAI (${short})`;
+  if (provider === "mock" || provider === "seed")
+    return "extracted in offline mode (deterministic — free LLM quota reached for today)";
+  return `extracted by ${provider}/${model}`;
 }
