@@ -4,6 +4,7 @@ import {
   DEFAULT_FREE_MODEL,
   DEFAULT_LOCAL_MODEL,
   DEFAULT_PAID_MODEL,
+  OLLAMA_URL,
   keyStatus,
 } from "./lib/llm";
 
@@ -39,20 +40,16 @@ export const get = query({
         model = row.model ?? null;
       }
     }
+    // local Ollama is autodetected at runtime by the action (a query can't probe
+    // the network), so activeMode reflects the non-local fallback; the UI notes
+    // that local is tried first when reachable.
     const activeMode =
-      mode !== "auto"
-        ? mode
-        : keys.local
-          ? "local"
-          : keys.paid
-            ? "paid"
-            : keys.free
-              ? "free"
-              : "offline";
+      mode !== "auto" ? mode : keys.paid ? "paid" : keys.free ? "free" : "offline";
     return {
       mode,
       model,
       keys,
+      localUrl: OLLAMA_URL,
       defaultLocalModel: DEFAULT_LOCAL_MODEL,
       defaultFreeModel: DEFAULT_FREE_MODEL,
       defaultPaidModel: DEFAULT_PAID_MODEL,

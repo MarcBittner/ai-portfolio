@@ -262,14 +262,16 @@ paid    → [anthropic]                         → mock
 auto    → [ollama?, anthropic, openrouter]    → mock   (local if reachable → paid → free → offline)
 ```
 
-A provider is attempted only if available (`keyStatus()` reads env): local Ollama when
-`OLLAMA_BASE_URL` is set to a reachable host (the action runs in Convex's cloud, so it's
-gated on the URL to avoid a per-run timeout — and fails fast over an 8s `AbortSignal` if
-unreachable, falling through), free when `OPENROUTER_API_KEY` is set, paid when
-`ANTHROPIC_API_KEY` is set. `model` overrides the default for the chosen provider.
-Defaults: `OLLAMA_MODEL=llama3.1:8b`, `OPENROUTER_MODEL=google/gemma-4-31b-it:free`,
-`ANTHROPIC_MODEL=claude-haiku-4-5-20251001`.
-Keys/URLs live as **Convex deployment env vars** (server-side), never in the browser bundle.
+A provider is attempted only if available. **Local Ollama is autodetected** — a cached
+probe (`GET {OLLAMA_URL}/api/tags`, 1.5s timeout, ~60s TTL) decides availability with no
+flag; `OLLAMA_URL` defaults to `http://localhost:11434` and is overridable. Because the
+action runs in Convex's cloud it detects whatever *that* runtime can reach — zero-config
+when Convex is self-hosted alongside Ollama; on the managed cloud the probe fails fast and
+falls through. Free is used when `OPENROUTER_API_KEY` is set, paid when `ANTHROPIC_API_KEY`
+is set (`keyStatus()`). `model` overrides the chosen provider's default. Defaults:
+`OLLAMA_MODEL=llama3.1:8b`, `OPENROUTER_MODEL=google/gemma-4-31b-it:free`,
+`ANTHROPIC_MODEL=claude-haiku-4-5-20251001`. Keys/URLs are **Convex deployment env vars**
+(server-side), never in the browser bundle.
 OpenRouter free tier is 50 req/day; past that a run resolves to the mock (shown on the
 review header + Diagnostics).
 

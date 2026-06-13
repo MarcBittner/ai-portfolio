@@ -137,6 +137,12 @@ export default function Configuration() {
         <p className="mt-3 text-xs text-[--color-muted]">
           Right now a run resolves to <b className="text-[--color-ink]">{cfg.activeMode}</b>.
         </p>
+        {(mode === "auto" || mode === "local") && (
+          <p className="mt-1 text-xs text-[--color-muted]">
+            Local Ollama is auto-detected (probed at{" "}
+            <span className="font-mono">{cfg.localUrl}</span>) and used first if it responds.
+          </p>
+        )}
       </section>
 
       {/* provider status */}
@@ -144,13 +150,9 @@ export default function Configuration() {
         <div className="text-sm font-semibold">Provider status</div>
         <div className="mt-3 space-y-2 text-sm">
           <Row
-            ok={cfg.keys.local}
-            label="Local — Ollama"
-            detail={
-              cfg.keys.local
-                ? `reachable · ${cfg.defaultLocalModel}`
-                : "set OLLAMA_BASE_URL (to a reachable host) to enable"
-            }
+            ok
+            label="Local — Ollama (auto-detected)"
+            detail={`probed at runtime: ${cfg.localUrl} · ${cfg.defaultLocalModel}`}
           />
           <Row
             ok={cfg.keys.paid}
