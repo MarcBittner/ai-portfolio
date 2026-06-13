@@ -13,14 +13,14 @@ services:
     envVars:
       - key: PERSONA_TWIN_ROUTE_OBJECTIVE
         value: cost
-  # maskline — warehouse data-access governance + masking-policy-as-code.
-  # Runs fully offline (deterministic classifier + Snowflake-compatible SQL on DuckDB).
+  # postureline — one posture/compliance engine, two scanners (warehouse + exposure).
+  # Folds the former maskline + perimeter. Runs fully offline.
   - type: web
-    name: maskline
+    name: postureline
     runtime: docker
     plan: free
-    dockerfilePath: ./projects/maskline/Dockerfile
-    dockerContext: ./projects/maskline
+    dockerfilePath: ./projects/postureline/Dockerfile
+    dockerContext: ./projects/postureline
     healthCheckPath: /health
   # relaytoken — scoped WebRTC room access tokens (Go) + adversarial breaker suite.
   - type: web
@@ -56,14 +56,6 @@ services:
     plan: free
     dockerfilePath: ./projects/quorum/Dockerfile
     dockerContext: ./projects/quorum
-    healthCheckPath: /health
-  # perimeter — internet-exposure intelligence → risk posture → multi-framework GRC reporting.
-  - type: web
-    name: perimeter
-    runtime: docker
-    plan: free
-    dockerfilePath: ./projects/perimeter/Dockerfile
-    dockerContext: ./projects/perimeter
     healthCheckPath: /health
   # burnrate — instrumented Flask SRE service (Prometheus + SLO burn rate + GitOps).
   - type: web
