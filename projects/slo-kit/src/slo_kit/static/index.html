@@ -4,6 +4,16 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>slo-kit — SLOs, error budgets & traces</title>
+<!-- POLISH KIT: theme-init (apply before paint, no flash) -->
+<script>
+(function(){
+  try{
+    var t=localStorage.getItem("theme")||"system";
+    var dark = t==="dark" || (t==="system" && !window.matchMedia("(prefers-color-scheme: light)").matches);
+    if(!dark) document.documentElement.classList.add("light");
+  }catch(e){}
+})();
+</script>
 <style>
   /* ============================ design system ============================ */
   :root{
@@ -19,20 +29,35 @@
     --grad:linear-gradient(135deg,var(--accent),var(--accent-2));
     --ease:cubic-bezier(.22,.61,.36,1);
     --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+    --header-bg:rgba(10,13,20,.72);
+    --bg-radial-1:rgba(107,130,255,.10); --bg-radial-2:rgba(67,201,138,.05);
+  }
+  /* POLISH KIT: theme toggle — LIGHT palette overrides (same accents, light surfaces, dark ink) */
+  html.light{
+    --bg:#f4f6fb; --bg-grad-1:#eef2fb; --bg-grad-2:#f4f6fb;
+    --surface:#ffffff; --surface-2:#f1f4fa; --surface-3:#e6ebf5;
+    --line:#d8dfec; --line-2:#c2ccde;
+    --ink:#16203a; --ink-dim:#566184; --ink-faint:#8b95ad;
+    --accent:#3a6ff0; --accent-2:#7c5cf5; --accent-ink:#ffffff;
+    --ok:#1f9d63; --warn:#b9791f; --bad:#d83a4d; --info:#3a6ff0; --violet:#6f53d6;
+    --sh:0 1px 2px rgba(20,32,58,.06), 0 8px 24px -14px rgba(20,32,58,.18);
+    --sh-lg:0 1px 2px rgba(20,32,58,.08), 0 24px 64px -28px rgba(20,32,58,.28);
+    --header-bg:rgba(255,255,255,.78);
+    --bg-radial-1:rgba(58,111,240,.10); --bg-radial-2:rgba(31,157,99,.06);
   }
   *{box-sizing:border-box}
   html{scroll-behavior:smooth}
   body{margin:0;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;
     font:15px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Inter,sans-serif;
-    background-image:radial-gradient(1200px 600px at 80% -10%,rgba(107,130,255,.10),transparent 60%),
-      radial-gradient(900px 500px at 0% 0%,rgba(67,201,138,.05),transparent 55%);
-    background-attachment:fixed;min-height:100vh}
+    background-image:radial-gradient(1200px 600px at 80% -10%,var(--bg-radial-1),transparent 60%),
+      radial-gradient(900px 500px at 0% 0%,var(--bg-radial-2),transparent 55%);
+    background-attachment:fixed;min-height:100vh;transition:background-color .25s var(--ease),color .25s var(--ease)}
   ::selection{background:rgba(106,161,255,.3)}
   a{color:var(--accent);text-decoration:none}
   /* header */
   header{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:14px;
     padding:14px 24px;border-bottom:1px solid var(--line);
-    background:rgba(10,13,20,.72);backdrop-filter:blur(14px) saturate(140%)}
+    background:var(--header-bg);backdrop-filter:blur(14px) saturate(140%)}
   .brand{display:flex;align-items:center;gap:11px;font-weight:650;font-size:16px;letter-spacing:.2px}
   .logo{width:30px;height:30px;border-radius:9px;background:var(--grad);position:relative;
     box-shadow:0 4px 16px -4px rgba(106,161,255,.6);flex:none}
@@ -148,6 +173,31 @@
   .field label{font-size:12px;color:var(--ink-dim);font-weight:600;display:flex;justify-content:space-between}
   .field .hint{font-size:11.5px;color:var(--ink-faint);font-weight:400}
   .seg{display:flex;gap:6px;flex-wrap:wrap}
+  /* POLISH KIT: segmented control (theme + routing mode) */
+  .seg .segbtn{font:inherit;font-size:12px;cursor:pointer;border:1px solid var(--line);background:var(--surface-2);
+    color:var(--ink-dim);border-radius:var(--r-sm);padding:7px 11px;transition:.16s var(--ease)}
+  .seg .segbtn:hover{color:var(--ink);border-color:var(--line-2)}
+  .seg .segbtn[aria-pressed="true"]{background:var(--grad);border-color:transparent;color:var(--accent-ink);font-weight:600}
+  .pstat{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12.5px;
+    padding:7px 11px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface-2)}
+  .pstat .pdot{width:8px;height:8px;border-radius:50%;background:var(--ink-faint);flex:none}
+  .pstat .pdot.on{background:var(--ok);box-shadow:0 0 0 3px rgba(67,201,138,.18)}
+  .chainline{font-family:var(--mono);font-size:11.5px;color:var(--ink-dim);
+    background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);padding:8px 11px;word-break:break-word}
+  /* POLISH KIT: help modal (centered dialog, reuses scrim) */
+  #help{position:fixed;top:50%;left:50%;transform:translate(-50%,calc(-50% + 12px));z-index:70;
+    width:560px;max-width:94vw;max-height:86vh;overflow:auto;opacity:0;pointer-events:none;
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh-lg);
+    transition:opacity .25s var(--ease),transform .25s var(--ease)}
+  #help.open{opacity:1;pointer-events:auto;transform:translate(-50%,-50%)}
+  #help header{position:static;background:none;backdrop-filter:none;border-bottom:1px solid var(--line)}
+  #help .body{padding:20px;display:grid;gap:16px}
+  #help h4{margin:0 0 6px;font-size:11.5px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--ink-dim)}
+  #help p{margin:0;color:var(--ink-dim);font-size:13.5px}
+  #help ol{margin:0;padding-left:20px;color:var(--ink-dim);font-size:13.5px;display:grid;gap:4px}
+  #help .kbd{font-family:var(--mono);font-size:11.5px;background:var(--surface-2);border:1px solid var(--line);
+    border-bottom-width:2px;border-radius:6px;padding:1px 7px;color:var(--ink)}
+  #help .eps{display:flex;gap:7px;flex-wrap:wrap}
   .targets{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);padding:13px 14px;display:grid;gap:9px}
   .targets .tr{display:flex;justify-content:space-between;align-items:center;font-size:12.5px}
   .targets .tr .tk{color:var(--ink-dim)} .targets .tr .tv{font-weight:600;font-variant-numeric:tabular-nums}
@@ -193,6 +243,12 @@
   <span class="spacer"></span>
   <span class="status"><span class="dot" id="hdot"></span><span id="hstat">connecting…</span></span>
   <span class="pill" id="slopill">SLO …</span>
+  <!-- POLISH KIT: theme toggle -->
+  <button class="iconbtn" id="themebtn" title="Toggle theme" aria-label="Toggle light/dark theme"><span id="themeicon">☾</span></button>
+  <!-- POLISH KIT: help modal trigger -->
+  <button class="iconbtn" id="helpbtn" title="Help (?)" aria-label="Help">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 1 1 4.6 3c-.8.6-1.7 1-1.7 2.2"/><line x1="12" y1="17.5" x2="12" y2="17.51"/></svg>
+  </button>
   <button class="iconbtn" id="gear" title="Settings" aria-label="Settings">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
   </button>
@@ -304,10 +360,71 @@
       </div>
       <div class="muted" style="font-size:11.5px">Targets are enforced server-side and read-only here — change them in <code>slo.py</code>.</div>
     </div>
+
+    <!-- POLISH KIT: theme segmented control -->
+    <div class="field">
+      <label>Theme <span class="hint">appearance</span></label>
+      <div class="seg" id="themeseg">
+        <button type="button" class="segbtn" data-theme="dark">Dark</button>
+        <button type="button" class="segbtn" data-theme="light">Light</button>
+        <button type="button" class="segbtn" data-theme="system">System</button>
+      </div>
+    </div>
+
+    <!-- POLISH KIT: routing config -->
+    <div class="field">
+      <label>Routing mode <span class="hint">which provider the summary uses</span></label>
+      <div class="seg" id="modeseg">
+        <button type="button" class="segbtn" data-mode="auto">auto</button>
+        <button type="button" class="segbtn" data-mode="local">local</button>
+        <button type="button" class="segbtn" data-mode="free">free</button>
+        <button type="button" class="segbtn" data-mode="paid">paid</button>
+        <button type="button" class="segbtn" data-mode="offline">offline</button>
+      </div>
+      <div class="hint" id="modeblurb">auto = local if reachable, else paid, else free, else offline.</div>
+    </div>
+    <div class="field">
+      <label for="cfgModel">Model override <span class="hint">optional</span></label>
+      <input id="cfgModel" type="text" placeholder="provider default" />
+    </div>
+    <div class="field">
+      <label>Provider status <span class="hint" id="modeactive">active: auto</span></label>
+      <div style="display:grid;gap:6px" id="provrows"></div>
+    </div>
+    <div class="field">
+      <label>Fallback chain <span class="hint">→ on failure</span></label>
+      <div class="chainline" id="chainline">offline (deterministic)</div>
+    </div>
+    <div class="muted" style="font-size:11.5px">Provider keys live server-side; this selects which available provider the incident summary uses.</div>
   </div>
   <div class="foot">
     <button class="btn" id="resetcfg">Reset</button>
     <button class="btn primary" id="savecfg" style="flex:1"><span class="lbl">Save</span></button>
+  </div>
+</aside>
+
+<!-- POLISH KIT: help modal -->
+<aside id="help" role="dialog" aria-modal="true" aria-labelledby="helptitle" aria-hidden="true">
+  <header><div class="brand" style="font-size:15px"><span class="logo" style="width:24px;height:24px"></span>
+    <span id="helptitle">Help · slo-kit</span></div>
+    <span class="spacer"></span><button class="iconbtn" id="closehelp" aria-label="Close help">✕</button></header>
+  <div class="body">
+    <div><h4>What it is</h4><p>An instrumented reference SRE service: RED metrics (rate/errors/duration),
+      availability &amp; latency SLOs with error budgets and burn rate, OpenTelemetry-style traces, and an
+      on-demand incident you can inject and recover. The model only writes the on-call narrative; severity
+      is classified deterministically from the SLO math.</p></div>
+    <div><h4>How to use</h4><ol>
+      <li><b>Run load</b> — click <i>Run load</i> in <i>Operator controls</i> to drive healthy traffic and populate the SLOs.</li>
+      <li><b>Inject an incident</b> — set error % and added latency, click <i>Inject incident + load</i> to burn the error budget.</li>
+      <li><b>Generate a summary</b> — click <i>Generate incident summary</i> to compress the live state into a severity, narrative, and runbook steps.</li>
+      <li><b>Reset</b> — click <i>Reset</i> to clear the fault and recover the budget.</li>
+    </ol></div>
+    <div><h4>Endpoints</h4><div class="eps">
+      <code>/metrics</code><code>/metrics/snapshot</code><code>/slo</code><code>/traces</code>
+      <code>/incident/summary</code><code>/evals</code><code>/llm</code><code>/admin/loadtest</code>
+      <code>/admin/fault</code><code>/admin/reset</code></div></div>
+    <div><h4>Keyboard shortcuts</h4><p><span class="kbd">?</span> open this help · <span class="kbd">Esc</span> close any overlay</p></div>
+    <div><p class="muted" style="font-size:11.5px">All traffic, traces, and incidents are <b>synthetic</b> — generated by the built-in load tester.</p></div>
   </div>
 </aside>
 
@@ -319,8 +436,9 @@ const j=async(u,o)=>(await fetch(u,o)).json();
 const post=(u,b)=>j(u,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(b||{})});
 const pct=x=>(x*100).toFixed(2)+"%";
 const CFG_KEY="slokit.cfg";
-const DEFAULTS={n:300,err:6,lat:450};
+const DEFAULTS={n:300,err:6,lat:450,mode:"auto",model:""};
 let cfg={...DEFAULTS};
+let llmProviders={};  // last GET /llm providers map
 
 function toast(msg,type="info"){
   const t=document.createElement("div");t.className=`toast ${type}`;
@@ -330,15 +448,17 @@ function toast(msg,type="info"){
 function loadCfg(){try{cfg={...cfg,...JSON.parse(localStorage.getItem(CFG_KEY)||"{}")}}catch{}}
 // reflect cfg onto the inline operator controls
 function applyCfgToInline(){$("#n").value=cfg.n;$("#er").value=cfg.err;$("#lat").value=cfg.lat;}
-function applyCfgToForm(){$("#cfgN").value=cfg.n;$("#cfgErr").value=cfg.err;$("#cfgLat").value=cfg.lat;}
+function applyCfgToForm(){$("#cfgN").value=cfg.n;$("#cfgErr").value=cfg.err;$("#cfgLat").value=cfg.lat;
+  $("#cfgModel").value=cfg.model||"";selectMode(cfg.mode||"auto");renderRouting();syncThemeSeg();}
 function openDrawer(){applyCfgToForm();$("#scrim").classList.add("open");$("#drawer").classList.add("open");$("#drawer").setAttribute("aria-hidden","false")}
 function closeDrawer(){$("#scrim").classList.remove("open");$("#drawer").classList.remove("open");$("#drawer").setAttribute("aria-hidden","true")}
 $("#gear").onclick=openDrawer;$("#closedrawer").onclick=closeDrawer;$("#scrim").onclick=closeDrawer;
 $("#savecfg").onclick=()=>{
-  cfg={n:+$("#cfgN").value||DEFAULTS.n,err:+$("#cfgErr").value||0,lat:+$("#cfgLat").value||0};
-  localStorage.setItem(CFG_KEY,JSON.stringify(cfg));applyCfgToInline();closeDrawer();toast("Settings saved","ok");
+  cfg={n:+$("#cfgN").value||DEFAULTS.n,err:+$("#cfgErr").value||0,lat:+$("#cfgLat").value||0,
+    mode:currentMode(),model:$("#cfgModel").value.trim()};
+  localStorage.setItem(CFG_KEY,JSON.stringify(cfg));applyCfgToInline();renderRouting();closeDrawer();toast("Settings saved","ok");
 };
-$("#resetcfg").onclick=()=>{cfg={...DEFAULTS};localStorage.removeItem(CFG_KEY);applyCfgToForm();applyCfgToInline();toast("Reset to defaults","info")};
+$("#resetcfg").onclick=()=>{cfg={...DEFAULTS};localStorage.removeItem(CFG_KEY);applyCfgToForm();applyCfgToInline();renderRouting();toast("Reset to defaults","info")};
 
 // ---- SLO rendering -----------------------------------------------------------
 const STATUSCLASS={healthy:"ok",no_data:"",burning:"warn",exhausted:"bad",violated:"bad",at_risk:"bad"};
@@ -413,7 +533,7 @@ async function summarize(){
   const btn=$("#summ");btn.classList.add("loading");
   $("#summres").innerHTML='<span class="muted">summarizing…</span>';
   try{
-    const r=await post("incident/summary",{});
+    const r=await post("incident/summary",{mode:(cfg.mode&&cfg.mode!=="auto")?cfg.mode:null});
     const badge=SEVCLASS[r.severity]||"b-info";
     const esc=s=>s.replace(/&/g,"&amp;").replace(/</g,"&lt;");
     const steps=r.suggested_steps.map(s=>`<li style="margin:4px 0">${esc(s)}</li>`).join("");
@@ -429,13 +549,84 @@ async function summarize(){
 }
 $("#summ").onclick=summarize;
 async function loadLlm(){
-  try{const s=await j("llm");const active=Object.entries(s.providers).find(e=>e[1]);
-    $("#llmstat").textContent=active?active[0]:"offline (deterministic)";}catch{}
+  try{const s=await j("llm");llmProviders=s.providers||{};
+    const active=Object.entries(llmProviders).find(e=>e[1]);
+    $("#llmstat").textContent=active?active[0]:"offline (deterministic)";
+    renderRouting();}catch{}
 }
+
+/* ===================== POLISH KIT: theme toggle ===================== */
+const THEME_KEY="theme";
+function getTheme(){try{return localStorage.getItem(THEME_KEY)||"system"}catch{return "system"}}
+function effectiveDark(t){
+  if(t==="dark")return true; if(t==="light")return false;
+  return !window.matchMedia("(prefers-color-scheme: light)").matches;
+}
+function applyTheme(t){
+  const dark=effectiveDark(t);
+  document.documentElement.classList.toggle("light",!dark);
+  $("#themeicon").textContent=dark?"☾":"☀";
+  $("#themebtn").title=`Theme: ${t}`;
+}
+function setTheme(t){try{localStorage.setItem(THEME_KEY,t)}catch{} applyTheme(t); syncThemeSeg();}
+function syncThemeSeg(){const cur=getTheme();
+  $$("#themeseg .segbtn").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.theme===cur)));}
+$("#themebtn").onclick=()=>{const cur=getTheme();const next=effectiveDark(cur)?"light":"dark";setTheme(next);};
+$$("#themeseg .segbtn").forEach(b=>b.onclick=()=>setTheme(b.dataset.theme));
+window.matchMedia("(prefers-color-scheme: light)").addEventListener?.("change",()=>{if(getTheme()==="system")applyTheme("system");});
+applyTheme(getTheme());
+
+/* ===================== POLISH KIT: help modal ===================== */
+function openHelp(){$("#scrim").classList.add("open");$("#help").classList.add("open");
+  $("#help").setAttribute("aria-hidden","false");$("#closehelp").focus();}
+function closeHelp(){$("#scrim").classList.remove("open");$("#help").classList.remove("open");
+  $("#help").setAttribute("aria-hidden","true");}
+$("#helpbtn").onclick=openHelp;$("#closehelp").onclick=closeHelp;
+$("#scrim").onclick=()=>{closeDrawer();closeHelp();};
+document.addEventListener("keydown",e=>{
+  const typing=/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName||"")||document.activeElement?.isContentEditable;
+  if(e.key==="Escape"){closeDrawer();closeHelp();}
+  else if(e.key==="?"&&!typing&&!$("#help").classList.contains("open")){e.preventDefault();openHelp();}
+});
+
+/* ===================== POLISH KIT: routing config ===================== */
+const MODE_BLURBS={
+  auto:"auto = local if reachable, else paid, else free, else offline.",
+  local:"local = Ollama only (on-box, zero cost).",
+  free:"free = OpenRouter free models only.",
+  paid:"paid = Anthropic, then OpenAI.",
+  offline:"offline = deterministic drafter only (no LLM call).",
+};
+const MODE_CHAIN={
+  auto:["anthropic","openai","ollama","openrouter"],
+  local:["ollama"], free:["openrouter"], paid:["anthropic","openai"], offline:[],
+};
+const PROVIDERS=["anthropic","openai","ollama","openrouter"];
+function selectMode(m){
+  $$("#modeseg .segbtn").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.mode===m)));
+  $("#modeblurb").textContent=MODE_BLURBS[m]||"";
+  $("#modeactive").textContent=`active: ${m}`;
+}
+function currentMode(){return $("#modeseg").querySelector('[aria-pressed="true"]')?.dataset.mode||"auto";}
+function renderRouting(){
+  const m=currentMode();
+  $("#modeactive").textContent=`active: ${m}`;
+  const rows=PROVIDERS.map(p=>{
+    const on=!!llmProviders[p];
+    return `<div class="pstat"><span>${p}</span><span class="pdot ${on?'on':''}" title="${on?'available':'not configured'}"></span></div>`;
+  }).join("")+
+    `<div class="pstat"><span>offline (deterministic)</span><span class="pdot on" title="always available"></span></div>`;
+  $("#provrows").innerHTML=rows;
+  const chain=(MODE_CHAIN[m]||[]).filter(p=>llmProviders[p]);
+  const display=[...chain,"offline (deterministic)"];
+  $("#chainline").textContent=display.join("  →  ");
+}
+$$("#modeseg .segbtn").forEach(b=>b.onclick=()=>{selectMode(b.dataset.mode);renderRouting();});
 
 // ---- cold-start boot ---------------------------------------------------------
 async function boot(){
   loadCfg();applyCfgToInline();
+  selectMode(cfg.mode||"auto");  // seed routing segment so renderRouting has a mode before drawer opens
   let ready=false;
   for(let i=0;i<60 && !ready;i++){
     try{const r=await fetch("health");if(r.ok){ready=true;break}}catch{}
