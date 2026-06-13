@@ -83,7 +83,7 @@ export function Settings({ open, onClose }: { open: boolean; onClose: () => void
         aria-hidden={!open}
         className={cn(
           "fixed right-0 top-0 z-50 flex h-full w-[400px] max-w-[94vw] flex-col",
-          "border-l border-border bg-card text-card-foreground shadow-xl",
+          "border-l border-border bg-card text-card-foreground shadow-xl backdrop-blur-xl",
           "transition-transform duration-300 ease-out",
           open ? "translate-x-0" : "translate-x-full",
         )}

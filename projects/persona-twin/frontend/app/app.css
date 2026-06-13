@@ -4,7 +4,8 @@
 @theme {
   --color-background: oklch(0.985 0.002 90);
   --color-foreground: oklch(0.24 0.01 260);
-  --color-card: oklch(1 0 0);
+  /* card is translucent so the page background shows through frosted panes */
+  --color-card: oklch(1 0 0 / 0.72);
   --color-card-foreground: oklch(0.24 0.01 260);
   --color-primary: oklch(0.45 0.09 250);
   --color-primary-foreground: oklch(0.985 0.002 90);
@@ -22,7 +23,7 @@
 .dark {
   --color-background: oklch(0.17 0.012 260);
   --color-foreground: oklch(0.92 0.008 90);
-  --color-card: oklch(0.21 0.014 260);
+  --color-card: oklch(0.22 0.014 260 / 0.6);
   --color-card-foreground: oklch(0.92 0.008 90);
   --color-primary: oklch(0.68 0.12 250);
   --color-primary-foreground: oklch(0.16 0.012 260);
@@ -38,3 +39,24 @@ html { color-scheme: light; }
 html.dark { color-scheme: dark; }
 /* anchor offset so Help deep-links don't tuck under surrounding chrome */
 [data-help-section] { scroll-margin-top: 1rem; }
+
+/* Generated, offline background so the translucent panes have something to
+   reveal: a soft colour mesh + a faint dot grid, fixed to the viewport. */
+body {
+  background-attachment: fixed;
+  background-repeat: repeat, no-repeat, no-repeat, no-repeat, no-repeat;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22'%3E%3Ccircle cx='1.5' cy='1.5' r='1.3' fill='%23334155' fill-opacity='0.05'/%3E%3C/svg%3E"),
+    radial-gradient(60% 50% at 15% 8%, oklch(0.85 0.085 255 / 0.55), transparent 60%),
+    radial-gradient(55% 45% at 88% 10%, oklch(0.86 0.08 320 / 0.45), transparent 60%),
+    radial-gradient(60% 55% at 82% 92%, oklch(0.88 0.09 160 / 0.45), transparent 60%),
+    radial-gradient(55% 50% at 10% 90%, oklch(0.88 0.08 70 / 0.4), transparent 60%);
+}
+.dark body {
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22'%3E%3Ccircle cx='1.5' cy='1.5' r='1.3' fill='%23cbd5e1' fill-opacity='0.05'/%3E%3C/svg%3E"),
+    radial-gradient(60% 50% at 15% 8%, oklch(0.5 0.14 255 / 0.42), transparent 60%),
+    radial-gradient(55% 45% at 88% 10%, oklch(0.48 0.15 320 / 0.34), transparent 60%),
+    radial-gradient(60% 55% at 82% 92%, oklch(0.5 0.13 160 / 0.32), transparent 60%),
+    radial-gradient(55% 50% at 10% 90%, oklch(0.48 0.12 40 / 0.3), transparent 60%);
+}
