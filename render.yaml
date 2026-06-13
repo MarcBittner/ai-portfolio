@@ -22,3 +22,11 @@ services:
     dockerfilePath: ./projects/maskline/Dockerfile
     dockerContext: ./projects/maskline
     healthCheckPath: /health
+  # relaytoken — scoped WebRTC room access tokens (Go) + adversarial breaker suite.
+  - type: web
+    name: relaytoken
+    runtime: docker
+    plan: free
+    dockerfilePath: ./projects/relaytoken/Dockerfile
+    dockerContext: ./projects/relaytoken
+    healthCheckPath: /healthz
