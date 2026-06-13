@@ -6,7 +6,7 @@
 [![Ruff](https://img.shields.io/badge/lint-ruff-261230.svg)](https://github.com/astral-sh/ruff)
 [![FastAPI](https://img.shields.io/badge/api-FastAPI-009688.svg)](https://fastapi.tiangolo.com)
 
-**[▶ Live demo](https://baseplate.onrender.com)**
+**[▶ Live demo](https://baseplate-mlrj.onrender.com)**
 
 The **paved road** a platform-engineering team builds so the rest of the org
 ships fast and safely: reusable **Terraform** (a `service` module + VPC/EKS/RDS

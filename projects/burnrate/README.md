@@ -6,7 +6,7 @@
 [![Ruff](https://img.shields.io/badge/lint-ruff-261230.svg)](https://github.com/astral-sh/ruff)
 [![Flask](https://img.shields.io/badge/api-Flask-000000.svg)](https://flask.palletsprojects.com)
 
-**[▶ Live demo](https://burnrate.onrender.com)**
+**[▶ Live demo](https://burnrate-grza.onrender.com)**
 
 A **Flask** outreach service built and operated the way an infrastructure SRE runs
 boring, dependable systems. A simulated "outreach-send" API is wrapped in **RED
