@@ -36,6 +36,15 @@ export default function InvoiceReview() {
   const recoverable = lines.reduce((s, l) => s + l.recoverableUsd, 0);
   const redCount = lines.filter((l) => l.flag === "red").length;
   const yellowCount = lines.filter((l) => l.flag === "yellow").length;
+  // inline styles so the colors are guaranteed to render (no Tailwind ambiguity)
+  const flagColor = (f: string) =>
+    f === "red" ? "#f15b6c" : f === "yellow" ? "#e6ad52" : "#43c98a";
+  const flagBg = (f: string) =>
+    f === "red"
+      ? "rgba(241,91,108,0.12)"
+      : f === "yellow"
+        ? "rgba(230,173,82,0.12)"
+        : "rgba(67,201,138,0.08)";
 
   async function correct(lineId: Id<"invoiceLines">, current: number) {
     const v = window.prompt("Corrected unit price:", String(current));
@@ -138,13 +147,11 @@ export default function InvoiceReview() {
             {lines.map((l) => (
               <tr
                 key={l._id}
-                className={`border-b border-[--color-line]/50 align-top ${
-                  l.flag === "red"
-                    ? "bg-[--color-bad]/10"
-                    : l.flag === "yellow"
-                      ? "bg-[--color-warn]/10"
-                      : "bg-[--color-ok]/5"
-                }`}
+                className="border-b border-[--color-line]/50 align-top"
+                style={{
+                  backgroundColor: flagBg(l.flag),
+                  borderLeft: `3px solid ${flagColor(l.flag)}`,
+                }}
               >
                 <td className="p-3">
                   <div className="font-medium">{l.description}</div>
@@ -162,20 +169,14 @@ export default function InvoiceReview() {
                 </td>
                 <td className="p-3 whitespace-nowrap">
                   {l.quantity} {l.unit} ×{" "}
-                  <span
-                    className={
-                      l.flag === "red"
-                        ? "font-semibold text-[--color-bad]"
-                        : l.flag === "yellow"
-                          ? "text-[--color-warn]"
-                          : ""
-                    }
-                  >
+                  <span style={{ color: flagColor(l.flag), fontWeight: 600 }}>
                     {usd(l.unitPrice)}
                   </span>
                 </td>
                 <td
-                  className={`p-3 whitespace-nowrap ${l.flag === "red" ? "font-semibold text-[--color-bad]" : ""}`}
+                  className="p-3 whitespace-nowrap text-base font-bold"
+                  style={{ color: flagColor(l.flag) }}
+                  title="the cost billed on this line"
                 >
                   {usd(l.claimedExtension)}
                 </td>
