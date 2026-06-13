@@ -1,0 +1,26 @@
+# PostgreSQL — the data layer cycleledger is built around.
+#
+# Every environment honors DATABASE_URL when set (Rails merges it on top of
+# these values), which is how the Docker image and Render wire to an external
+# Postgres. Locally, connect over TCP as role `app`. The defaults below match a
+# bare local cluster so `rails db:prepare` works with zero env in dev.
+default: &default
+  adapter: postgresql
+  encoding: unicode
+  pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
+  host: <%= ENV.fetch("PGHOST", "localhost") %>
+  port: <%= ENV.fetch("PGPORT", 5432) %>
+  username: <%= ENV.fetch("PGUSER", "app") %>
+  password: <%= ENV.fetch("PGPASSWORD", "app") %>
+
+development:
+  <<: *default
+  database: cycleledger_development
+
+test:
+  <<: *default
+  database: cycleledger_test
+
+production:
+  <<: *default
+  database: <%= ENV.fetch("CYCLELEDGER_DATABASE", "cycleledger_production") %>

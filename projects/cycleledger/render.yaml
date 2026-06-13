@@ -1,0 +1,30 @@
+# Render blueprint — a Dockerized web service + managed Postgres.
+# NOTE: Render Blueprints can be finicky on the free tier; this is provided as
+# a reviewable reference. The image also runs anywhere `docker run` does, wired
+# to any external Postgres via DATABASE_URL.
+services:
+  - type: web
+    name: cycleledger
+    runtime: docker
+    plan: free
+    autoDeploy: false
+    healthCheckPath: /up
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: cycleledger-db
+          property: connectionString
+      - key: SECRET_KEY_BASE
+        generateValue: true
+      - key: APP_HOST
+        value: cycleledger.onrender.com
+      - key: RAILS_LOG_TO_STDOUT
+        value: "1"
+      - key: LLM_MODE
+        value: auto
+      # LLM keys are set in the Render dashboard, never committed.
+
+databases:
+  - name: cycleledger-db
+    plan: free
+    postgresMajorVersion: "15"

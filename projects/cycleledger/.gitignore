@@ -1,0 +1,39 @@
+# Rails / Ruby standard ignores.
+
+# Ignore bundler config & locally-vendored gems (installed to vendor/bundle in
+# this environment because the system gem dir is read-only). CI / Docker run a
+# fresh `bundle install`, so the vendored copy must not be committed.
+/.bundle
+/vendor/bundle
+
+# Ignore all logfiles and tempfiles.
+/log/*
+/tmp/*
+!/log/.keep
+!/tmp/.keep
+
+# Ignore pidfiles, but keep the directory.
+/tmp/pids/*
+!/tmp/pids/
+!/tmp/pids/.keep
+
+# Ignore storage (uploaded files in development and any SQLite databases).
+/storage/*
+!/storage/.keep
+/tmp/storage/*
+!/tmp/storage/
+
+*.sqlite3
+*.sqlite3-*
+
+# Ignore master key for decrypting credentials and more.
+/config/master.key
+
+# Local env overrides — never commit secrets.
+/.env
+/.env.*
+!/.env.example
+
+# OS / editor noise.
+.DS_Store
+*.swp

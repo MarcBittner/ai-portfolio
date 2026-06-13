@@ -25,6 +25,7 @@ PATTERNS=(
 ALLOWLIST=(
   'USER:PASSWORD@'
   'user:pass@'
+  'app:app@localhost'  # local-dev Postgres throwaway (Rails demo); never a real secret
   'sk-ant-your-key-here'
   'sk-your-key-here'
   'test-placeholder'

@@ -1,0 +1,33 @@
+#!/bin/sh
+# Container entrypoint: wait for Postgres, prepare + seed the schema, then exec
+# the CMD (puma). `db:prepare` creates the DB if missing and migrates it; the
+# partition DDL lives in db/structure.sql, which db:prepare loads. Seeding is
+# guarded so a restart does not re-truncate a populated database.
+set -e
+
+# Wait for the database to accept connections (Render's Postgres may lag boot).
+if [ -n "$DATABASE_URL" ]; then
+  echo "[entrypoint] waiting for Postgres ..."
+  i=0
+  until pg_isready -d "$DATABASE_URL" >/dev/null 2>&1; do
+    i=$((i + 1))
+    [ "$i" -ge 60 ] && { echo "[entrypoint] Postgres not ready after 60s"; break; }
+    sleep 1
+  done
+fi
+
+echo "[entrypoint] db:prepare ..."
+bundle exec rails db:prepare
+
+# Seed only when the dataset is empty (SEED=skip to disable entirely).
+if [ "${SEED:-auto}" != "skip" ]; then
+  count=$(bundle exec rails runner 'print Contribution.count' 2>/dev/null || echo 0)
+  if [ "$count" = "0" ]; then
+    echo "[entrypoint] seeding synthetic data ..."
+    bundle exec rails db:seed
+  else
+    echo "[entrypoint] data present ($count contributions) — skipping seed"
+  fi
+fi
+
+exec "$@"

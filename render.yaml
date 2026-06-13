@@ -30,3 +30,27 @@ services:
     dockerfilePath: ./projects/relaytoken/Dockerfile
     dockerContext: ./projects/relaytoken
     healthCheckPath: /healthz
+  # cycleledger — Rails contributions data layer (Postgres partitioning + query-plan artifact).
+  - type: web
+    name: cycleledger
+    runtime: docker
+    plan: free
+    dockerfilePath: ./projects/cycleledger/Dockerfile
+    dockerContext: ./projects/cycleledger
+    healthCheckPath: /up
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: cycleledger-db
+          property: connectionString
+      - key: SECRET_KEY_BASE
+        generateValue: true
+      - key: RAILS_LOG_TO_STDOUT
+        value: "1"
+      - key: LLM_MODE
+        value: auto
+
+databases:
+  - name: cycleledger-db
+    plan: free
+    postgresMajorVersion: "15"

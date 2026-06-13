@@ -1,0 +1,28 @@
+source "https://rubygems.org"
+
+# Core framework — API-only Rails on Ruby 3.1.
+gem "rails", "~> 7.2.3", ">= 7.2.3.1"
+
+# PostgreSQL: the data layer. Declarative range partitioning lives in raw DDL
+# migrations (`execute`), so we lean on the adapter, not on a partitioning gem.
+gem "pg", "~> 1.1"
+
+# Puma: the app server the Dockerfile/Render boot with.
+gem "puma", ">= 5.0"
+
+# Sidekiq + Redis: real background ingest. The IngestJob runs inline when Redis
+# is absent (Active Job :inline adapter), so the deployed demo needs no worker.
+gem "sidekiq", "~> 7.3"
+gem "redis", "~> 5.3"
+
+# Windows does not include zoneinfo files, so bundle the tzinfo-data gem
+gem "tzinfo-data", platforms: %i[ mswin mswin64 mingw x64_mingw jruby ]
+
+group :development, :test do
+  gem "debug", platforms: %i[ mri mswin mswin64 mingw x64_mingw ], require: "debug/prelude"
+end
+
+group :test do
+  # Minitest ships with Rails; rack-test drives the request/integration tests.
+  gem "rack-test"
+end
