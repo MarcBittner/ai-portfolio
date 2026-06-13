@@ -34,6 +34,8 @@ export default function InvoiceReview() {
 
   const { invoice, lines } = data;
   const recoverable = lines.reduce((s, l) => s + l.recoverableUsd, 0);
+  const redCount = lines.filter((l) => l.flag === "red").length;
+  const yellowCount = lines.filter((l) => l.flag === "yellow").length;
 
   async function correct(lineId: Id<"invoiceLines">, current: number) {
     const v = window.prompt("Corrected unit price:", String(current));
@@ -75,6 +77,40 @@ export default function InvoiceReview() {
           </button>
         </div>
       </div>
+
+      {lines.length > 0 && (
+        <div className="glass mb-4 p-4 text-sm">
+          <p className="text-[--color-muted]">
+            trueline re-checked all <b className="text-[--color-ink]">{lines.length} lines</b> of{" "}
+            <b className="text-[--color-ink]">{invoice.invoiceNumber}</b> against{" "}
+            <b className="text-[--color-ink]">{invoice.poNumber}</b> and market rates. The AI only
+            read the invoice text —{" "}
+            <b className="text-[--color-ink]">every calculation below is deterministic code</b>.
+          </p>
+          <p className="mt-2">
+            {redCount > 0 ? (
+              <span className="font-medium text-[--color-bad]">
+                🔴 {redCount} overcharge{redCount > 1 ? "s" : ""} totaling {usd(recoverable)} you can
+                push back on.{" "}
+              </span>
+            ) : (
+              <span className="text-[--color-ok]">
+                🟢 No overcharges — every line is within PO &amp; market.{" "}
+              </span>
+            )}
+            {yellowCount > 0 && (
+              <span className="text-[--color-warn]">
+                🟡 {yellowCount} line{yellowCount > 1 ? "s" : ""} need a human look.
+              </span>
+            )}
+          </p>
+          <p className="mt-2 text-xs text-[--color-muted]">
+            Read each row left→right: what the vendor charged → what code recomputed → the PO price →
+            the catalog (market) price → variance → confidence → flag. The italics under each line
+            are the reasons it flagged.
+          </p>
+        </div>
+      )}
 
       {invoice.status === "extracting" && (
         <p className="glass p-3 text-sm text-[--color-muted]">

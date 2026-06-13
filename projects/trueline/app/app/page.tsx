@@ -52,6 +52,22 @@ export default function Dashboard() {
     <main className="mx-auto max-w-5xl px-6 py-8">
       <Nav />
 
+      <section className="glass mb-4 p-4 text-sm">
+        <div className="font-semibold">What you're looking at</div>
+        <p className="mt-1 text-[--color-muted]">
+          Each row below is a <b className="text-[--color-ink]">vendor invoice</b>. trueline read it
+          with an LLM, then <b className="text-[--color-ink]">re-computed every line in code</b> and
+          checked each charge against the agreed purchase order (PO-4471) and market rates.{" "}
+          <span className="whitespace-nowrap">🔴 overcharge</span> ·{" "}
+          <span className="whitespace-nowrap">🟡 needs a look</span> ·{" "}
+          <span className="whitespace-nowrap">🟢 within tolerance</span>. The{" "}
+          <b className="text-[--color-ink]">recoverable</b> figure is money you can dispute.
+        </p>
+        <p className="mt-2 text-[--color-accent]">
+          👉 New here? Open <b>INV-1010</b> — a padded bill with ~$1,090 in overcharges.
+        </p>
+      </section>
+
       <section className="grid gap-3 sm:grid-cols-4">
         <Stat label="Invoices" value={stats ? String(stats.invoices) : "—"} />
         <Stat label="Recoverable" value={stats ? usd(stats.recoverableUsd) : "—"} accent />
@@ -87,6 +103,7 @@ export default function Dashboard() {
                   <div className="text-xs text-[--color-muted]">
                     {inv.vendor} · {inv.lineCount} lines · claimed {usd(inv.claimedTotal)}
                   </div>
+                  <div className={`mt-0.5 text-xs ${verdictCls(inv)}`}>{verdictText(inv)}</div>
                 </div>
                 <div className="flex items-center gap-1.5 text-xs">
                   {inv.red > 0 && <FlagBadge flag="red" />}
@@ -183,4 +200,26 @@ function EvalCell({ k, v }: { k: string; v: number }) {
       <div className="text-base font-semibold">{v.toFixed(2)}</div>
     </div>
   );
+}
+
+type InvRow = {
+  red: number;
+  yellow: number;
+  green: number;
+  lineCount: number;
+  recoverableUsd?: number | null;
+  status: string;
+};
+function verdictText(inv: InvRow): string {
+  if (inv.status === "extracting") return "extracting line items…";
+  if (inv.red > 0)
+    return `${inv.red} overcharge${inv.red > 1 ? "s" : ""} found · ${usd(inv.recoverableUsd)} to dispute`;
+  if (inv.yellow > 0) return `${inv.yellow} line${inv.yellow > 1 ? "s" : ""} to review`;
+  if (inv.lineCount > 0) return "clean — every line within PO & market";
+  return "";
+}
+function verdictCls(inv: InvRow): string {
+  if (inv.red > 0) return "text-[--color-bad] font-medium";
+  if (inv.yellow > 0) return "text-[--color-warn]";
+  return "text-[--color-ok]";
 }
