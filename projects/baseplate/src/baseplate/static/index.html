@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>baseplate — platform console</title>
+<style>
+  :root { --bg:#0d1117; --panel:#161b22; --line:#30363d; --fg:#e6edf3;
+          --dim:#8b949e; --accent:#58a6ff; --good:#3fb950; --bad:#f85149;
+          --mono:"SF Mono",ui-monospace,Menlo,Consolas,monospace; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg);
+         font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif; }
+  header { padding:20px 24px; border-bottom:1px solid var(--line); }
+  h1 { margin:0; font-size:20px; }
+  h1 span { color:var(--accent); }
+  .sub { color:var(--dim); font-size:13px; margin-top:4px; }
+  main { max-width:1080px; margin:0 auto; padding:24px; display:grid;
+         grid-template-columns:1fr 1fr; gap:20px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:10px;
+          padding:18px; }
+  .card.wide { grid-column:1 / -1; }
+  h2 { margin:0 0 12px; font-size:15px; }
+  label { display:block; font-size:12px; color:var(--dim); margin:10px 0 4px; }
+  input[type=text], textarea, select { width:100%; background:var(--bg);
+          border:1px solid var(--line); color:var(--fg); border-radius:6px;
+          padding:8px; font:13px var(--mono); }
+  textarea { resize:vertical; min-height:60px; }
+  .row { display:flex; gap:16px; align-items:center; margin-top:8px; }
+  .row label { margin:0; }
+  button { margin-top:14px; background:var(--accent); color:#0d1117; border:0;
+           border-radius:6px; padding:9px 16px; font-weight:600; cursor:pointer; }
+  button.ghost { background:transparent; color:var(--accent);
+                 border:1px solid var(--line); }
+  pre { background:var(--bg); border:1px solid var(--line); border-radius:6px;
+        padding:10px; overflow:auto; font:12px/1.45 var(--mono); max-height:340px; }
+  .tabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
+  .tab { font:12px var(--mono); padding:4px 8px; border:1px solid var(--line);
+         border-radius:5px; cursor:pointer; color:var(--dim); }
+  .tab.active { color:var(--accent); border-color:var(--accent); }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th,td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); }
+  th { color:var(--dim); font-weight:600; font-size:11px; text-transform:uppercase; }
+  .pill { font:11px var(--mono); padding:2px 6px; border-radius:4px;
+          border:1px solid var(--line); }
+  .good { color:var(--good); } .bad { color:var(--bad); }
+  .gauge { font-size:34px; font-weight:700; }
+  .note { color:var(--dim); font-size:12px; margin-top:8px; }
+  code { font:12px var(--mono); color:var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <h1><span>baseplate</span> — platform console</h1>
+  <div class="sub">The paved road: scaffold a service, see its generated IaC / k8s /
+    CI / SLO, watch it onboard, and read the example workload's data-quality SLI.
+    Illustrative IaC; synthetic data; offline by default.</div>
+</header>
+
+<main>
+  <section class="card">
+    <h2>Scaffold a service</h2>
+    <label>Describe the service (free text → the LLM/offline parser extracts a spec)</label>
+    <textarea id="desc">A Python FastAPI service called rate-ingest that reads rates from Postgres and serves them over HTTP</textarea>
+    <div class="row">
+      <label><input type="checkbox" id="onboard" checked /> onboard to catalog</label>
+    </div>
+    <button onclick="scaffold()">Generate paved-road files</button>
+    <div id="routing" class="note"></div>
+  </section>
+
+  <section class="card">
+    <h2>Data-quality SLI (example ingest workload)</h2>
+    <div id="gauge" class="gauge">—</div>
+    <div class="note" id="dqnote">Run the synthetic price-transparency rate file
+      through validation.</div>
+    <button class="ghost" onclick="loadQuality()">Run ingest</button>
+    <pre id="dq" style="margin-top:10px;display:none"></pre>
+  </section>
+
+  <section class="card wide">
+    <h2>Generated files</h2>
+    <div class="tabs" id="tabs"></div>
+    <pre id="files">// Generate a service to see its Dockerfile, k8s manifest,
+// Terraform module invocation, golden CI workflow, and SLO stub.</pre>
+  </section>
+
+  <section class="card">
+    <h2>Service catalog (on the paved road)</h2>
+    <table id="catalog"><thead><tr><th>service</th><th>lang</th><th>db</th>
+      <th>http</th><th>role</th><th>via</th></tr></thead><tbody></tbody></table>
+  </section>
+
+  <section class="card">
+    <h2>SLOs (Datadog-style)</h2>
+    <table id="slo"><thead><tr><th>slo</th><th>objective</th>
+      <th>budget /30d</th><th>current</th></tr></thead><tbody></tbody></table>
+  </section>
+</main>
+
+<script>
+let GENERATED = {};
+async function jget(u){ return (await fetch(u)).json(); }
+async function jpost(u,b){ return (await fetch(u,{method:'POST',
+  headers:{'content-type':'application/json'},body:JSON.stringify(b||{})})).json(); }
+
+async function scaffold(){
+  const desc = document.getElementById('desc').value;
+  const onboard = document.getElementById('onboard').checked;
+  const r = await jpost('/scaffold', {description: desc, onboard});
+  if (r.error){ document.getElementById('routing').textContent = r.error; return; }
+  GENERATED = r.files;
+  const s = r.spec, rt = r.routing;
+  document.getElementById('routing').innerHTML =
+    `spec: <code>${s.name}</code> · ${s.language} · db=${s.needs_db} · `+
+    `http=${s.exposes_http} &nbsp;|&nbsp; via ${rt.provider}/${rt.model}`;
+  renderTabs();
+  loadCatalog();
+}
+function renderTabs(){
+  const tabs = document.getElementById('tabs');
+  tabs.innerHTML = '';
+  const paths = Object.keys(GENERATED).sort();
+  paths.forEach((p,i)=>{
+    const t = document.createElement('span');
+    t.className = 'tab' + (i===0?' active':'');
+    t.textContent = p;
+    t.onclick = ()=>{ document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+      t.classList.add('active'); show(p); };
+    tabs.appendChild(t);
+  });
+  if (paths.length) show(paths[0]);
+}
+function show(p){ document.getElementById('files').textContent = GENERATED[p]; }
+
+async function loadQuality(){
+  const q = await jget('/quality');
+  const pct = (q.data_quality_pass_rate*100).toFixed(1)+'%';
+  const g = document.getElementById('gauge');
+  g.textContent = pct;
+  g.className = 'gauge ' + (q.data_quality_pass_rate>=0.98?'good':'bad');
+  document.getElementById('dqnote').textContent =
+    `${q.valid}/${q.rows} rows valid · defects: `+
+    Object.entries(q.defects).map(([k,v])=>`${k}×${v}`).join(', ');
+  const dq = document.getElementById('dq');
+  dq.style.display='block';
+  dq.textContent = JSON.stringify(q, null, 2);
+  loadSlo();
+}
+async function loadCatalog(){
+  const c = await jget('/catalog');
+  const tb = document.querySelector('#catalog tbody');
+  tb.innerHTML = c.services.map(s=>`<tr><td><code>${s.name}</code></td>`+
+    `<td>${s.language}</td><td>${s.needs_db}</td><td>${s.exposes_http}</td>`+
+    `<td>${s.role}</td><td><span class="pill">${s.onboarded_via}</span></td></tr>`).join('');
+}
+async function loadSlo(){
+  const v = await jget('/slo');
+  const tb = document.querySelector('#slo tbody');
+  tb.innerHTML = v.slos.map(s=>{
+    const cur = ('current_sli_pct' in s)
+      ? `<span class="${s.meeting_objective?'good':'bad'}">${s.current_sli_pct}%</span>` : '—';
+    return `<tr><td>${s.name}</td><td>${s.objective_pct}%</td>`+
+      `<td>${s.error_budget_minutes_30d}min</td><td>${cur}</td></tr>`;
+  }).join('');
+}
+scaffold(); loadQuality(); loadCatalog(); loadSlo();
+</script>
+</body>
+</html>

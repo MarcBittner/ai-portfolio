@@ -1,0 +1,73 @@
+# baseplate — the GOLDEN CI/CD pipeline (ILLUSTRATIVE reference).
+#
+# This is the paved-road pipeline every service inherits; the scaffolder emits a
+# per-service copy with the language test step filled in (see
+# src/baseplate/templates.py). The non-negotiable stages — and why they exist:
+#
+#   OIDC keyless auth   no long-lived AWS keys in CI; assume a scoped role
+#   build -> test       fail fast before anything leaves CI
+#   scan                fail the build on HIGH/CRITICAL image CVEs
+#   deploy (GitOps)     bump the image tag in the repo; Argo CD reconciles
+#   post-deploy smoke   verify /health + a golden request; roll back on failure
+#
+# To put a service on the paved road this becomes its .github/workflows/ci.yml.
+name: golden-ci
+on:
+  push: { branches: [main] }
+  pull_request: {}
+
+permissions:
+  contents: write    # GitOps: write the new image tag back to the repo
+  id-token: write    # OIDC: assume the deploy role, no static secrets
+
+env:
+  AWS_REGION: us-east-1
+  SERVICE: SERVICE_NAME
+
+jobs:
+  ship:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # --- build + test (fail fast) ---------------------------------------
+      - name: Test
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pytest -q
+
+      - name: Build image
+        run: docker build -t "$SERVICE:$GITHUB_SHA" .
+
+      # --- supply-chain gate ----------------------------------------------
+      - name: Scan image (fail on HIGH/CRITICAL)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: "${{ env.SERVICE }}:${{ github.sha }}"
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+
+      # --- keyless auth ----------------------------------------------------
+      - name: Auth to AWS (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::ACCOUNT:role/${{ env.SERVICE }}-deploy
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Push to ECR
+        run: ./platform/push.sh "$SERVICE" "$GITHUB_SHA"
+
+      # --- GitOps deploy: bump the tag, Argo CD reconciles ----------------
+      - name: Deploy (GitOps tag bump)
+        if: github.ref == 'refs/heads/main'
+        run: ./platform/bump-tag.sh "$SERVICE" "$GITHUB_SHA"
+
+      # --- post-deploy smoke gate with rollback ---------------------------
+      - name: Post-deploy smoke gate
+        if: github.ref == 'refs/heads/main'
+        run: |
+          if ! ./platform/smoke.sh "$SERVICE"; then
+            echo "::error::smoke failed — rolling back $SERVICE"
+            ./platform/rollback.sh "$SERVICE"
+            exit 1
+          fi

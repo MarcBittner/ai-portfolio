@@ -1,0 +1,38 @@
+# baseplate — GitOps app-of-apps via an Argo CD ApplicationSet (ILLUSTRATIVE).
+#
+# This is the heart of self-service onboarding: the ApplicationSet's git
+# generator scans `services/*/deploy/k8s` in the repo and creates one Argo CD
+# Application per matched directory. A developer onboards a new service by
+# adding its manifest directory (the scaffolder generates it) and opening a PR —
+# no Argo CD config changes, no platform-team ticket. The repo is the source of
+# truth; the cluster continuously reconciles to it.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: paved-road-services
+  namespace: argocd
+spec:
+  goTemplate: true
+  generators:
+    - git:
+        repoURL: https://github.com/ORG/REPO.git
+        revision: main
+        directories:
+          - path: services/*/deploy/k8s
+  template:
+    metadata:
+      # path[1] is the service directory name under services/
+      name: "{{index .path.segments 1}}"
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/ORG/REPO.git
+        targetRevision: main
+        path: "{{.path.path}}"
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: "{{index .path.segments 1}}"
+      syncPolicy:
+        automated: { prune: true, selfHeal: true }
+        syncOptions:
+          - CreateNamespace=true

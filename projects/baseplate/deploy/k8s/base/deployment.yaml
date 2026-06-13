@@ -1,0 +1,89 @@
+# baseplate — the paved-road k8s BASE (ILLUSTRATIVE). Every service inherits
+# this shape; the scaffolder renders a per-service copy with the name filled in
+# (see src/baseplate/templates.py). Placeholders in ALL_CAPS are substituted by
+# the scaffolder / the golden CI pipeline.
+#
+# Contract the base guarantees: non-root, resource requests+limits, readiness +
+# liveness probes on /health, an HPA, and a PodDisruptionBudget so rollouts and
+# node drains always keep a quorum.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: SERVICE_NAME
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: SERVICE_NAME
+  namespace: SERVICE_NAME
+  labels: { app: SERVICE_NAME, paved-road: "true" }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: SERVICE_NAME }
+  template:
+    metadata:
+      labels: { app: SERVICE_NAME }
+    spec:
+      serviceAccountName: SERVICE_NAME   # bound to the IRSA role (keyless)
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+      containers:
+        - name: app
+          image: ECR_REPO/SERVICE_NAME:GIT_SHA   # immutable tag, set by CI
+          ports:
+            - containerPort: 8080
+          env:
+            - name: PORT
+              value: "8080"
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits:   { cpu: "1",  memory: 256Mi }
+          readinessProbe:
+            httpGet: { path: /health, port: 8080 }
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /health, port: 8080 }
+            initialDelaySeconds: 10
+            periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: SERVICE_NAME
+  namespace: SERVICE_NAME
+spec:
+  selector: { app: SERVICE_NAME }
+  ports:
+    - port: 80
+      targetPort: 8080
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: SERVICE_NAME
+  namespace: SERVICE_NAME
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: SERVICE_NAME
+  minReplicas: 2
+  maxReplicas: 8
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: 65 }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: SERVICE_NAME
+  namespace: SERVICE_NAME
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: { app: SERVICE_NAME }
