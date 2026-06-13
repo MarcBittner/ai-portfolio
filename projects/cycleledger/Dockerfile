@@ -9,9 +9,10 @@ ENV RAILS_ENV=production \
     RAILS_LOG_TO_STDOUT=1
 
 # libpq5 for the pg gem at runtime; build-essential + libpq-dev to compile it;
-# postgresql-client for the entrypoint's readiness check + db tasks.
+# libyaml-dev for the psych (YAML) native extension; postgresql-client for the
+# entrypoint's readiness check + db tasks.
 RUN apt-get update -qq && apt-get install -y --no-install-recommends \
-      build-essential libpq-dev libpq5 postgresql-client curl \
+      build-essential libpq-dev libpq5 libyaml-dev postgresql-client curl \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
