@@ -30,6 +30,7 @@ ALLOWLIST=(
   'test-placeholder'
   # synthetic, obviously-fake test vectors (security demos need secret-shaped data)
   'sk-ant-EXAMPLE'
+  'sk-EXAMPLE'
   'AKIAIOSFODNN7EXAMPLE'
 )
 

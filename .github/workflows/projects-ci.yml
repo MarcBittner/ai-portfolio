@@ -27,6 +27,7 @@ jobs:
           - rate-atlas
           - attack-surface
           - txn-ledger
+          - agent-factory
     defaults:
       run:
         working-directory: projects/${{ matrix.project }}
