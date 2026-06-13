@@ -273,15 +273,42 @@ is set (`keyStatus()`). `model` overrides the chosen provider's default. Default
 `ANTHROPIC_MODEL=claude-haiku-4-5-20251001`. Keys/URLs are **Convex deployment env vars**
 (server-side), never in the browser bundle.
 
-**Host Ollama with a cloud backend.** A cloud-hosted action can't reach your `localhost`,
-so local Ollama is *also* wired **client-side**: in `auto`/`local` mode the browser (which
-is on your machine) probes `localhost:11434`, and if it answers it extracts there and
-submits the lines via `submitExtraction` — so even a cloud Convex deployment uses the model
-on your machine. It falls back to the server action (paid → free → offline) when Ollama
-isn't reachable. One host-side requirement: let the app origin call Ollama —
-`OLLAMA_ORIGINS=* ollama serve` (or set it to the app's URL).
-OpenRouter free tier is 50 req/day; past that a run resolves to the mock (shown on the
+OpenRouter's free tier is 50 req/day; past that a run resolves to the mock (shown on the
 review header + Diagnostics).
+
+### Reaching a host Ollama from the browser (the client-side path)
+
+There are **two routing layers**. The block above is the **server-side** path — it runs in
+Convex's cloud, so it can reach Anthropic / OpenRouter, and Ollama only if `OLLAMA_URL`
+points at a host the *cloud* can reach. But the common case is Ollama on **your machine**
+with a cloud-hosted backend: the cloud can't see your `localhost` — yet the browser, which
+runs on your machine, can. So in `auto`/`local` mode the upload is routed **through the
+browser** instead of the action:
+
+```
+createInvoiceFromText({ deferServer: true })      // don't schedule the server action yet
+  → probeOllama()        // browser: GET localhost:11434/api/tags, else :11435 (CORS proxy)
+  → extractWithOllama()  // browser → host Ollama /api/chat  (stream:false, format:"json")
+  → submitExtraction({ invoiceId, provider:"ollama (browser→host)", model, lines })
+                         // Convex mutation: reconcile + write — same code path as the server
+  ── if Ollama unreachable ──▶ scheduleExtract()  // hand back to the server action (paid→free→offline)
+```
+
+Files: `app/lib/ollama.ts` (probe + extract + JSON coerce), `app/app/page.tsx`
+(`uploadInvoice` orchestration), `convex/invoices.ts` (`createInvoiceFromText`'s
+`deferServer`, `submitExtraction`, `scheduleExtract`). The model proposes; the same
+deterministic `reconcileLine` still does the math — only the *transport* changed.
+
+**CORS.** A page served from another origin can't call `localhost:11434` unless Ollama
+allows it. Either:
+- run Ollama with `OLLAMA_ORIGINS='*' ollama serve` (allows the app's origin); **or**
+- put a tiny **CORS proxy** next to Ollama that forwards `:11435 → :11434` and adds
+  `Access-Control-Allow-Origin: *` — e.g. a one-file `http.server` proxy, or
+  `docker run -p 11435:11435 …` (handy when Ollama is the menu-bar app and you don't want to
+  change its launch env).
+
+`probeOllama` tries **`:11434` first (direct)** and falls back to **`:11435` (proxy)**, so
+either approach works with no change to the app.
 
 ## Reconcile algorithm (`convex/lib/reconcile.ts`, pure)
 
