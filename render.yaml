@@ -57,6 +57,30 @@ services:
     dockerfilePath: ./projects/quorum/Dockerfile
     dockerContext: ./projects/quorum
     healthCheckPath: /health
+  # perimeter — internet-exposure intelligence → risk posture → multi-framework GRC reporting.
+  - type: web
+    name: perimeter
+    runtime: docker
+    plan: free
+    dockerfilePath: ./projects/perimeter/Dockerfile
+    dockerContext: ./projects/perimeter
+    healthCheckPath: /health
+  # burnrate — instrumented Flask SRE service (Prometheus + SLO burn rate + GitOps).
+  - type: web
+    name: burnrate
+    runtime: docker
+    plan: free
+    dockerfilePath: ./projects/burnrate/Dockerfile
+    dockerContext: ./projects/burnrate
+    healthCheckPath: /healthz
+  # baseplate — platform paved-road (IaC/GitOps/SLOs) + self-service service scaffolder.
+  - type: web
+    name: baseplate
+    runtime: docker
+    plan: free
+    dockerfilePath: ./projects/baseplate/Dockerfile
+    dockerContext: ./projects/baseplate
+    healthCheckPath: /health
 
 databases:
   - name: cycleledger-db
