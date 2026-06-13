@@ -186,82 +186,242 @@ for a thrown function error, `{"status":"error","errorMessage":…}` (the messag
 `4xx` for malformed JSON / missing `path`. Auth: add `-H "Authorization: Bearer <Clerk JWT
 (convex template)>"`; reads degrade to empty without it, writes return the masked error.
 
-### `invoices.ts`
+Each entry below is `path` · kind · auth, a parameters table, the return shape, and
+errors. `path` is the value of the `"path"` field in an HTTP call; `query`/`mutation`/
+`action` map to `/api/query`, `/api/mutation`, `/api/action`. `Id<"t">` is a Convex
+document id for table `t`. `internal*` functions are server-only — not listed (callable
+only from other functions, never over HTTP).
 
-**`query listInvoices() → InvoiceRow[]`** — newest-first invoices for the tenant, each
-augmented with flag rollups `{ lineCount, red, yellow, green }`. `[]` if unauthenticated.
+---
 
-**`query getInvoice({ invoiceId: Id<"invoices"> }) → { invoice, lines } | null`** — the
-invoice plus its `invoiceLines` sorted by `lineNo`; `null` if missing or owned by
-another tenant.
+#### `invoices:listInvoices` · query · auth optional
 
-**`query stats() → { invoices, recoverableUsd, needsReview, latestEval }`** — dashboard
-rollups (`latestEval: EvalRun | null`).
+| Parameter | Type | Req | Description |
+| --------- | ---- | --- | ----------- |
+| _(none)_ | | | |
 
-**`query baseline() → { hasPo, poLines, poNumber, vendor }`** — whether a contract/PO is
-loaded; drives the guided stepper.
+**Returns** `InvoiceRow[]` — the tenant's invoices, newest first. Each row is an
+`invoices` document plus flag rollups `{ lineCount, red, yellow, green }`.
+**Errors** none. `[]` when unauthenticated.
 
-**`query recentLogs() → Log[]`** — newest 60 event-log rows.
+---
 
-**`mutation seedIfEmpty() → { seeded: boolean }`** — no-op if any invoice exists, else
-inserts the demo PO + catalog + three invoices (reconciled inline). Idempotent.
+#### `invoices:getInvoice` · query · auth optional
 
-**`mutation setBaselineFromText({ rawText: string, poNumber?: string }) → { poLines }`** —
-parses a PO file (`lib/parse.ts:parsePoText`), **replaces** existing POs, seeds the
-market catalog if absent. Throws if no line items parse.
+| Parameter | Type | Req | Description |
+| --------- | ---- | --- | ----------- |
+| `invoiceId` | `Id<"invoices">` | yes | invoice to fetch |
 
-**`mutation createInvoiceFromText({ invoiceNumber: string, rawText: string, poNumber?: string }) → Id<"invoices">`** —
-inserts the invoice as `status:"extracting"`, logs it, and **schedules**
-`internal.extract.run` via `scheduler.runAfter(0, …)`. Returns immediately; extraction
-finishes async and the UI updates reactively.
+**Returns** `{ invoice, lines } | null` — the invoice and its `invoiceLines` sorted by
+`lineNo`. **Errors** none. `null` if the id is missing or owned by another tenant.
 
-**`mutation reviewLine({ lineId: Id<"invoiceLines">, decision: "approved"|"rejected" }) → void`** —
-records the reviewer's decision + identity on a line.
+---
 
-**`mutation correctLine({ lineId: Id<"invoiceLines">, unitPrice: number, quantity?: number }) → void`** —
-applies a corrected price/qty, **re-runs `reconcileLine`** (flags + recoverable
-recompute), marks the line `decision:"edited"` (an edit becomes a label).
+#### `invoices:stats` · query · auth optional
 
-**`mutation setInvoiceStatus({ invoiceId, status: "approved"|"rejected"|"needs_review" }) → void`**
+| Parameter | Type | Req | Description |
+| --------- | ---- | --- | ----------- |
+| _(none)_ | | | |
 
-**`mutation resetDemo() → { cleared: true }`** — deletes every row for the tenant
-(invoices, lines, PO, catalog, evals, logs).
+**Returns** `{ invoices: number, recoverableUsd: number, needsReview: number, latestEval: EvalRun | null }` — dashboard rollups. **Errors** none.
 
-**`internalMutation writeResults({ invoiceId, orgId, lines, provider, model, latencyMs?, costUsd? })`** —
-called by the action. **One transaction**: clears + re-inserts `invoiceLines`
-(idempotent on the invoice `_id`), reconciles each line, patches the invoice with
-status/totals/telemetry. `markError` and `appendLog` are the error/log sinks.
+---
 
-### `extract.ts`
+#### `invoices:baseline` · query · auth optional
 
-**`internalQuery _getRaw({ invoiceId }) → { rawText, invoiceNumber } | null`**
+| Parameter | Type | Req | Description |
+| --------- | ---- | --- | ----------- |
+| _(none)_ | | | |
 
-**`internalAction run({ invoiceId, orgId })`** — the only place external I/O is legal.
-Reads raw text + routing config (`runQuery`), calls `extractLineItems`, measures latency
-and estimates cost, writes back via `runMutation writeResults`, appends a log. Not
-auto-retried — safe to re-run because the write is idempotent.
+**Returns** `{ hasPo: boolean, poLines: number, poNumber: string, vendor: string }` —
+whether a contract/PO is loaded; drives the guided stepper. **Errors** none.
 
-### `routing.ts`
+---
 
-**`query get() → { mode, model, keys:{free,paid}, defaultFreeModel, defaultPaidModel, activeMode }`** —
-the tenant's routing config + live key availability (env-derived) + the mode a run
-resolves to now.
+#### `invoices:recentLogs` · query · auth optional
 
-**`mutation set({ mode: "auto"|"free"|"paid"|"offline", model?: string }) → { ok: true }`** —
-upserts `settings`.
+| Parameter | Type | Req | Description |
+| --------- | ---- | --- | ----------- |
+| _(none)_ | | | |
 
-**`internalQuery _forExtract({ orgId }) → { mode, model }`** — read by the action.
+**Returns** `Log[]` — the newest 60 event-log rows for the tenant. **Errors** none.
 
-### `evals.ts`
+---
 
-**`mutation runEval() → EvalRun`** — scores the labeled set; inserts + returns the run.
-**`query listEvals() → EvalRun[]`** — newest 10.
+#### `invoices:seedIfEmpty` · mutation · auth required
 
-### `diagnostics.ts`
+| Parameter | Type | Req | Description |
+| --------- | ---- | --- | ----------- |
+| _(none)_ | | | |
 
-**`action benchmark({ invoiceText: string }) → { mode, provider, model, latencyMs, lines, error }[]`** —
-runs the same invoice through `offline`, `free`, and `paid`; returns the comparison and
-logs it.
+**Returns** `{ seeded: boolean }` — `false` (no-op) if any invoice already exists, else
+inserts the demo PO + market catalog + three invoices (reconciled inline) and returns
+`true`. Idempotent. **Errors** `Error("Not authenticated")`.
+
+---
+
+#### `invoices:setBaselineFromText` · mutation · auth required
+
+| Parameter | Type | Req | Description |
+| --------- | ---- | --- | ----------- |
+| `rawText` | `string` | yes | PO/contract text to parse |
+| `poNumber` | `string` | no | overrides the parsed PO number |
+
+**Returns** `{ poLines: number }`. Parses the PO (`lib/parse.ts:parsePoText`),
+**replaces** existing POs, seeds the market catalog if absent. **Errors**
+`Error("Not authenticated")`; throws if no line items parse.
+
+---
+
+#### `invoices:createInvoiceFromText` · mutation · auth required
+
+| Parameter | Type | Req | Description |
+| --------- | ---- | --- | ----------- |
+| `invoiceNumber` | `string` | yes | display id for the invoice |
+| `rawText` | `string` | yes | raw invoice text to extract from |
+| `poNumber` | `string` | no | PO to reconcile against (defaults to the demo PO) |
+| `deferServer` | `boolean` | no | if `true`, **skip** scheduling the server extract — the client will extract via host-local Ollama in the browser and call `submitExtraction` (see **Routing config** below) |
+
+**Returns** `Id<"invoices">` — inserts the invoice as `status:"extracting"` and, unless
+`deferServer`, schedules `internal.extract.run` via `scheduler.runAfter(0, …)`. Returns
+immediately; extraction completes async and the UI updates reactively. **Errors**
+`Error("Not authenticated")`.
+
+---
+
+#### `invoices:scheduleExtract` · mutation · auth required
+
+| Parameter | Type | Req | Description |
+| --------- | ---- | --- | ----------- |
+| `invoiceId` | `Id<"invoices">` | yes | invoice to extract server-side |
+
+**Returns** `void`. Client fallback: schedules the server action (paid → free → offline)
+when host-local Ollama wasn't reachable in the browser. **Errors**
+`Error("Not authenticated")`, `Error("not found")` (missing / cross-tenant).
+
+---
+
+#### `invoices:submitExtraction` · mutation · auth required
+
+| Parameter | Type | Req | Description |
+| --------- | ---- | --- | ----------- |
+| `invoiceId` | `Id<"invoices">` | yes | invoice the lines belong to |
+| `provider` | `string` | yes | e.g. `"ollama (browser→host)"` |
+| `model` | `string` | yes | model that produced the lines |
+| `latencyMs` | `number` | no | client-measured extraction latency |
+| `lines` | `Line[]` | yes | extracted line items (see shape below) |
+
+`Line` = `{ description: string, sku?: string, quantity: number, unit: string, unitPrice: number, extension: number, confidence: number, sourceQuote: string }`.
+
+**Returns** `void`. Accepts line items extracted in the browser by the host's local
+Ollama, reconciles them, and patches the invoice (`status:"needs_review"`, telemetry,
+`costUsd:0`). This is how a cloud backend uses a model on the user's machine — the
+browser reaches `localhost`, the cloud action cannot. **Errors**
+`Error("Not authenticated")`, `Error("not found")`.
+
+---
+
+#### `invoices:reviewLine` · mutation · auth required
+
+| Parameter | Type | Req | Description |
+| --------- | ---- | --- | ----------- |
+| `lineId` | `Id<"invoiceLines">` | yes | line being reviewed |
+| `decision` | `"approved" \| "rejected"` | yes | reviewer's call |
+
+**Returns** `void`. Records the decision + reviewer identity on the line. **Errors**
+`Error("Not authenticated")`.
+
+---
+
+#### `invoices:correctLine` · mutation · auth required
+
+| Parameter | Type | Req | Description |
+| --------- | ---- | --- | ----------- |
+| `lineId` | `Id<"invoiceLines">` | yes | line being corrected |
+| `unitPrice` | `number` | yes | corrected unit price |
+| `quantity` | `number` | no | corrected quantity |
+
+**Returns** `void`. Applies the correction, **re-runs `reconcileLine`** (recomputes flags
++ recoverable), and marks the line `decision:"edited"` — an edit becomes a training
+label. **Errors** `Error("Not authenticated")`.
+
+---
+
+#### `invoices:setInvoiceStatus` · mutation · auth required
+
+| Parameter | Type | Req | Description |
+| --------- | ---- | --- | ----------- |
+| `invoiceId` | `Id<"invoices">` | yes | invoice to update |
+| `status` | `"approved" \| "rejected" \| "needs_review"` | yes | new status |
+
+**Returns** `void`. **Errors** `Error("Not authenticated")`.
+
+---
+
+#### `invoices:resetDemo` · mutation · auth required
+
+| Parameter | Type | Req | Description |
+| --------- | ---- | --- | ----------- |
+| _(none)_ | | | |
+
+**Returns** `{ cleared: true }`. Deletes every row for the tenant (invoices, lines, PO,
+catalog, evals, logs). **Errors** `Error("Not authenticated")`.
+
+---
+
+#### `routing:get` · query · auth optional
+
+| Parameter | Type | Req | Description |
+| --------- | ---- | --- | ----------- |
+| _(none)_ | | | |
+
+**Returns** `{ mode, model, keys: { free: boolean, paid: boolean }, defaultFreeModel, defaultPaidModel, activeMode }` — the tenant's routing config, live key availability
+(env-derived), and the mode a run resolves to right now. **Errors** none.
+
+---
+
+#### `routing:set` · mutation · auth required
+
+| Parameter | Type | Req | Description |
+| --------- | ---- | --- | ----------- |
+| `mode` | `"auto" \| "local" \| "free" \| "paid" \| "offline"` | yes | routing mode |
+| `model` | `string` | no | pin a specific model for the mode |
+
+**Returns** `{ ok: true }`. Upserts the tenant's `settings` row. **Errors**
+`Error("Not authenticated")`.
+
+---
+
+#### `evals:runEval` · mutation · auth required
+
+| Parameter | Type | Req | Description |
+| --------- | ---- | --- | ----------- |
+| _(none)_ | | | |
+
+**Returns** `EvalRun` — scores the labeled set (flag precision/recall), inserts the run,
+and returns it. **Errors** `Error("Not authenticated")`.
+
+---
+
+#### `evals:listEvals` · query · auth optional
+
+| Parameter | Type | Req | Description |
+| --------- | ---- | --- | ----------- |
+| _(none)_ | | | |
+
+**Returns** `EvalRun[]` — the newest 10 runs. **Errors** none.
+
+---
+
+#### `diagnostics:benchmark` · action · auth optional
+
+| Parameter | Type | Req | Description |
+| --------- | ---- | --- | ----------- |
+| `invoiceText` | `string` | yes | invoice text to run through every mode |
+
+**Returns** `{ mode, provider, model, latencyMs, lines, error }[]` — runs the same
+invoice through `offline`, `free`, and `paid` and returns the comparison (also logged).
+**Errors** none (per-mode failures surface in each row's `error`).
 
 ## LLM integration (`convex/lib/llm.ts`)
 
