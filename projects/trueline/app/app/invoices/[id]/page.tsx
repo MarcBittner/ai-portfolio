@@ -46,11 +46,26 @@ export default function InvoiceReview() {
         ? "rgba(230,173,82,0.12)"
         : "rgba(67,201,138,0.08)";
 
-  async function correct(lineId: Id<"invoiceLines">, current: number) {
-    const v = window.prompt("Corrected unit price:", String(current));
+  async function correct(l: {
+    _id: Id<"invoiceLines">;
+    description: string;
+    unitPrice: number;
+    poUnitPrice?: number | null;
+    catalogPrice?: number | null;
+  }) {
+    // suggest (and pre-fill) the agreed PO price, else the market rate
+    const suggested = l.poUnitPrice ?? l.catalogPrice ?? l.unitPrice;
+    const v = window.prompt(
+      `Correct the unit price for "${l.description}".\n` +
+        `Invoiced ${usd(l.unitPrice)}` +
+        (l.poUnitPrice != null ? `  ·  agreed PO ${usd(l.poUnitPrice)}` : "") +
+        (l.catalogPrice != null ? `  ·  market ${usd(l.catalogPrice)}` : "") +
+        `\n\nWe pre-filled the agreed PO price — press OK to apply it, or edit it:`,
+      String(suggested),
+    );
     if (v === null) return;
-    const n = parseFloat(v);
-    if (Number.isFinite(n)) await correctLine({ lineId, unitPrice: n });
+    const n = parseFloat(v.replace(/[$,]/g, ""));
+    if (Number.isFinite(n)) await correctLine({ lineId: l._id, unitPrice: n });
   }
 
   return (
@@ -212,10 +227,13 @@ export default function InvoiceReview() {
                         approve
                       </button>
                       <button
-                        onClick={() => correct(l._id, l.unitPrice)}
+                        onClick={() => correct(l)}
                         className="rounded bg-white/5 px-2 py-0.5 text-xs"
+                        title="set the unit price to the agreed PO price"
                       >
-                        correct
+                        {l.poUnitPrice != null || l.catalogPrice != null
+                          ? `correct → ${usd(l.poUnitPrice ?? l.catalogPrice)}`
+                          : "correct"}
                       </button>
                       <button
                         onClick={() => reviewLine({ lineId: l._id, decision: "rejected" })}
