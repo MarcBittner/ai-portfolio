@@ -1,0 +1,320 @@
+import { v } from "convex/values";
+import {
+  internalMutation,
+  type MutationCtx,
+  mutation,
+  query,
+} from "./_generated/server";
+import { internal } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
+import { reconcileLine } from "./lib/reconcile";
+import { parsePipeInvoice, type ExtractedLine } from "./lib/parse";
+import {
+  DEMO_CATALOG,
+  DEMO_INVOICES,
+  DEMO_PO_LINES,
+  DEMO_PO_NUMBER,
+  DEMO_VENDOR,
+} from "./lib/demoData";
+
+// ---- multi-tenancy: derive the tenant from the Clerk identity ----
+// Prefer the active organization (org_id claim); fall back to a per-user tenant
+// so a reviewer who hasn't created an org still gets an isolated, seeded space.
+async function requireOrg(ctx: { auth: MutationCtx["auth"] }) {
+  const id = await ctx.auth.getUserIdentity();
+  if (!id) throw new Error("Not authenticated");
+  const claims = id as unknown as { org_id?: string };
+  const orgId = claims.org_id ?? `user:${id.subject}`;
+  const who = id.email ?? id.name ?? id.subject;
+  return { orgId, who };
+}
+
+// Reconcile a set of extracted lines against the org's PO + catalog and write
+// them, returning the invoice rollups. Shared by the seed and the extract action.
+async function insertReconciledLines(
+  ctx: MutationCtx,
+  args: { orgId: string; invoiceId: Id<"invoices">; extracted: ExtractedLine[] },
+) {
+  const { orgId, invoiceId, extracted } = args;
+  const pos = await ctx.db
+    .query("purchaseOrders")
+    .withIndex("by_org", (q) => q.eq("orgId", orgId))
+    .collect();
+  const poLines = pos.flatMap((p) => p.lines);
+  const catalog = await ctx.db
+    .query("catalog")
+    .withIndex("by_org", (q) => q.eq("orgId", orgId))
+    .collect();
+
+  // idempotent: clear any prior lines for this invoice before re-inserting
+  const existing = await ctx.db
+    .query("invoiceLines")
+    .withIndex("by_invoice", (q) => q.eq("invoiceId", invoiceId))
+    .collect();
+  for (const l of existing) await ctx.db.delete(l._id);
+
+  let recoverableUsd = 0;
+  let claimedTotal = 0;
+  let lineNo = 0;
+  for (const line of extracted) {
+    const r = reconcileLine(line, poLines, catalog);
+    recoverableUsd += r.recoverableUsd;
+    claimedTotal += line.extension;
+    await ctx.db.insert("invoiceLines", {
+      orgId,
+      invoiceId,
+      lineNo: ++lineNo,
+      description: line.description,
+      sku: line.sku,
+      unit: line.unit,
+      quantity: line.quantity,
+      unitPrice: line.unitPrice,
+      claimedExtension: line.extension,
+      confidence: line.confidence,
+      sourceQuote: line.sourceQuote,
+      ...r,
+      decision: "pending",
+    });
+  }
+  return {
+    recoverableUsd: Math.round(recoverableUsd * 100) / 100,
+    claimedTotal: Math.round(claimedTotal * 100) / 100,
+  };
+}
+
+// ---- queries (reactive reads) ----
+
+export const listInvoices = query({
+  args: {},
+  handler: async (ctx) => {
+    const { orgId } = await requireOrg(ctx);
+    const invoices = await ctx.db
+      .query("invoices")
+      .withIndex("by_org", (q) => q.eq("orgId", orgId))
+      .order("desc")
+      .collect();
+    return Promise.all(
+      invoices.map(async (inv) => {
+        const lines = await ctx.db
+          .query("invoiceLines")
+          .withIndex("by_invoice", (q) => q.eq("invoiceId", inv._id))
+          .collect();
+        const count = (f: string) => lines.filter((l) => l.flag === f).length;
+        return {
+          ...inv,
+          lineCount: lines.length,
+          red: count("red"),
+          yellow: count("yellow"),
+          green: count("green"),
+        };
+      }),
+    );
+  },
+});
+
+export const getInvoice = query({
+  args: { invoiceId: v.id("invoices") },
+  handler: async (ctx, { invoiceId }) => {
+    const { orgId } = await requireOrg(ctx);
+    const invoice = await ctx.db.get(invoiceId);
+    if (!invoice || invoice.orgId !== orgId) return null;
+    const lines = await ctx.db
+      .query("invoiceLines")
+      .withIndex("by_invoice", (q) => q.eq("invoiceId", invoiceId))
+      .collect();
+    lines.sort((a, b) => a.lineNo - b.lineNo);
+    return { invoice, lines };
+  },
+});
+
+export const stats = query({
+  args: {},
+  handler: async (ctx) => {
+    const { orgId } = await requireOrg(ctx);
+    const invoices = await ctx.db
+      .query("invoices")
+      .withIndex("by_org", (q) => q.eq("orgId", orgId))
+      .collect();
+    const evals = await ctx.db
+      .query("evalRuns")
+      .withIndex("by_org", (q) => q.eq("orgId", orgId))
+      .order("desc")
+      .take(1);
+    return {
+      invoices: invoices.length,
+      recoverableUsd: Math.round(
+        invoices.reduce((s, i) => s + (i.recoverableUsd ?? 0), 0) * 100,
+      ) / 100,
+      needsReview: invoices.filter((i) => i.status === "needs_review").length,
+      latestEval: evals[0] ?? null,
+    };
+  },
+});
+
+// ---- mutations (transactional writes) ----
+
+export const seedIfEmpty = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const { orgId } = await requireOrg(ctx);
+    const existing = await ctx.db
+      .query("invoices")
+      .withIndex("by_org", (q) => q.eq("orgId", orgId))
+      .first();
+    if (existing) return { seeded: false };
+
+    await ctx.db.insert("purchaseOrders", {
+      orgId,
+      poNumber: DEMO_PO_NUMBER,
+      vendor: DEMO_VENDOR,
+      lines: DEMO_PO_LINES,
+    });
+    for (const c of DEMO_CATALOG) await ctx.db.insert("catalog", { orgId, ...c });
+
+    for (const inv of DEMO_INVOICES) {
+      const invoiceId = await ctx.db.insert("invoices", {
+        orgId,
+        invoiceNumber: inv.invoiceNumber,
+        vendor: DEMO_VENDOR,
+        poNumber: DEMO_PO_NUMBER,
+        rawText: inv.rawText,
+        status: "needs_review",
+        extractionProvider: "seed",
+        extractionModel: "deterministic",
+      });
+      const rollup = await insertReconciledLines(ctx, {
+        orgId,
+        invoiceId,
+        extracted: parsePipeInvoice(inv.rawText),
+      });
+      await ctx.db.patch(invoiceId, rollup);
+    }
+    return { seeded: true };
+  },
+});
+
+export const createInvoiceFromText = mutation({
+  args: { invoiceNumber: v.string(), rawText: v.string(), poNumber: v.optional(v.string()) },
+  handler: async (ctx, { invoiceNumber, rawText, poNumber }) => {
+    const { orgId, who } = await requireOrg(ctx);
+    const invoiceId = await ctx.db.insert("invoices", {
+      orgId,
+      invoiceNumber,
+      vendor: DEMO_VENDOR,
+      poNumber: poNumber ?? DEMO_PO_NUMBER,
+      rawText,
+      status: "extracting",
+      uploadedBy: who,
+    });
+    // hand off the external LLM work to an action (the only place I/O is legal)
+    await ctx.scheduler.runAfter(0, internal.extract.run, { invoiceId, orgId });
+    return invoiceId;
+  },
+});
+
+export const reviewLine = mutation({
+  args: {
+    lineId: v.id("invoiceLines"),
+    decision: v.union(v.literal("approved"), v.literal("rejected")),
+  },
+  handler: async (ctx, { lineId, decision }) => {
+    const { orgId, who } = await requireOrg(ctx);
+    const line = await ctx.db.get(lineId);
+    if (!line || line.orgId !== orgId) throw new Error("not found");
+    await ctx.db.patch(lineId, { decision, reviewer: who });
+  },
+});
+
+export const correctLine = mutation({
+  // an estimator's edit re-runs the deterministic reconcile and is a label
+  args: { lineId: v.id("invoiceLines"), unitPrice: v.number(), quantity: v.optional(v.number()) },
+  handler: async (ctx, { lineId, unitPrice, quantity }) => {
+    const { orgId, who } = await requireOrg(ctx);
+    const line = await ctx.db.get(lineId);
+    if (!line || line.orgId !== orgId) throw new Error("not found");
+    const pos = await ctx.db
+      .query("purchaseOrders")
+      .withIndex("by_org", (q) => q.eq("orgId", orgId))
+      .collect();
+    const catalog = await ctx.db
+      .query("catalog")
+      .withIndex("by_org", (q) => q.eq("orgId", orgId))
+      .collect();
+    const qty = quantity ?? line.quantity;
+    const r = reconcileLine(
+      {
+        description: line.description,
+        sku: line.sku,
+        quantity: qty,
+        unit: line.unit,
+        unitPrice,
+        extension: Math.round(qty * unitPrice * 100) / 100,
+        confidence: line.confidence,
+        sourceQuote: line.sourceQuote,
+      },
+      pos.flatMap((p) => p.lines),
+      catalog,
+    );
+    await ctx.db.patch(lineId, {
+      unitPrice,
+      quantity: qty,
+      claimedExtension: Math.round(qty * unitPrice * 100) / 100,
+      ...r,
+      decision: "edited",
+      reviewer: who,
+    });
+  },
+});
+
+export const setInvoiceStatus = mutation({
+  args: {
+    invoiceId: v.id("invoices"),
+    status: v.union(v.literal("approved"), v.literal("rejected"), v.literal("needs_review")),
+  },
+  handler: async (ctx, { invoiceId, status }) => {
+    const { orgId } = await requireOrg(ctx);
+    const inv = await ctx.db.get(invoiceId);
+    if (!inv || inv.orgId !== orgId) throw new Error("not found");
+    await ctx.db.patch(invoiceId, { status });
+  },
+});
+
+// ---- internal mutation: the extract action writes results back here ----
+// One transaction for all the DB work (the action's external step is separate).
+export const writeResults = internalMutation({
+  args: {
+    invoiceId: v.id("invoices"),
+    orgId: v.string(),
+    lines: v.array(
+      v.object({
+        description: v.string(),
+        sku: v.optional(v.string()),
+        quantity: v.number(),
+        unit: v.string(),
+        unitPrice: v.number(),
+        extension: v.number(),
+        confidence: v.number(),
+        sourceQuote: v.string(),
+      }),
+    ),
+    provider: v.string(),
+    model: v.string(),
+  },
+  handler: async (ctx, { invoiceId, orgId, lines, provider, model }) => {
+    const rollup = await insertReconciledLines(ctx, { orgId, invoiceId, extracted: lines });
+    await ctx.db.patch(invoiceId, {
+      status: "needs_review",
+      extractionProvider: provider,
+      extractionModel: model,
+      error: undefined,
+      ...rollup,
+    });
+  },
+});
+
+export const markError = internalMutation({
+  args: { invoiceId: v.id("invoices"), error: v.string() },
+  handler: async (ctx, { invoiceId, error }) => {
+    await ctx.db.patch(invoiceId, { status: "needs_review", error });
+  },
+});
