@@ -1,16 +1,19 @@
 """Multi-provider LLM router with a circuit breaker — vendored, stdlib-only.
 
-Offline-first: prefers a local **Ollama** model, falls back across configured
-cloud providers (**Anthropic/Claude**, OpenRouter, OpenAI), and finally a
-deterministic **mock**, so a call never raises. Adds, over the base router:
+Portfolio-standard routing order: **paid (Anthropic → OpenAI) → local (Ollama) →
+free (OpenRouter) → deterministic offline mock**, so a call never raises. A
+provider is *available* only when its key is set (Ollama autodetected via a probe
+to ``/api/tags``); the offline mock is always terminal. ``LLM_MODE`` (or the
+per-call ``provider`` arg) pins a tier: ``auto`` walks the full chain, or force
+``paid`` / ``local`` / ``free`` / ``offline``. Adds, over the base router:
 
 * **latency** measurement per call (``latency_ms`` on the result), and
 * a per-provider **circuit breaker** — after N consecutive failures a provider is
   skipped for a cooldown, so one flapping upstream can't stall every request.
 
 Config via environment (all optional): ANTHROPIC_API_KEY / ANTHROPIC_MODEL,
-OLLAMA_BASE_URL / OLLAMA_MODEL, OPENAI_API_KEY / OPENAI_MODEL,
-OPENROUTER_API_KEY / OPENROUTER_MODEL, LLM_TIMEOUT,
+OPENAI_API_KEY / OPENAI_MODEL, OLLAMA_BASE_URL / OLLAMA_MODEL,
+OPENROUTER_API_KEY / OPENROUTER_MODEL, LLM_MODE, LLM_TIMEOUT,
 LLM_BREAKER_THRESHOLD (default 3), LLM_BREAKER_COOLDOWN (seconds, default 30).
 """
 
@@ -21,7 +24,7 @@ import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
 
-LLM_MODE = os.environ.get("LLM_MODE", "auto").lower()  # auto|free|paid|offline
+LLM_MODE = os.environ.get("LLM_MODE", "auto").lower()  # auto|paid|local|free|offline
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
 ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001")
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
@@ -44,7 +47,8 @@ LLM_TIMEOUT = float(os.environ.get("LLM_TIMEOUT", "45"))
 BREAKER_THRESHOLD = int(os.environ.get("LLM_BREAKER_THRESHOLD", "3"))
 BREAKER_COOLDOWN = float(os.environ.get("LLM_BREAKER_COOLDOWN", "30"))
 
-PROVIDERS = ("ollama", "anthropic", "openrouter", "openai", "mock")
+# Portfolio-standard order: paid (anthropic → openai) → local → free → offline.
+PROVIDERS = ("anthropic", "openai", "ollama", "openrouter", "mock")
 
 
 @dataclass
@@ -143,32 +147,39 @@ def _mock(system: str, prompt: str, model: str) -> str:
     return f"[mock completion] {prompt.strip()[:200]}"
 
 
-def _resolve_order(provider: str | None) -> list[str]:
-    """Concrete provider name pins it; a mode (free/paid/offline) selects a chain;
-    auto/None → free-first when keyed, else paid, else local, else mock."""
-    if provider and provider not in ("auto", "free", "paid", "offline", None):
-        return [provider]
-    mode = provider if provider in ("free", "paid", "offline") else LLM_MODE
-    if mode == "offline":
-        return ["ollama", "mock"]
-    if mode == "free":
-        return ["openrouter", "mock"]
-    if mode == "paid":
-        order = []
-        if ANTHROPIC_API_KEY:
-            order.append("anthropic")
-        if OPENAI_API_KEY:
-            order.append("openai")
-        order.append("mock")
-        return order
-    order = []
-    if OPENROUTER_API_KEY:
-        order.append("openrouter")
+def _paid(order: list[str]) -> list[str]:
+    """Append available paid providers (Anthropic first, then OpenAI)."""
     if ANTHROPIC_API_KEY:
         order.append("anthropic")
     if OPENAI_API_KEY:
         order.append("openai")
-    order += ["ollama", "mock"]
+    return order
+
+
+def _resolve_order(provider: str | None) -> list[str]:
+    """Resolve the provider chain. A concrete provider name pins it; a mode
+    (paid/local/free/offline) selects a sub-chain; auto/None walks the full
+    portfolio-standard order: paid → local → free → offline. A provider is
+    included only when configured/reachable; ``mock`` is always terminal."""
+    modes = ("auto", "paid", "local", "free", "offline")
+    if provider and provider not in (*modes, None):
+        return [provider]
+    mode = provider if provider in modes else LLM_MODE
+    if mode == "offline":
+        return ["mock"]
+    if mode == "paid":
+        return _paid([]) + ["mock"]
+    if mode == "local":
+        return (["ollama"] if reachable() else []) + ["mock"]
+    if mode == "free":
+        return (["openrouter"] if OPENROUTER_API_KEY else []) + ["mock"]
+    # auto: paid → local → free → offline
+    order = _paid([])
+    if reachable():
+        order.append("ollama")
+    if OPENROUTER_API_KEY:
+        order.append("openrouter")
+    order.append("mock")
     return order
 
 
@@ -253,34 +264,39 @@ def reachable(timeout: float = 1.5) -> bool:
 
 
 def active_mode() -> str:
-    """The effective mode the next ``auto`` call will use (for the UI)."""
-    if LLM_MODE in ("free", "paid", "offline"):
+    """The effective tier the next ``auto`` call will reach first (for the UI).
+    Mirrors the standard order: paid → local → free → offline."""
+    if LLM_MODE in ("paid", "local", "free", "offline"):
         return LLM_MODE
-    if OPENROUTER_API_KEY:
-        return "free"
     if ANTHROPIC_API_KEY or OPENAI_API_KEY:
         return "paid"
+    if reachable():
+        return "local"
+    if OPENROUTER_API_KEY:
+        return "free"
     return "offline"
 
 
 def providers_status() -> dict:
+    ollama_up = reachable()
     return {
         "mode": LLM_MODE,
         "active_mode": active_mode(),
         "default_order": _resolve_order("auto"),
         "available": {
-            "free": bool(OPENROUTER_API_KEY),
             "paid": bool(ANTHROPIC_API_KEY or OPENAI_API_KEY),
+            "local": ollama_up,
+            "free": bool(OPENROUTER_API_KEY),
             "offline": True,
-            "ollama": reachable(),
             "anthropic": bool(ANTHROPIC_API_KEY),
-            "openrouter": bool(OPENROUTER_API_KEY),
             "openai": bool(OPENAI_API_KEY),
+            "ollama": ollama_up,
+            "openrouter": bool(OPENROUTER_API_KEY),
             "mock": True,
         },
         "models": {
-            "ollama": OLLAMA_MODEL, "anthropic": ANTHROPIC_MODEL,
-            "openrouter": OPENROUTER_MODEL, "openai": OPENAI_MODEL, "mock": "mock",
+            "anthropic": ANTHROPIC_MODEL, "openai": OPENAI_MODEL,
+            "ollama": OLLAMA_MODEL, "openrouter": OPENROUTER_MODEL, "mock": "mock",
         },
         "free_models": OPENROUTER_FREE_FALLBACKS,
         "breaker": breaker.state(),

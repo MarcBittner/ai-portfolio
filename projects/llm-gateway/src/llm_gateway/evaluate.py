@@ -44,3 +44,54 @@ def run_eval() -> dict:
             "output_detection_rate": out["detection_rate"],
         },
     }
+
+
+def _table(fw: dict) -> str:
+    return (
+        "| metric | value |\n| --- | --- |\n"
+        f"| samples | {fw['samples']} |\n"
+        f"| detection rate (recall on bad) | {fw['detection_rate']} |\n"
+        f"| false-positive rate | {fw['false_positive_rate']} |\n"
+        f"| accuracy | {fw['accuracy']} |\n"
+    )
+
+
+def render_report() -> str:
+    """Render the committed eval-report.md from a fresh run over the labeled set."""
+    r = run_eval()
+    return (
+        "# llm-gateway — eval report\n\n"
+        "Reproducible with `./run.sh eval`. The guardrails are deterministic "
+        "(regex firewall + redaction detectors — no model, no network), so these "
+        "numbers reproduce exactly with zero keys and zero cost.\n\n"
+        "The labeled set in `data.py` is a **regulated advisor copilot**: benign "
+        "advisor work vs. prompt-injection / jailbreak / exfiltration on the way "
+        "in, and clean responses vs. client-PII or credential leaks on the way "
+        "out. **Detection rate is the safety metric** — a missed malicious input "
+        "or leaking output is a governance failure.\n\n"
+        "## Input firewall (prompt-injection / jailbreak / exfiltration)\n\n"
+        f"Scored over **{r['input_firewall']['samples']}** labeled prompts.\n\n"
+        f"{_table(r['input_firewall'])}\n"
+        "## Output firewall (client-PII / credential leakage)\n\n"
+        f"Scored over **{r['output_firewall']['samples']}** labeled responses, "
+        "reusing the redaction detectors (a secret hit is `critical`, PII is "
+        "`medium`).\n\n"
+        f"{_table(r['output_firewall'])}\n"
+        "> The firewall is rules-based, so it is exact on this synthetic set; the "
+        "value of the eval is as a **regression gate** — weakening a rule shows up "
+        "here as a measurable drop, not a silent gap. Redaction findings carry "
+        "only type + count, never the matched value, on every branch.\n"
+    )
+
+
+def main() -> None:
+    from pathlib import Path
+    out = Path(__file__).resolve().parents[2] / "eval-report.md"
+    report = render_report()
+    out.write_text(report)
+    print(report)
+    print(f"\nWrote {out}")
+
+
+if __name__ == "__main__":
+    main()
