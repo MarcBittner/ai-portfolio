@@ -11,6 +11,12 @@ class AccessRequest(BaseModel):
     reidentify: bool = False
 
 
+class NoteRequest(BaseModel):
+    note: str | None = None       # raw note text, or…
+    record_id: str | None = None  # …a record whose intake note to scrub
+    mode: str | None = None       # auto | paid | local | free | offline
+
+
 class HealthResponse(BaseModel):
     status: str
     version: str

@@ -154,3 +154,36 @@ def test_regression_audit_chain_verifies(client):
 
 def test_regression_unknown_record_404(client):
     assert client.get("/records/rec-9999").status_code == 404
+
+
+# ------------------------------- LLM SURFACE -------------------------------
+
+def test_smoke_llm_status(client):
+    s = client.get("/llm").json()
+    assert set(s["providers"]) == {"anthropic", "openai", "ollama", "openrouter"}
+    assert s["offline_fallback"] is True
+
+
+def test_regression_note_scrub_removes_phi(client):
+    note = "Member Pat Doe (DOB 1980-01-02) at 415-555-0100 or pat.doe@example.com."
+    r = client.post("/notes/detect", json={"note": note})
+    assert r.status_code == 200, r.text
+    out = r.json()
+    # the LLM may or may not be configured; the chain always yields a result and
+    # deterministic redaction must remove the structured PHI either way.
+    assert "pat.doe@example.com" not in out["redacted"]
+    assert "415-555-0100" not in out["redacted"]
+    assert out["phi_found"] >= 2
+
+
+def test_regression_kanon_finds_singletons(client):
+    k = client.get("/privacy").json()
+    assert k["k_min"] == 1
+    assert k["singleton_count"] == k["records"]
+
+
+def test_regression_evals_recall_is_high(client):
+    ev = client.get("/evals").json()
+    assert ev["notes"] > 0
+    assert 0.0 <= ev["precision"] <= 1.0
+    assert ev["recall"] >= 0.5  # offline detector is lossless; a live model may vary

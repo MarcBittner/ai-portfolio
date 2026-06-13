@@ -8,8 +8,8 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, JSONResponse
 
-from field_vault import __version__, audit, policy, store
-from field_vault.models import AccessRequest, HealthResponse
+from field_vault import __version__, audit, llm, notes, policy, privacy, store
+from field_vault.models import AccessRequest, HealthResponse, NoteRequest
 from field_vault.score import provider_scores
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -55,6 +55,45 @@ def access(req: AccessRequest) -> JSONResponse:
 @app.get("/scores")
 def scores() -> dict:
     return {"providers": provider_scores(store.records())}
+
+
+@app.post("/notes/detect")
+def notes_detect(req: NoteRequest) -> JSONResponse:
+    """Detect + redact PHI in a free-text note via the LLM routing chain.
+
+    Accepts raw ``note`` text, or a ``record_id`` whose intake note to scrub.
+    """
+    note = req.note
+    if note is None and req.record_id is not None:
+        note = store.intake_note(req.record_id)
+    if not note:
+        return JSONResponse({"error": "provide 'note' or a known 'record_id'"},
+                            status_code=400)
+    return JSONResponse(notes.detect(note, mode=req.mode))
+
+
+@app.get("/privacy")
+def privacy_kanon() -> dict:
+    """k-anonymity of the de-identified surface — re-identification by linkage."""
+    return privacy.k_anonymity(store.records())
+
+
+@app.get("/privacy/sweep")
+def privacy_sweep() -> dict:
+    """How coarser generalization raises k (the privacy/utility lever)."""
+    return {"sweep": privacy.generalization_sweep(store.records())}
+
+
+@app.get("/evals")
+def evals() -> dict:
+    """Score PHI detection over the labeled note set (precision/recall/F1)."""
+    return notes.evaluate()
+
+
+@app.get("/llm")
+def llm_status() -> dict:
+    """Which providers are configured/reachable + the active routing mode."""
+    return llm.status()
 
 
 @app.get("/audit")

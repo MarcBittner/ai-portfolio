@@ -4,7 +4,7 @@ chain, and compute the de-identified provider score.
 Run: python -m field_vault.demo   (no network required)
 """
 
-from field_vault import audit, store
+from field_vault import audit, llm, notes, privacy, store
 from field_vault.score import provider_scores
 
 
@@ -43,6 +43,37 @@ def main() -> None:
     for p in provider_scores(store.records()):
         print(f"   #{p['rank']} {p['provider_id']}  outcome={p['outcome_score']}  "
               f"adverse={p['adverse_rate']}  avg=${p['avg_allowed_amount']}")
+
+    print("\nPHI in free text — what column rules miss (LLM-assisted de-id):")
+    s = llm.status()
+    active = next((p for p, ok in s["providers"].items() if ok), "offline")
+    print(f"   routing mode={s['mode']}  active={active}  "
+          f"(chain: Anthropic/OpenAI → Ollama → OpenRouter → offline)")
+    audit.log.reset()  # fresh chain so the scrub events below verify cleanly
+    note = store.intake_note("rec-0004")
+    out = notes.detect(note, audit_log=True)
+    print(f"   intake : {note}")
+    print(f"   scrubbed: {out['redacted']}")
+    print(f"   provider={out['provider']}  PHI found={out['phi_found']} "
+          f"{out['by_type']}  latency={out['latency_ms']}ms")
+
+    ev = notes.evaluate()
+    print(f"   detection over {ev['notes']} notes: precision={ev['precision']} "
+          f"recall={ev['recall']} f1={ev['f1']} (leaks={ev['leaks']})")
+
+    print("\nRe-identification risk on the de-identified surface (k-anonymity):")
+    k = privacy.k_anonymity(store.records())
+    print(f"   quasi-identifiers {k['quasi_identifiers']} → k_min={k['k_min']}; "
+          f"{k['singleton_count']}/{k['records']} rows are singletons "
+          f"(re-identifiable by linkage)")
+    print("   coarser generalization raises k:")
+    for row in privacy.generalization_sweep(store.records()):
+        print(f"     {row['generalization']:28} k_min={row['k_min']:>2} "
+              f"singletons={row['singletons']:>2}")
+
+    v3 = audit.log.verify()
+    print(f"\nAudit chain after note-scrub events: "
+          f"{'VERIFIED' if v3['ok'] else 'BROKEN'} ({len(audit.log)} entries)")
 
 
 if __name__ == "__main__":

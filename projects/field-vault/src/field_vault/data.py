@@ -63,3 +63,67 @@ def claims() -> list[dict]:
         rec["allowed_amount"] = float(rec["allowed_amount"])
         out.append(rec)
     return out
+
+
+# --------------------------------------------------------------------------- #
+# Free-text intake notes (the surface schema-based de-id can't reach).         #
+#                                                                              #
+# Real claims carry unstructured notes where PHI hides in prose — a name,      #
+# DOB, phone, email, sometimes an SSN — that column classification never       #
+# sees. These synthetic notes are generated from the claim data so each note   #
+# has an EXACT gold PHI label set, which the detection eval scores against.    #
+# Nothing here is real PHI.                                                     #
+# --------------------------------------------------------------------------- #
+
+_DX_TEXT = {
+    "E11.9": "type 2 diabetes follow-up",
+    "I10": "hypertension management",
+    "M54.5": "low back pain",
+    "J45.9": "asthma review",
+}
+
+
+def _phone(member_id: str) -> str:
+    n = int(member_id.split("-")[1])
+    return f"415-555-{(1000 + n * 7) % 10000:04d}"
+
+
+def _email(name: str) -> str:
+    return name.lower().replace(" ", ".") + "@example.com"
+
+
+def _ssn(member_id: str) -> str:
+    n = int(member_id.split("-")[1])
+    return f"5{n:02d}-2{n % 9}-{(1000 + n * 13) % 10000:04d}"
+
+
+def note_records() -> list[dict]:
+    """One inbound free-text note per claim, with its exact gold PHI spans.
+
+    ``gold`` lists every PHI value embedded in the note and its type — the
+    ground truth the PHI-detection eval scores precision/recall against.
+    """
+    out = []
+    for i, c in enumerate(claims(), 1):
+        name, dob, mid = c["member_name"], c["dob"], c["member_id"]
+        phone, email = _phone(mid), _email(name)
+        dx = _DX_TEXT.get(c["dx_code"], "follow-up")
+        gold = [
+            {"text": name, "type": "NAME"},
+            {"text": dob, "type": "DOB"},
+            {"text": c["service_date"], "type": "DATE"},  # service dates are PHI too
+            {"text": phone, "type": "PHONE"},
+            {"text": email, "type": "EMAIL"},
+        ]
+        note = (
+            f"Member {name} (DOB {dob}) seen on {c['service_date']} for {dx}. "
+            f"Reachable at {phone} or {email}. "
+        )
+        if i % 4 == 0:  # some notes also leak an SSN
+            ssn = _ssn(mid)
+            gold.append({"text": ssn, "type": "SSN"})
+            note += f"SSN on file {ssn}. "
+        note += "Plan: continue current management, recheck in 3 months."
+        out.append({"record_id": f"rec-{i:04d}", "member_id": mid,
+                    "note": note, "gold": gold})
+    return out

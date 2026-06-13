@@ -228,6 +228,23 @@
   </div>
 
   <div class="panel full reveal">
+    <h2>PHI in free text <span class="muted" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">LLM finds what column rules miss · routing <span id="llmstat">offline</span></span></h2>
+    <div class="body" style="padding:16px">
+      <textarea id="note" rows="3" style="width:100%;box-sizing:border-box;font:inherit;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,.14);background:rgba(0,0,0,.25);color:inherit">Member Ada Quill (DOB 1972-03-14) seen on 2026-01-08 for type 2 diabetes follow-up. Reachable at 415-555-1071 or ada.quill@example.com. Plan: recheck A1c in 3 months.</textarea>
+      <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+        <button class="btn primary" id="scrub"><span class="spin"></span><span class="lbl">Detect &amp; redact</span></button>
+        <span id="scrubmeta" class="muted" style="margin-left:auto">—</span>
+      </div>
+      <div class="result" id="scrubres" style="margin-top:10px"><span class="muted">Detect PHI to see the redacted note + spans. The model only reads; redaction + audit are deterministic.</span></div>
+    </div>
+  </div>
+
+  <div class="panel full reveal">
+    <h2>Re-identification risk <span class="muted" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">k-anonymity — tokenizing isn't enough</span></h2>
+    <div class="body" style="padding:16px"><div id="kanon"><span class="muted">loading…</span></div></div>
+  </div>
+
+  <div class="panel full reveal">
     <h2>Tamper-evident access audit</h2>
     <div class="body" style="padding:0;max-height:300px;overflow:auto"><table id="audit"></table></div>
     <div class="verifybar">
@@ -372,6 +389,33 @@ $("#tamper").onclick=async()=>{await j("audit/_demo_tamper?seq=0",{method:"POST"
   if(v.ok){$("#vres").innerHTML=`<span class="badge b-allow">verified</span>`;toast("No change","info")}
   else{$("#vres").innerHTML=`<span class="badge b-block">tamper detected at #${v.broken_at}</span> ${v.reason}`;toast("Tamper detected — chain integrity broken","bad")}};
 
+async function scrub(){
+  const btn=$("#scrub"); btn.classList.add("loading");
+  const note=$("#note").value;
+  $("#scrubres").innerHTML='<span class="muted">detecting…</span>';
+  try{
+    const r=await j("notes/detect",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({note})});
+    const red=r.redacted.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/\[(\w+)\]/g,'<mark style="background:#ffd54f;color:#111;border-radius:3px;padding:0 3px">[$1]</mark>');
+    const types=Object.entries(r.by_type).map(([k,v])=>`${k}×${v}`).join(", ")||"none";
+    $("#scrubres").innerHTML=`<div style="line-height:1.6">${red}</div>`;
+    $("#scrubmeta").textContent=`${r.provider} · ${r.phi_found} PHI (${types}) · ${r.latency_ms}ms`;
+  }catch(e){$("#scrubres").textContent="detection failed";}
+  btn.classList.remove("loading");
+}
+$("#scrub").onclick=scrub;
+
+async function loadPrivacy(){
+  try{
+    const k=await j("privacy"); const s=(await j("privacy/sweep")).sweep;
+    const rows=s.map(x=>`<tr><td>${x.generalization}</td><td style="text-align:right">${x.k_min}</td><td style="text-align:right">${x.singletons}</td></tr>`).join("");
+    $("#kanon").innerHTML=`<p style="margin:0 0 10px">Quasi-identifiers <code>${k.quasi_identifiers.join(", ")}</code> → minimum <b>k = ${k.k_min}</b>; <b>${k.singleton_count}/${k.records}</b> rows are singletons, re-identifiable by linkage despite tokenized direct identifiers.</p><table style="width:100%"><tr><th style="text-align:left">generalization</th><th style="text-align:right">k_min</th><th style="text-align:right">singletons</th></tr>${rows}</table><p class="muted" style="margin:8px 0 0">Coarser generalization raises k — the privacy/utility lever.</p>`;
+  }catch{}
+}
+async function loadLlm(){
+  try{const s=await j("llm");const active=Object.entries(s.providers).find(e=>e[1]);
+    $("#llmstat").textContent=active?active[0]:"offline (deterministic)";}catch{}
+}
+
 async function boot(){
   loadCfg();
   // cold-start: poll health until ready, then reveal
@@ -397,6 +441,8 @@ async function boot(){
   }catch{}
   try{renderScores((await j("scores")).providers);}catch{}
   await refreshAudit();
+  loadLlm(); loadPrivacy();
+  try{await scrub();}catch{}
   // run the care_coordinator + treatment re-identify example so the panel is populated
   try{
     $("#role").value="care_coordinator";$("#field").value="member_name";

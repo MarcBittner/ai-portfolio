@@ -8,22 +8,34 @@ through this layer.
 """
 
 from field_vault import audit
-from field_vault.data import FIELD_CLASS, claims
+from field_vault.data import FIELD_CLASS, claims, note_records
 from field_vault.deid import Vault
 from field_vault.policy import decide
 
 vault = Vault()
 _records: dict[str, dict] = {}
+# Raw inbound free-text notes, keyed by record_id. This is the *intake* queue —
+# un-scrubbed documents awaiting PHI de-identification (see notes.py) — not part
+# of the de-identified store the analytics surface reads.
+_intake: dict[str, str] = {}
 
 
 def ingest() -> int:
     """(Re)build the de-identified store + vault from the synthetic claims."""
     vault.reset()
     _records.clear()
+    _intake.clear()
     for i, claim in enumerate(claims(), 1):
         rec_id = f"rec-{i:04d}"
         _records[rec_id] = {"record_id": rec_id, **vault.deidentify(claim)}
+    for n in note_records():
+        _intake[n["record_id"]] = n["note"]
     return len(_records)
+
+
+def intake_note(record_id: str) -> str | None:
+    """The raw inbound note for a record (free text, pre-de-identification)."""
+    return _intake.get(record_id)
 
 
 def reset() -> None:
