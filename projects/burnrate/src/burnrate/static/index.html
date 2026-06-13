@@ -4,166 +4,544 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>burnrate — SLOs, error budget & multiwindow burn rate</title>
+<!-- POLISH KIT: theme-init (apply before paint, no flash) -->
+<script>
+(function(){
+  try{
+    var t=localStorage.getItem("theme")||"system";
+    var dark = t==="dark" || (t==="system" && !window.matchMedia("(prefers-color-scheme: light)").matches);
+    if(!dark) document.documentElement.classList.add("light");
+  }catch(e){}
+})();
+</script>
 <style>
+  /* ============================ design system ============================ */
   :root{
-    --bg:#0b0e16; --surface:#141927; --surface-2:#1b2233; --line:#27324a;
-    --ink:#e9eef7; --dim:#98a4bb; --faint:#677288;
+    --bg:#0a0d14; --bg-grad-1:#0e1322; --bg-grad-2:#0a0d14;
+    --surface:#131826; --surface-2:#1a2032; --surface-3:#212a40;
+    --line:#263149; --line-2:#33405d;
+    --ink:#e9eef7; --ink-dim:#97a3ba; --ink-faint:#67728a;
     --accent:#ff8a5c; --accent-2:#ffd166; --accent-ink:#180a04;
-    --ok:#43c98a; --warn:#e6ad52; --bad:#f15b6c;
-    --r:14px; --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    --ok:#43c98a; --warn:#e6ad52; --bad:#f15b6c; --info:#6aa1ff; --violet:#9b86ff;
+    --r:15px; --r-sm:10px; --r-xs:7px;
+    --sh:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.5);
+    --sh-lg:0 1px 2px rgba(0,0,0,.4), 0 24px 64px -24px rgba(0,0,0,.7);
     --grad:linear-gradient(135deg,var(--accent),var(--accent-2));
+    --ease:cubic-bezier(.22,.61,.36,1);
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+    --header-bg:rgba(10,13,20,.72);
+    --bg-radial-1:rgba(255,138,92,.10); --bg-radial-2:rgba(255,209,102,.05);
+    --mark-bg:#ffd54f; --mark-ink:#111;
+  }
+  /* POLISH KIT: theme toggle — LIGHT palette overrides (same accents, light surfaces, dark ink) */
+  html.light{
+    --bg:#f4f6fb; --bg-grad-1:#eef2fb; --bg-grad-2:#f4f6fb;
+    --surface:#ffffff; --surface-2:#f1f4fa; --surface-3:#e6ebf5;
+    --line:#d8dfec; --line-2:#c2ccde;
+    --ink:#16203a; --ink-dim:#566184; --ink-faint:#8b95ad;
+    --accent:#e8632a; --accent-2:#d99a1c; --accent-ink:#ffffff;
+    --ok:#1f9d63; --warn:#b9791f; --bad:#d83a4d; --info:#3a6ff0; --violet:#6f53d6;
+    --sh:0 1px 2px rgba(20,32,58,.06), 0 8px 24px -14px rgba(20,32,58,.18);
+    --sh-lg:0 1px 2px rgba(20,32,58,.08), 0 24px 64px -28px rgba(20,32,58,.28);
+    --header-bg:rgba(255,255,255,.78);
+    --bg-radial-1:rgba(232,99,42,.10); --bg-radial-2:rgba(217,154,28,.08);
+    --mark-bg:#ffe08a; --mark-ink:#3a2c00;
   }
   *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--ink);min-height:100vh;
-    font:15px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Inter,sans-serif;
-    background-image:radial-gradient(1100px 520px at 85% -10%,rgba(255,138,92,.10),transparent 60%);}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;
+    font:15px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Inter,sans-serif;
+    background-image:radial-gradient(1200px 600px at 80% -10%,var(--bg-radial-1),transparent 60%),
+      radial-gradient(900px 500px at 0% 0%,var(--bg-radial-2),transparent 55%);
+    background-attachment:fixed;min-height:100vh;transition:background-color .25s var(--ease),color .25s var(--ease)}
+  ::selection{background:rgba(255,138,92,.3)}
   a{color:var(--accent);text-decoration:none}
-  header{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:14px;
-    padding:13px 22px;border-bottom:1px solid var(--line);background:rgba(11,14,22,.8);
-    backdrop-filter:blur(12px)}
-  .logo{width:28px;height:28px;border-radius:8px;background:var(--grad);flex:none}
-  .brand{font-weight:650;font-size:16px}
-  .brand .tag{color:var(--dim);font-size:12.5px;font-weight:400;margin-left:6px}
+  /* header */
+  header{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:14px;
+    padding:14px 24px;border-bottom:1px solid var(--line);
+    background:var(--header-bg);backdrop-filter:blur(14px) saturate(140%)}
+  .brand{display:flex;align-items:center;gap:11px;font-weight:650;font-size:16px;letter-spacing:.2px}
+  .logo{width:30px;height:30px;border-radius:9px;background:var(--grad);position:relative;
+    box-shadow:0 4px 16px -4px rgba(255,138,92,.6);flex:none}
+  .logo::after{content:"";position:absolute;inset:7px;border-radius:5px;
+    border:2px solid rgba(255,255,255,.85);border-right-color:transparent;
+    animation:spin 3.5s linear infinite}
+  .brand .tag{color:var(--ink-dim);font-size:12.5px;font-weight:400}
   .spacer{flex:1}
-  .pill{font-size:12px;color:var(--dim);border:1px solid var(--line);border-radius:999px;
+  .status{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--ink-dim);
+    padding:5px 11px;border:1px solid var(--line);border-radius:999px;background:var(--surface)}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--ink-faint)}
+  .dot.ok{background:var(--ok);box-shadow:0 0 0 0 rgba(67,201,138,.5);animation:pulse 2s infinite}
+  .dot.bad{background:var(--bad)}
+  .pill{font-size:12px;color:var(--ink-dim);border:1px solid var(--line);border-radius:999px;
     padding:5px 12px;background:var(--surface);white-space:nowrap}
   .pill.ok{color:var(--ok);border-color:rgba(67,201,138,.4)}
   .pill.bad{color:var(--bad);border-color:rgba(241,91,108,.45)}
   .pill.warn{color:var(--warn);border-color:rgba(230,173,82,.45)}
-  main{max-width:1140px;margin:0 auto;padding:22px;display:grid;gap:16px;
+  .iconbtn{width:36px;height:36px;border-radius:10px;border:1px solid var(--line);background:var(--surface);
+    color:var(--ink-dim);cursor:pointer;display:grid;place-items:center;transition:.18s var(--ease)}
+  .iconbtn:hover{color:var(--ink);border-color:var(--line-2);transform:translateY(-1px);background:var(--surface-2)}
+  .iconbtn svg{width:18px;height:18px}
+  /* layout */
+  main{max-width:1160px;margin:0 auto;padding:26px 24px 64px;display:grid;gap:18px;
     grid-template-columns:1fr 1fr}
   .full{grid-column:1/-1}
-  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
-    padding:18px}
-  .card h2{margin:0 0 4px;font-size:13px;letter-spacing:.4px;text-transform:uppercase;
-    color:var(--dim)}
-  .card .sub{color:var(--faint);font-size:12.5px;margin-bottom:12px}
-  .row{display:flex;gap:18px;flex-wrap:wrap}
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+    box-shadow:var(--sh);overflow:hidden;transition:.25s var(--ease)}
+  .panel:hover{border-color:var(--line-2)}
+  .panel h2{margin:0;padding:14px 18px;font-size:11.5px;font-weight:600;letter-spacing:.7px;
+    text-transform:uppercase;color:var(--ink-dim);border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:10px}
+  .panel .body{padding:18px}
+  .sub{color:var(--ink-faint);font-size:12.5px;margin-bottom:14px}
+  .sub b{color:var(--ink-dim)}
+  /* stats */
+  .row{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+  .stats{display:flex;gap:18px;flex-wrap:wrap}
   .stat{flex:1;min-width:120px}
-  .stat .n{font-size:26px;font-weight:680;font-variant-numeric:tabular-nums}
-  .stat .l{color:var(--faint);font-size:12px;margin-top:2px}
-  .bar{height:9px;border-radius:6px;background:var(--surface-2);overflow:hidden;margin-top:10px}
-  .bar > i{display:block;height:100%;background:var(--ok);transition:width .4s ease,background .4s}
-  button{font:inherit;cursor:pointer;border-radius:10px;border:1px solid var(--line);
-    background:var(--surface-2);color:var(--ink);padding:8px 13px;transition:.15s}
-  button:hover{border-color:var(--accent);transform:translateY(-1px)}
-  button.primary{background:var(--grad);color:var(--accent-ink);border:none;font-weight:620}
-  .btns{display:flex;gap:9px;flex-wrap:wrap;margin-top:6px}
-  pre{margin:10px 0 0;background:#0a0d15;border:1px solid var(--line);border-radius:10px;
-    padding:12px;font:12.5px/1.5 var(--mono);color:#cfe;overflow:auto;max-height:340px;white-space:pre-wrap}
-  .kv{font:12.5px var(--mono);color:var(--dim)}
-  .kv b{color:var(--ink)}
-  .tag-page{color:var(--bad);font-weight:650}
-  .tag-ticket{color:var(--warn);font-weight:650}
-  .tag-none{color:var(--ok);font-weight:650}
-  footer{grid-column:1/-1;color:var(--faint);font-size:12px;text-align:center;padding:8px}
+  .stat .n{font-size:26px;font-weight:680;font-variant-numeric:tabular-nums;transition:color .3s var(--ease)}
+  .stat .l{color:var(--ink-faint);font-size:12px;margin-top:2px}
+  .bar{height:9px;border-radius:6px;background:var(--surface-3);overflow:hidden;margin-top:14px}
+  .bar > i{display:block;height:100%;background:var(--ok);transition:width .4s var(--ease),background .4s}
+  .tag-page{color:var(--bad)}
+  .tag-ticket{color:var(--warn)}
+  .tag-none{color:var(--ok)}
+  /* controls */
+  textarea,select,input{font:inherit;color:var(--ink);background:var(--surface-2);
+    border:1px solid var(--line);border-radius:var(--r-sm);padding:11px 13px;transition:.16s var(--ease);width:100%}
+  textarea:focus,select:focus,input:focus{outline:none;border-color:var(--accent);
+    box-shadow:0 0 0 3px rgba(255,138,92,.16)}
+  .btn{font:inherit;font-weight:600;cursor:pointer;border-radius:var(--r-sm);padding:11px 17px;
+    border:1px solid var(--line);background:var(--surface-2);color:var(--ink);
+    transition:.16s var(--ease);display:inline-flex;align-items:center;gap:8px;position:relative}
+  .btn:hover{transform:translateY(-1px);border-color:var(--line-2)}
+  .btn:active{transform:translateY(0)}
+  .btn.primary{background:var(--grad);border:none;color:var(--accent-ink);
+    box-shadow:0 6px 20px -8px rgba(255,138,92,.7)}
+  .btn.primary:hover{box-shadow:0 10px 28px -8px rgba(255,138,92,.8)}
+  .btn.bad{border-color:rgba(241,91,108,.45);color:var(--bad)}
+  .btn[disabled]{opacity:.6;pointer-events:none}
+  .btn .spin{width:14px;height:14px;border:2px solid rgba(255,255,255,.25);border-top-color:currentColor;
+    border-radius:50%;animation:spin .7s linear infinite;display:none}
+  .btn.primary .spin{border-color:rgba(24,10,4,.35);border-top-color:var(--accent-ink)}
+  .btn.loading .spin{display:block}.btn.loading .lbl{opacity:.7}
+  .btns{display:flex;gap:9px;flex-wrap:wrap}
+  pre{margin:14px 0 0;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);
+    padding:13px;font:12.5px/1.55 var(--mono);color:var(--ink);overflow:auto;max-height:360px;white-space:pre-wrap}
+  .muted{color:var(--ink-dim);font-size:12.5px}
+  code{background:var(--surface-2);padding:1px 6px;border-radius:6px;font-family:var(--mono);font-size:12px}
+  .badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:700;
+    text-transform:uppercase;letter-spacing:.3px}
+  .b-page{background:rgba(241,91,108,.18);color:var(--bad)}
+  .b-ticket{background:rgba(230,173,82,.16);color:var(--warn)}
+  .b-none{background:rgba(67,201,138,.16);color:var(--ok)}
+  /* reveal on load */
+  .reveal{opacity:0;transform:translateY(14px)}
+  .reveal.in{opacity:1;transform:none;transition:.55s var(--ease)}
+  /* settings drawer */
+  .scrim{position:fixed;inset:0;background:rgba(5,8,14,.55);backdrop-filter:blur(2px);z-index:50;
+    opacity:0;pointer-events:none;transition:.25s var(--ease)}
+  .scrim.open{opacity:1;pointer-events:auto}
+  .drawer{position:fixed;top:0;right:0;height:100%;width:380px;max-width:92vw;z-index:60;
+    background:var(--surface);border-left:1px solid var(--line);box-shadow:var(--sh-lg);
+    transform:translateX(100%);transition:transform .3s var(--ease);display:flex;flex-direction:column}
+  .drawer.open{transform:none}
+  .drawer header{position:static;background:none;backdrop-filter:none;border-bottom:1px solid var(--line)}
+  .drawer h3{margin:0;font-size:15px;font-weight:650}
+  .drawer .body{padding:20px;overflow:auto;display:grid;gap:18px}
+  .field{display:grid;gap:7px}
+  .field label{font-size:12px;color:var(--ink-dim);font-weight:600;display:flex;justify-content:space-between}
+  .field .hint{font-size:11.5px;color:var(--ink-faint);font-weight:400}
+  .seg{display:flex;gap:6px;flex-wrap:wrap}
+  /* POLISH KIT: segmented control (theme + routing mode) */
+  .seg .segbtn{font:inherit;font-size:12px;cursor:pointer;border:1px solid var(--line);background:var(--surface-2);
+    color:var(--ink-dim);border-radius:var(--r-sm);padding:7px 11px;transition:.16s var(--ease)}
+  .seg .segbtn:hover{color:var(--ink);border-color:var(--line-2)}
+  .seg .segbtn[aria-pressed="true"]{background:var(--grad);border-color:transparent;color:var(--accent-ink);font-weight:600}
+  .pstat{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12.5px;
+    padding:7px 11px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface-2)}
+  .pstat .pdot{width:8px;height:8px;border-radius:50%;background:var(--ink-faint);flex:none}
+  .pstat .pdot.on{background:var(--ok);box-shadow:0 0 0 3px rgba(67,201,138,.18)}
+  .chainline{font-family:var(--mono);font-size:11.5px;color:var(--ink-dim);
+    background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);padding:8px 11px;word-break:break-word}
+  .drawer .foot{margin-top:auto;padding:16px 20px;border-top:1px solid var(--line);display:flex;gap:10px}
+  /* POLISH KIT: help modal (centered dialog, reuses scrim) */
+  #help{position:fixed;top:50%;left:50%;transform:translate(-50%,calc(-50% + 12px));z-index:70;
+    width:560px;max-width:94vw;max-height:86vh;overflow:auto;opacity:0;pointer-events:none;
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh-lg);
+    transition:opacity .25s var(--ease),transform .25s var(--ease)}
+  #help.open{opacity:1;pointer-events:auto;transform:translate(-50%,-50%)}
+  #help header{position:static;background:none;backdrop-filter:none;border-bottom:1px solid var(--line)}
+  #help .body{padding:20px;display:grid;gap:16px}
+  #help h4{margin:0 0 6px;font-size:11.5px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--ink-dim)}
+  #help p{margin:0;color:var(--ink-dim);font-size:13.5px}
+  #help ol{margin:0;padding-left:20px;color:var(--ink-dim);font-size:13.5px;display:grid;gap:4px}
+  #help .kbd{font-family:var(--mono);font-size:11.5px;background:var(--surface-2);border:1px solid var(--line);
+    border-bottom-width:2px;border-radius:6px;padding:1px 7px;color:var(--ink)}
+  #help .eps{display:flex;gap:7px;flex-wrap:wrap}
+  /* toast */
+  #toasts{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:80;
+    display:flex;flex-direction:column;gap:10px;align-items:center}
+  .toast{background:var(--surface-3);border:1px solid var(--line-2);border-radius:11px;padding:11px 16px;
+    box-shadow:var(--sh-lg);font-size:13px;display:flex;align-items:center;gap:10px;
+    animation:toastIn .3s var(--ease)}
+  .toast .tdot{width:8px;height:8px;border-radius:50%}
+  .toast.ok .tdot{background:var(--ok)}.toast.bad .tdot{background:var(--bad)}.toast.info .tdot{background:var(--info)}
+  /* cold-start overlay */
+  #boot{position:fixed;inset:0;z-index:90;background:var(--bg);display:grid;place-items:center;
+    transition:opacity .5s var(--ease)}
+  #boot.hide{opacity:0;pointer-events:none}
+  .boot-card{text-align:center;display:grid;gap:18px;justify-items:center}
+  .boot-card .logo{width:54px;height:54px}
+  .boot-card .ring{width:38px;height:38px;border:3px solid var(--line);border-top-color:var(--accent);
+    border-radius:50%;animation:spin .8s linear infinite}
+  .boot-card .msg{color:var(--ink-dim);font-size:13.5px}
+  .boot-card .sub{color:var(--ink-faint);font-size:12px;max-width:280px;margin:0}
+  /* keyframes */
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(67,201,138,.5)}70%{box-shadow:0 0 0 6px rgba(67,201,138,0)}100%{box-shadow:0 0 0 0 rgba(67,201,138,0)}}
+  @keyframes toastIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  @media(max-width:860px){main{grid-template-columns:1fr}}
+  @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 </style>
 </head>
 <body>
+<div id="boot"><div class="boot-card">
+  <div class="logo"></div><div class="ring"></div>
+  <div><div class="msg" id="bootmsg">Waking the demo…</div>
+  <p class="sub">Free-tier instances sleep when idle — first load takes ~30–60s.</p></div>
+</div></div>
+
 <header>
-  <div class="logo"></div>
-  <div class="brand">burnrate<span class="tag">Flask · RED metrics · multiwindow burn rate · TaskTiger/Redis</span></div>
-  <div class="spacer"></div>
+  <div class="brand"><span class="logo"></span> burnrate
+    <span class="tag">Flask · RED metrics · multiwindow burn rate · TaskTiger/Redis</span></div>
+  <span class="spacer"></span>
+  <span class="status"><span class="dot" id="hdot"></span><span id="hstat">connecting…</span></span>
   <span class="pill" id="p-backend">tasks: …</span>
-  <span class="pill" id="p-llm">llm: …</span>
   <span class="pill" id="p-status">…</span>
+  <!-- POLISH KIT: theme toggle -->
+  <button class="iconbtn" id="themebtn" title="Toggle theme" aria-label="Toggle light/dark theme"><span id="themeicon">☾</span></button>
+  <!-- POLISH KIT: help modal trigger -->
+  <button class="iconbtn" id="helpbtn" title="Help (?)" aria-label="Help">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 1 1 4.6 3c-.8.6-1.7 1-1.7 2.2"/><line x1="12" y1="17.5" x2="12" y2="17.51"/></svg>
+  </button>
+  <button class="iconbtn" id="gear" title="Settings" aria-label="Settings">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+  </button>
 </header>
 
 <main>
-  <section class="card">
+  <div class="panel reveal">
     <h2>Availability SLO</h2>
-    <div class="sub">target 99.5% · error budget 0.5%</div>
-    <div class="row">
-      <div class="stat"><div class="n" id="avail">—</div><div class="l">SLI (non-5xx)</div></div>
-      <div class="stat"><div class="n" id="budget">—</div><div class="l">budget remaining</div></div>
+    <div class="body">
+      <div class="sub">target 99.5% · error budget 0.5%</div>
+      <div class="stats">
+        <div class="stat"><div class="n" id="avail">—</div><div class="l">SLI (non-5xx)</div></div>
+        <div class="stat"><div class="n" id="budget">—</div><div class="l">budget remaining</div></div>
+      </div>
+      <div class="bar"><i id="budget-bar" style="width:100%"></i></div>
     </div>
-    <div class="bar"><i id="budget-bar" style="width:100%"></i></div>
-  </section>
+  </div>
 
-  <section class="card">
+  <div class="panel reveal">
     <h2>Latency SLO</h2>
-    <div class="sub">target 95% of requests under 250 ms</div>
-    <div class="row">
-      <div class="stat"><div class="n" id="lat">—</div><div class="l">SLI (fast enough)</div></div>
-      <div class="stat"><div class="n" id="p95">—</div><div class="l">p95 (ms)</div></div>
+    <div class="body">
+      <div class="sub">target 95% of requests under 250 ms</div>
+      <div class="stats">
+        <div class="stat"><div class="n" id="lat">—</div><div class="l">SLI (fast enough)</div></div>
+        <div class="stat"><div class="n" id="p95">—</div><div class="l">p95 (ms)</div></div>
+      </div>
     </div>
-  </section>
+  </div>
 
-  <section class="card full">
+  <div class="panel full reveal">
     <h2>Multiwindow burn-rate policy</h2>
-    <div class="sub">canonical SRE alerting: 14.4× (long+short) → <b>page</b> · 3× → <b>ticket</b></div>
-    <div class="row">
-      <div class="stat"><div class="n" id="burn">—</div><div class="l">burn rate (instant)</div></div>
-      <div class="stat"><div class="n" id="burn-long">—</div><div class="l">long window</div></div>
-      <div class="stat"><div class="n" id="burn-short">—</div><div class="l">short window</div></div>
-      <div class="stat"><div class="n" id="action">—</div><div class="l">policy action</div></div>
+    <div class="body">
+      <div class="sub">canonical SRE alerting: 14.4× (long+short) → <b>page</b> · 3× → <b>ticket</b></div>
+      <div class="stats">
+        <div class="stat"><div class="n" id="burn">—</div><div class="l">burn rate (instant)</div></div>
+        <div class="stat"><div class="n" id="burn-long">—</div><div class="l">long window</div></div>
+        <div class="stat"><div class="n" id="burn-short">—</div><div class="l">short window</div></div>
+        <div class="stat"><div class="n" id="action">—</div><div class="l">policy action</div></div>
+      </div>
     </div>
-  </section>
+  </div>
 
-  <section class="card full">
-    <h2>Operator controls</h2>
-    <div class="sub">inject a deterministic incident, drive load, recover — byte-reproducible</div>
-    <div class="btns">
-      <button class="primary" onclick="loadtest(300)">Drive load (300)</button>
-      <button onclick="batch()">Background batch task</button>
-      <button onclick="inject(0.08,450)">Inject fast burn (8% + 450ms)</button>
-      <button onclick="inject(0.02,0)">Inject slow burn (2%)</button>
-      <button onclick="reset()">Recover / reset</button>
-      <button onclick="summary()">Generate incident summary (LLM)</button>
+  <div class="panel full reveal">
+    <h2>Operator controls <span class="muted" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">routing <span id="llmstat">offline</span></span></h2>
+    <div class="body">
+      <div class="sub">inject a deterministic incident, drive load, recover — byte-reproducible</div>
+      <div class="btns">
+        <button class="btn primary" id="b-load"><span class="spin"></span><span class="lbl">Drive load (300)</span></button>
+        <button class="btn" id="b-batch"><span class="spin"></span><span class="lbl">Background batch task</span></button>
+        <button class="btn" id="b-inject-fast"><span class="spin"></span><span class="lbl">Inject fast burn (8% + 450ms)</span></button>
+        <button class="btn" id="b-inject-slow"><span class="spin"></span><span class="lbl">Inject slow burn (2%)</span></button>
+        <button class="btn bad" id="b-reset"><span class="spin"></span><span class="lbl">Recover / reset</span></button>
+        <button class="btn" id="b-summary"><span class="spin"></span><span class="lbl">Generate incident summary (LLM)</span></button>
+      </div>
+      <pre id="out">Ready. Drive load, then inject an incident to watch the budget burn.</pre>
     </div>
-    <pre id="out">Ready. Drive load, then inject an incident to watch the budget burn.</pre>
-  </section>
+  </div>
 
-  <footer>Single-instance demo · synthetic & deterministic · no secrets · <a href="/metrics">/metrics</a> · <a href="/slo">/slo</a> · <a href="/tasks">/tasks</a></footer>
+  <footer class="full muted" style="text-align:center;padding:8px">Single-instance demo · synthetic & deterministic · no secrets ·
+    <a href="/metrics">/metrics</a> · <a href="/slo">/slo</a> · <a href="/tasks">/tasks</a> · <a href="/healthz">/healthz</a></footer>
 </main>
 
-<script>
-const $ = id => document.getElementById(id);
-const j = (m,u,b) => fetch(u,{method:m,headers:{'content-type':'application/json'},
-  body:b?JSON.stringify(b):undefined}).then(r=>r.json());
-const pct = x => (x*100).toFixed(2)+'%';
+<!-- settings drawer -->
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-hidden="true">
+  <header><div class="brand" style="font-size:15px"><span class="logo" style="width:24px;height:24px"></span> Settings</div>
+    <span class="spacer"></span><button class="iconbtn" id="closedrawer" aria-label="Close">✕</button></header>
+  <div class="body">
+    <!-- POLISH KIT: theme segmented control -->
+    <div class="field">
+      <label>Theme <span class="hint">appearance</span></label>
+      <div class="seg" id="themeseg">
+        <button type="button" class="segbtn" data-theme="dark">Dark</button>
+        <button type="button" class="segbtn" data-theme="light">Light</button>
+        <button type="button" class="segbtn" data-theme="system">System</button>
+      </div>
+    </div>
 
+    <!-- POLISH KIT: routing config -->
+    <div class="field">
+      <label>Routing mode <span class="hint">which provider the incident summary uses</span></label>
+      <div class="seg" id="modeseg">
+        <button type="button" class="segbtn" data-mode="auto">auto</button>
+        <button type="button" class="segbtn" data-mode="local">local</button>
+        <button type="button" class="segbtn" data-mode="free">free</button>
+        <button type="button" class="segbtn" data-mode="paid">paid</button>
+        <button type="button" class="segbtn" data-mode="offline">offline</button>
+      </div>
+      <div class="hint" id="modeblurb">auto = local if reachable, else paid, else free, else offline.</div>
+    </div>
+    <div class="field">
+      <label for="cfgModel">Model override <span class="hint">optional · informational</span></label>
+      <input id="cfgModel" type="text" placeholder="provider default" />
+    </div>
+    <div class="field">
+      <label>Provider status <span class="hint" id="modeactive">active: auto</span></label>
+      <div style="display:grid;gap:6px" id="provrows"></div>
+    </div>
+    <div class="field">
+      <label>Fallback chain <span class="hint">→ on failure</span></label>
+      <div class="chainline" id="chainline">offline (deterministic)</div>
+    </div>
+    <div class="muted" style="font-size:11.5px">Provider keys live server-side; this selects which available provider the incident
+      summary uses. The deterministic offline summary is always available as the final fallback.</div>
+  </div>
+  <div class="foot">
+    <button class="btn" id="resetcfg">Reset</button>
+    <button class="btn primary" id="savecfg" style="flex:1"><span class="lbl">Save</span></button>
+  </div>
+</aside>
+
+<!-- POLISH KIT: help modal -->
+<aside id="help" role="dialog" aria-modal="true" aria-labelledby="helptitle" aria-hidden="true">
+  <header><div class="brand" style="font-size:15px"><span class="logo" style="width:24px;height:24px"></span>
+    <span id="helptitle">Help · burnrate</span></div>
+    <span class="spacer"></span><button class="iconbtn" id="closehelp" aria-label="Close help">✕</button></header>
+  <div class="body">
+    <div><h4>What it is</h4><p>An instrumented Flask SRE service: real RED metrics (Prometheus exposition), availability &amp;
+      latency SLIs/SLOs with an error budget, a canonical multiwindow <b>burn-rate</b> alerting policy, and an
+      LLM-backed incident summary. A deterministic fault is injectable so you can burn and recover the budget.</p></div>
+    <div><h4>How to use</h4><ol>
+      <li><b>Drive load</b> — click <i>Drive load</i> to send synthetic traffic and populate the SLO windows.</li>
+      <li><b>Inject an incident</b> — <i>Inject fast burn</i> (errors + latency → page) or <i>slow burn</i> (errors → ticket); watch the budget bar burn down.</li>
+      <li><b>Generate a summary</b> — click <i>Generate incident summary (LLM)</i> for a severity, action, and next steps.</li>
+      <li><b>Recover / reset</b> — clears the fault and starts a fresh window.</li>
+    </ol></div>
+    <div><h4>Endpoints</h4><div class="eps">
+      <code>/metrics</code><code>/healthz</code><code>/slo</code>
+      <code>/incident/summary</code><code>/admin/*</code><code>/llm</code></div></div>
+    <div><h4>Keyboard shortcuts</h4><p><span class="kbd">?</span> open this help · <span class="kbd">Esc</span> close any overlay</p></div>
+    <div><p class="muted" style="font-size:11.5px">All traffic, faults, and metrics are <b>synthetic &amp; deterministic</b> — no secrets, no real users.</p></div>
+  </div>
+</aside>
+
+<div id="toasts"></div>
+
+<script>
+const $=s=>document.getElementById(s), $$=s=>[...document.querySelectorAll(s)];
+const jr=(m,u,b)=>fetch(u,{method:m,headers:{'content-type':'application/json'},
+  body:b?JSON.stringify(b):undefined}).then(r=>r.json());
+const j=u=>fetch(u).then(r=>r.json());
+const pct=x=>(x*100).toFixed(2)+'%';
+const CFG_KEY="burnrate.cfg";
+let cfg={mode:"auto",model:""};
+let llmProviders={};  // last GET /llm providers map
+
+function toast(msg,type="info"){
+  const t=document.createElement("div");t.className=`toast ${type}`;
+  t.innerHTML=`<span class="tdot"></span>${msg}`;$("toasts").appendChild(t);
+  setTimeout(()=>{t.style.opacity="0";t.style.transition="opacity .3s";setTimeout(()=>t.remove(),300)},2600);
+}
+function loadCfg(){try{cfg={...cfg,...JSON.parse(localStorage.getItem(CFG_KEY)||"{}")}}catch{}}
+function applyCfgToForm(){
+  $("cfgModel").value=cfg.model||"";
+  selectMode(cfg.mode||"auto");
+  syncThemeSeg();
+}
+function openDrawer(){applyCfgToForm();renderRouting();$("scrim").classList.add("open");$("drawer").classList.add("open");$("drawer").setAttribute("aria-hidden","false")}
+function closeDrawer(){$("scrim").classList.remove("open");$("drawer").classList.remove("open");$("drawer").setAttribute("aria-hidden","true")}
+$("gear").onclick=openDrawer;$("closedrawer").onclick=closeDrawer;
+$("savecfg").onclick=()=>{cfg={mode:currentMode(),model:$("cfgModel").value.trim()};
+  localStorage.setItem(CFG_KEY,JSON.stringify(cfg));renderRouting();closeDrawer();toast("Settings saved","ok")};
+$("resetcfg").onclick=()=>{cfg={mode:"auto",model:""};localStorage.removeItem(CFG_KEY);applyCfgToForm();renderRouting();toast("Reset to defaults","info")};
+
+/* ===================== SLO dashboard (preserved behavior) ===================== */
 async function refresh(){
-  const s = await j('GET','/slo');
-  const a = s.availability, l = s.latency, p = s.burn_policy;
-  $('avail').textContent = pct(a.sli);
-  $('budget').textContent = pct(a.budget_remaining);
-  $('lat').textContent = pct(l.sli);
-  $('p95').textContent = l.p95_ms;
-  $('burn').textContent = a.burn_rate+'×';
-  $('burn-long').textContent = p.long_window_burn+'×';
-  $('burn-short').textContent = p.short_window_burn+'×';
-  const act = $('action'); act.textContent = p.action;
-  act.className = 'n tag-'+p.action;
-  const bar = $('budget-bar'); bar.style.width = Math.max(2,a.budget_remaining*100)+'%';
-  bar.style.background = a.budget_remaining>0.5?'var(--ok)':a.budget_remaining>0?'var(--warn)':'var(--bad)';
-  const st = $('p-status');
-  st.textContent = s.overall_status;
-  st.className = 'pill '+(s.overall_status==='healthy'?'ok':'bad');
+  try{
+    const s=await j('/slo');
+    const a=s.availability, l=s.latency, p=s.burn_policy;
+    $('avail').textContent=pct(a.sli);
+    $('budget').textContent=pct(a.budget_remaining);
+    $('lat').textContent=pct(l.sli);
+    $('p95').textContent=l.p95_ms;
+    $('burn').textContent=a.burn_rate+'×';
+    $('burn-long').textContent=p.long_window_burn+'×';
+    $('burn-short').textContent=p.short_window_burn+'×';
+    const act=$('action'); act.textContent=p.action; act.className='n tag-'+p.action;
+    const bar=$('budget-bar'); bar.style.width=Math.max(2,a.budget_remaining*100)+'%';
+    bar.style.background=a.budget_remaining>0.5?'var(--ok)':a.budget_remaining>0?'var(--warn)':'var(--bad)';
+    const st=$('p-status'); st.textContent=s.overall_status;
+    st.className='pill '+(s.overall_status==='healthy'?'ok':'bad');
+  }catch{}
 }
 async function badges(){
-  const h = await j('GET','/healthz'); $('p-backend').textContent='tasks: '+h.task_backend;
-  const lm = await j('GET','/llm');
-  const active = Object.entries(lm.providers).find(([,v])=>v);
-  $('p-llm').textContent='llm: '+(active?active[0]:'offline');
+  try{
+    const h=await j('/healthz'); $('p-backend').textContent='tasks: '+h.task_backend;
+  }catch{}
 }
-async function loadtest(n){ $('out').textContent='driving '+n+' requests…';
-  await j('POST','/admin/loadtest',{n}); await refresh(); $('out').textContent='load done.'; }
-async function batch(){ $('out').textContent='enqueuing background batch task…';
-  const r = await j('POST','/tasks/process_batch',{n:200}); await refresh();
-  $('out').textContent='task '+r.task+' backend='+r.backend+' deferred='+r.deferred+' drained='+r.drained; }
-async function inject(er,lm){ $('out').textContent='injecting fault…';
-  await j('POST','/admin/inject',{error_rate:er,latency_ms:lm});
-  await j('POST','/admin/loadtest',{n:300}); await refresh();
-  $('out').textContent='fault injected + 300 requests driven — watch the budget burn.'; }
-async function reset(){ await j('POST','/admin/reset'); await j('POST','/admin/loadtest',{n:300});
-  await refresh(); $('out').textContent='recovered: fault cleared, fresh window.'; }
-async function summary(){ $('out').textContent='generating incident summary…';
-  const r = await j('POST','/incident/summary',{});
-  $('out').textContent = '['+r.severity.toUpperCase()+'] action='+r.action+'  provider='+r.provider+
-    '\n\n'+r.summary+'\n\nNext steps:\n'+r.suggested_steps.map((s,i)=>(i+1)+'. '+s).join('\n'); }
+function busy(id,on){const b=$(id);b.classList.toggle('loading',on);b.disabled=on;}
+async function loadtest(n){busy('b-load',true);$('out').textContent='driving '+n+' requests…';
+  try{await jr('POST','/admin/loadtest',{n});await refresh();$('out').textContent='load done.';toast('Drove '+n+' requests','ok');}
+  catch{$('out').textContent='load failed.';toast('Load failed','bad');}busy('b-load',false);}
+async function batch(){busy('b-batch',true);$('out').textContent='enqueuing background batch task…';
+  try{const r=await jr('POST','/tasks/process_batch',{n:200});await refresh();
+    $('out').textContent='task '+r.task+' backend='+r.backend+' deferred='+r.deferred+' drained='+r.drained;toast('Batch task drained','ok');}
+  catch{$('out').textContent='batch failed.';toast('Batch failed','bad');}busy('b-batch',false);}
+async function inject(er,lm,id){busy(id,true);$('out').textContent='injecting fault…';
+  try{await jr('POST','/admin/inject',{error_rate:er,latency_ms:lm});
+    await jr('POST','/admin/loadtest',{n:300});await refresh();
+    $('out').textContent='fault injected + 300 requests driven — watch the budget burn.';toast('Fault injected','bad');}
+  catch{$('out').textContent='inject failed.';toast('Inject failed','bad');}busy(id,false);}
+async function reset(){busy('b-reset',true);
+  try{await jr('POST','/admin/reset');await jr('POST','/admin/loadtest',{n:300});
+    await refresh();$('out').textContent='recovered: fault cleared, fresh window.';toast('Recovered — fresh window','ok');}
+  catch{$('out').textContent='reset failed.';toast('Reset failed','bad');}busy('b-reset',false);}
+async function summary(){busy('b-summary',true);$('out').textContent='generating incident summary…';
+  try{const r=await jr('POST','/incident/summary',{mode:cfg.mode||null});
+    $('out').textContent='['+r.severity.toUpperCase()+'] action='+r.action+'  provider='+r.provider+'  mode='+r.mode+
+      '\n\n'+r.summary+'\n\nNext steps:\n'+r.suggested_steps.map((s,i)=>(i+1)+'. '+s).join('\n');
+    toast('Summary via '+r.provider,'info');}
+  catch{$('out').textContent='summary failed.';toast('Summary failed','bad');}busy('b-summary',false);}
 
-badges(); refresh(); setInterval(refresh, 4000);
+$('b-load').onclick=()=>loadtest(300);
+$('b-batch').onclick=batch;
+$('b-inject-fast').onclick=()=>inject(0.08,450,'b-inject-fast');
+$('b-inject-slow').onclick=()=>inject(0.02,0,'b-inject-slow');
+$('b-reset').onclick=reset;
+$('b-summary').onclick=summary;
+
+async function loadLlm(){
+  try{const s=await j('/llm');llmProviders=s.providers||{};
+    const active=Object.entries(llmProviders).find(e=>e[1]);
+    $('llmstat').textContent=active?active[0]:'offline (deterministic)';
+    renderRouting();}catch{}
+}
+
+/* ===================== POLISH KIT: theme toggle ===================== */
+const THEME_KEY="theme";
+function getTheme(){try{return localStorage.getItem(THEME_KEY)||"system"}catch{return "system"}}
+function effectiveDark(t){
+  if(t==="dark")return true; if(t==="light")return false;
+  return !window.matchMedia("(prefers-color-scheme: light)").matches;
+}
+function applyTheme(t){
+  const dark=effectiveDark(t);
+  document.documentElement.classList.toggle("light",!dark);
+  $("themeicon").textContent=dark?"☾":"☀";
+  $("themebtn").title=`Theme: ${t}`;
+}
+function setTheme(t){try{localStorage.setItem(THEME_KEY,t)}catch{} applyTheme(t); syncThemeSeg();}
+function syncThemeSeg(){const cur=getTheme();
+  $$("#themeseg .segbtn").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.theme===cur)));}
+$("themebtn").onclick=()=>{const cur=getTheme();const next=effectiveDark(cur)?"light":"dark";setTheme(next);};
+$$("#themeseg .segbtn").forEach(b=>b.onclick=()=>setTheme(b.dataset.theme));
+window.matchMedia("(prefers-color-scheme: light)").addEventListener?.("change",()=>{if(getTheme()==="system")applyTheme("system");});
+applyTheme(getTheme());
+
+/* ===================== POLISH KIT: help modal ===================== */
+function openHelp(){$("scrim").classList.add("open");$("help").classList.add("open");
+  $("help").setAttribute("aria-hidden","false");$("closehelp").focus();}
+function closeHelp(){$("scrim").classList.remove("open");$("help").classList.remove("open");
+  $("help").setAttribute("aria-hidden","true");}
+$("helpbtn").onclick=openHelp;$("closehelp").onclick=closeHelp;
+$("scrim").onclick=()=>{closeDrawer();closeHelp();};
+document.addEventListener("keydown",e=>{
+  const typing=/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName||"")||document.activeElement?.isContentEditable;
+  if(e.key==="Escape"){closeDrawer();closeHelp();}
+  else if(e.key==="?"&&!typing&&!$("help").classList.contains("open")){e.preventDefault();openHelp();}
+});
+
+/* ===================== POLISH KIT: routing config ===================== */
+const MODE_BLURBS={
+  auto:"auto = local if reachable, else paid, else free, else offline.",
+  local:"local = Ollama only (on-box, zero cost).",
+  free:"free = OpenRouter free models only.",
+  paid:"paid = Anthropic, then OpenAI.",
+  offline:"offline = deterministic incident summary only (no LLM call).",
+};
+const MODE_CHAIN={
+  auto:["anthropic","openai","ollama","openrouter"],
+  local:["ollama"], free:["openrouter"], paid:["anthropic","openai"], offline:[],
+};
+const PROVIDERS=["anthropic","openai","ollama","openrouter"];
+function selectMode(m){
+  $$("#modeseg .segbtn").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.mode===m)));
+  $("modeblurb").textContent=MODE_BLURBS[m]||"";
+  $("modeactive").textContent=`active: ${m}`;
+}
+function currentMode(){return document.querySelector('#modeseg .segbtn[aria-pressed="true"]')?.dataset.mode||"auto";}
+function renderRouting(){
+  const m=currentMode();
+  $("modeactive").textContent=`active: ${m}`;
+  const rows=PROVIDERS.map(p=>{
+    const on=!!llmProviders[p];
+    return `<div class="pstat"><span>${p}</span><span class="pdot ${on?'on':''}" title="${on?'available':'not configured'}"></span></div>`;
+  }).join("")+
+    `<div class="pstat"><span>offline (deterministic)</span><span class="pdot on" title="always available"></span></div>`;
+  $("provrows").innerHTML=rows;
+  const chain=(MODE_CHAIN[m]||[]).filter(p=>llmProviders[p]);
+  const display=[...chain,"offline (deterministic)"];
+  $("chainline").textContent=display.join("  →  ");
+}
+$$("#modeseg .segbtn").forEach(b=>b.onclick=()=>{selectMode(b.dataset.mode);renderRouting();});
+
+/* ===================== boot / cold-start ===================== */
+async function boot(){
+  loadCfg();
+  selectMode(cfg.mode||"auto");
+  let ready=false;
+  for(let i=0;i<60 && !ready;i++){
+    try{const r=await fetch("/healthz");if(r.ok){ready=true;break}}catch{}
+    if(i===4)$("bootmsg").textContent="Still waking up…";
+    await new Promise(r=>setTimeout(r,1500));
+  }
+  $("hdot").className="dot ok";$("hstat").textContent="live";
+  $("boot").classList.add("hide");setTimeout(()=>$("boot").remove(),600);
+  $$(".reveal").forEach((el,i)=>setTimeout(()=>el.classList.add("in"),90*i));
+  badges(); await refresh(); loadLlm();
+  // live-status pill keeps polling /healthz
+  setInterval(async()=>{
+    try{const h=await j('/healthz');$("hdot").className="dot ok";$("hstat").textContent="live";
+      $('p-backend').textContent='tasks: '+h.task_backend;}
+    catch{$("hdot").className="dot bad";$("hstat").textContent="offline";}
+  },8000);
+  setInterval(refresh,4000);
+}
+boot();
 </script>
 </body>
 </html>
