@@ -3,143 +3,409 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>field-vault — de-identified access</title>
+<title>field-vault — de-identified field access</title>
 <style>
-  :root{--bg:#0f1419;--panel:#171d26;--panel2:#1d2530;--line:#2a3441;
-    --ink:#e7edf3;--dim:#9aa7b4;--accent:#5b9dff;--ok:#3fb56b;--deny:#ef5b6b;--warn:#e0a64a}
+  /* ============================ design system ============================ */
+  :root{
+    --bg:#0a0d14; --bg-grad-1:#0e1322; --bg-grad-2:#0a0d14;
+    --surface:#131826; --surface-2:#1a2032; --surface-3:#212a40;
+    --line:#263149; --line-2:#33405d;
+    --ink:#e9eef7; --ink-dim:#97a3ba; --ink-faint:#67728a;
+    --accent:#6aa1ff; --accent-2:#9b86ff; --accent-ink:#06101f;
+    --ok:#43c98a; --warn:#e6ad52; --bad:#f15b6c; --info:#6aa1ff; --violet:#9b86ff;
+    --r:15px; --r-sm:10px; --r-xs:7px;
+    --sh:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.5);
+    --sh-lg:0 1px 2px rgba(0,0,0,.4), 0 24px 64px -24px rgba(0,0,0,.7);
+    --grad:linear-gradient(135deg,var(--accent),var(--accent-2));
+    --ease:cubic-bezier(.22,.61,.36,1);
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+  }
   *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--ink);
-    font:15px/1.5 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
-  header{padding:18px 26px;border-bottom:1px solid var(--line);display:flex;gap:14px;align-items:baseline;flex-wrap:wrap}
-  header h1{margin:0;font-size:19px} header .tag{color:var(--dim);font-size:13px}
-  main{max-width:1140px;margin:0 auto;padding:20px 26px;display:grid;gap:16px;grid-template-columns:1fr 1fr}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;
+    font:15px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Inter,sans-serif;
+    background-image:radial-gradient(1200px 600px at 80% -10%,rgba(107,130,255,.10),transparent 60%),
+      radial-gradient(900px 500px at 0% 0%,rgba(67,201,138,.05),transparent 55%);
+    background-attachment:fixed;min-height:100vh}
+  ::selection{background:rgba(106,161,255,.3)}
+  a{color:var(--accent);text-decoration:none}
+  /* header */
+  header{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:14px;
+    padding:14px 24px;border-bottom:1px solid var(--line);
+    background:rgba(10,13,20,.72);backdrop-filter:blur(14px) saturate(140%)}
+  .brand{display:flex;align-items:center;gap:11px;font-weight:650;font-size:16px;letter-spacing:.2px}
+  .logo{width:30px;height:30px;border-radius:9px;background:var(--grad);position:relative;
+    box-shadow:0 4px 16px -4px rgba(106,161,255,.6);flex:none}
+  .logo::after{content:"";position:absolute;inset:7px;border-radius:5px;
+    border:2px solid rgba(255,255,255,.85);border-right-color:transparent;
+    animation:spin 3.5s linear infinite}
+  .brand .tag{color:var(--ink-dim);font-size:12.5px;font-weight:400}
+  .spacer{flex:1}
+  .status{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--ink-dim);
+    padding:5px 11px;border:1px solid var(--line);border-radius:999px;background:var(--surface)}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--ink-faint)}
+  .dot.ok{background:var(--ok);box-shadow:0 0 0 0 rgba(67,201,138,.5);animation:pulse 2s infinite}
+  .pill{font-size:12px;color:var(--ink-dim);border:1px solid var(--line);border-radius:999px;
+    padding:5px 12px;background:var(--surface);white-space:nowrap}
+  .iconbtn{width:36px;height:36px;border-radius:10px;border:1px solid var(--line);background:var(--surface);
+    color:var(--ink-dim);cursor:pointer;display:grid;place-items:center;transition:.18s var(--ease)}
+  .iconbtn:hover{color:var(--ink);border-color:var(--line-2);transform:translateY(-1px);background:var(--surface-2)}
+  .iconbtn svg{width:18px;height:18px}
+  /* layout */
+  main{max-width:1160px;margin:0 auto;padding:26px 24px 64px;display:grid;gap:18px;
+    grid-template-columns:1fr 1fr}
   .full{grid-column:1/-1}
-  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px}
-  .panel h2{margin:0;padding:12px 16px;font-size:12px;border-bottom:1px solid var(--line);
-    color:var(--dim);text-transform:uppercase;letter-spacing:.6px}
-  .panel .body{padding:14px 16px}
-  select,button,input{font:inherit;color:var(--ink);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
-  button{cursor:pointer} button.primary{background:var(--accent);border-color:var(--accent);color:#06101f;font-weight:600}
-  .ctl{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-  .ctl label{color:var(--dim);font-size:12px;display:flex;gap:6px;align-items:center}
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+    box-shadow:var(--sh);overflow:hidden;transition:.25s var(--ease)}
+  .panel:hover{border-color:var(--line-2)}
+  .panel h2{margin:0;padding:14px 18px;font-size:11.5px;font-weight:600;letter-spacing:.7px;
+    text-transform:uppercase;color:var(--ink-dim);border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:10px}
+  .panel .body{padding:18px}
+  /* controls */
+  textarea,select,input{font:inherit;color:var(--ink);background:var(--surface-2);
+    border:1px solid var(--line);border-radius:var(--r-sm);padding:11px 13px;transition:.16s var(--ease);width:100%}
+  textarea:focus,select:focus,input:focus{outline:none;border-color:var(--accent);
+    box-shadow:0 0 0 3px rgba(106,161,255,.16)}
+  textarea{min-height:88px;resize:vertical;font-family:var(--mono);font-size:13px;line-height:1.5}
+  .btn{font:inherit;font-weight:600;cursor:pointer;border-radius:var(--r-sm);padding:11px 17px;
+    border:1px solid var(--line);background:var(--surface-2);color:var(--ink);
+    transition:.16s var(--ease);display:inline-flex;align-items:center;gap:8px;position:relative}
+  .btn:hover{transform:translateY(-1px);border-color:var(--line-2)}
+  .btn:active{transform:translateY(0)}
+  .btn.primary{background:var(--grad);border:none;color:#06101f;
+    box-shadow:0 6px 20px -8px rgba(106,161,255,.7)}
+  .btn.primary:hover{box-shadow:0 10px 28px -8px rgba(106,161,255,.8)}
+  .btn[disabled]{opacity:.6;pointer-events:none}
+  .btn .spin{width:14px;height:14px;border:2px solid rgba(6,16,31,.35);border-top-color:#06101f;
+    border-radius:50%;animation:spin .7s linear infinite;display:none}
+  .btn.loading .spin{display:block}.btn.loading .lbl{opacity:.7}
+  .chip{font:inherit;font-size:12px;cursor:pointer;border:1px dashed var(--line);background:transparent;
+    color:var(--ink-dim);border-radius:999px;padding:5px 12px;transition:.16s var(--ease)}
+  .chip:hover{color:var(--ink);border-color:var(--accent);border-style:solid;
+    background:rgba(106,161,255,.08)}
+  .row{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+  /* labeled field control */
+  .ctl{display:flex;flex-direction:column;gap:6px}
+  .ctl>span{font-size:11px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:var(--ink-faint)}
+  .ctls{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:13px;align-items:end}
+  .check{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-dim);cursor:pointer;
+    padding:11px 13px;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm)}
+  .check input{width:auto}
+  /* badges */
+  .badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:700;
+    text-transform:uppercase;letter-spacing:.3px}
+  .b-allow{background:rgba(67,201,138,.16);color:var(--ok)}
+  .b-flag{background:rgba(230,173,82,.16);color:var(--warn)}
+  .b-block{background:rgba(241,91,108,.18);color:var(--bad)}
+  .b-info{background:rgba(106,161,255,.15);color:var(--info)}
+  .mono{font-family:var(--mono);font-size:12px}
+  /* decision result */
+  .result{margin-top:16px;padding:16px;border:1px solid var(--line);border-radius:var(--r-sm);
+    background:var(--surface-2);transition:.25s var(--ease)}
+  .result.allow{border-color:rgba(67,201,138,.4);background:rgba(67,201,138,.05)}
+  .result.deny{border-color:rgba(241,91,108,.4);background:rgba(241,91,108,.05)}
+  .result .head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13.5px}
+  .result .reason{color:var(--ink-dim);font-size:12.5px;margin-top:8px}
+  .result .recovered{margin-top:12px;padding:11px 13px;border-radius:var(--r-sm);
+    background:rgba(155,134,255,.10);border:1px solid rgba(155,134,255,.3);
+    font-size:13px;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+  .result .recovered b{font-family:var(--mono);font-size:13px;color:var(--ink)}
+  /* tokens — make de-identification visually obvious */
+  .tok{font-family:var(--mono);font-size:11.5px;color:var(--violet);
+    background:rgba(155,134,255,.12);border:1px solid rgba(155,134,255,.28);
+    padding:1px 7px;border-radius:6px;display:inline-block}
+  .gen{font-family:var(--mono);font-size:11.5px;color:var(--warn);
+    background:rgba(230,173,82,.10);padding:1px 7px;border-radius:6px;display:inline-block}
+  /* table */
   table{width:100%;border-collapse:collapse;font-size:12.5px}
-  th,td{text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
-  th{color:var(--dim);font-size:11px}
-  code{background:var(--panel2);padding:1px 5px;border-radius:5px;font-size:12px}
-  .tok{color:var(--warn)}
-  .badge{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11.5px;font-weight:700}
-  .b-ok{background:rgba(63,181,107,.16);color:var(--ok)} .b-deny{background:rgba(239,91,107,.18);color:var(--deny)}
-  .result{margin-top:12px;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--panel2);font-size:13.5px}
-  .ex{font-size:11.5px;color:var(--dim);border:1px dashed var(--line);background:transparent}
-  .muted{color:var(--dim);font-size:12px}
-  .scorebar{height:7px;background:var(--panel2);border-radius:4px;overflow:hidden;width:90px;display:inline-block;vertical-align:middle}
-  .scorebar>i{display:block;height:100%;background:var(--ok)}
-  .verifyline{padding:10px 16px;border-top:1px solid var(--line);display:flex;gap:10px;align-items:center}
+  th,td{text-align:left;padding:9px 14px;border-bottom:1px solid var(--line);white-space:nowrap}
+  th{color:var(--ink-faint);font-size:11px;font-weight:600;letter-spacing:.4px;text-transform:uppercase}
+  tbody tr{transition:.14s var(--ease)}tbody tr:hover{background:var(--surface-2)}
+  tbody tr.fresh{animation:rowIn .5s var(--ease)}
+  .scorebar{height:7px;background:var(--surface-3);border-radius:4px;overflow:hidden;width:84px;
+    display:inline-block;vertical-align:middle;margin-right:8px}
+  .scorebar>i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--ok))}
+  .verifybar{padding:13px 18px;border-top:1px solid var(--line);display:flex;gap:10px;align-items:center}
+  .muted{color:var(--ink-dim);font-size:12.5px}
+  code{background:var(--surface-2);padding:1px 6px;border-radius:6px;font-family:var(--mono);font-size:12px}
+  /* reveal on load */
+  .reveal{opacity:0;transform:translateY(14px)}
+  .reveal.in{opacity:1;transform:none;transition:.55s var(--ease)}
+  /* settings drawer */
+  .scrim{position:fixed;inset:0;background:rgba(5,8,14,.55);backdrop-filter:blur(2px);z-index:50;
+    opacity:0;pointer-events:none;transition:.25s var(--ease)}
+  .scrim.open{opacity:1;pointer-events:auto}
+  .drawer{position:fixed;top:0;right:0;height:100%;width:380px;max-width:92vw;z-index:60;
+    background:var(--surface);border-left:1px solid var(--line);box-shadow:var(--sh-lg);
+    transform:translateX(100%);transition:transform .3s var(--ease);display:flex;flex-direction:column}
+  .drawer.open{transform:none}
+  .drawer header{position:static;background:none;backdrop-filter:none;border-bottom:1px solid var(--line)}
+  .drawer h3{margin:0;font-size:15px;font-weight:650}
+  .drawer .body{padding:20px;overflow:auto;display:grid;gap:18px}
+  .field{display:grid;gap:7px}
+  .field label{font-size:12px;color:var(--ink-dim);font-weight:600;display:flex;justify-content:space-between}
+  .field .hint{font-size:11.5px;color:var(--ink-faint);font-weight:400}
+  .seg{display:flex;gap:6px;flex-wrap:wrap}
+  .drawer .foot{margin-top:auto;padding:16px 20px;border-top:1px solid var(--line);display:flex;gap:10px}
+  /* toast */
+  #toasts{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:80;
+    display:flex;flex-direction:column;gap:10px;align-items:center}
+  .toast{background:var(--surface-3);border:1px solid var(--line-2);border-radius:11px;padding:11px 16px;
+    box-shadow:var(--sh-lg);font-size:13px;display:flex;align-items:center;gap:10px;
+    animation:toastIn .3s var(--ease)}
+  .toast .tdot{width:8px;height:8px;border-radius:50%}
+  .toast.ok .tdot{background:var(--ok)}.toast.bad .tdot{background:var(--bad)}.toast.info .tdot{background:var(--info)}
+  /* cold-start overlay */
+  #boot{position:fixed;inset:0;z-index:90;background:var(--bg);display:grid;place-items:center;
+    transition:opacity .5s var(--ease)}
+  #boot.hide{opacity:0;pointer-events:none}
+  .boot-card{text-align:center;display:grid;gap:18px;justify-items:center}
+  .boot-card .logo{width:54px;height:54px}
+  .boot-card .ring{width:38px;height:38px;border:3px solid var(--line);border-top-color:var(--accent);
+    border-radius:50%;animation:spin .8s linear infinite}
+  .boot-card .msg{color:var(--ink-dim);font-size:13.5px}
+  .boot-card .sub{color:var(--ink-faint);font-size:12px;max-width:280px}
+  /* keyframes */
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(67,201,138,.5)}70%{box-shadow:0 0 0 6px rgba(67,201,138,0)}100%{box-shadow:0 0 0 0 rgba(67,201,138,0)}}
+  @keyframes slideIn{to{opacity:1;transform:none}}
+  @keyframes rowIn{from{background:rgba(106,161,255,.14)}to{background:transparent}}
+  @keyframes toastIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  @media(max-width:860px){main{grid-template-columns:1fr}}
+  @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 </style>
 </head>
 <body>
+<div id="boot"><div class="boot-card">
+  <div class="logo"></div><div class="ring"></div>
+  <div><div class="msg" id="bootmsg">Waking the demo…</div>
+  <div class="sub">Free-tier instances sleep when idle — first load takes ~30–60s.</div></div>
+</div></div>
+
 <header>
-  <h1>field-vault</h1>
-  <span class="tag">de-identified at ingest · least-privilege field access · tamper-evident audit</span>
+  <div class="brand"><span class="logo"></span> field-vault
+    <span class="tag">field-level de-identification · least-privilege · audit</span></div>
+  <span class="spacer"></span>
+  <span class="status"><span class="dot" id="hdot"></span><span id="hstat">connecting…</span></span>
+  <span class="pill" id="recpill">tamper-evident audit</span>
+  <button class="iconbtn" id="gear" title="Settings" aria-label="Settings">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+  </button>
 </header>
+
 <main>
-  <div class="panel full">
-    <h2>Access console — request a field as a role</h2>
+  <div class="panel full reveal">
+    <h2>Access console <span class="muted" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">request a field as a role</span></h2>
     <div class="body">
-      <div class="ctl">
-        <label>role <select id="role"></select></label>
-        <label>record <select id="record"></select></label>
-        <label>field <select id="field"></select></label>
-        <label>purpose <select id="purpose"><option value="">—</option><option>treatment</option><option>care_coordination</option><option>analytics</option></select></label>
-        <label><input type="checkbox" id="reid"> re-identify</label>
-        <button class="primary" id="go">Request access</button>
+      <div class="ctls">
+        <label class="ctl"><span>role</span><select id="role"></select></label>
+        <label class="ctl"><span>record</span><select id="record"></select></label>
+        <label class="ctl"><span>field</span><select id="field"></select></label>
+        <label class="ctl"><span>purpose</span><select id="purpose"><option value="">—</option><option>treatment</option><option>care_coordination</option><option>analytics</option></select></label>
+        <label class="check"><input type="checkbox" id="reid"> re-identify</label>
+        <button class="btn primary" id="go"><span class="spin"></span><span class="lbl">Request access</span></button>
       </div>
-      <div class="ctl" style="margin-top:8px">
-        <span class="muted">try:</span>
-        <button class="ex" data-r="analyst" data-f="dx_code">analyst reads dx_code</button>
-        <button class="ex" data-r="analyst" data-f="member_name" data-reid="1">analyst re-identifies name (deny)</button>
-        <button class="ex" data-r="care_coordinator" data-f="member_name" data-reid="1" data-p="treatment">care_coordinator re-identifies (treatment)</button>
-        <button class="ex" data-r="care_coordinator" data-f="member_name" data-reid="1">care_coordinator, no purpose (deny)</button>
+      <div class="row" style="margin-top:14px">
+        <span class="muted">examples:</span>
+        <button class="chip" data-r="analyst" data-f="dx_code">analyst reads dx_code</button>
+        <button class="chip" data-r="analyst" data-f="member_name" data-reid="1">analyst re-identifies name (deny)</button>
+        <button class="chip" data-r="care_coordinator" data-f="member_name" data-reid="1" data-p="treatment">care_coordinator re-identifies (treatment)</button>
+        <button class="chip" data-r="care_coordinator" data-f="member_name" data-reid="1">care_coordinator, no purpose (deny)</button>
       </div>
       <div class="result" id="result"><span class="muted">Request a field to see the policy decision + audit entry.</span></div>
     </div>
   </div>
 
-  <div class="panel">
-    <h2>De-identified surface (what analysts see)</h2>
+  <div class="panel reveal">
+    <h2>De-identified surface <span class="muted" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">what analysts see</span></h2>
     <div class="body" style="padding:0;overflow-x:auto"><table id="records"></table></div>
   </div>
 
-  <div class="panel">
-    <h2>De-identified provider outcome score (no PHI)</h2>
-    <div class="body" style="padding:0"><table id="scores"></table></div>
+  <div class="panel reveal">
+    <h2>Provider outcome score <span class="muted" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">no PHI</span></h2>
+    <div class="body" style="padding:0;overflow-x:auto"><table id="scores"></table></div>
   </div>
 
-  <div class="panel full">
+  <div class="panel full reveal">
     <h2>Tamper-evident access audit</h2>
-    <div class="body" style="padding:0;max-height:260px;overflow:auto"><table id="audit"></table></div>
-    <div class="verifyline">
-      <button id="verify">Verify chain</button>
-      <button id="tamper" class="ex">Tamper #0 (demo)</button>
-      <span id="vres" class="muted">—</span>
+    <div class="body" style="padding:0;max-height:300px;overflow:auto"><table id="audit"></table></div>
+    <div class="verifybar">
+      <button class="btn" id="verify">Verify chain</button>
+      <button class="chip" id="tamper">Tamper #0 (demo)</button>
+      <span id="vres" class="muted" style="margin-left:auto">—</span>
     </div>
   </div>
 </main>
-<script>
-const $=s=>document.querySelector(s);
-const isTok=v=>typeof v==="string"&&v.startsWith("tok_");
-async function j(u,o){return (await fetch(u,o)).json();}
-const FIELDS=["member_id","member_name","dob","zip","service_date","provider_id","dx_code","procedure_code","outcome","allowed_amount"];
 
-async function init(){
-  const roles=await j("roles");
-  $("#role").innerHTML=roles.map(r=>`<option>${r.role}</option>`).join("");
-  $("#field").innerHTML=FIELDS.map(f=>`<option>${f}</option>`).join("");
-  const recs=(await j("records")).records;
-  $("#record").innerHTML=recs.map(r=>`<option>${r.record_id}</option>`).join("");
-  renderRecords(recs.slice(0,8));
-  renderScores((await j("scores")).providers);
-  refreshAudit();
+<!-- settings drawer -->
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-hidden="true">
+  <header><div class="brand" style="font-size:15px"><span class="logo" style="width:24px;height:24px"></span> Settings</div>
+    <span class="spacer"></span><button class="iconbtn" id="closedrawer" aria-label="Close">✕</button></header>
+  <div class="body">
+    <div class="field">
+      <label>Default role <span class="hint">prefills the console</span></label>
+      <select id="cfgRole">
+        <option value="analyst">analyst</option>
+        <option value="care_coordinator">care_coordinator</option>
+        <option value="auditor">auditor</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Default purpose <span class="hint">prefills the console</span></label>
+      <select id="cfgPurpose">
+        <option value="">—</option>
+        <option value="treatment">treatment</option>
+        <option value="care_coordination">care_coordination</option>
+        <option value="analytics">analytics</option>
+      </select>
+    </div>
+    <div class="muted" style="font-size:11.5px">Policy is enforced server-side: roles get least-privilege field access, and
+      re-identifying a direct identifier requires an appropriate purpose. Every read is appended to the tamper-evident audit chain.</div>
+  </div>
+  <div class="foot">
+    <button class="btn" id="resetcfg">Reset</button>
+    <button class="btn primary" id="savecfg" style="flex:1"><span class="lbl">Save</span></button>
+  </div>
+</aside>
+
+<div id="toasts"></div>
+
+<script>
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const j=async(u,o)=>(await fetch(u,o)).json();
+const isTok=v=>typeof v==="string"&&v.startsWith("tok_");
+const CFG_KEY="fieldvault.cfg";
+const FIELDS=["member_id","member_name","dob","zip","service_date","provider_id","dx_code","procedure_code","outcome","allowed_amount"];
+let cfg={role:"analyst",purpose:""};
+
+function toast(msg,type="info"){
+  const t=document.createElement("div");t.className=`toast ${type}`;
+  t.innerHTML=`<span class="tdot"></span>${msg}`;$("#toasts").appendChild(t);
+  setTimeout(()=>{t.style.opacity="0";t.style.transition="opacity .3s";setTimeout(()=>t.remove(),300)},2600);
+}
+function loadCfg(){try{cfg={...cfg,...JSON.parse(localStorage.getItem(CFG_KEY)||"{}")}}catch{}}
+function applyCfgToForm(){
+  if($("#cfgRole").querySelector(`option[value="${cfg.role}"]`))$("#cfgRole").value=cfg.role;
+  $("#cfgPurpose").value=cfg.purpose;
+}
+function applyCfgToConsole(){
+  if($("#role").querySelector(`option[value="${cfg.role}"]`))$("#role").value=cfg.role;
+  $("#purpose").value=cfg.purpose;
+}
+function openDrawer(){applyCfgToForm();$("#scrim").classList.add("open");$("#drawer").classList.add("open");$("#drawer").setAttribute("aria-hidden","false")}
+function closeDrawer(){$("#scrim").classList.remove("open");$("#drawer").classList.remove("open");$("#drawer").setAttribute("aria-hidden","true")}
+$("#gear").onclick=openDrawer;$("#closedrawer").onclick=closeDrawer;$("#scrim").onclick=closeDrawer;
+$("#savecfg").onclick=()=>{cfg={role:$("#cfgRole").value,purpose:$("#cfgPurpose").value};
+  localStorage.setItem(CFG_KEY,JSON.stringify(cfg));applyCfgToConsole();closeDrawer();toast("Settings saved","ok")};
+$("#resetcfg").onclick=()=>{cfg={role:"analyst",purpose:""};localStorage.removeItem(CFG_KEY);applyCfgToForm();applyCfgToConsole();toast("Reset to defaults","info")};
+
+function cell(v){
+  if(isTok(v))return `<span class="tok">${v}</span>`;
+  if(typeof v==="string"&&/^(\d{3}\*\*|[A-Z]\d{2}(\.|$)|\d{4}-\d{2}$)/.test(v))return `<span class="gen">${v}</span>`;
+  return v;
 }
 function renderRecords(recs){
   const cols=["record_id","member_name","dob","zip","provider_id","dx_code","outcome","allowed_amount"];
   $("#records").innerHTML=`<thead><tr>${cols.map(c=>`<th>${c}</th>`).join("")}</tr></thead><tbody>`+
-    recs.map(r=>`<tr>${cols.map(c=>`<td class="${isTok(r[c])?'tok':''}">${isTok(r[c])?'<code>'+r[c]+'</code>':r[c]}</td>`).join("")}</tr>`).join("")+`</tbody>`;
+    recs.map(r=>`<tr>${cols.map(c=>`<td>${cell(r[c])}</td>`).join("")}</tr>`).join("")+`</tbody>`;
 }
 function renderScores(ps){
   $("#scores").innerHTML=`<thead><tr><th>#</th><th>provider</th><th>claims</th><th>outcome</th><th>adverse</th><th>avg $</th></tr></thead><tbody>`+
     ps.map(p=>`<tr><td>${p.rank}</td><td><code>${p.provider_id}</code></td><td>${p.claims}</td>
-      <td><span class="scorebar"><i style="width:${p.outcome_score*100}%"></i></span> ${p.outcome_score}</td>
+      <td><span class="scorebar"><i style="width:${p.outcome_score*100}%"></i></span>${p.outcome_score}</td>
       <td>${p.adverse_rate}</td><td>$${p.avg_allowed_amount}</td></tr>`).join("")+`</tbody>`;
 }
+let prevLen=0;
 async function refreshAudit(){
   const a=await j("audit");
   $("#audit").innerHTML=`<thead><tr><th>#</th><th>role</th><th>record</th><th>field</th><th>class</th><th>action</th><th>purpose</th><th>decision</th></tr></thead><tbody>`+
-    a.entries.slice(-14).reverse().map(e=>`<tr><td>${e.seq}</td><td>${e.role}</td><td>${e.record_id}</td>
-      <td>${e.field}</td><td>${e.field_class}</td><td>${e.action}</td><td>${e.purpose||'—'}</td>
-      <td><span class="badge ${e.allowed?'b-ok':'b-deny'}">${e.allowed?'allow':'deny'}</span></td></tr>`).join("")
-      +`</tbody>`||"";
+    (a.entries.slice(-14).reverse().map((e,i)=>{
+      const fresh=(a.entries.length>prevLen && i===0)?"fresh":"";
+      return `<tr class="${fresh}"><td>${e.seq}</td><td>${e.role}</td><td class="mono">${e.record_id}</td>
+        <td class="mono">${e.field}</td><td>${e.field_class}</td><td>${e.action}</td><td>${e.purpose||'—'}</td>
+        <td><span class="badge ${e.allowed?'b-allow':'b-block'}">${e.allowed?'allow':'deny'}</span></td></tr>`;
+    }).join("")||`<tr><td colspan="8" class="muted" style="padding:16px">No access requests yet.</td></tr>`)+`</tbody>`;
+  prevLen=a.entries.length;
 }
 async function request(){
+  const btn=$("#go");btn.classList.add("loading");
   const body={role:$("#role").value,record_id:$("#record").value,field:$("#field").value,
     purpose:$("#purpose").value||null,reidentify:$("#reid").checked};
-  const r=await j("access",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
-  const badge=r.allowed?'<span class="badge b-ok">ALLOWED</span>':'<span class="badge b-deny">DENIED</span>';
-  const val=r.allowed?`<div style="margin-top:6px">value: <code>${r.value}</code> ${isTok(r.value)?'<span class="muted">(de-identified token)</span>':''}</div>`:'';
-  $("#result").innerHTML=`${badge} <b>${body.role}</b> · ${body.action||(body.reidentify?'reidentify':'read_deid')} · <code>${body.field}</code><div class="muted" style="margin-top:4px">${r.reason}</div>${val}<div class="muted" style="margin-top:4px">audit #${r.audit_seq}</div>`;
-  refreshAudit();
+  try{
+    const r=await j("access",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
+    const allowed=r.allowed;
+    const action=r.action||(body.reidentify?'reidentify':'read_deid');
+    let recovered='';
+    if(allowed){
+      const tok=isTok(r.value);
+      recovered=body.reidentify
+        ? `<div class="recovered">re-identified value <b>${r.value}</b> <span class="badge b-info">recovered from vault</span></div>`
+        : `<div class="recovered">value <b>${r.value}</b> ${tok?'<span class="badge b-info">de-identified token</span>':''}</div>`;
+    }
+    $("#result").className=`result ${allowed?'allow':'deny'}`;
+    $("#result").innerHTML=
+      `<div class="head"><span class="badge ${allowed?'b-allow':'b-block'}">${allowed?'ALLOW':'DENIED'}</span>
+        <b>${body.role}</b> · ${action} · <code>${body.field}</code>
+        <span class="muted" style="margin-left:auto">audit #${r.audit_seq}</span></div>
+       <div class="reason">${r.reason||''}</div>${recovered}`;
+    toast(allowed?`${action} allowed`:`${action} denied`, allowed?"ok":"bad");
+    refreshAudit();
+  }catch(e){
+    $("#result").className="result deny";
+    $("#result").innerHTML=`<div class="head"><span class="badge b-block">ERROR</span> request failed</div>`;
+    toast("Request failed","bad");
+  }
+  btn.classList.remove("loading");
 }
 $("#go").onclick=request;
-document.querySelectorAll(".ex[data-r]").forEach(b=>b.onclick=()=>{
+$$(".chip[data-r]").forEach(b=>b.onclick=()=>{
   $("#role").value=b.dataset.r; $("#field").value=b.dataset.f;
   $("#reid").checked=b.dataset.reid==="1"; $("#purpose").value=b.dataset.p||"";
   request();
 });
 $("#verify").onclick=async()=>{const v=await j("audit/verify");
-  $("#vres").innerHTML=v.ok?`<span class="badge b-ok">chain verified</span> ${v.length} entries`:`<span class="badge b-deny">broken at #${v.broken_at}</span> ${v.reason}`;};
+  if(v.ok){$("#vres").innerHTML=`<span class="badge b-allow">chain verified</span> ${v.length} entries`;toast("Audit chain verified","ok")}
+  else{$("#vres").innerHTML=`<span class="badge b-block">broken at #${v.broken_at}</span> ${v.reason}`;toast("Chain broken: "+v.reason,"bad")}};
 $("#tamper").onclick=async()=>{await j("audit/_demo_tamper?seq=0",{method:"POST"});const v=await j("audit/verify");
-  $("#vres").innerHTML=v.ok?`<span class="badge b-ok">verified</span>`:`<span class="badge b-deny">tamper detected at #${v.broken_at}</span> ${v.reason}`;};
-init();
+  if(v.ok){$("#vres").innerHTML=`<span class="badge b-allow">verified</span>`;toast("No change","info")}
+  else{$("#vres").innerHTML=`<span class="badge b-block">tamper detected at #${v.broken_at}</span> ${v.reason}`;toast("Tamper detected — chain integrity broken","bad")}};
+
+async function boot(){
+  loadCfg();
+  // cold-start: poll health until ready, then reveal
+  let ready=false;
+  for(let i=0;i<60 && !ready;i++){
+    try{const r=await fetch("health");if(r.ok){ready=true;break}}catch{}
+    if(i===4)$("#bootmsg").textContent="Still waking up…";
+    await new Promise(r=>setTimeout(r,1500));
+  }
+  $("#hdot").className="dot ok";$("#hstat").textContent="live";
+  $("#boot").classList.add("hide");setTimeout(()=>$("#boot").remove(),600);
+  $$(".reveal").forEach((el,i)=>setTimeout(()=>el.classList.add("in"),90*i));
+  // populate
+  try{
+    const roles=await j("roles");
+    $("#role").innerHTML=roles.map(r=>`<option>${r.role}</option>`).join("");
+    $("#field").innerHTML=FIELDS.map(f=>`<option>${f}</option>`).join("");
+    const recs=(await j("records")).records;
+    $("#record").innerHTML=recs.map(r=>`<option>${r.record_id}</option>`).join("");
+    $("#recpill").textContent=`records · ${recs.length}`;
+    renderRecords(recs.slice(0,8));
+    applyCfgToConsole();
+  }catch{}
+  try{renderScores((await j("scores")).providers);}catch{}
+  await refreshAudit();
+  // run the care_coordinator + treatment re-identify example so the panel is populated
+  try{
+    $("#role").value="care_coordinator";$("#field").value="member_name";
+    $("#reid").checked=true;$("#purpose").value="treatment";
+    await request();
+    applyCfgToConsole();
+  }catch{}
+}
+boot();
 </script>
 </body>
 </html>

@@ -5,111 +5,397 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>txn-ledger — contributions data service</title>
 <style>
-  :root{--bg:#0f1419;--panel:#171d26;--panel2:#1d2530;--line:#2a3441;--ink:#e7edf3;--dim:#9aa7b4;
-    --accent:#5b9dff;--ok:#3fb56b;--bad:#ef5b6b;--warn:#e0a64a}
+  /* ============================ design system ============================ */
+  :root{
+    --bg:#0a0d14; --bg-grad-1:#0e1322; --bg-grad-2:#0a0d14;
+    --surface:#131826; --surface-2:#1a2032; --surface-3:#212a40;
+    --line:#263149; --line-2:#33405d;
+    --ink:#e9eef7; --ink-dim:#97a3ba; --ink-faint:#67728a;
+    --accent:#6aa1ff; --accent-2:#9b86ff; --accent-ink:#06101f;
+    --ok:#43c98a; --warn:#e6ad52; --bad:#f15b6c; --info:#6aa1ff; --violet:#9b86ff;
+    --r:15px; --r-sm:10px; --r-xs:7px;
+    --sh:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.5);
+    --sh-lg:0 1px 2px rgba(0,0,0,.4), 0 24px 64px -24px rgba(0,0,0,.7);
+    --grad:linear-gradient(135deg,var(--accent),var(--accent-2));
+    --ease:cubic-bezier(.22,.61,.36,1);
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+  }
   *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 ui-sans-serif,system-ui,Segoe UI,Roboto,sans-serif}
-  header{padding:18px 26px;border-bottom:1px solid var(--line);display:flex;gap:14px;align-items:baseline;flex-wrap:wrap}
-  header h1{margin:0;font-size:19px} header .tag{color:var(--dim);font-size:13px}
-  main{max-width:1100px;margin:0 auto;padding:20px 26px;display:grid;gap:16px}
-  .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
-  .card .k{color:var(--dim);font-size:11px;text-transform:uppercase} .card .v{font-size:22px;font-weight:700;margin-top:3px}
-  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px}
-  .panel h2{margin:0;padding:12px 16px;font-size:12px;border-bottom:1px solid var(--line);color:var(--dim);text-transform:uppercase;letter-spacing:.6px}
-  .panel .body{padding:14px 16px}
-  .plan{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-  .planbox{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:12px;font-family:ui-monospace,Menlo,monospace;font-size:12px}
-  .planbox .h{color:var(--dim);font-size:11px;text-transform:uppercase;margin-bottom:6px}
-  .scan{color:var(--bad)} .search{color:var(--ok)} .tmp{color:var(--warn)}
-  select,button,input{font:inherit;color:var(--ink);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
-  button{cursor:pointer} button.primary{background:var(--accent);border-color:var(--accent);color:#06101f;font-weight:600}
-  .ctl{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;
+    font:15px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Inter,sans-serif;
+    background-image:radial-gradient(1200px 600px at 80% -10%,rgba(107,130,255,.10),transparent 60%),
+      radial-gradient(900px 500px at 0% 0%,rgba(67,201,138,.05),transparent 55%);
+    background-attachment:fixed;min-height:100vh}
+  ::selection{background:rgba(106,161,255,.3)}
+  a{color:var(--accent);text-decoration:none}
+  /* header */
+  header{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:14px;
+    padding:14px 24px;border-bottom:1px solid var(--line);
+    background:rgba(10,13,20,.72);backdrop-filter:blur(14px) saturate(140%)}
+  .brand{display:flex;align-items:center;gap:11px;font-weight:650;font-size:16px;letter-spacing:.2px}
+  .logo{width:30px;height:30px;border-radius:9px;background:var(--grad);position:relative;
+    box-shadow:0 4px 16px -4px rgba(106,161,255,.6);flex:none}
+  .logo::after{content:"";position:absolute;inset:7px;border-radius:5px;
+    border:2px solid rgba(255,255,255,.85);border-right-color:transparent;
+    animation:spin 3.5s linear infinite}
+  .brand .tag{color:var(--ink-dim);font-size:12.5px;font-weight:400}
+  .spacer{flex:1}
+  .status{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--ink-dim);
+    padding:5px 11px;border:1px solid var(--line);border-radius:999px;background:var(--surface)}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--ink-faint)}
+  .dot.ok{background:var(--ok);box-shadow:0 0 0 0 rgba(67,201,138,.5);animation:pulse 2s infinite}
+  .pill{font-size:12px;color:var(--ink-dim);border:1px solid var(--line);border-radius:999px;
+    padding:5px 12px;background:var(--surface);white-space:nowrap}
+  .iconbtn{width:36px;height:36px;border-radius:10px;border:1px solid var(--line);background:var(--surface);
+    color:var(--ink-dim);cursor:pointer;display:grid;place-items:center;transition:.18s var(--ease)}
+  .iconbtn:hover{color:var(--ink);border-color:var(--line-2);transform:translateY(-1px);background:var(--surface-2)}
+  .iconbtn svg{width:18px;height:18px}
+  /* layout */
+  main{max-width:1160px;margin:0 auto;padding:26px 24px 64px;display:grid;gap:18px;
+    grid-template-columns:1fr 1fr}
+  .full{grid-column:1/-1}
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+    box-shadow:var(--sh);overflow:hidden;transition:.25s var(--ease)}
+  .panel:hover{border-color:var(--line-2)}
+  .panel h2{margin:0;padding:14px 18px;font-size:11.5px;font-weight:600;letter-spacing:.7px;
+    text-transform:uppercase;color:var(--ink-dim);border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:10px}
+  .panel .body{padding:18px}
+  /* cards */
+  .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  .scard{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);padding:15px 16px;
+    transition:.2s var(--ease)}
+  .scard:hover{border-color:var(--line-2);transform:translateY(-2px)}
+  .scard .k{color:var(--ink-faint);font-size:11px;text-transform:uppercase;letter-spacing:.4px}
+  .scard .v{font-size:24px;font-weight:700;margin-top:5px;letter-spacing:-.3px}
+  .scard .v.grad{background:var(--grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+  /* controls */
+  textarea,select,input{font:inherit;color:var(--ink);background:var(--surface-2);
+    border:1px solid var(--line);border-radius:var(--r-sm);padding:11px 13px;transition:.16s var(--ease);width:100%}
+  textarea:focus,select:focus,input:focus{outline:none;border-color:var(--accent);
+    box-shadow:0 0 0 3px rgba(106,161,255,.16)}
+  .btn{font:inherit;font-weight:600;cursor:pointer;border-radius:var(--r-sm);padding:11px 17px;
+    border:1px solid var(--line);background:var(--surface-2);color:var(--ink);
+    transition:.16s var(--ease);display:inline-flex;align-items:center;gap:8px;position:relative}
+  .btn:hover{transform:translateY(-1px);border-color:var(--line-2)}
+  .btn:active{transform:translateY(0)}
+  .btn.primary{background:var(--grad);border:none;color:#06101f;
+    box-shadow:0 6px 20px -8px rgba(106,161,255,.7)}
+  .btn.primary:hover{box-shadow:0 10px 28px -8px rgba(106,161,255,.8)}
+  .btn[disabled]{opacity:.6;pointer-events:none}
+  .btn .spin{width:14px;height:14px;border:2px solid rgba(6,16,31,.35);border-top-color:#06101f;
+    border-radius:50%;animation:spin .7s linear infinite;display:none}
+  .btn.loading .spin{display:block}.btn.loading .lbl{opacity:.7}
+  .chip{font:inherit;font-size:12px;cursor:pointer;border:1px dashed var(--line);background:transparent;
+    color:var(--ink-dim);border-radius:999px;padding:5px 12px;transition:.16s var(--ease)}
+  .chip:hover{color:var(--ink);border-color:var(--accent);border-style:solid;
+    background:rgba(106,161,255,.08)}
+  .row{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+  .ctl{display:flex;gap:11px;flex-wrap:wrap;align-items:center}
+  .ctl label{font-size:12px;color:var(--ink-dim);font-weight:600}
+  .ctl select,.ctl input{width:auto}
+  .badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:700;
+    text-transform:uppercase;letter-spacing:.3px}
+  .b-allow{background:rgba(67,201,138,.16);color:var(--ok)}
+  .b-flag{background:rgba(230,173,82,.16);color:var(--warn)}
+  .b-block{background:rgba(241,91,108,.18);color:var(--bad)}
+  .b-info{background:rgba(106,161,255,.15);color:var(--info)}
+  .mono{font-family:var(--mono);font-size:12px}
+  .muted{color:var(--ink-dim);font-size:12.5px}
+  code{background:var(--surface-2);padding:1px 6px;border-radius:6px;font-family:var(--mono);font-size:12px}
+  /* query plan diff — the showpiece */
+  .plan{display:grid;grid-template-columns:1fr auto 1fr;gap:14px;align-items:stretch}
+  .planbox{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);
+    padding:13px 14px;font-family:var(--mono);font-size:12px;line-height:1.7;position:relative;overflow:hidden}
+  .planbox.before{border-color:rgba(241,91,108,.32);background:linear-gradient(180deg,rgba(241,91,108,.06),transparent 60%)}
+  .planbox.after{border-color:rgba(67,201,138,.34);background:linear-gradient(180deg,rgba(67,201,138,.07),transparent 60%)}
+  .planbox .h{font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:9px;
+    display:flex;align-items:center;gap:8px;font-weight:700}
+  .planbox.before .h{color:var(--bad)} .planbox.after .h{color:var(--ok)}
+  .planbox .h .tag{font-family:ui-sans-serif,system-ui,sans-serif;font-weight:600;font-size:10px;
+    padding:2px 8px;border-radius:999px;letter-spacing:.3px;text-transform:none}
+  .planbox.before .h .tag{background:rgba(241,91,108,.16);color:var(--bad)}
+  .planbox.after .h .tag{background:rgba(67,201,138,.16);color:var(--ok)}
+  .scan{color:var(--bad)} .search{color:var(--ok);font-weight:600} .tmp{color:var(--warn)}
+  .planarrow{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+    color:var(--ink-faint);min-width:74px}
+  .planarrow .glyph{font-size:24px;color:var(--accent);line-height:1}
+  .planarrow .call{font-size:10.5px;font-weight:700;letter-spacing:.3px;text-align:center;
+    color:var(--ok);background:rgba(67,201,138,.12);border:1px solid rgba(67,201,138,.3);
+    border-radius:999px;padding:4px 9px;white-space:nowrap}
+  /* table */
   table{width:100%;border-collapse:collapse;font-size:12.5px}
-  th,td{text-align:left;padding:7px 12px;border-bottom:1px solid var(--line)}
-  th{color:var(--dim);font-size:11px} td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
-  .pill{font-size:11px;color:var(--dim);background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:2px 9px}
-  .muted{color:var(--dim);font-size:12px} code{background:var(--panel2);padding:1px 5px;border-radius:5px;font-size:12px}
+  th,td{text-align:left;padding:9px 14px;border-bottom:1px solid var(--line)}
+  th{color:var(--ink-faint);font-size:11px;font-weight:600;letter-spacing:.4px;text-transform:uppercase}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+  tbody tr{transition:.14s var(--ease)}tbody tr:hover{background:var(--surface-2)}
+  tbody tr.fresh{animation:rowIn .5s var(--ease) both}
+  /* surge result */
+  .surgeres{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);
+    padding:13px 15px;margin-top:14px;font-family:var(--mono);font-size:13px;display:flex;gap:18px;
+    flex-wrap:wrap;align-items:center}
+  .surgeres .m{display:flex;flex-direction:column;gap:2px}
+  .surgeres .m .ml{font-size:10px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.4px;
+    font-family:ui-sans-serif,system-ui,sans-serif}
+  .surgeres .m .mv{font-size:16px;font-weight:700;color:var(--ink)}
+  .surgeres .m .mv b{background:var(--grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+  /* reveal on load */
+  .reveal{opacity:0;transform:translateY(14px)}
+  .reveal.in{opacity:1;transform:none;transition:.55s var(--ease)}
+  /* settings drawer */
+  .scrim{position:fixed;inset:0;background:rgba(5,8,14,.55);backdrop-filter:blur(2px);z-index:50;
+    opacity:0;pointer-events:none;transition:.25s var(--ease)}
+  .scrim.open{opacity:1;pointer-events:auto}
+  .drawer{position:fixed;top:0;right:0;height:100%;width:380px;max-width:92vw;z-index:60;
+    background:var(--surface);border-left:1px solid var(--line);box-shadow:var(--sh-lg);
+    transform:translateX(100%);transition:transform .3s var(--ease);display:flex;flex-direction:column}
+  .drawer.open{transform:none}
+  .drawer header{position:static;background:none;backdrop-filter:none;border-bottom:1px solid var(--line)}
+  .drawer h3{margin:0;font-size:15px;font-weight:650}
+  .drawer .body{padding:20px;overflow:auto;display:grid;gap:18px}
+  .field{display:grid;gap:7px}
+  .field label{font-size:12px;color:var(--ink-dim);font-weight:600;display:flex;justify-content:space-between}
+  .field .hint{font-size:11.5px;color:var(--ink-faint);font-weight:400}
+  .seg{display:flex;gap:6px;flex-wrap:wrap}
+  .drawer .foot{margin-top:auto;padding:16px 20px;border-top:1px solid var(--line);display:flex;gap:10px}
+  /* toast */
+  #toasts{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:80;
+    display:flex;flex-direction:column;gap:10px;align-items:center}
+  .toast{background:var(--surface-3);border:1px solid var(--line-2);border-radius:11px;padding:11px 16px;
+    box-shadow:var(--sh-lg);font-size:13px;display:flex;align-items:center;gap:10px;
+    animation:toastIn .3s var(--ease)}
+  .toast .tdot{width:8px;height:8px;border-radius:50%}
+  .toast.ok .tdot{background:var(--ok)}.toast.bad .tdot{background:var(--bad)}.toast.info .tdot{background:var(--info)}
+  /* cold-start overlay */
+  #boot{position:fixed;inset:0;z-index:90;background:var(--bg);display:grid;place-items:center;
+    transition:opacity .5s var(--ease)}
+  #boot.hide{opacity:0;pointer-events:none}
+  .boot-card{text-align:center;display:grid;gap:18px;justify-items:center}
+  .boot-card .logo{width:54px;height:54px}
+  .boot-card .ring{width:38px;height:38px;border:3px solid var(--line);border-top-color:var(--accent);
+    border-radius:50%;animation:spin .8s linear infinite}
+  .boot-card .msg{color:var(--ink-dim);font-size:13.5px}
+  .boot-card .sub{color:var(--ink-faint);font-size:12px;max-width:280px}
+  /* keyframes */
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(67,201,138,.5)}70%{box-shadow:0 0 0 6px rgba(67,201,138,0)}100%{box-shadow:0 0 0 0 rgba(67,201,138,0)}}
+  @keyframes rowIn{from{background:rgba(106,161,255,.14)}to{background:transparent}}
+  @keyframes toastIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  @media(max-width:860px){main{grid-template-columns:1fr}.cards{grid-template-columns:repeat(2,1fr)}
+    .plan{grid-template-columns:1fr}.planarrow{flex-direction:row;min-width:0}}
+  @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 </style>
 </head>
 <body>
-<header>
-  <h1>txn-ledger</h1>
-  <span class="tag">high-volume contributions · partitioned by cycle · query-plan tuning · FEC rollups</span>
-</header>
-<main>
-  <div class="cards" id="cards"></div>
+<div id="boot"><div class="boot-card">
+  <div class="logo"></div><div class="ring"></div>
+  <div><div class="msg" id="bootmsg">Waking the demo…</div>
+  <div class="sub">Free-tier instances sleep when idle — first load takes ~30–60s.</div></div>
+</div></div>
 
-  <div class="panel"><h2>Query plan — the aggregation hot path, before vs. after the index</h2>
+<header>
+  <div class="brand"><span class="logo"></span> txn-ledger
+    <span class="tag">high-volume contributions · query-plan tuning</span></div>
+  <span class="spacer"></span>
+  <span class="status"><span class="dot" id="hdot"></span><span id="hstat">connecting…</span></span>
+  <span class="pill" id="rowpill">loading rows …</span>
+  <button class="iconbtn" id="gear" title="Settings" aria-label="Settings">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+  </button>
+</header>
+
+<main>
+  <div class="panel full reveal">
+    <h2>Dataset</h2>
+    <div class="body"><div class="cards" id="cards"></div></div>
+  </div>
+
+  <div class="panel full reveal">
+    <h2>Query plan — the aggregation hot path, before vs. after the index</h2>
     <div class="body">
-      <div class="muted" style="margin-bottom:8px"><code id="q"></code></div>
+      <div class="muted" style="margin-bottom:12px"><code id="q"></code></div>
       <div class="plan">
-        <div class="planbox"><div class="h">before index — full scan</div><div id="pb"></div></div>
-        <div class="planbox"><div class="h">after index — covering search</div><div id="pa"></div></div>
+        <div class="planbox before"><div class="h"><span class="tag">full scan</span></div><div id="pb"></div></div>
+        <div class="planarrow"><div class="glyph">→</div><div class="call">→ index search</div></div>
+        <div class="planbox after"><div class="h"><span class="tag">covering-index search</span></div><div id="pa"></div></div>
       </div>
     </div>
   </div>
 
-  <div class="panel"><h2>FEC-style rollup by committee</h2>
+  <div class="panel reveal">
+    <h2>FEC-style rollup by committee</h2>
     <div class="body">
-      <div class="ctl">
-        cycle <select id="cycle"></select>
-        <button class="primary" id="agg">Aggregate →</button>
-        <span class="pill" id="elapsed"></span>
+      <div class="ctl" style="margin-bottom:14px">
+        <label for="cycle">cycle</label><select id="cycle"></select>
+        <button class="btn primary" id="agg"><span class="lbl">Aggregate →</span></button>
+        <span class="spacer"></span>
+        <span class="pill" id="elapsed">—</span>
       </div>
       <table id="rollup"></table>
     </div>
   </div>
 
-  <div class="panel"><h2>End-of-quarter surge — latency under a read burst</h2>
+  <div class="panel reveal">
+    <h2>End-of-quarter surge — latency under a read burst</h2>
     <div class="body">
       <div class="ctl">
-        queries <input id="n" type="number" value="1000" min="1" max="20000" style="width:100px">
-        <button id="surge">Run surge</button>
-        <span id="surgeres" class="muted">—</span>
+        <label for="n">queries</label>
+        <input id="n" type="number" value="1000" min="1" max="20000" style="width:110px">
+        <button class="btn primary" id="surge"><span class="spin"></span><span class="lbl">Run surge</span></button>
       </div>
+      <div id="surgewrap"><div class="muted" style="margin-top:14px">Fire a burst of aggregation queries to see throughput and tail latency.</div></div>
     </div>
   </div>
 </main>
+
+<!-- settings drawer -->
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-hidden="true">
+  <header><div class="brand" style="font-size:15px"><span class="logo" style="width:24px;height:24px"></span> Settings</div>
+    <span class="spacer"></span><button class="iconbtn" id="closedrawer" aria-label="Close">✕</button></header>
+  <div class="body">
+    <div class="field">
+      <label>Default surge size <span class="hint">prefills the surge input</span></label>
+      <input id="cfgSurge" type="number" min="1" max="20000" placeholder="1000">
+    </div>
+    <div class="field">
+      <label>Default cycle <span class="hint">selected on load</span></label>
+      <select id="cfgCycle"></select>
+    </div>
+    <div class="field">
+      <label>Dataset row count <span class="hint">read-only</span></label>
+      <input id="cfgRows" disabled>
+      <div class="muted" style="font-size:11.5px">Set at build time via the <code>TXN_LEDGER_ROWS</code> env on the deployment.</div>
+    </div>
+  </div>
+  <div class="foot">
+    <button class="btn" id="resetcfg">Reset</button>
+    <button class="btn primary" id="savecfg" style="flex:1"><span class="lbl">Save</span></button>
+  </div>
+</aside>
+
+<div id="toasts"></div>
+
 <script>
-const $=s=>document.querySelector(s);
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const j=async(u,o)=>(await fetch(u,o)).json();
 const money=n=>"$"+Math.round(n).toLocaleString();
-async function j(u,o){return (await fetch(u,o)).json();}
-function colorPlan(lines){return lines.map(l=>{
+const num=n=>Number(n).toLocaleString();
+const CFG_KEY="txnledger.cfg";
+let cfg={surge:1000,cycle:2026};
+let CYCLES=[];
+
+function toast(msg,type="info"){
+  const t=document.createElement("div");t.className=`toast ${type}`;
+  t.innerHTML=`<span class="tdot"></span>${msg}`;$("#toasts").appendChild(t);
+  setTimeout(()=>{t.style.opacity="0";t.style.transition="opacity .3s";setTimeout(()=>t.remove(),300)},2600);
+}
+function loadCfg(){try{cfg={...cfg,...JSON.parse(localStorage.getItem(CFG_KEY)||"{}")}}catch{}}
+function applyCfgToForm(){
+  $("#cfgSurge").value=cfg.surge;
+  if($("#cfgCycle").querySelector(`option[value="${cfg.cycle}"]`))$("#cfgCycle").value=cfg.cycle;
+}
+function openDrawer(){applyCfgToForm();$("#scrim").classList.add("open");$("#drawer").classList.add("open");$("#drawer").setAttribute("aria-hidden","false")}
+function closeDrawer(){$("#scrim").classList.remove("open");$("#drawer").classList.remove("open");$("#drawer").setAttribute("aria-hidden","true")}
+$("#gear").onclick=openDrawer;$("#closedrawer").onclick=closeDrawer;$("#scrim").onclick=closeDrawer;
+$("#savecfg").onclick=()=>{
+  cfg={surge:Math.max(1,Math.min(20000,+$("#cfgSurge").value||1000)),cycle:+$("#cfgCycle").value};
+  localStorage.setItem(CFG_KEY,JSON.stringify(cfg));
+  $("#n").value=cfg.surge;
+  if($("#cycle").querySelector(`option[value="${cfg.cycle}"]`))$("#cycle").value=cfg.cycle;
+  closeDrawer();toast("Settings saved","ok");
+};
+$("#resetcfg").onclick=()=>{cfg={surge:1000,cycle:CYCLES[CYCLES.length-1]||2026};localStorage.removeItem(CFG_KEY);applyCfgToForm();toast("Reset to defaults","info")};
+
+function colorPlan(lines){return (lines||[]).map(l=>{
   let cls=l.includes("SCAN")?"scan":l.includes("SEARCH")?"search":l.includes("TEMP")?"tmp":"";
-  return `<div class="${cls}">${l}</div>`;}).join("");}
+  return `<div class="${cls}">${l.replace(/</g,"&lt;")}</div>`;}).join("");}
+
+async function boot(){
+  loadCfg();
+  // cold-start: poll health until ready, then reveal
+  let ready=false;
+  for(let i=0;i<60 && !ready;i++){
+    try{const r=await fetch("health");if(r.ok){ready=true;break}}catch{}
+    if(i===4)$("#bootmsg").textContent="Still waking up…";
+    await new Promise(r=>setTimeout(r,1500));
+  }
+  $("#hdot").className="dot ok";$("#hstat").textContent="live";
+  $("#boot").classList.add("hide");setTimeout(()=>$("#boot").remove(),600);
+  $$(".reveal").forEach((el,i)=>setTimeout(()=>el.classList.add("in"),90*i));
+  await init();
+}
 
 async function init(){
+  // summary cards + header pill
   const s=await j("summary");
   $("#cards").innerHTML=`
-    <div class="card"><div class="k">Contributions</div><div class="v">${s.rows.toLocaleString()}</div></div>
-    <div class="card"><div class="k">Total raised</div><div class="v">${money(s.total_raised)}</div></div>
-    <div class="card"><div class="k">Distinct donors</div><div class="v">${s.distinct_donors.toLocaleString()}</div></div>
-    <div class="card"><div class="k">Load time</div><div class="v">${s.load_ms} ms</div></div>`;
+    <div class="scard"><div class="k">Contributions</div><div class="v">${num(s.rows)}</div></div>
+    <div class="scard"><div class="k">Total raised</div><div class="v grad">${money(s.total_raised)}</div></div>
+    <div class="scard"><div class="k">Distinct donors</div><div class="v">${num(s.distinct_donors)}</div></div>
+    <div class="scard"><div class="k">Load time</div><div class="v">${s.load_ms} ms</div></div>`;
+  $("#rowpill").textContent=`${num(s.rows)} rows`;
+  $("#cfgRows").value=`${num(s.rows)} rows`;
+
+  // query plan diff
   const p=await j("plan");
   $("#q").textContent=p.query;
   $("#pb").innerHTML=colorPlan(p.plan_before_index);
   $("#pa").innerHTML=colorPlan(p.plan_after_index);
-  const cs=(await j("cycles")).cycles;
-  $("#cycle").innerHTML=cs.map(c=>`<option ${c===2026?'selected':''}>${c}</option>`).join("");
-  agg();
+
+  // cycles → selects
+  CYCLES=(await j("cycles")).cycles;
+  const latest=CYCLES[CYCLES.length-1];
+  if(!localStorage.getItem(CFG_KEY))cfg.cycle=latest;
+  const optsFor=sel=>CYCLES.map(c=>`<option value="${c}" ${c===sel?'selected':''}>${c}</option>`).join("");
+  $("#cycle").innerHTML=optsFor(cfg.cycle);
+  $("#cfgCycle").innerHTML=optsFor(cfg.cycle);
+
+  // prefill surge from settings
+  $("#n").value=cfg.surge;
+
+  // auto-aggregate the configured (latest) cycle so the page is populated
+  await agg();
 }
+
 async function agg(){
   const a=await j("aggregate?cycle="+$("#cycle").value);
-  $("#elapsed").textContent=`${a.rows.length} committees in ${a.elapsed_ms} ms`;
-  $("#rollup").innerHTML=`<thead><tr><th>committee</th><th class="num">raised</th><th class="num">contribs</th><th class="num">donors</th><th class="num">itemized</th><th class="num">unitemized</th></tr></thead><tbody>`+
-    a.rows.map(r=>`<tr><td><b>${r.name}</b> <span class="muted">${r.committee_id}</span></td>
-      <td class="num">${money(r.total_raised)}</td><td class="num">${r.contributions.toLocaleString()}</td>
-      <td class="num">${r.donors.toLocaleString()}</td><td class="num">${money(r.itemized)}</td>
-      <td class="num">${money(r.unitemized)}</td></tr>`).join("")+`</tbody>`;
+  $("#elapsed").textContent=`${a.rows.length} committees · ${a.elapsed_ms} ms`;
+  const rows=[...a.rows].sort((x,y)=>y.total_raised-x.total_raised);
+  $("#rollup").innerHTML=
+    `<thead><tr><th>committee</th><th class="num">raised</th><th class="num">contribs</th>`+
+    `<th class="num">donors</th><th class="num">itemized</th><th class="num">unitemized</th></tr></thead><tbody>`+
+    rows.map((r,i)=>`<tr class="fresh" style="animation-delay:${i*40}ms">`+
+      `<td><b>${r.name}</b> <span class="muted mono">${r.committee_id}</span></td>`+
+      `<td class="num">${money(r.total_raised)}</td><td class="num">${num(r.contributions)}</td>`+
+      `<td class="num">${num(r.donors)}</td><td class="num">${money(r.itemized)}</td>`+
+      `<td class="num">${money(r.unitemized)}</td></tr>`).join("")+`</tbody>`;
 }
 $("#agg").onclick=agg;
+$("#cycle").onchange=agg;
+
 $("#surge").onclick=async()=>{
-  $("#surgeres").textContent="running…";
-  const r=await j("loadtest",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({n:+$("#n").value})});
-  $("#surgeres").innerHTML=`<b>${r.qps.toLocaleString()}</b> qps · p50 <b>${r.p50_ms}</b>ms · p95 <b>${r.p95_ms}</b>ms · p99 <b>${r.p99_ms}</b>ms · max ${r.max_ms}ms`;
+  const btn=$("#surge");btn.classList.add("loading");
+  $("#surgewrap").innerHTML=`<div class="muted" style="margin-top:14px">Firing the burst…</div>`;
+  try{
+    const r=await j("loadtest",{method:"POST",headers:{"content-type":"application/json"},
+      body:JSON.stringify({n:+$("#n").value})});
+    $("#surgewrap").innerHTML=`<div class="surgeres">`+
+      `<div class="m"><span class="ml">throughput</span><span class="mv"><b>${num(r.qps)}</b> qps</span></div>`+
+      `<div class="m"><span class="ml">p50</span><span class="mv">${r.p50_ms} ms</span></div>`+
+      `<div class="m"><span class="ml">p95</span><span class="mv">${r.p95_ms} ms</span></div>`+
+      `<div class="m"><span class="ml">p99</span><span class="mv">${r.p99_ms} ms</span></div>`+
+      `<div class="m"><span class="ml">max</span><span class="mv">${r.max_ms} ms</span></div></div>`;
+    toast(`Surge done — ${num(r.qps)} qps, p99 ${r.p99_ms} ms`,"ok");
+  }catch(e){
+    $("#surgewrap").innerHTML=`<div class="muted" style="margin-top:14px">Error — try again.</div>`;
+    toast("Surge failed","bad");
+  }
+  btn.classList.remove("loading");
 };
-init();
+
+boot();
 </script>
 </body>
 </html>

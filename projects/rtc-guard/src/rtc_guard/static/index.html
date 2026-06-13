@@ -5,125 +5,395 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>rtc-guard — scoped real-time access tokens</title>
 <style>
-  :root{--bg:#0f1419;--panel:#171d26;--panel2:#1d2530;--line:#2a3441;
-    --ink:#e7edf3;--dim:#9aa7b4;--accent:#5b9dff;--ok:#3fb56b;--bad:#ef5b6b;--warn:#e0a64a}
+  /* ============================ design system ============================ */
+  :root{
+    --bg:#0a0d14; --bg-grad-1:#0e1322; --bg-grad-2:#0a0d14;
+    --surface:#131826; --surface-2:#1a2032; --surface-3:#212a40;
+    --line:#263149; --line-2:#33405d;
+    --ink:#e9eef7; --ink-dim:#97a3ba; --ink-faint:#67728a;
+    --accent:#6aa1ff; --accent-2:#9b86ff; --accent-ink:#06101f;
+    --ok:#43c98a; --warn:#e6ad52; --bad:#f15b6c; --info:#6aa1ff; --violet:#9b86ff;
+    --r:15px; --r-sm:10px; --r-xs:7px;
+    --sh:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.5);
+    --sh-lg:0 1px 2px rgba(0,0,0,.4), 0 24px 64px -24px rgba(0,0,0,.7);
+    --grad:linear-gradient(135deg,var(--accent),var(--accent-2));
+    --ease:cubic-bezier(.22,.61,.36,1);
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+  }
   *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 ui-sans-serif,system-ui,Segoe UI,Roboto,sans-serif}
-  header{padding:18px 26px;border-bottom:1px solid var(--line);display:flex;gap:14px;align-items:baseline;flex-wrap:wrap}
-  header h1{margin:0;font-size:19px} header .tag{color:var(--dim);font-size:13px} header .spacer{flex:1}
-  .evalbadge{font-size:12px;color:var(--dim);border:1px solid var(--line);padding:4px 10px;border-radius:999px}
-  main{max-width:1140px;margin:0 auto;padding:20px 26px;display:grid;gap:16px;grid-template-columns:1fr 1fr}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;
+    font:15px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Inter,sans-serif;
+    background-image:radial-gradient(1200px 600px at 80% -10%,rgba(107,130,255,.10),transparent 60%),
+      radial-gradient(900px 500px at 0% 0%,rgba(67,201,138,.05),transparent 55%);
+    background-attachment:fixed;min-height:100vh}
+  ::selection{background:rgba(106,161,255,.3)}
+  a{color:var(--accent);text-decoration:none}
+  /* header */
+  header{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:14px;
+    padding:14px 24px;border-bottom:1px solid var(--line);
+    background:rgba(10,13,20,.72);backdrop-filter:blur(14px) saturate(140%)}
+  .brand{display:flex;align-items:center;gap:11px;font-weight:650;font-size:16px;letter-spacing:.2px}
+  .logo{width:30px;height:30px;border-radius:9px;background:var(--grad);position:relative;
+    box-shadow:0 4px 16px -4px rgba(106,161,255,.6);flex:none}
+  .logo::after{content:"";position:absolute;inset:7px;border-radius:5px;
+    border:2px solid rgba(255,255,255,.85);border-right-color:transparent;
+    animation:spin 3.5s linear infinite}
+  .brand .tag{color:var(--ink-dim);font-size:12.5px;font-weight:400}
+  .spacer{flex:1}
+  .status{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--ink-dim);
+    padding:5px 11px;border:1px solid var(--line);border-radius:999px;background:var(--surface)}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--ink-faint)}
+  .dot.ok{background:var(--ok);box-shadow:0 0 0 0 rgba(67,201,138,.5);animation:pulse 2s infinite}
+  .pill{font-size:12px;color:var(--ink-dim);border:1px solid var(--line);border-radius:999px;
+    padding:5px 12px;background:var(--surface);white-space:nowrap}
+  .pill.ok{color:var(--ok);border-color:rgba(67,201,138,.35);background:rgba(67,201,138,.07)}
+  .iconbtn{width:36px;height:36px;border-radius:10px;border:1px solid var(--line);background:var(--surface);
+    color:var(--ink-dim);cursor:pointer;display:grid;place-items:center;transition:.18s var(--ease)}
+  .iconbtn:hover{color:var(--ink);border-color:var(--line-2);transform:translateY(-1px);background:var(--surface-2)}
+  .iconbtn svg{width:18px;height:18px}
+  /* layout */
+  main{max-width:1160px;margin:0 auto;padding:26px 24px 64px;display:grid;gap:18px;
+    grid-template-columns:1fr 1fr}
   .full{grid-column:1/-1}
-  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px}
-  .panel h2{margin:0;padding:12px 16px;font-size:12px;border-bottom:1px solid var(--line);color:var(--dim);text-transform:uppercase;letter-spacing:.6px}
-  .panel .body{padding:14px 16px}
-  select,button,input,textarea{font:inherit;color:var(--ink);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
-  textarea{width:100%;font-family:ui-monospace,Menlo,monospace;font-size:11.5px;min-height:64px;resize:vertical;word-break:break-all}
-  button{cursor:pointer} button.primary{background:var(--accent);border-color:var(--accent);color:#06101f;font-weight:600}
-  .ctl{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
-  .ctl label{color:var(--dim);font-size:12px;display:flex;gap:6px;align-items:center}
-  .ctl input{width:96px}
-  code,.mono{font-family:ui-monospace,Menlo,monospace;font-size:12px}
-  .claims{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px;margin-top:8px;font-size:12px}
-  .grant{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;margin:2px 3px 0 0}
-  .g-on{background:rgba(63,181,107,.16);color:var(--ok)} .g-off{background:rgba(154,167,180,.12);color:var(--dim)}
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+    box-shadow:var(--sh);overflow:hidden;transition:.25s var(--ease)}
+  .panel:hover{border-color:var(--line-2)}
+  .panel h2{margin:0;padding:14px 18px;font-size:11.5px;font-weight:600;letter-spacing:.7px;
+    text-transform:uppercase;color:var(--ink-dim);border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:10px}
+  .panel .body{padding:18px}
+  /* controls */
+  textarea,select,input{font:inherit;color:var(--ink);background:var(--surface-2);
+    border:1px solid var(--line);border-radius:var(--r-sm);padding:11px 13px;transition:.16s var(--ease);width:100%}
+  textarea:focus,select:focus,input:focus{outline:none;border-color:var(--accent);
+    box-shadow:0 0 0 3px rgba(106,161,255,.16)}
+  textarea{min-height:88px;resize:vertical;font-family:var(--mono);font-size:13px;line-height:1.5;word-break:break-all}
+  .btn{font:inherit;font-weight:600;cursor:pointer;border-radius:var(--r-sm);padding:11px 17px;
+    border:1px solid var(--line);background:var(--surface-2);color:var(--ink);
+    transition:.16s var(--ease);display:inline-flex;align-items:center;gap:8px;position:relative}
+  .btn:hover{transform:translateY(-1px);border-color:var(--line-2)}
+  .btn:active{transform:translateY(0)}
+  .btn.primary{background:var(--grad);border:none;color:#06101f;
+    box-shadow:0 6px 20px -8px rgba(106,161,255,.7)}
+  .btn.primary:hover{box-shadow:0 10px 28px -8px rgba(106,161,255,.8)}
+  .btn[disabled]{opacity:.6;pointer-events:none}
+  .btn .spin{width:14px;height:14px;border:2px solid rgba(6,16,31,.35);border-top-color:#06101f;
+    border-radius:50%;animation:spin .7s linear infinite;display:none}
+  .btn.loading .spin{display:block}.btn.loading .lbl{opacity:.7}
+  .chip{font:inherit;font-size:12px;cursor:pointer;border:1px dashed var(--line);background:transparent;
+    color:var(--ink-dim);border-radius:999px;padding:5px 12px;transition:.16s var(--ease)}
+  .chip:hover{color:var(--ink);border-color:var(--accent);border-style:solid;
+    background:rgba(106,161,255,.08)}
+  .row{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+  /* control fields */
+  .field-inline{display:grid;gap:6px}
+  .field-inline label{font-size:11px;color:var(--ink-faint);font-weight:600;letter-spacing:.4px;text-transform:uppercase}
+  .ctl{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+  .ctl .wide{grid-column:1/-1}
+  /* policy / grant chips */
+  .pchips{display:flex;gap:8px;flex-wrap:wrap}
+  .pchip{font-size:11.5px;padding:5px 11px;border-radius:999px;background:var(--surface-2);
+    border:1px solid var(--line);color:var(--ink-faint);display:flex;align-items:center;gap:6px}
+  .pchip.on{color:var(--ok);border-color:rgba(67,201,138,.35);background:rgba(67,201,138,.07)}
+  .badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:700;
+    text-transform:uppercase;letter-spacing:.3px}
+  .b-allow{background:rgba(67,201,138,.16);color:var(--ok)}
+  .b-flag{background:rgba(230,173,82,.16);color:var(--warn)}
+  .b-block{background:rgba(241,91,108,.18);color:var(--bad)}
+  .b-info{background:rgba(106,161,255,.15);color:var(--info)}
+  .mono{font-family:var(--mono);font-size:12px}
+  .out{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);
+    padding:12px;margin-top:8px;white-space:pre-wrap;font-family:var(--mono);font-size:12.5px;
+    color:var(--ink-dim);max-height:160px;overflow:auto;word-break:break-all}
+  .claims{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);
+    padding:13px;margin-top:12px;font-size:12.5px;color:var(--ink-dim)}
+  .redchip{display:inline-block;font-size:11px;font-family:var(--mono);padding:2px 8px;border-radius:6px;
+    background:rgba(155,134,255,.14);color:var(--violet);margin:2px 3px 0 0}
+  /* table */
   table{width:100%;border-collapse:collapse;font-size:12.5px}
-  th,td{text-align:left;padding:7px 12px;border-bottom:1px solid var(--line);vertical-align:top}
-  th{color:var(--dim);font-size:11px}
-  .badge{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:700}
-  .b-ok{background:rgba(63,181,107,.16);color:var(--ok)} .b-bad{background:rgba(239,91,107,.18);color:var(--bad)}
-  .muted{color:var(--dim);font-size:12.5px} .cat{color:var(--warn);font-size:11px;text-transform:uppercase}
+  th,td{text-align:left;padding:9px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--ink-faint);font-size:11px;font-weight:600;letter-spacing:.4px;text-transform:uppercase}
+  tbody tr{transition:.14s var(--ease)}tbody tr:hover{background:var(--surface-2)}
+  tbody tr.fresh{animation:rowIn .5s var(--ease)}
+  .cat{color:var(--violet);font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;margin-top:3px;font-weight:600}
+  .muted{color:var(--ink-dim);font-size:12.5px}
+  code{background:var(--surface-2);padding:1px 6px;border-radius:6px;font-family:var(--mono);font-size:12px}
+  /* reveal on load */
+  .reveal{opacity:0;transform:translateY(14px)}
+  .reveal.in{opacity:1;transform:none;transition:.55s var(--ease)}
+  /* settings drawer */
+  .scrim{position:fixed;inset:0;background:rgba(5,8,14,.55);backdrop-filter:blur(2px);z-index:50;
+    opacity:0;pointer-events:none;transition:.25s var(--ease)}
+  .scrim.open{opacity:1;pointer-events:auto}
+  .drawer{position:fixed;top:0;right:0;height:100%;width:380px;max-width:92vw;z-index:60;
+    background:var(--surface);border-left:1px solid var(--line);box-shadow:var(--sh-lg);
+    transform:translateX(100%);transition:transform .3s var(--ease);display:flex;flex-direction:column}
+  .drawer.open{transform:none}
+  .drawer header{position:static;background:none;backdrop-filter:none;border-bottom:1px solid var(--line)}
+  .drawer h3{margin:0;font-size:15px;font-weight:650}
+  .drawer .body{padding:20px;overflow:auto;display:grid;gap:18px}
+  .field{display:grid;gap:7px}
+  .field label{font-size:12px;color:var(--ink-dim);font-weight:600;display:flex;justify-content:space-between}
+  .field .hint{font-size:11.5px;color:var(--ink-faint);font-weight:400}
+  .seg{display:flex;gap:6px;flex-wrap:wrap}
+  .drawer .foot{margin-top:auto;padding:16px 20px;border-top:1px solid var(--line);display:flex;gap:10px}
+  /* toast */
+  #toasts{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:80;
+    display:flex;flex-direction:column;gap:10px;align-items:center}
+  .toast{background:var(--surface-3);border:1px solid var(--line-2);border-radius:11px;padding:11px 16px;
+    box-shadow:var(--sh-lg);font-size:13px;display:flex;align-items:center;gap:10px;
+    animation:toastIn .3s var(--ease)}
+  .toast .tdot{width:8px;height:8px;border-radius:50%}
+  .toast.ok .tdot{background:var(--ok)}.toast.bad .tdot{background:var(--bad)}.toast.info .tdot{background:var(--info)}
+  /* cold-start overlay */
+  #boot{position:fixed;inset:0;z-index:90;background:var(--bg);display:grid;place-items:center;
+    transition:opacity .5s var(--ease)}
+  #boot.hide{opacity:0;pointer-events:none}
+  .boot-card{text-align:center;display:grid;gap:18px;justify-items:center}
+  .boot-card .logo{width:54px;height:54px}
+  .boot-card .ring{width:38px;height:38px;border:3px solid var(--line);border-top-color:var(--accent);
+    border-radius:50%;animation:spin .8s linear infinite}
+  .boot-card .msg{color:var(--ink-dim);font-size:13.5px}
+  .boot-card .sub{color:var(--ink-faint);font-size:12px;max-width:280px}
+  /* keyframes */
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(67,201,138,.5)}70%{box-shadow:0 0 0 6px rgba(67,201,138,0)}100%{box-shadow:0 0 0 0 rgba(67,201,138,0)}}
+  @keyframes slideIn{to{opacity:1;transform:none}}
+  @keyframes rowIn{from{background:rgba(106,161,255,.14)}to{background:transparent}}
+  @keyframes toastIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  @media(max-width:860px){main{grid-template-columns:1fr}}
+  @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 </style>
 </head>
 <body>
+<div id="boot"><div class="boot-card">
+  <div class="logo"></div><div class="ring"></div>
+  <div><div class="msg" id="bootmsg">Waking the demo…</div>
+  <div class="sub">Free-tier instances sleep when idle — first load takes ~30–60s.</div></div>
+</div></div>
+
 <header>
-  <h1>rtc-guard</h1>
-  <span class="tag">scoped WebRTC access tokens · adversarial suite · AV threat model</span>
+  <div class="brand"><span class="logo"></span> rtc-guard
+    <span class="tag">scoped WebRTC tokens · adversarial-tested</span></div>
   <span class="spacer"></span>
-  <span class="evalbadge" id="advbadge">adversarial: …</span>
+  <span class="status"><span class="dot" id="hdot"></span><span id="hstat">connecting…</span></span>
+  <span class="pill" id="advpill">adversarial …</span>
+  <button class="iconbtn" id="gear" title="Settings" aria-label="Settings">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+  </button>
 </header>
+
 <main>
-  <div class="panel">
+  <div class="panel reveal">
     <h2>Mint a scoped token</h2>
     <div class="body">
       <div class="ctl">
-        <label>identity <input id="identity" value="alice"></label>
-        <label>room <input id="room" value="room-a"></label>
-        <label>grant <select id="template"></select></label>
-        <label>ttl s <input id="ttl" type="number" value="300"></label>
-        <button class="primary" id="mint">Mint →</button>
+        <div class="field-inline"><label>identity</label><input id="identity" value="alice"></div>
+        <div class="field-inline"><label>room</label><input id="room" value="room-a"></div>
+        <div class="field-inline"><label>grant template</label><select id="template"></select></div>
+        <div class="field-inline"><label>ttl (s)</label><input id="ttl" type="number" value="300"></div>
       </div>
-      <textarea id="token" placeholder="minted JWT appears here"></textarea>
+      <div class="row">
+        <button class="btn primary" id="mint"><span class="spin"></span><span class="lbl">Mint token →</span></button>
+      </div>
       <div class="claims" id="claims"><span class="muted">Mint a token to see its signed grant.</span></div>
+      <div class="out" id="token" style="display:none"></div>
     </div>
   </div>
 
-  <div class="panel">
+  <div class="panel reveal">
     <h2>Verify a token</h2>
     <div class="body">
       <div class="ctl">
-        <label>expected room <input id="vroom" value="room-a"></label>
-        <button id="verify">Verify</button>
-        <button id="copymint" class="muted">↤ use minted</button>
+        <div class="field-inline"><label>expected room</label><input id="vroom" value="room-a"></div>
+        <div class="field-inline" style="justify-content:flex-end">
+          <label>&nbsp;</label>
+          <button class="chip" id="copymint">↤ use minted token</button>
+        </div>
       </div>
       <textarea id="vtoken" placeholder="paste a token to verify"></textarea>
+      <div class="row" style="margin-top:12px">
+        <button class="btn primary" id="verify"><span class="spin"></span><span class="lbl">Verify →</span></button>
+      </div>
       <div class="claims" id="vresult"><span class="muted">Verify checks signature, TTL, and room scope.</span></div>
     </div>
   </div>
 
-  <div class="panel full">
-    <h2>Adversarial suite — every attack should be blocked</h2>
+  <div class="panel full reveal">
+    <h2>Adversarial suite <span class="muted" style="text-transform:none;letter-spacing:0;margin-left:auto">every attack defeated</span></h2>
     <div class="body" style="padding:0"><table id="adv"></table></div>
   </div>
 
-  <div class="panel full">
+  <div class="panel full reveal">
     <h2>Threat model — human↔AI real-time pipeline</h2>
     <div class="body" style="padding:0"><table id="threats"></table></div>
-    <div class="body muted">Builder side: a self-hostable voice-agent sample at
-      <code><a href="sample/voice-agent" style="color:var(--accent)">/sample/voice-agent</a></code>
+    <div class="body muted" style="border-top:1px solid var(--line)">Builder side: a self-hostable voice-agent sample at
+      <code><a href="sample/voice-agent">/sample/voice-agent</a></code>
       mints a scoped agent token the same way.</div>
   </div>
 </main>
-<script>
-const $=s=>document.querySelector(s);
-async function j(u,o){return (await fetch(u,o)).json();}
-function grants(v){return Object.entries(v).filter(([k])=>k!=="room").map(([k,val])=>
-  `<span class="grant ${val?'g-on':'g-off'}">${k} ${val?'✓':'✗'}</span>`).join("");}
 
-async function init(){
-  const t=await j("templates");
-  $("#template").innerHTML=Object.keys(t.templates).map(x=>`<option ${x==='viewer'?'selected':''}>${x}</option>`).join("");
-  renderAdv(await j("adversary"));
-  renderThreats((await j("threat-model")).threats);
+<!-- settings drawer -->
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-hidden="true">
+  <header><div class="brand" style="font-size:15px"><span class="logo" style="width:24px;height:24px"></span> Settings</div>
+    <span class="spacer"></span><button class="iconbtn" id="closedrawer" aria-label="Close">✕</button></header>
+  <div class="body">
+    <div class="field">
+      <label>Default identity <span class="hint">prefills mint</span></label>
+      <input id="cfgIdentity" placeholder="alice">
+    </div>
+    <div class="field">
+      <label>Default room <span class="hint">prefills mint + verify</span></label>
+      <input id="cfgRoom" placeholder="room-a">
+    </div>
+    <div class="field">
+      <label>Default grant template</label>
+      <select id="cfgTemplate"></select>
+    </div>
+    <div class="field">
+      <label>Default TTL (s)</label>
+      <input id="cfgTtl" type="number" placeholder="300">
+    </div>
+    <div class="field">
+      <label>Signing key <span class="hint">read-only</span></label>
+      <div class="muted" style="font-size:11.5px">The demo uses a default HS256 signing key. Override it on the deployment via the <code>RTC_GUARD_SIGNING_KEY</code> env var — no real secrets are required to run the demo.</div>
+    </div>
+  </div>
+  <div class="foot">
+    <button class="btn" id="resetcfg">Reset</button>
+    <button class="btn primary" id="savecfg" style="flex:1"><span class="lbl">Save</span></button>
+  </div>
+</aside>
+
+<div id="toasts"></div>
+
+<script>
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const j=async(u,o)=>(await fetch(u,o)).json();
+const esc=s=>String(s).replace(/</g,"&lt;");
+const CFG_KEY="rtcguard.cfg";
+const DEF={identity:"alice",room:"room-a",template:"viewer",ttl:300};
+let cfg={...DEF};
+let templateKeys=[];
+
+function toast(msg,type="info"){
+  const t=document.createElement("div");t.className=`toast ${type}`;
+  t.innerHTML=`<span class="tdot"></span>${msg}`;$("#toasts").appendChild(t);
+  setTimeout(()=>{t.style.opacity="0";t.style.transition="opacity .3s";setTimeout(()=>t.remove(),300)},2600);
 }
-$("#mint").onclick=async()=>{
-  const r=await j("v1/token",{method:"POST",headers:{"content-type":"application/json"},
-    body:JSON.stringify({identity:$("#identity").value,room:$("#room").value,template:$("#template").value,ttl:+$("#ttl").value})});
-  if(r.detail){$("#claims").innerHTML=`<span class="badge b-bad">error</span> ${r.detail}`;return;}
-  $("#token").value=r.token;
-  const v=r.claims.video;
-  $("#claims").innerHTML=`<div><b>${r.claims.sub}</b> → room <code>${v.room}</code> · exp in ${r.expires_in}s · jti <code>${r.claims.jti}</code></div><div style="margin-top:6px">${grants(v)}</div>`;
-};
-$("#copymint").onclick=()=>{$("#vtoken").value=$("#token").value;};
+function loadCfg(){try{cfg={...cfg,...JSON.parse(localStorage.getItem(CFG_KEY)||"{}")}}catch{}}
+function fillTemplateSelects(){
+  const html=templateKeys.map(x=>`<option value="${x}">${x}</option>`).join("");
+  $("#template").innerHTML=html;$("#cfgTemplate").innerHTML=html;
+}
+function applyCfgToForm(){
+  $("#cfgIdentity").value=cfg.identity;$("#cfgRoom").value=cfg.room;$("#cfgTtl").value=cfg.ttl;
+  if($("#cfgTemplate").querySelector(`option[value="${cfg.template}"]`))$("#cfgTemplate").value=cfg.template;
+}
+function applyCfgToMint(){
+  $("#identity").value=cfg.identity;$("#room").value=cfg.room;$("#ttl").value=cfg.ttl;
+  $("#vroom").value=cfg.room;
+  if($("#template").querySelector(`option[value="${cfg.template}"]`))$("#template").value=cfg.template;
+}
+function openDrawer(){applyCfgToForm();$("#scrim").classList.add("open");$("#drawer").classList.add("open");$("#drawer").setAttribute("aria-hidden","false")}
+function closeDrawer(){$("#scrim").classList.remove("open");$("#drawer").classList.remove("open");$("#drawer").setAttribute("aria-hidden","true")}
+$("#gear").onclick=openDrawer;$("#closedrawer").onclick=closeDrawer;$("#scrim").onclick=closeDrawer;
+$("#savecfg").onclick=()=>{
+  cfg={identity:$("#cfgIdentity").value.trim()||DEF.identity,room:$("#cfgRoom").value.trim()||DEF.room,
+    template:$("#cfgTemplate").value,ttl:+$("#cfgTtl").value||DEF.ttl};
+  localStorage.setItem(CFG_KEY,JSON.stringify(cfg));applyCfgToMint();closeDrawer();toast("Settings saved","ok")};
+$("#resetcfg").onclick=()=>{cfg={...DEF};localStorage.removeItem(CFG_KEY);applyCfgToForm();applyCfgToMint();toast("Reset to defaults","info")};
+
+function grantChips(v){
+  const order=["roomJoin","canSubscribe","canPublish","canPublishData"];
+  return order.filter(k=>k in v).map(k=>
+    `<span class="pchip ${v[k]?'on':''}">${k} ${v[k]?'✓':'✗'}</span>`).join("");
+}
+
+async function boot(){
+  loadCfg();
+  // cold-start: poll health until ready, then reveal
+  let ready=false;
+  for(let i=0;i<60 && !ready;i++){
+    try{const r=await fetch("health");if(r.ok){ready=true;break}}catch{}
+    if(i===4)$("#bootmsg").textContent="Still waking up…";
+    await new Promise(r=>setTimeout(r,1500));
+  }
+  $("#hdot").className="dot ok";$("#hstat").textContent="live";
+  $("#boot").classList.add("hide");setTimeout(()=>$("#boot").remove(),600);
+  $$(".reveal").forEach((el,i)=>setTimeout(()=>el.classList.add("in"),90*i));
+  // populate
+  try{
+    const t=await j("templates");
+    templateKeys=Object.keys(t.templates);
+    fillTemplateSelects();applyCfgToForm();applyCfgToMint();
+  }catch{}
+  try{renderAdv(await j("adversary"));}catch{$("#advpill").style.display="none"}
+  try{renderThreats((await j("threat-model")).threats);}catch{}
+  mintToken({silent:true}); // populate the grant panel with a sample token
+}
+
+async function mintToken(opts={}){
+  const btn=$("#mint");btn.classList.add("loading");
+  try{
+    const r=await j("v1/token",{method:"POST",headers:{"content-type":"application/json"},
+      body:JSON.stringify({identity:$("#identity").value,room:$("#room").value,
+        template:$("#template").value,ttl:+$("#ttl").value})});
+    if(r.detail){
+      $("#claims").innerHTML=`<span class="badge b-block">error</span> ${esc(r.detail)}`;
+      $("#token").style.display="none";
+      if(!opts.silent)toast("Mint rejected","bad");
+      return;
+    }
+    const v=r.claims.video;
+    $("#claims").innerHTML=
+      `<div style="margin-bottom:9px"><b>${esc(r.claims.sub)}</b> → room <code>${esc(v.room)}</code>`+
+      ` · exp in ${r.expires_in}s · jti <code>${esc(String(r.claims.jti).slice(0,14))}</code></div>`+
+      `<div class="pchips">${grantChips(v)}</div>`;
+    $("#token").textContent=r.token;$("#token").style.display="block";
+    $("#vtoken").value=$("#vtoken").value||r.token;
+    if(!opts.silent)toast("token minted","ok");
+  }catch(e){if(!opts.silent)toast("Mint failed","bad")}
+  finally{btn.classList.remove("loading")}
+}
+$("#mint").onclick=()=>mintToken();
+$("#copymint").onclick=()=>{$("#vtoken").value=$("#token").textContent||"";};
+
 $("#verify").onclick=async()=>{
-  const r=await j("v1/verify",{method:"POST",headers:{"content-type":"application/json"},
-    body:JSON.stringify({token:$("#vtoken").value,expected_room:$("#vroom").value||null})});
-  const badge=r.valid?'<span class="badge b-ok">VALID</span>':'<span class="badge b-bad">REJECTED</span>';
-  const who=r.claims?` · <b>${r.claims.sub}</b> @ <code>${(r.claims.video||{}).room||'?'}</code>`:'';
-  $("#vresult").innerHTML=`${badge} ${r.reason}${who}`;
+  const btn=$("#verify");btn.classList.add("loading");
+  try{
+    const r=await j("v1/verify",{method:"POST",headers:{"content-type":"application/json"},
+      body:JSON.stringify({token:$("#vtoken").value,expected_room:$("#vroom").value||null})});
+    const badge=r.valid?'<span class="badge b-allow">VALID</span>':'<span class="badge b-block">REJECTED</span>';
+    const who=r.claims?` · <b>${esc(r.claims.sub)}</b> @ <code>${esc((r.claims.video||{}).room||'?')}</code>`:'';
+    $("#vresult").innerHTML=`${badge} <span class="muted">${esc(r.reason)}</span>${who}`;
+    toast(r.valid?"VALID":"REJECTED",r.valid?"ok":"bad");
+  }catch(e){toast("Verify failed","bad")}
+  finally{btn.classList.remove("loading")}
 };
+
 function renderAdv(a){
-  $("#advbadge").textContent=`adversarial · ${a.blocked}/${a.total} blocked (${(a.block_rate*100).toFixed(0)}%)`;
-  $("#adv").innerHTML=`<thead><tr><th>attack</th><th>result</th><th>why it failed</th></tr></thead><tbody>`+
-    a.checks.map(c=>`<tr><td>${c.attack}</td><td><span class="badge ${c.blocked?'b-ok':'b-bad'}">${c.blocked?'blocked':'LEAK'}</span></td><td class="muted">${c.detail}</td></tr>`).join("")+`</tbody>`;
+  const pill=$("#advpill");
+  pill.className="pill ok";
+  pill.innerHTML=`adversarial · <b>${a.blocked}/${a.total}</b> blocked`;
+  $("#adv").innerHTML=
+    `<thead><tr><th>attack</th><th>result</th><th>why it failed</th></tr></thead><tbody>`+
+    a.checks.map(c=>`<tr><td><b>${esc(c.attack)}</b></td>`+
+      `<td><span class="badge ${c.blocked?'b-allow':'b-block'}">${c.blocked?'blocked':'LEAK'}</span></td>`+
+      `<td class="muted">${esc(c.detail)}</td></tr>`).join("")+`</tbody>`;
 }
 function renderThreats(ts){
-  $("#threats").innerHTML=`<thead><tr><th>#</th><th>threat</th><th>mitigation</th><th>control</th></tr></thead><tbody>`+
-    ts.map(t=>`<tr><td><code>${t.id}</code><div class="cat">${t.category}</div></td>
-      <td><b>${t.title}</b><div class="muted">${t.threat}</div></td>
-      <td class="muted">${t.mitigation}</td><td class="muted mono">${t.control}</td></tr>`).join("")+`</tbody>`;
+  $("#threats").innerHTML=
+    `<thead><tr><th>#</th><th>threat</th><th>mitigation</th><th>control</th></tr></thead><tbody>`+
+    ts.map(t=>`<tr><td><code>${esc(t.id)}</code><div class="cat">${esc(t.category)}</div></td>`+
+      `<td><b>${esc(t.title)}</b><div class="muted">${esc(t.threat)}</div></td>`+
+      `<td class="muted">${esc(t.mitigation)}</td>`+
+      `<td><span class="redchip">${esc(t.control)}</span></td></tr>`).join("")+`</tbody>`;
 }
-init();
+
+boot();
 </script>
 </body>
 </html>
