@@ -1,199 +1,602 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>evalkit</title>
-    <style>
-      :root {
-        --bg: #0b0e14; --panel: #131722; --border: #232838; --fg: #e6e9ef;
-        --muted: #8b93a7; --accent: #6ea8fe; --ok: #63e6be; --bad: #ff6b6b;
-      }
-      * { box-sizing: border-box; }
-      body { margin: 0; background: var(--bg); color: var(--fg);
-        font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
-      main { max-width: 1040px; margin: 0 auto; padding: 28px 20px 60px; }
-      h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -0.01em; }
-      p.lede { color: var(--muted); margin: 0 0 20px; }
-      .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-bottom: 16px; }
-      .panel h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin: 0 0 10px; }
-      textarea { width: 100%; min-height: 150px; resize: vertical; background: #0e1320; color: var(--fg);
-        border: 1px solid var(--border); border-radius: 8px; padding: 10px;
-        font: 13px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; }
-      textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
-      .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-      @media (max-width: 640px) { .metrics { grid-template-columns: 1fr; } }
-      .metric { display: flex; align-items: center; gap: 8px; font-size: 13px; }
-      .metric label { flex: 1; display: flex; gap: 6px; align-items: center; }
-      .metric .desc { color: var(--muted); font-size: 11px; }
-      .metric input[type=number] { width: 64px; background: #0e1320; color: var(--fg);
-        border: 1px solid var(--border); border-radius: 6px; padding: 3px 6px; font-size: 12px; }
-      .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 12px 0; }
-      .spacer { flex: 1; }
-      button { background: var(--accent); color: #07101f; border: 1px solid var(--accent);
-        border-radius: 7px; padding: 7px 14px; font-size: 13px; font-weight: 600; cursor: pointer; }
-      button.ghost { background: #1b2230; color: var(--fg); border-color: var(--border); font-weight: 400; }
-      .bars { display: grid; gap: 8px; }
-      .bar { display: grid; grid-template-columns: 160px 1fr 48px; gap: 10px; align-items: center; font-size: 13px; }
-      .bar .track { height: 10px; background: #0e1320; border-radius: 999px; overflow: hidden; border: 1px solid var(--border); }
-      .bar .fill { height: 100%; background: var(--accent); }
-      .bar .val { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
-      .gate { display: inline-block; padding: 4px 12px; border-radius: 999px; font-weight: 600; font-size: 13px; }
-      .gate.pass { background: rgba(99,230,190,.15); color: var(--ok); border: 1px solid var(--ok); }
-      .gate.fail { background: rgba(255,107,107,.15); color: var(--bad); border: 1px solid var(--bad); }
-      table { width: 100%; border-collapse: collapse; font-size: 12px; }
-      th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--border); font-variant-numeric: tabular-nums; }
-      th { color: var(--muted); font-weight: 500; }
-      .empty { color: var(--muted); }
-      footer { color: var(--muted); font-size: 12px; margin-top: 20px; }
-      a { color: var(--accent); }
-    </style>
-  </head>
-  <body>
-    <main>
-      <h1>evalkit</h1>
-      <p class="lede">
-        Deterministic, offline-first LLM evaluation — score predictions against
-        references across layered metrics, set a regression gate, and compare
-        runs. No model, no network.
-      </p>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>evalkit — offline-first LLM evaluation</title>
+<!-- POLISH KIT: theme-init (apply before paint, no flash) -->
+<script>
+(function(){
+  try{
+    var t=localStorage.getItem("theme")||"system";
+    var dark = t==="dark" || (t==="system" && !window.matchMedia("(prefers-color-scheme: light)").matches);
+    if(!dark) document.documentElement.classList.add("light");
+  }catch(e){}
+})();
+</script>
+<style>
+  /* ============================ design system ============================ */
+  :root{
+    --bg:#0a0d14; --bg-grad-1:#0e1322; --bg-grad-2:#0a0d14;
+    --surface:#131826; --surface-2:#1a2032; --surface-3:#212a40;
+    --line:#263149; --line-2:#33405d;
+    --ink:#e9eef7; --ink-dim:#97a3ba; --ink-faint:#67728a;
+    --accent:#6aa1ff; --accent-2:#9b86ff; --accent-ink:#06101f;
+    --ok:#43c98a; --warn:#e6ad52; --bad:#f15b6c; --info:#6aa1ff; --violet:#9b86ff;
+    --r:15px; --r-sm:10px; --r-xs:7px;
+    --sh:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.5);
+    --sh-lg:0 1px 2px rgba(0,0,0,.4), 0 24px 64px -24px rgba(0,0,0,.7);
+    --grad:linear-gradient(135deg,var(--accent),var(--accent-2));
+    --ease:cubic-bezier(.22,.61,.36,1);
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+    --header-bg:rgba(10,13,20,.72);
+    --bg-radial-1:rgba(107,130,255,.10); --bg-radial-2:rgba(67,201,138,.05);
+  }
+  /* POLISH KIT: theme toggle — LIGHT palette overrides (same accents, light surfaces, dark ink) */
+  html.light{
+    --bg:#f4f6fb; --bg-grad-1:#eef2fb; --bg-grad-2:#f4f6fb;
+    --surface:#ffffff; --surface-2:#f1f4fa; --surface-3:#e6ebf5;
+    --line:#d8dfec; --line-2:#c2ccde;
+    --ink:#16203a; --ink-dim:#566184; --ink-faint:#8b95ad;
+    --accent:#3a6ff0; --accent-2:#7c5cf5; --accent-ink:#ffffff;
+    --ok:#1f9d63; --warn:#b9791f; --bad:#d83a4d; --info:#3a6ff0; --violet:#6f53d6;
+    --sh:0 1px 2px rgba(20,32,58,.06), 0 8px 24px -14px rgba(20,32,58,.18);
+    --sh-lg:0 1px 2px rgba(20,32,58,.08), 0 24px 64px -28px rgba(20,32,58,.28);
+    --header-bg:rgba(255,255,255,.78);
+    --bg-radial-1:rgba(58,111,240,.10); --bg-radial-2:rgba(31,157,99,.06);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;
+    font:15px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Inter,sans-serif;
+    background-image:radial-gradient(1200px 600px at 80% -10%,var(--bg-radial-1),transparent 60%),
+      radial-gradient(900px 500px at 0% 0%,var(--bg-radial-2),transparent 55%);
+    background-attachment:fixed;min-height:100vh;transition:background-color .25s var(--ease),color .25s var(--ease)}
+  ::selection{background:rgba(106,161,255,.3)}
+  a{color:var(--accent);text-decoration:none}
+  /* header */
+  header{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:14px;
+    padding:14px 24px;border-bottom:1px solid var(--line);
+    background:var(--header-bg);backdrop-filter:blur(14px) saturate(140%)}
+  .brand{display:flex;align-items:center;gap:11px;font-weight:650;font-size:16px;letter-spacing:.2px}
+  .logo{width:30px;height:30px;border-radius:9px;background:var(--grad);position:relative;
+    box-shadow:0 4px 16px -4px rgba(106,161,255,.6);flex:none}
+  .logo::after{content:"";position:absolute;inset:7px;border-radius:5px;
+    border:2px solid rgba(255,255,255,.85);border-right-color:transparent;
+    animation:spin 3.5s linear infinite}
+  .brand .tag{color:var(--ink-dim);font-size:12.5px;font-weight:400}
+  .spacer{flex:1}
+  .status{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--ink-dim);
+    padding:5px 11px;border:1px solid var(--line);border-radius:999px;background:var(--surface)}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--ink-faint)}
+  .dot.ok{background:var(--ok);box-shadow:0 0 0 0 rgba(67,201,138,.5);animation:pulse 2s infinite}
+  .pill{font-size:12px;color:var(--ink-dim);border:1px solid var(--line);border-radius:999px;
+    padding:5px 12px;background:var(--surface);white-space:nowrap}
+  .iconbtn{width:36px;height:36px;border-radius:10px;border:1px solid var(--line);background:var(--surface);
+    color:var(--ink-dim);cursor:pointer;display:grid;place-items:center;transition:.18s var(--ease)}
+  .iconbtn:hover{color:var(--ink);border-color:var(--line-2);transform:translateY(-1px);background:var(--surface-2)}
+  .iconbtn svg{width:18px;height:18px}
+  /* layout */
+  main{max-width:1160px;margin:0 auto;padding:26px 24px 64px;display:grid;gap:18px;
+    grid-template-columns:1fr 1fr}
+  .full{grid-column:1/-1}
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+    box-shadow:var(--sh);overflow:hidden;transition:.25s var(--ease)}
+  .panel:hover{border-color:var(--line-2)}
+  .panel h2{margin:0;padding:14px 18px;font-size:11.5px;font-weight:600;letter-spacing:.7px;
+    text-transform:uppercase;color:var(--ink-dim);border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:10px}
+  .panel .body{padding:18px}
+  /* controls */
+  textarea,select,input{font:inherit;color:var(--ink);background:var(--surface-2);
+    border:1px solid var(--line);border-radius:var(--r-sm);padding:11px 13px;transition:.16s var(--ease);width:100%}
+  textarea:focus,select:focus,input:focus{outline:none;border-color:var(--accent);
+    box-shadow:0 0 0 3px rgba(106,161,255,.16)}
+  textarea{min-height:150px;resize:vertical;font-family:var(--mono);font-size:13px;line-height:1.55}
+  .btn{font:inherit;font-weight:600;cursor:pointer;border-radius:var(--r-sm);padding:11px 17px;
+    border:1px solid var(--line);background:var(--surface-2);color:var(--ink);
+    transition:.16s var(--ease);display:inline-flex;align-items:center;gap:8px;position:relative}
+  .btn:hover{transform:translateY(-1px);border-color:var(--line-2)}
+  .btn:active{transform:translateY(0)}
+  .btn.primary{background:var(--grad);border:none;color:#06101f;
+    box-shadow:0 6px 20px -8px rgba(106,161,255,.7)}
+  .btn.primary:hover{box-shadow:0 10px 28px -8px rgba(106,161,255,.8)}
+  .btn[disabled]{opacity:.6;pointer-events:none}
+  .btn .spin{width:14px;height:14px;border:2px solid rgba(6,16,31,.35);border-top-color:#06101f;
+    border-radius:50%;animation:spin .7s linear infinite;display:none}
+  .btn.loading .spin{display:block}.btn.loading .lbl{opacity:.7}
+  .chip{font:inherit;font-size:12px;cursor:pointer;border:1px dashed var(--line);background:transparent;
+    color:var(--ink-dim);border-radius:999px;padding:5px 12px;transition:.16s var(--ease)}
+  .chip:hover{color:var(--ink);border-color:var(--accent);border-style:solid;
+    background:rgba(106,161,255,.08)}
+  .row{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+  /* labeled field control */
+  .ctl{display:flex;flex-direction:column;gap:6px}
+  .ctl>span{font-size:11px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:var(--ink-faint)}
+  /* metric grid */
+  .metrics{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+  @media(max-width:640px){.metrics{grid-template-columns:1fr}}
+  .metric{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface-2);
+    border:1px solid var(--line);border-radius:var(--r-sm)}
+  .metric label{flex:1;display:flex;gap:7px;align-items:baseline;font-size:13px;cursor:pointer;min-width:0}
+  .metric label input{width:auto;flex:none}
+  .metric .name{font-weight:600}
+  .metric .desc{color:var(--ink-faint);font-size:11px}
+  .metric input[type=number]{width:62px;flex:none;padding:4px 7px;font-size:12px;text-align:right}
+  .judge-row{display:flex;gap:13px;flex-wrap:wrap;align-items:end;margin-top:14px;
+    border-top:1px solid var(--line);padding-top:14px}
+  .judge-row .ctl{flex:1;min-width:140px}
+  /* badges */
+  .badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:700;
+    text-transform:uppercase;letter-spacing:.3px}
+  .b-pass{background:rgba(67,201,138,.16);color:var(--ok)}
+  .b-fail{background:rgba(241,91,108,.18);color:var(--bad)}
+  .b-info{background:rgba(106,161,255,.15);color:var(--info)}
+  .mono{font-family:var(--mono);font-size:12px}
+  /* aggregate bars */
+  .bars{display:grid;gap:10px}
+  .bar{display:grid;grid-template-columns:160px 1fr 52px;gap:12px;align-items:center;font-size:13px}
+  @media(max-width:560px){.bar{grid-template-columns:110px 1fr 46px}}
+  .bar .track{height:9px;background:var(--surface-3);border-radius:999px;overflow:hidden;border:1px solid var(--line)}
+  .bar .fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--ok));transition:width .5s var(--ease)}
+  .bar .val{text-align:right;font-variant-numeric:tabular-nums;color:var(--ink-dim);font-family:var(--mono);font-size:12px}
+  .bar .mname{font-family:var(--mono);font-size:12px}
+  /* table */
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th,td{text-align:left;padding:8px 14px;border-bottom:1px solid var(--line);white-space:nowrap;
+    font-variant-numeric:tabular-nums}
+  th{color:var(--ink-faint);font-size:11px;font-weight:600;letter-spacing:.4px;text-transform:uppercase}
+  tbody tr{transition:.14s var(--ease)}tbody tr:hover{background:var(--surface-2)}
+  .muted{color:var(--ink-dim);font-size:12.5px}
+  .empty{color:var(--ink-dim);font-size:13px}
+  code{background:var(--surface-2);padding:1px 6px;border-radius:6px;font-family:var(--mono);font-size:12px}
+  .routing{font-family:var(--mono);font-size:12px;color:var(--ink-dim);margin-top:10px;
+    padding:8px 12px;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm)}
+  /* reveal on load */
+  .reveal{opacity:0;transform:translateY(14px)}
+  .reveal.in{opacity:1;transform:none;transition:.55s var(--ease)}
+  /* settings drawer */
+  .scrim{position:fixed;inset:0;background:rgba(5,8,14,.55);backdrop-filter:blur(2px);z-index:50;
+    opacity:0;pointer-events:none;transition:.25s var(--ease)}
+  .scrim.open{opacity:1;pointer-events:auto}
+  .drawer{position:fixed;top:0;right:0;height:100%;width:380px;max-width:92vw;z-index:60;
+    background:var(--surface);border-left:1px solid var(--line);box-shadow:var(--sh-lg);
+    transform:translateX(100%);transition:transform .3s var(--ease);display:flex;flex-direction:column}
+  .drawer.open{transform:none}
+  .drawer header{position:static;background:none;backdrop-filter:none;border-bottom:1px solid var(--line)}
+  .drawer h3{margin:0;font-size:15px;font-weight:650}
+  .drawer .body{padding:20px;overflow:auto;display:grid;gap:18px}
+  .field{display:grid;gap:7px}
+  .field label{font-size:12px;color:var(--ink-dim);font-weight:600;display:flex;justify-content:space-between}
+  .field .hint{font-size:11.5px;color:var(--ink-faint);font-weight:400}
+  .seg{display:flex;gap:6px;flex-wrap:wrap}
+  /* POLISH KIT: segmented control (theme + routing mode) */
+  .seg .segbtn{font:inherit;font-size:12px;cursor:pointer;border:1px solid var(--line);background:var(--surface-2);
+    color:var(--ink-dim);border-radius:var(--r-sm);padding:7px 11px;transition:.16s var(--ease)}
+  .seg .segbtn:hover{color:var(--ink);border-color:var(--line-2)}
+  .seg .segbtn[aria-pressed="true"]{background:var(--grad);border-color:transparent;color:var(--accent-ink);font-weight:600}
+  .pstat{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12.5px;
+    padding:7px 11px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface-2)}
+  .pstat .pdot{width:8px;height:8px;border-radius:50%;background:var(--ink-faint);flex:none}
+  .pstat .pdot.on{background:var(--ok);box-shadow:0 0 0 3px rgba(67,201,138,.18)}
+  .pstat .pmodel{font-family:var(--mono);font-size:11px;color:var(--ink-faint);margin-left:auto;margin-right:8px;
+    max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .chainline{font-family:var(--mono);font-size:11.5px;color:var(--ink-dim);
+    background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);padding:8px 11px;word-break:break-word}
+  .drawer .foot{margin-top:auto;padding:16px 20px;border-top:1px solid var(--line);display:flex;gap:10px}
+  /* POLISH KIT: help modal (centered dialog, reuses scrim) */
+  #help{position:fixed;top:50%;left:50%;transform:translate(-50%,calc(-50% + 12px));z-index:70;
+    width:560px;max-width:94vw;max-height:86vh;overflow:auto;opacity:0;pointer-events:none;
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh-lg);
+    transition:opacity .25s var(--ease),transform .25s var(--ease)}
+  #help.open{opacity:1;pointer-events:auto;transform:translate(-50%,-50%)}
+  #help header{position:static;background:none;backdrop-filter:none;border-bottom:1px solid var(--line)}
+  #help .body{padding:20px;display:grid;gap:16px}
+  #help h4{margin:0 0 6px;font-size:11.5px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--ink-dim)}
+  #help p{margin:0;color:var(--ink-dim);font-size:13.5px}
+  #help ol{margin:0;padding-left:20px;color:var(--ink-dim);font-size:13.5px;display:grid;gap:4px}
+  #help .kbd{font-family:var(--mono);font-size:11.5px;background:var(--surface-2);border:1px solid var(--line);
+    border-bottom-width:2px;border-radius:6px;padding:1px 7px;color:var(--ink)}
+  #help .eps{display:flex;gap:7px;flex-wrap:wrap}
+  /* toast */
+  #toasts{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:80;
+    display:flex;flex-direction:column;gap:10px;align-items:center}
+  .toast{background:var(--surface-3);border:1px solid var(--line-2);border-radius:11px;padding:11px 16px;
+    box-shadow:var(--sh-lg);font-size:13px;display:flex;align-items:center;gap:10px;
+    animation:toastIn .3s var(--ease)}
+  .toast .tdot{width:8px;height:8px;border-radius:50%}
+  .toast.ok .tdot{background:var(--ok)}.toast.bad .tdot{background:var(--bad)}.toast.info .tdot{background:var(--info)}
+  /* cold-start overlay */
+  #boot{position:fixed;inset:0;z-index:90;background:var(--bg);display:grid;place-items:center;
+    transition:opacity .5s var(--ease)}
+  #boot.hide{opacity:0;pointer-events:none}
+  .boot-card{text-align:center;display:grid;gap:18px;justify-items:center}
+  .boot-card .logo{width:54px;height:54px}
+  .boot-card .ring{width:38px;height:38px;border:3px solid var(--line);border-top-color:var(--accent);
+    border-radius:50%;animation:spin .8s linear infinite}
+  .boot-card .msg{color:var(--ink-dim);font-size:13.5px}
+  .boot-card .sub{color:var(--ink-faint);font-size:12px;max-width:280px}
+  /* keyframes */
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(67,201,138,.5)}70%{box-shadow:0 0 0 6px rgba(67,201,138,0)}100%{box-shadow:0 0 0 0 rgba(67,201,138,0)}}
+  @keyframes toastIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  @media(max-width:860px){main{grid-template-columns:1fr}}
+  @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+<div id="boot"><div class="boot-card">
+  <div class="logo"></div><div class="ring"></div>
+  <div><div class="msg" id="bootmsg">Waking the demo…</div>
+  <div class="sub">Free-tier instances sleep when idle — first load takes ~30–60s.</div></div>
+</div></div>
 
-      <div class="panel">
-        <h2>Items — one per line: <code>prediction ||| reference</code></h2>
-        <textarea id="items" spellcheck="false"></textarea>
-        <div class="row">
-          <button class="ghost" id="sample">Load sample</button>
-          <div class="spacer"></div>
-          <button id="run">Evaluate</button>
+<header>
+  <div class="brand"><span class="logo"></span> evalkit
+    <span class="tag">offline-first LLM evaluation · LLM-judge · regression gate</span></div>
+  <span class="spacer"></span>
+  <span class="status"><span class="dot" id="hdot"></span><span id="hstat">connecting…</span></span>
+  <span class="pill" id="metricpill">metrics</span>
+  <!-- POLISH KIT: theme toggle -->
+  <button class="iconbtn" id="themebtn" title="Toggle theme" aria-label="Toggle light/dark theme"><span id="themeicon">☾</span></button>
+  <!-- POLISH KIT: help modal trigger -->
+  <button class="iconbtn" id="helpbtn" title="Help (?)" aria-label="Help">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 1 1 4.6 3c-.8.6-1.7 1-1.7 2.2"/><line x1="12" y1="17.5" x2="12" y2="17.51"/></svg>
+  </button>
+  <button class="iconbtn" id="gear" title="Settings" aria-label="Settings">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+  </button>
+</header>
+
+<main>
+  <div class="panel full reveal">
+    <h2>Items <span class="muted" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">one per line: <code>prediction ||| reference</code></span></h2>
+    <div class="body">
+      <textarea id="items" spellcheck="false" placeholder="The capital of France is Paris. ||| Paris"></textarea>
+      <div class="row" style="margin-top:14px">
+        <button class="chip" id="sample">Load sample</button>
+        <span class="spacer"></span>
+        <button class="btn primary" id="run"><span class="spin"></span><span class="lbl">Evaluate</span></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel full reveal">
+    <h2>Metrics &amp; gate thresholds <span class="muted" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">check to score · set a number to gate (blank = no gate)</span></h2>
+    <div class="body">
+      <div class="metrics" id="metrics"></div>
+      <div class="judge-row">
+        <label class="ctl"><span>LLM judge provider</span>
+          <select id="provider"><option value="auto">Auto (recommended)</option></select>
+        </label>
+        <label class="ctl"><span>model override</span>
+          <input id="model" placeholder="(provider default)" />
+        </label>
+        <div class="ctl" style="flex:none">
+          <span>Ollama</span>
+          <span id="ollamaStatus" class="muted" style="padding:6px 0">checking…</span>
         </div>
       </div>
+      <div class="muted" id="providerLive" style="font-size:11.5px;margin-top:8px"></div>
+    </div>
+  </div>
 
-      <div class="panel">
-        <h2>Metrics &amp; gate thresholds (blank = no gate)</h2>
-        <div class="metrics" id="metrics"></div>
-        <div class="row" style="margin-top:12px; border-top:1px solid var(--border); padding-top:10px">
-          <label>LLM judge provider
-            <select id="provider"><option value="auto">Auto (recommended)</option></select>
-          </label>
-          <label>model <input id="model" placeholder="(default)" style="width:150px" /></label>
-          <span class="spacer"></span>
-          <span id="ollamaStatus" style="font-size:12px;color:var(--muted)">checking Ollama…</span>
-        </div>
-        <div style="font-size:11px;color:var(--muted);margin-top:4px"><span id="providerLive"></span></div>
-        <div id="routing" style="font-size:12px;color:var(--muted);font-family:ui-monospace,Menlo,monospace;margin-top:6px"></div>
+  <div class="panel full reveal" id="results" style="display:none">
+    <h2>Results <span id="gate" style="margin-left:10px"></span>
+      <span class="muted" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400" id="resultmeta"></span></h2>
+    <div class="body">
+      <div class="bars" id="bars"></div>
+      <div class="routing" id="routing" style="display:none"></div>
+      <div style="margin-top:16px;max-height:300px;overflow:auto;border:1px solid var(--line);border-radius:var(--r-sm)">
+        <table id="table"></table>
       </div>
+    </div>
+  </div>
+</main>
 
-      <div class="panel" id="results" style="display:none">
-        <h2>Results <span id="gate"></span></h2>
-        <div class="bars" id="bars"></div>
-        <div style="margin-top:14px; max-height:260px; overflow:auto">
-          <table id="table"></table>
-        </div>
+<!-- settings drawer -->
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-hidden="true">
+  <header><div class="brand" style="font-size:15px"><span class="logo" style="width:24px;height:24px"></span> Settings</div>
+    <span class="spacer"></span><button class="iconbtn" id="closedrawer" aria-label="Close">✕</button></header>
+  <div class="body">
+    <!-- POLISH KIT: theme segmented control -->
+    <div class="field">
+      <label>Theme <span class="hint">appearance</span></label>
+      <div class="seg" id="themeseg">
+        <button type="button" class="segbtn" data-theme="dark">Dark</button>
+        <button type="button" class="segbtn" data-theme="light">Light</button>
+        <button type="button" class="segbtn" data-theme="system">System</button>
       </div>
+    </div>
 
-      <footer>
-        <code>POST /evaluate</code> · <code>POST /compare</code> ·
-        <code>GET /metrics</code>. Synthetic data only. Part of the
-        <a href="https://github.com/MarcBittner/ai-portfolio">ai-portfolio</a>.
-      </footer>
-    </main>
+    <!-- POLISH KIT: routing config -->
+    <div class="field">
+      <label>LLM-judge routing mode <span class="hint">used by the <code>llm_judge</code> metric</span></label>
+      <div class="seg" id="modeseg">
+        <button type="button" class="segbtn" data-mode="auto">auto</button>
+        <button type="button" class="segbtn" data-mode="free">free</button>
+        <button type="button" class="segbtn" data-mode="paid">paid</button>
+        <button type="button" class="segbtn" data-mode="offline">offline</button>
+      </div>
+      <div class="hint" id="modeblurb">auto = free (OpenRouter) if keyed, else paid, else local Ollama, else mock.</div>
+    </div>
+    <div class="field">
+      <label for="cfgModel">Model override <span class="hint">optional</span></label>
+      <input id="cfgModel" type="text" placeholder="provider default" />
+    </div>
+    <div class="field">
+      <label>Provider status <span class="hint" id="modeactive">active: auto</span></label>
+      <div style="display:grid;gap:6px" id="provrows"></div>
+    </div>
+    <div class="field">
+      <label>Fallback chain <span class="hint">→ on failure</span></label>
+      <div class="chainline" id="chainline">mock (deterministic)</div>
+    </div>
+    <div class="muted" style="font-size:11.5px">Deterministic metrics never call a model. Only the <code>llm_judge</code> metric
+      routes — and the chain always ends at a deterministic mock, so a run never fails. Provider keys live server-side.</div>
+  </div>
+  <div class="foot">
+    <button class="btn" id="resetcfg">Reset</button>
+    <button class="btn primary" id="savecfg" style="flex:1"><span class="lbl">Save</span></button>
+  </div>
+</aside>
 
-    <script>
-      const $ = (id) => document.getElementById(id);
-      const SAMPLE = [
-        "The capital of France is Paris. ||| Paris",
-        "It is roughly 384,400 km to the Moon. ||| 384,400 km",
-        "I don't have information on that. ||| Not covered in the notes.",
-        "The Eiffel Tower opened in 1889. ||| The Eiffel Tower opened in 1887.",
-      ].join("\n");
+<!-- POLISH KIT: help modal -->
+<aside id="help" role="dialog" aria-modal="true" aria-labelledby="helptitle" aria-hidden="true">
+  <header><div class="brand" style="font-size:15px"><span class="logo" style="width:24px;height:24px"></span>
+    <span id="helptitle">Help · evalkit</span></div>
+    <span class="spacer"></span><button class="iconbtn" id="closehelp" aria-label="Close help">✕</button></header>
+  <div class="body">
+    <div><h4>What it is</h4><p>An offline-first LLM evaluation toolkit: score model predictions against references
+      across layered deterministic metrics, add an optional <b>LLM-judge</b> grade, and gate a release on a regression
+      threshold. Deterministic metrics need no model or network; the judge routes through a multi-provider chain that
+      always ends at a deterministic fallback.</p></div>
+    <div><h4>How to use</h4><ol>
+      <li><b>Paste items</b> — one per line as <code>prediction ||| reference</code> in the <i>Items</i> panel.</li>
+      <li><b>Pick metrics</b> — check the metrics to score; add the <i>llm_judge</i> metric for an LLM grade.</li>
+      <li><b>Set thresholds</b> — type a minimum next to a metric to arm the regression <i>gate</i> (blank = no gate).</li>
+      <li><b>Evaluate</b> — see aggregate bars, the PASS/FAIL gate badge, and the per-item score table.</li>
+    </ol></div>
+    <div><h4>Endpoints</h4><div class="eps">
+      <code>GET /health</code><code>GET /metrics</code><code>GET /providers</code>
+      <code>POST /evaluate</code><code>POST /compare</code></div></div>
+    <div><h4>Keyboard shortcuts</h4><p><span class="kbd">?</span> open this help · <span class="kbd">Esc</span> close any overlay</p></div>
+    <div><p class="muted" style="font-size:11.5px">All sample predictions and references are <b>synthetic</b> — no real data.</p></div>
+  </div>
+</aside>
 
-      async function loadMetrics() {
-        const metrics = await fetch("/metrics").then((r) => r.json());
-        $("metrics").innerHTML = metrics
-          .map(
-            (m) => `<div class="metric">
-              <label><input type="checkbox" data-m="${m.name}" ${m.source === "llm" ? "" : "checked"} />
-                ${m.name} <span class="desc">${m.description}</span></label>
-              <input type="number" min="0" max="1" step="0.05" data-th="${m.name}" placeholder="min" />
-            </div>`,
-          )
-          .join("");
-        try {
-          const p = await fetch("/providers").then((r) => r.json());
-          const shortName = (m) => (m || "").split("/").pop().replace(/:free$/, "");
-          const sel = $("provider");
-          const freeLabel = "Free · " + shortName((p.free_models || [])[0] || "");
-          sel.insertAdjacentHTML("beforeend",
-            `<option value="free">${freeLabel}</option>` +
-            `<option value="offline">Offline (deterministic)</option>` +
-            (p.available.paid ? `<option value="paid">Paid (your key)</option>` : ""));
-          sel.value = "auto";
-          const liveNote = $("providerLive");
-          if (liveNote) {
-            const suf = p.active_mode === "free" ? " · " + shortName((p.free_models || [])[0] || "") : "";
-            liveNote.textContent = "Live: " + p.active_mode + suf;
-          }
-          $("ollamaStatus").textContent = p.available.ollama
-            ? `Ollama: reachable (${p.models.ollama})` : "Ollama: not reachable → fallback";
-        } catch { /* providers optional */ }
-      }
+<div id="toasts"></div>
 
-      function parseItems() {
-        return $("items").value
-          .split("\n").map((l) => l.trim()).filter(Boolean)
-          .map((l) => {
-            const [prediction, reference = ""] = l.split("|||");
-            return { prediction: prediction.trim(), reference: reference.trim() };
-          });
-      }
+<script>
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const j=async(u,o)=>(await fetch(u,o)).json();
+const CFG_KEY="evalkit.cfg";
+const SAMPLE=[
+  "The capital of France is Paris. ||| Paris",
+  "It is roughly 384,400 km to the Moon. ||| 384,400 km",
+  "I don't have information on that. ||| Not covered in the notes.",
+  "The Eiffel Tower opened in 1889. ||| The Eiffel Tower opened in 1887.",
+].join("\n");
+let cfg={mode:"auto",model:""};
+let provStatus={};  // last GET /providers payload
 
-      async function run() {
-        const items = parseItems();
-        if (!items.length) return;
-        const metrics = [...document.querySelectorAll("input[data-m]:checked")].map((c) => c.dataset.m);
-        const thresholds = {};
-        document.querySelectorAll("input[data-th]").forEach((i) => {
-          if (i.value !== "" && metrics.includes(i.dataset.th)) thresholds[i.dataset.th] = Number(i.value);
-        });
-        const body = { items, metrics, thresholds: Object.keys(thresholds).length ? thresholds : null,
-          provider: $("provider").value, model: $("model").value || null };
-        const res = await fetch("/evaluate", {
-          method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
-        });
-        if (!res.ok) { alert(await res.text()); return; }
-        const data = await res.json();
-        $("routing").textContent = data.routing
-          ? `llm_judge routed via ${data.routing.provider} (${data.routing.model})` : "";
-        render(data);
-      }
+function toast(msg,type="info"){
+  const t=document.createElement("div");t.className=`toast ${type}`;
+  t.innerHTML=`<span class="tdot"></span>${msg}`;$("#toasts").appendChild(t);
+  setTimeout(()=>{t.style.opacity="0";t.style.transition="opacity .3s";setTimeout(()=>t.remove(),300)},2600);
+}
+const shortName=m=>(m||"").split("/").pop().replace(/:free$/,"");
+function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
 
-      function render(data) {
-        $("results").style.display = "block";
-        $("bars").innerHTML = data.metrics
-          .map((m) => {
-            const v = data.aggregate[m] ?? 0;
-            return `<div class="bar"><span>${m}</span>
-              <span class="track"><span class="fill" style="width:${(v * 100).toFixed(0)}%"></span></span>
-              <span class="val">${v.toFixed(3)}</span></div>`;
-          })
-          .join("");
-        const g = $("gate");
-        if (data.gate) {
-          g.className = "gate " + (data.gate.passed ? "pass" : "fail");
-          g.textContent = data.gate.passed
-            ? "gate: PASS"
-            : "gate: FAIL — " + Object.keys(data.gate.failures).join(", ");
-        } else { g.className = ""; g.textContent = ""; }
-        const head = "<tr><th>#</th>" + data.metrics.map((m) => `<th>${m}</th>`).join("") + "</tr>";
-        const rows = data.per_item
-          .map((r) => `<tr><td>${r.index}</td>` + data.metrics.map((m) => `<td>${(r.scores[m] ?? 0).toFixed(3)}</td>`).join("") + "</tr>")
-          .join("");
-        $("table").innerHTML = head + rows;
-      }
+/* ===================== settings drawer ===================== */
+function loadCfg(){try{cfg={...cfg,...JSON.parse(localStorage.getItem(CFG_KEY)||"{}")}}catch{}}
+function applyCfgToForm(){
+  $("#cfgModel").value=cfg.model||"";
+  selectMode(cfg.mode||"auto");
+  syncThemeSeg();
+}
+function syncJudgeControls(){
+  // keep the in-panel judge provider/model controls in sync with saved routing cfg
+  const sel=$("#provider");
+  if(sel.querySelector(`option[value="${cfg.mode}"]`))sel.value=cfg.mode;
+  $("#model").value=cfg.model||"";
+}
+function openDrawer(){applyCfgToForm();$("#scrim").classList.add("open");$("#drawer").classList.add("open");$("#drawer").setAttribute("aria-hidden","false")}
+function closeDrawer(){$("#scrim").classList.remove("open");$("#drawer").classList.remove("open");$("#drawer").setAttribute("aria-hidden","true")}
+$("#gear").onclick=openDrawer;$("#closedrawer").onclick=closeDrawer;
+$("#savecfg").onclick=()=>{
+  cfg={mode:currentMode(),model:$("#cfgModel").value.trim()};
+  localStorage.setItem(CFG_KEY,JSON.stringify(cfg));
+  syncJudgeControls();renderRouting();closeDrawer();toast("Settings saved","ok");
+};
+$("#resetcfg").onclick=()=>{
+  cfg={mode:"auto",model:""};localStorage.removeItem(CFG_KEY);
+  applyCfgToForm();syncJudgeControls();renderRouting();toast("Reset to defaults","info");
+};
 
-      $("sample").addEventListener("click", () => { $("items").value = SAMPLE; run(); });
-      $("run").addEventListener("click", run);
-      loadMetrics();
-    </script>
-  </body>
+/* ===================== metrics + providers ===================== */
+async function loadMetrics(){
+  const metrics=await j("metrics");
+  $("#metrics").innerHTML=metrics.map(m=>`<div class="metric">
+      <label><input type="checkbox" data-m="${m.name}" ${m.source==="llm"?"":"checked"} />
+        <span class="name">${m.name}</span><span class="desc">${esc(m.description)}</span></label>
+      <input type="number" min="0" max="1" step="0.05" data-th="${m.name}" placeholder="min" />
+    </div>`).join("");
+  $("#metricpill").textContent=`metrics · ${metrics.length}`;
+}
+async function loadProviders(){
+  try{
+    const p=await j("providers");provStatus=p;
+    const sel=$("#provider");
+    const freeLabel="Free · "+shortName((p.free_models||[])[0]||"");
+    sel.insertAdjacentHTML("beforeend",
+      `<option value="free">${freeLabel}</option>`+
+      `<option value="offline">Offline (deterministic)</option>`+
+      (p.available.paid?`<option value="paid">Paid (your key)</option>`:""));
+    syncJudgeControls();
+    const liveNote=$("#providerLive");
+    if(liveNote){
+      const suf=p.active_mode==="free"?" · "+shortName((p.free_models||[])[0]||""):"";
+      liveNote.textContent="Live judge routing: "+p.active_mode+suf;
+    }
+    $("#ollamaStatus").textContent=p.available.ollama
+      ?`reachable (${shortName(p.models.ollama)})`:"not reachable → fallback";
+    renderRouting();
+  }catch{/* providers optional */}
+}
+
+/* ===================== evaluate ===================== */
+function parseItems(){
+  return $("#items").value
+    .split("\n").map(l=>l.trim()).filter(Boolean)
+    .map(l=>{const [prediction,reference=""]=l.split("|||");
+      return {prediction:prediction.trim(),reference:reference.trim()};});
+}
+async function run(){
+  const items=parseItems();
+  if(!items.length){toast("Add at least one item","bad");return;}
+  const btn=$("#run");btn.classList.add("loading");
+  const metrics=$$("input[data-m]:checked").map(c=>c.dataset.m);
+  const thresholds={};
+  $$("input[data-th]").forEach(i=>{
+    if(i.value!==""&&metrics.includes(i.dataset.th))thresholds[i.dataset.th]=Number(i.value);
+  });
+  const body={items,metrics,thresholds:Object.keys(thresholds).length?thresholds:null,
+    provider:$("#provider").value,model:$("#model").value.trim()||null};
+  try{
+    const res=await fetch("evaluate",{method:"POST",
+      headers:{"content-type":"application/json"},body:JSON.stringify(body)});
+    if(!res.ok){const t=await res.text();toast("Evaluate failed","bad");
+      $("#results").style.display="block";
+      $("#resultmeta").textContent=t;return;}
+    render(await res.json());
+    toast(`Evaluated ${items.length} item${items.length===1?"":"s"}`,"ok");
+  }catch{toast("Request failed","bad");}
+  btn.classList.remove("loading");
+}
+function render(data){
+  $("#results").style.display="block";
+  $("#resultmeta").textContent=`${data.n} item${data.n===1?"":"s"} · ${data.metrics.length} metric${data.metrics.length===1?"":"s"}`;
+  $("#bars").innerHTML=data.metrics.map(m=>{
+    const v=data.aggregate[m]??0;
+    return `<div class="bar"><span class="mname">${m}</span>
+      <span class="track"><span class="fill" style="width:${(v*100).toFixed(0)}%"></span></span>
+      <span class="val">${v.toFixed(3)}</span></div>`;
+  }).join("");
+  const g=$("#gate");
+  if(data.gate){
+    g.className="badge "+(data.gate.passed?"b-pass":"b-fail");
+    g.textContent=data.gate.passed
+      ?"gate: PASS"
+      :"gate: FAIL — "+Object.keys(data.gate.failures).join(", ");
+  }else{g.className="";g.textContent="";}
+  const r=$("#routing");
+  if(data.routing){
+    r.style.display="block";
+    const fb=data.routing.fallbacks&&data.routing.fallbacks.length
+      ?`  (after ${data.routing.fallbacks.join(", ")})`:"";
+    r.textContent=`llm_judge routed via ${data.routing.provider} (${data.routing.model})${fb}`;
+  }else{r.style.display="none";r.textContent="";}
+  const head="<thead><tr><th>#</th>"+data.metrics.map(m=>`<th>${m}</th>`).join("")+"</tr></thead>";
+  const rows=data.per_item.map(row=>
+    `<tr><td>${row.index}</td>`+data.metrics.map(m=>`<td>${(row.scores[m]??0).toFixed(3)}</td>`).join("")+"</tr>").join("");
+  $("#table").innerHTML=head+"<tbody>"+rows+"</tbody>";
+}
+$("#sample").onclick=()=>{$("#items").value=SAMPLE;run();};
+$("#run").onclick=run;
+// in-panel judge controls write through to cfg so the drawer stays consistent
+$("#provider").onchange=()=>{cfg.mode=$("#provider").value;};
+$("#model").oninput=()=>{cfg.model=$("#model").value.trim();};
+
+/* ===================== POLISH KIT: theme toggle ===================== */
+const THEME_KEY="theme";
+function getTheme(){try{return localStorage.getItem(THEME_KEY)||"system"}catch{return "system"}}
+function effectiveDark(t){
+  if(t==="dark")return true; if(t==="light")return false;
+  return !window.matchMedia("(prefers-color-scheme: light)").matches;
+}
+function applyTheme(t){
+  const dark=effectiveDark(t);
+  document.documentElement.classList.toggle("light",!dark);
+  $("#themeicon").textContent=dark?"☾":"☀";
+  $("#themebtn").title=`Theme: ${t}`;
+}
+function setTheme(t){try{localStorage.setItem(THEME_KEY,t)}catch{} applyTheme(t); syncThemeSeg();}
+function syncThemeSeg(){const cur=getTheme();
+  $$("#themeseg .segbtn").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.theme===cur)));}
+$("#themebtn").onclick=()=>{const cur=getTheme();const next=effectiveDark(cur)?"light":"dark";setTheme(next);};
+$$("#themeseg .segbtn").forEach(b=>b.onclick=()=>setTheme(b.dataset.theme));
+window.matchMedia("(prefers-color-scheme: light)").addEventListener?.("change",()=>{if(getTheme()==="system")applyTheme("system");});
+applyTheme(getTheme());
+
+/* ===================== POLISH KIT: help modal ===================== */
+function openHelp(){$("#scrim").classList.add("open");$("#help").classList.add("open");
+  $("#help").setAttribute("aria-hidden","false");$("#closehelp").focus();}
+function closeHelp(){$("#scrim").classList.remove("open");$("#help").classList.remove("open");
+  $("#help").setAttribute("aria-hidden","true");}
+$("#helpbtn").onclick=openHelp;$("#closehelp").onclick=closeHelp;
+$("#scrim").onclick=()=>{closeDrawer();closeHelp();};
+document.addEventListener("keydown",e=>{
+  const typing=/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName||"")||document.activeElement?.isContentEditable;
+  if(e.key==="Escape"){closeDrawer();closeHelp();}
+  else if(e.key==="?"&&!typing&&!$("#help").classList.contains("open")){e.preventDefault();openHelp();}
+});
+
+/* ===================== POLISH KIT: routing config ===================== */
+const MODE_BLURBS={
+  auto:"auto = free (OpenRouter) if keyed, else paid, else local Ollama, else mock.",
+  free:"free = OpenRouter free models only, then mock.",
+  paid:"paid = Anthropic, then OpenAI (your key), then mock.",
+  offline:"offline = local Ollama if reachable, else deterministic mock.",
+};
+const MODE_CHAIN={
+  auto:["openrouter","anthropic","openai","ollama"],
+  free:["openrouter"], paid:["anthropic","openai"], offline:["ollama"],
+};
+const PROVIDERS=["openrouter","anthropic","openai","ollama"];
+function selectMode(m){
+  $$("#modeseg .segbtn").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.mode===m)));
+  $("#modeblurb").textContent=MODE_BLURBS[m]||"";
+  $("#modeactive").textContent=`active: ${m}`;
+}
+function currentMode(){return $("#modeseg").querySelector('[aria-pressed="true"]')?.dataset.mode||"auto";}
+function renderRouting(){
+  const m=currentMode();
+  $("#modeactive").textContent=`active: ${m}`;
+  const avail=provStatus.available||{};const models=provStatus.models||{};
+  const rows=PROVIDERS.map(p=>{
+    const on=!!avail[p];
+    const mdl=on?(shortName(models[p])||""):"";
+    return `<div class="pstat"><span>${p}</span>
+      <span class="pmodel">${mdl}</span><span class="pdot ${on?'on':''}" title="${on?'available':'not configured'}"></span></div>`;
+  }).join("")+
+    `<div class="pstat"><span>mock (deterministic)</span>
+      <span class="pmodel">mock</span><span class="pdot on" title="always available"></span></div>`;
+  $("#provrows").innerHTML=rows;
+  const chain=(MODE_CHAIN[m]||[]).filter(p=>avail[p]);
+  const display=[...chain,"mock (deterministic)"];
+  $("#chainline").textContent=display.join("  →  ");
+}
+$$("#modeseg .segbtn").forEach(b=>b.onclick=()=>{selectMode(b.dataset.mode);renderRouting();});
+
+/* ===================== boot ===================== */
+async function boot(){
+  loadCfg();
+  selectMode(cfg.mode||"auto");  // seed routing segment before drawer/render
+  let ready=false;
+  for(let i=0;i<60 && !ready;i++){
+    try{const r=await fetch("health");if(r.ok){ready=true;break}}catch{}
+    if(i===4)$("#bootmsg").textContent="Still waking up…";
+    await new Promise(r=>setTimeout(r,1500));
+  }
+  $("#hdot").className="dot ok";$("#hstat").textContent="live";
+  $("#boot").classList.add("hide");setTimeout(()=>$("#boot").remove(),600);
+  $$(".reveal").forEach((el,i)=>setTimeout(()=>el.classList.add("in"),90*i));
+  await loadMetrics();
+  await loadProviders();
+}
+boot();
+</script>
+</body>
 </html>
