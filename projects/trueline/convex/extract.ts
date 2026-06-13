@@ -9,7 +9,7 @@ export const _getRaw = internalQuery({
   args: { invoiceId: v.id("invoices") },
   handler: async (ctx, { invoiceId }) => {
     const inv = await ctx.db.get(invoiceId);
-    return inv ? { rawText: inv.rawText } : null;
+    return inv ? { rawText: inv.rawText, invoiceNumber: inv.invoiceNumber } : null;
   },
 });
 
@@ -43,10 +43,23 @@ export const run = internalAction({
         latencyMs,
         costUsd,
       });
+      await ctx.runMutation(internal.invoices.appendLog, {
+        orgId,
+        level: "info",
+        event: "extract",
+        detail: `${inv.invoiceNumber}: ${provider}/${model} · ${lines.length} lines${costUsd ? ` · $${costUsd}` : ""}`,
+        latencyMs,
+      });
     } catch (err) {
       await ctx.runMutation(internal.invoices.markError, {
         invoiceId,
         error: String(err).slice(0, 300),
+      });
+      await ctx.runMutation(internal.invoices.appendLog, {
+        orgId,
+        level: "error",
+        event: "extract",
+        detail: String(err).slice(0, 200),
       });
     }
   },

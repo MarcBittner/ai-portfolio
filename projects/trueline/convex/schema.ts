@@ -101,6 +101,15 @@ export default defineSchema({
     .index("by_invoice", ["invoiceId"])
     .index("by_org_decision", ["orgId", "decision"]),
 
+  // Structured event log surfaced on the Diagnostics tab.
+  logs: defineTable({
+    orgId: v.string(),
+    level: v.union(v.literal("info"), v.literal("warn"), v.literal("error")),
+    event: v.string(),
+    detail: v.string(),
+    latencyMs: v.optional(v.number()),
+  }).index("by_org", ["orgId"]),
+
   // Per-tenant LLM routing configuration (set on the Configuration page).
   settings: defineTable({
     orgId: v.string(),

@@ -221,6 +221,12 @@ export const createInvoiceFromText = mutation({
       status: "extracting",
       uploadedBy: who,
     });
+    await ctx.db.insert("logs", {
+      orgId,
+      level: "info",
+      event: "upload",
+      detail: `${invoiceNumber} uploaded — extraction scheduled`,
+    });
     // hand off the external LLM work to an action (the only place I/O is legal)
     await ctx.scheduler.runAfter(0, internal.extract.run, { invoiceId, orgId });
     return invoiceId;
@@ -267,6 +273,12 @@ export const setBaselineFromText = mutation({
       .withIndex("by_org", (q) => q.eq("orgId", orgId))
       .first();
     if (!cat) for (const c of DEMO_CATALOG) await ctx.db.insert("catalog", { orgId, ...c });
+    await ctx.db.insert("logs", {
+      orgId,
+      level: "info",
+      event: "baseline",
+      detail: `contract loaded — ${lines.length} agreed line items`,
+    });
     return { poLines: lines.length };
   },
 });
@@ -407,5 +419,34 @@ export const markError = internalMutation({
   args: { invoiceId: v.id("invoices"), error: v.string() },
   handler: async (ctx, { invoiceId, error }) => {
     await ctx.db.patch(invoiceId, { status: "needs_review", error });
+  },
+});
+
+// ---- event log (Diagnostics tab) ----
+const levelV = v.union(v.literal("info"), v.literal("warn"), v.literal("error"));
+
+export const appendLog = internalMutation({
+  args: {
+    orgId: v.string(),
+    level: levelV,
+    event: v.string(),
+    detail: v.string(),
+    latencyMs: v.optional(v.number()),
+  },
+  handler: async (ctx, a) => {
+    await ctx.db.insert("logs", a);
+  },
+});
+
+export const recentLogs = query({
+  args: {},
+  handler: async (ctx) => {
+    const orgId = await optionalOrg(ctx);
+    if (!orgId) return [];
+    return ctx.db
+      .query("logs")
+      .withIndex("by_org", (q) => q.eq("orgId", orgId))
+      .order("desc")
+      .take(60);
   },
 });
