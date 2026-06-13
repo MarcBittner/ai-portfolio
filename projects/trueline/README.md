@@ -61,6 +61,30 @@ useMutation(createInvoiceFromText) ──▶ mutation: insert invoices{status:ex
 useQuery(getInvoice) re-runs ◀── reactive push (no polling) ── appendLog{event:extract}
 ```
 
+**Walking through one upload:**
+
+1. **Client → mutation.** The dashboard calls `createInvoiceFromText`. It's a *mutation*
+   because this is a transactional write — the invoice row (`status:"extracting"`) and an
+   audit log entry are inserted atomically.
+2. **The async hop.** A mutation can't call the LLM (mutations are deterministic and do no
+   external I/O, so Convex can safely auto-retry them). So it **schedules an action**
+   instead — `scheduler.runAfter(0, internal.extract.run)` — and returns immediately. The
+   new row already shows up in the UI as "extracting…".
+3. **Action reads its inputs.** An action has no `ctx.db`, so `extract.run` pulls the raw
+   text and the tenant's routing config through `runQuery` (each is its own transaction).
+4. **Extract.** `extractLineItems` calls the configured provider (paid Anthropic / free
+   OpenRouter) with the strict-JSON prompt; on a 429 or missing key it falls to the
+   deterministic parser. Either way it returns typed line items.
+5. **Verify + reconcile.** `reconcileLine` recomputes every total, matches each line to the
+   PO and catalog, computes variance, and flags it — pure code. **The model's numbers are
+   never trusted for math or the decision.**
+6. **Write back.** The action calls `writeResults` (a mutation) — one transaction,
+   idempotent on the invoice `_id` (clear-then-insert lines), patching status + totals +
+   latency/cost.
+7. **Live update.** Because the review screen subscribed with `useQuery(getInvoice)`,
+   Convex re-runs that query the instant `writeResults` commits and **pushes** the new data
+   — the row fills in live, no refresh and no polling code.
+
 ## Persistence layer (`convex/schema.ts`)
 
 Every row is `orgId`-scoped (the active Clerk org, else `user:<subject>`); reads filter
@@ -104,40 +128,101 @@ No ORM: types are generated from this schema (`convex/_generated`) and flow to t
 `useQuery`/`useMutation` hooks. Relationships are `v.id(...)` references resolved in code;
 no SQL joins.
 
-## API (Convex functions)
+## API reference (Convex functions)
 
-`query` = reactive read · `mutation` = ACID transaction · `action` = external I/O ·
-`internal*` = not client-callable.
+End-to-end typed via `convex/_generated`. Kinds: **query** (reactive, cached read),
+**mutation** (serializable ACID write), **action** (external I/O; not transactional),
+**internal\*** (server-only, not client-callable).
 
-```
-convex/invoices.ts
-  query    listInvoices()                              → (Invoice & {lineCount,red,yellow,green})[]
-  query    getInvoice({ invoiceId })                   → { invoice, lines[] } | null
-  query    stats()                                     → { invoices, recoverableUsd, needsReview, latestEval }
-  query    baseline()                                  → { hasPo, poLines, poNumber, vendor }
-  query    recentLogs()                                → Log[]  (60, desc)
-  mutation seedIfEmpty()                               → { seeded }
-  mutation setBaselineFromText({ rawText, poNumber? }) → { poLines }     // parsePoText → PO + catalog
-  mutation createInvoiceFromText({ invoiceNumber, rawText, poNumber? }) → Id  // schedules extract.run
-  mutation reviewLine({ lineId, decision })            // approved | rejected
-  mutation correctLine({ lineId, unitPrice, quantity? })  // re-runs reconcileLine, decision="edited"
-  mutation setInvoiceStatus({ invoiceId, status })
-  mutation resetDemo()                                 // clears the tenant
-  internalMutation writeResults / markError / appendLog
-convex/extract.ts
-  internalQuery  _getRaw({ invoiceId })                → { rawText, invoiceNumber }
-  internalAction run({ invoiceId, orgId })             // LLM → reconcile → writeResults (+ latency/cost/log)
-convex/routing.ts
-  query    get()    → { mode, model, keys:{free,paid}, defaultFreeModel, defaultPaidModel, activeMode }
-  mutation set({ mode, model? })
-  internalQuery _forExtract({ orgId }) → { mode, model }
-convex/evals.ts        mutation runEval() → EvalRun · query listEvals() → EvalRun[]
-convex/diagnostics.ts  action benchmark({ invoiceText }) → [{ mode, provider, model, latencyMs, lines, error }]
-```
+**Auth.** Every public function derives the tenant from the Clerk identity (`org_id`
+claim, else `user:<subject>`). Reads use `optionalOrg` and return an empty result when
+unauthenticated (so a transient render can't throw); writes call `requireOrg` and
+**throw `Error("Not authenticated")`**. Cross-tenant access returns `null` / "not
+found".
 
-HTTP equivalents (used by the client + testable directly):
-`POST {CONVEX_URL}/api/query` and `/api/mutation` with `{ path, args, format:"json" }` and a
-`Authorization: Bearer <clerk-jwt>` header.
+**Transport.** The browser uses Convex's reactive websocket client. Any function is
+also callable over HTTP:
+`POST {NEXT_PUBLIC_CONVEX_URL}/api/{query|mutation|action}` with body
+`{"path":"file:function","args":{…},"format":"json"}` and header
+`Authorization: Bearer <Clerk JWT from the "convex" template>`. Response is
+`{"status":"success","value":…}` or `{"status":"error","errorMessage":…}`.
+
+### `invoices.ts`
+
+**`query listInvoices() → InvoiceRow[]`** — newest-first invoices for the tenant, each
+augmented with flag rollups `{ lineCount, red, yellow, green }`. `[]` if unauthenticated.
+
+**`query getInvoice({ invoiceId: Id<"invoices"> }) → { invoice, lines } | null`** — the
+invoice plus its `invoiceLines` sorted by `lineNo`; `null` if missing or owned by
+another tenant.
+
+**`query stats() → { invoices, recoverableUsd, needsReview, latestEval }`** — dashboard
+rollups (`latestEval: EvalRun | null`).
+
+**`query baseline() → { hasPo, poLines, poNumber, vendor }`** — whether a contract/PO is
+loaded; drives the guided stepper.
+
+**`query recentLogs() → Log[]`** — newest 60 event-log rows.
+
+**`mutation seedIfEmpty() → { seeded: boolean }`** — no-op if any invoice exists, else
+inserts the demo PO + catalog + three invoices (reconciled inline). Idempotent.
+
+**`mutation setBaselineFromText({ rawText: string, poNumber?: string }) → { poLines }`** —
+parses a PO file (`lib/parse.ts:parsePoText`), **replaces** existing POs, seeds the
+market catalog if absent. Throws if no line items parse.
+
+**`mutation createInvoiceFromText({ invoiceNumber: string, rawText: string, poNumber?: string }) → Id<"invoices">`** —
+inserts the invoice as `status:"extracting"`, logs it, and **schedules**
+`internal.extract.run` via `scheduler.runAfter(0, …)`. Returns immediately; extraction
+finishes async and the UI updates reactively.
+
+**`mutation reviewLine({ lineId: Id<"invoiceLines">, decision: "approved"|"rejected" }) → void`** —
+records the reviewer's decision + identity on a line.
+
+**`mutation correctLine({ lineId: Id<"invoiceLines">, unitPrice: number, quantity?: number }) → void`** —
+applies a corrected price/qty, **re-runs `reconcileLine`** (flags + recoverable
+recompute), marks the line `decision:"edited"` (an edit becomes a label).
+
+**`mutation setInvoiceStatus({ invoiceId, status: "approved"|"rejected"|"needs_review" }) → void`**
+
+**`mutation resetDemo() → { cleared: true }`** — deletes every row for the tenant
+(invoices, lines, PO, catalog, evals, logs).
+
+**`internalMutation writeResults({ invoiceId, orgId, lines, provider, model, latencyMs?, costUsd? })`** —
+called by the action. **One transaction**: clears + re-inserts `invoiceLines`
+(idempotent on the invoice `_id`), reconciles each line, patches the invoice with
+status/totals/telemetry. `markError` and `appendLog` are the error/log sinks.
+
+### `extract.ts`
+
+**`internalQuery _getRaw({ invoiceId }) → { rawText, invoiceNumber } | null`**
+
+**`internalAction run({ invoiceId, orgId })`** — the only place external I/O is legal.
+Reads raw text + routing config (`runQuery`), calls `extractLineItems`, measures latency
+and estimates cost, writes back via `runMutation writeResults`, appends a log. Not
+auto-retried — safe to re-run because the write is idempotent.
+
+### `routing.ts`
+
+**`query get() → { mode, model, keys:{free,paid}, defaultFreeModel, defaultPaidModel, activeMode }`** —
+the tenant's routing config + live key availability (env-derived) + the mode a run
+resolves to now.
+
+**`mutation set({ mode: "auto"|"free"|"paid"|"offline", model?: string }) → { ok: true }`** —
+upserts `settings`.
+
+**`internalQuery _forExtract({ orgId }) → { mode, model }`** — read by the action.
+
+### `evals.ts`
+
+**`mutation runEval() → EvalRun`** — scores the labeled set; inserts + returns the run.
+**`query listEvals() → EvalRun[]`** — newest 10.
+
+### `diagnostics.ts`
+
+**`action benchmark({ invoiceText: string }) → { mode, provider, model, latencyMs, lines, error }[]`** —
+runs the same invoice through `offline`, `free`, and `paid`; returns the comparison and
+logs it.
 
 ## LLM integration (`convex/lib/llm.ts`)
 
@@ -184,6 +269,10 @@ OpenRouter free tier is 50 req/day; past that a run resolves to the mock (shown 
 review header + Diagnostics).
 
 ## Reconcile algorithm (`convex/lib/reconcile.ts`, pure)
+
+This is where the money decisions are made. The LLM has *proposed* line items; these pure
+functions (no DB, no I/O — so they're trivially unit-testable and make the eval
+reproducible) recompute the math, match each line to the baselines, and decide the flag.
 
 ```
 computedExtension = round2(quantity × unitPrice);  mathOk = |computed − claimed| ≤ 0.015
