@@ -92,9 +92,23 @@
           (h.ocr_backend === "samples-only" ? " (install the 'ocr' extra + tesseract for real image OCR)" : "");
         try {
           const p = await fetch("/providers").then((r) => r.json());
-          for (const n of Object.keys(p.available))
-            $("provider").insertAdjacentHTML("beforeend",
-              `<option value="${n}">${n}${p.available[n] ? "" : " (unavailable)"}</option>`);
+          const shortName = (m) => (m || "").split("/").pop().replace(/:free$/, "");
+          const sel = $("provider");
+          sel.innerHTML = `<option value="auto" selected>Auto (recommended)</option>`;
+          if (p.available.free)
+            sel.insertAdjacentHTML("beforeend",
+              `<option value="free">Free · ${shortName(p.free_models && p.free_models[0])}</option>`);
+          sel.insertAdjacentHTML("beforeend",
+            `<option value="offline">Offline (deterministic)</option>`);
+          if (p.available.paid)
+            sel.insertAdjacentHTML("beforeend",
+              `<option value="paid">Paid (your key)</option>`);
+          const liveNote = document.createElement("span");
+          liveNote.style.cssText = "font-size:12px;color:var(--muted);margin-left:8px";
+          liveNote.textContent = "Live: " + p.active_mode +
+            (p.active_mode === "free" && p.free_models && p.free_models[0]
+              ? " · " + shortName(p.free_models[0]) : "");
+          sel.parentNode.appendChild(liveNote);
         } catch { /* optional */ }
         renderDoc("orig", SAMPLES[$("sample").value], []);
         $("redacted").innerHTML = "";

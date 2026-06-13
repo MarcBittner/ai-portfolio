@@ -73,12 +73,13 @@
         <div class="metrics" id="metrics"></div>
         <div class="row" style="margin-top:12px; border-top:1px solid var(--border); padding-top:10px">
           <label>LLM judge provider
-            <select id="provider"><option value="auto">auto</option></select>
+            <select id="provider"><option value="auto">Auto (recommended)</option></select>
           </label>
           <label>model <input id="model" placeholder="(default)" style="width:150px" /></label>
           <span class="spacer"></span>
           <span id="ollamaStatus" style="font-size:12px;color:var(--muted)">checking Ollama…</span>
         </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px"><span id="providerLive"></span></div>
         <div id="routing" style="font-size:12px;color:var(--muted);font-family:ui-monospace,Menlo,monospace;margin-top:6px"></div>
       </div>
 
@@ -119,9 +120,19 @@
           .join("");
         try {
           const p = await fetch("/providers").then((r) => r.json());
-          for (const name of Object.keys(p.available))
-            $("provider").insertAdjacentHTML("beforeend",
-              `<option value="${name}">${name}${p.available[name] ? "" : " (unavailable)"}</option>`);
+          const shortName = (m) => (m || "").split("/").pop().replace(/:free$/, "");
+          const sel = $("provider");
+          const freeLabel = "Free · " + shortName((p.free_models || [])[0] || "");
+          sel.insertAdjacentHTML("beforeend",
+            `<option value="free">${freeLabel}</option>` +
+            `<option value="offline">Offline (deterministic)</option>` +
+            (p.available.paid ? `<option value="paid">Paid (your key)</option>` : ""));
+          sel.value = "auto";
+          const liveNote = $("providerLive");
+          if (liveNote) {
+            const suf = p.active_mode === "free" ? " · " + shortName((p.free_models || [])[0] || "") : "";
+            liveNote.textContent = "Live: " + p.active_mode + suf;
+          }
           $("ollamaStatus").textContent = p.available.ollama
             ? `Ollama: reachable (${p.models.ollama})` : "Ollama: not reachable → fallback";
         } catch { /* providers optional */ }

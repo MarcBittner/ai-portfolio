@@ -25,7 +25,7 @@ from doc_extract.models import (
 from doc_extract.schemas import SCHEMA_NAMES, SCHEMAS
 
 STATIC_DIR = Path(__file__).parent / "static"
-VALID_PROVIDERS = ("auto", *llm.PROVIDERS)
+VALID_PROVIDERS = ("auto", "free", "paid", "offline", *llm.PROVIDERS)
 
 app = FastAPI(
     title="doc-extract",

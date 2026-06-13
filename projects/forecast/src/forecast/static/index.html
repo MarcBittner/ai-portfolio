@@ -52,7 +52,8 @@
         <label>Horizon</label>
         <input type="number" id="horizon" value="6" min="1" max="200" />
         <label><input type="checkbox" id="useLlm" checked /> LLM summary</label>
-        <label>provider <select id="provider"><option value="auto">auto</option></select></label>
+        <label>provider <select id="provider"><option value="auto">Auto (recommended)</option></select></label>
+        <span id="providerState" class="small" style="display:none"></span>
         <div class="spacer"></div>
         <label class="csv" style="cursor:pointer">📄 CSV
           <input type="file" id="csv" accept=".csv,text/csv" style="display:none" /></label>
@@ -97,9 +98,20 @@
           b.addEventListener("click", () => { $("series").value = SAMPLES[b.dataset.k]; run(); }));
         try {
           const p = await fetch("/providers").then((r) => r.json());
-          for (const n of Object.keys(p.available))
-            $("provider").insertAdjacentHTML("beforeend",
-              `<option value="${n}">${n}${p.available[n] ? "" : " (unavailable)"}</option>`);
+          const shortName = (s) => (s || "").split("/").pop().replace(/:free$/, "");
+          const sel = $("provider");
+          const freeLabel = p.free_models && p.free_models[0]
+            ? "Free · " + shortName(p.free_models[0]) : "Free";
+          sel.insertAdjacentHTML("beforeend", `<option value="free">${freeLabel}</option>`);
+          sel.insertAdjacentHTML("beforeend", `<option value="offline">Offline (deterministic)</option>`);
+          if (p.available && p.available.paid)
+            sel.insertAdjacentHTML("beforeend", `<option value="paid">Paid (your key)</option>`);
+          sel.value = "auto";
+          const state = $("providerState");
+          const activeLabel = p.active_mode === "free" && p.free_models && p.free_models[0]
+            ? p.active_mode + " · " + shortName(p.free_models[0]) : (p.active_mode || "");
+          state.textContent = "Live: " + activeLabel;
+          state.style.display = "";
         } catch { /* optional */ }
       }
       function parseSeries() {

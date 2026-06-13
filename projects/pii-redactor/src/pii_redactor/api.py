@@ -28,7 +28,7 @@ from pii_redactor.redact import STYLES, redact_spans
 
 STATIC_DIR = Path(__file__).parent / "static"
 ALL_TYPES = list(TYPE_NAMES) + list(LLM_TYPES)
-VALID_PROVIDERS = ("auto", *llm.PROVIDERS)
+VALID_PROVIDERS = ("auto", "free", "paid", "offline", *llm.PROVIDERS)
 
 app = FastAPI(
     title="pii-redactor",

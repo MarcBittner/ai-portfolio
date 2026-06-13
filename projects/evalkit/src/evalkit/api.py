@@ -28,7 +28,7 @@ from evalkit.models import (
 
 STATIC_DIR = Path(__file__).parent / "static"
 ALL_METRICS = list(METRIC_NAMES) + [JUDGE_NAME]
-VALID_PROVIDERS = ("auto", *llm.PROVIDERS)
+VALID_PROVIDERS = ("auto", "free", "paid", "offline", *llm.PROVIDERS)
 
 app = FastAPI(
     title="evalkit",

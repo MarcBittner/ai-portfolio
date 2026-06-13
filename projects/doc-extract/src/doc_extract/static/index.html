@@ -68,7 +68,8 @@
       </div>
       <div class="row">
         <label><input type="checkbox" id="useLlm" checked /> LLM fill missing</label>
-        <label>provider <select id="provider"><option value="auto">auto</option></select></label>
+        <label>provider <select id="provider"><option value="auto">Auto (recommended)</option></select></label>
+        <span id="providerState" style="font-size:12px;color:var(--muted)"></span>
         <label>model <input id="model" placeholder="(default)" style="width:140px" /></label>
         <span class="spacer"></span>
         <span id="ollamaStatus" style="font-size:12px;color:var(--muted)">checking Ollama…</span>
@@ -146,12 +147,26 @@
         render(data, text);
       }
 
+      function shortName(model) {
+        return (model || "").split("/").pop().replace(/:free$/, "");
+      }
+
       async function loadProviders() {
         try {
           const p = await fetch("/providers").then((r) => r.json());
-          for (const n of Object.keys(p.available))
-            $("provider").insertAdjacentHTML("beforeend",
-              `<option value="${n}">${n}${p.available[n] ? "" : " (unavailable)"}</option>`);
+          const sel = $("provider");
+          const freeLabel = "Free · " + shortName((p.free_models || [])[0] || "");
+          sel.insertAdjacentHTML("beforeend",
+            `<option value="free">${freeLabel}</option>`);
+          sel.insertAdjacentHTML("beforeend",
+            `<option value="offline">Offline (deterministic)</option>`);
+          if (p.available.paid)
+            sel.insertAdjacentHTML("beforeend",
+              `<option value="paid">Paid (your key)</option>`);
+          sel.value = "auto";
+          const activeShort = p.active_mode === "free"
+            ? " · " + shortName((p.free_models || [])[0] || "") : "";
+          $("providerState").textContent = "Live: " + (p.active_mode || "") + activeShort;
           $("ollamaStatus").textContent = p.available.ollama
             ? `Ollama: reachable (${p.models.ollama})` : "Ollama: not reachable → deterministic only";
         } catch { /* optional */ }

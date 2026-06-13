@@ -102,11 +102,20 @@
           b.addEventListener("click", () => { $("q").value = b.dataset.q; run(); }));
         try {
           const p = await fetch("/providers").then((r) => r.json());
-          for (const n of Object.keys(p.available))
-            $("provider").insertAdjacentHTML("beforeend",
-              `<option value="${n}">${n}${p.available[n] ? "" : " (unavailable)"}</option>`);
-          $("ollamaStatus").textContent = p.available.ollama
-            ? `Ollama: reachable (${p.models.ollama})` : "Ollama: not reachable → rule planner";
+          const shortName = (m) => (m || "").split("/").pop().replace(/:free$/, "");
+          const sel = $("provider");
+          sel.innerHTML = "";
+          sel.insertAdjacentHTML("beforeend", `<option value="auto" selected>Auto (recommended)</option>`);
+          const freeLabel = p.free_models && p.free_models[0]
+            ? `Free · ${shortName(p.free_models[0])}` : "Free";
+          sel.insertAdjacentHTML("beforeend", `<option value="free">${freeLabel}</option>`);
+          sel.insertAdjacentHTML("beforeend", `<option value="offline">Offline (deterministic)</option>`);
+          if (p.available.paid)
+            sel.insertAdjacentHTML("beforeend", `<option value="paid">Paid (your key)</option>`);
+          const liveNote = p.active_mode === "free" && p.free_models && p.free_models[0]
+            ? `Live: ${p.active_mode} · ${shortName(p.free_models[0])}`
+            : `Live: ${p.active_mode || "unknown"}`;
+          $("ollamaStatus").textContent = liveNote;
         } catch { /* optional */ }
       }
 

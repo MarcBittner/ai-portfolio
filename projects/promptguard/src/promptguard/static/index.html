@@ -108,7 +108,7 @@
       function esc(s) {
         return String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
       }
-      function loadSamples() {
+      async function loadSamples() {
         $("samples").innerHTML = SAMPLES.map(
           (s, i) => `<button data-i="${i}">${s[0]}</button>`).join("");
         $("samples").querySelectorAll("button").forEach((b) =>
@@ -118,9 +118,22 @@
           }));
         try {
           const p = await fetch("/providers").then((r) => r.json());
-          for (const n of Object.keys(p.available))
-            $("provider").insertAdjacentHTML("beforeend",
-              `<option value="${n}">${n}${p.available[n] ? "" : " (unavailable)"}</option>`);
+          const shortName = (m) => (m || "").replace(/:free$/, "").replace(/^.*\//, "");
+          const sel = $("provider");
+          sel.innerHTML = "";
+          sel.insertAdjacentHTML("beforeend", `<option value="auto">Auto (recommended)</option>`);
+          const freeLabel = p.free_models && p.free_models[0]
+            ? "Free · " + shortName(p.free_models[0]) : "Free";
+          sel.insertAdjacentHTML("beforeend", `<option value="free">${freeLabel}</option>`);
+          sel.insertAdjacentHTML("beforeend", `<option value="offline">Offline (deterministic)</option>`);
+          if (p.available && p.available.paid)
+            sel.insertAdjacentHTML("beforeend", `<option value="paid">Paid (your key)</option>`);
+          sel.value = "auto";
+          const liveText = "Live: " + p.active_mode +
+            (p.active_mode === "free" && p.free_models && p.free_models[0]
+              ? " · " + shortName(p.free_models[0]) : "");
+          $("routing").insertAdjacentHTML("afterend",
+            `<div id="provider-live" class="small" style="font-family:ui-monospace,Menlo,monospace;margin:0 0 6px">${liveText}</div>`);
         } catch { /* optional */ }
       }
 

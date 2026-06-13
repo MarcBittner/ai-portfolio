@@ -36,7 +36,7 @@ from multimodal_ocr.pipeline import process, tokens_to_text
 
 STATIC_DIR = Path(__file__).parent / "static"
 ALL_TYPES = list(TYPE_NAMES) + list(LLM_TYPES)
-VALID_PROVIDERS = ("auto", *llm.PROVIDERS)
+VALID_PROVIDERS = ("auto", "free", "paid", "offline", *llm.PROVIDERS)
 
 app = FastAPI(
     title="multimodal-ocr",

@@ -17,7 +17,7 @@ from llm_gateway.models import CompleteRequest, ExtractRequest, HealthResponse
 from llm_gateway.policy import DEFAULT
 
 STATIC_DIR = Path(__file__).parent / "static"
-VALID_PROVIDERS = ("auto", *llm.PROVIDERS)
+VALID_PROVIDERS = ("auto", "free", "paid", "offline", *llm.PROVIDERS)
 
 app = FastAPI(
     title="llm-gateway",

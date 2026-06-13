@@ -300,8 +300,22 @@ async function boot(){
   }catch{}
   try{
     const pr=await j("providers");
-    const opts=["auto",...Object.keys(pr.available)];
-    $("#cfgProvider").innerHTML=opts.map(o=>`<option value="${o}">${o}</option>`).join("");
+    const shortName=s=>(s||"").split("/").pop().replace(/:free$/,"");
+    const freeShort=pr.free_models&&pr.free_models.length?shortName(pr.free_models[0]):"";
+    const opts=[
+      {v:"auto",   label:"Auto (recommended)"},
+      {v:"free",   label:`Free · ${freeShort}`},
+      {v:"offline",label:"Offline (deterministic)"},
+      ...(pr.available.paid?[{v:"paid",label:"Paid (your key)"}]:[]),
+    ];
+    $("#cfgProvider").innerHTML=opts.map(o=>`<option value="${o.v}">${o.label}</option>`).join("");
+    const liveHint=pr.active_mode==="free"&&freeShort
+      ?`Live: ${pr.active_mode} · ${freeShort}`
+      :`Live: ${pr.active_mode||pr.mode}`;
+    const providerLabel=$("#drawer").querySelector("#cfgProvider").closest(".field").querySelector("label");
+    let hintEl=providerLabel.querySelector(".live-hint");
+    if(!hintEl){hintEl=document.createElement("span");hintEl.className="hint live-hint";providerLabel.appendChild(hintEl);}
+    hintEl.textContent=liveHint;
     $("#cfgAvail").innerHTML=Object.entries(pr.available).map(([k,v])=>
       `<span class="pchip ${v?'on':''}">${k} ${v?'✓':'·'}</span>`).join("");
     applyCfgToForm();

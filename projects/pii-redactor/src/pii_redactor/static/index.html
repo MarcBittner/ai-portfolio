@@ -60,7 +60,8 @@
         <div class="settings">
           <label><input type="checkbox" id="useLlm" checked /> LLM NER pass</label>
           <label>Provider
-            <select id="provider"><option value="auto">auto (Ollama→fallback)</option></select>
+            <select id="provider"><option value="auto">Auto (recommended)</option></select>
+            <span class="pill" id="providerState" style="font-size:11px;margin-left:4px"></span>
           </label>
           <label>Model <input id="model" placeholder="(default)" style="width:160px" /></label>
           <label>Redaction style
@@ -123,16 +124,34 @@
 
       function esc(s){return s.replace(/[&<>]/g,(c)=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));}
 
+      function shortName(m) {
+        if (!m) return "";
+        return (m.split("/").pop() || m).replace(/:free$/, "");
+      }
+
       async function init() {
         try {
           const p = await fetch("/providers").then((r) => r.json());
           const sel = $("provider");
-          for (const name of Object.keys(p.available)) {
-            const ok = p.available[name];
+          // Remove default placeholder; we build the curated list below
+          sel.innerHTML = "";
+
+          const add = (value, text, selected) => {
             const o = document.createElement("option");
-            o.value = name; o.textContent = `${name}${ok ? "" : " (unavailable)"}`;
+            o.value = value; o.textContent = text;
+            if (selected) o.selected = true;
             sel.appendChild(o);
-          }
+          };
+
+          add("auto", "Auto (recommended)", true);
+          add("free", "Free · " + shortName((p.free_models || [])[0]));
+          add("offline", "Offline (deterministic)");
+          if (p.available.paid) add("paid", "Paid (your key)");
+
+          // Live-state note
+          const freeLabel = p.active_mode === "free" ? " · " + shortName((p.free_models || [])[0]) : "";
+          $("providerState").textContent = "Live: " + p.active_mode + freeLabel;
+
           $("ollamaStatus").textContent = p.available.ollama
             ? `Ollama: reachable (${p.models.ollama})` : "Ollama: not reachable → mock fallback";
         } catch { $("ollamaStatus").textContent = "providers: unavailable"; }

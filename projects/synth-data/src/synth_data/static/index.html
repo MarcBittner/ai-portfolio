@@ -103,11 +103,23 @@
         setSchema();
         try {
           const p = await fetch("/providers").then((r) => r.json());
-          for (const n of Object.keys(p.available))
-            $("provider").insertAdjacentHTML("beforeend",
-              `<option value="${n}">${n}${p.available[n] ? "" : " (unavailable)"}</option>`);
-          $("ollamaStatus").textContent = p.available.ollama
-            ? `Ollama: reachable (${p.models.ollama})` : "Ollama: not reachable → placeholder";
+          const shortName = (m) => (m || "").split("/").pop().replace(/:free$/, "");
+          const sel = $("provider");
+          sel.innerHTML = "";
+          const add = (val, label) => {
+            const o = document.createElement("option");
+            o.value = val; o.textContent = label; sel.appendChild(o);
+          };
+          add("auto", "Auto (recommended)");
+          const fm = p.free_models && p.free_models[0] ? " · " + shortName(p.free_models[0]) : "";
+          add("free", "Free" + fm);
+          add("offline", "Offline (deterministic)");
+          if (p.available.paid) add("paid", "Paid (your key)");
+          sel.value = "auto";
+          const liveNote = p.active_mode === "free"
+            ? "Live: free" + (p.free_models && p.free_models[0] ? " · " + shortName(p.free_models[0]) : "")
+            : "Live: " + (p.active_mode || "unknown");
+          $("ollamaStatus").textContent = liveNote;
         } catch { /* optional */ }
       }
       function setSchema() {

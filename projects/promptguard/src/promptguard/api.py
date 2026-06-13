@@ -25,7 +25,7 @@ from promptguard.rules import RULES, SEVERITY_WEIGHT
 from promptguard.scan import Finding, counts_by_category, scan
 
 STATIC_DIR = Path(__file__).parent / "static"
-VALID_PROVIDERS = ("auto", *llm.PROVIDERS)
+VALID_PROVIDERS = ("auto", "free", "paid", "offline", *llm.PROVIDERS)
 
 app = FastAPI(
     title="promptguard",

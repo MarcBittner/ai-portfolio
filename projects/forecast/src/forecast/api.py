@@ -26,7 +26,7 @@ from forecast.models import (
 )
 
 STATIC_DIR = Path(__file__).parent / "static"
-VALID_PROVIDERS = ("auto", *llm.PROVIDERS)
+VALID_PROVIDERS = ("auto", "free", "paid", "offline", *llm.PROVIDERS)
 
 app = FastAPI(
     title="forecast",

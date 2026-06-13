@@ -20,7 +20,7 @@ from reconcile.review import build_queue
 from reconcile.variance import reconcile_items
 
 STATIC_DIR = Path(__file__).parent / "static"
-VALID_PROVIDERS = ("auto", *llm.PROVIDERS)
+VALID_PROVIDERS = ("auto", "free", "paid", "offline", *llm.PROVIDERS)
 
 app = FastAPI(
     title="reconcile",
