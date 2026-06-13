@@ -23,7 +23,16 @@ export const run = internalAction({
       const inv = await ctx.runQuery(internal.extract._getRaw, { invoiceId });
       if (!inv) return;
       const routing = await ctx.runQuery(internal.routing._forExtract, { orgId });
+      const t0 = Date.now();
       const { lines, provider, model } = await extractLineItems(inv.rawText, routing);
+      const latencyMs = Date.now() - t0;
+      // rough cost estimate (paid only); free + offline are $0
+      const inTok = Math.ceil(inv.rawText.length / 4);
+      const outTok = Math.ceil(JSON.stringify(lines).length / 4);
+      const costUsd =
+        provider === "anthropic"
+          ? Math.round(((inTok / 1e6) * 1 + (outTok / 1e6) * 5) * 1e6) / 1e6
+          : 0;
       // batch all DB writes into a single mutation (one transaction)
       await ctx.runMutation(internal.invoices.writeResults, {
         invoiceId,
@@ -31,6 +40,8 @@ export const run = internalAction({
         lines,
         provider,
         model,
+        latencyMs,
+        costUsd,
       });
     } catch (err) {
       await ctx.runMutation(internal.invoices.markError, {

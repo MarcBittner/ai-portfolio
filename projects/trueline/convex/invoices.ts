@@ -386,13 +386,17 @@ export const writeResults = internalMutation({
     ),
     provider: v.string(),
     model: v.string(),
+    latencyMs: v.optional(v.number()),
+    costUsd: v.optional(v.number()),
   },
-  handler: async (ctx, { invoiceId, orgId, lines, provider, model }) => {
+  handler: async (ctx, { invoiceId, orgId, lines, provider, model, latencyMs, costUsd }) => {
     const rollup = await insertReconciledLines(ctx, { orgId, invoiceId, extracted: lines });
     await ctx.db.patch(invoiceId, {
       status: "needs_review",
       extractionProvider: provider,
       extractionModel: model,
+      latencyMs,
+      costUsd,
       error: undefined,
       ...rollup,
     });

@@ -62,6 +62,8 @@ export default defineSchema({
     recoverableUsd: v.optional(v.number()),
     extractionProvider: v.optional(v.string()),
     extractionModel: v.optional(v.string()),
+    latencyMs: v.optional(v.number()),
+    costUsd: v.optional(v.number()),
     error: v.optional(v.string()),
     uploadedBy: v.optional(v.string()),
   })

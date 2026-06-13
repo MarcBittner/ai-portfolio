@@ -13,6 +13,12 @@ export function Nav() {
         Dashboard
       </Link>
       <Link
+        href="/app/evals"
+        className="rounded-md px-2 py-1 text-sm text-[--color-muted] hover:text-[--color-ink]"
+      >
+        Evals
+      </Link>
+      <Link
         href="/app/settings"
         className="rounded-md px-2 py-1 text-sm text-[--color-muted] hover:text-[--color-ink]"
       >

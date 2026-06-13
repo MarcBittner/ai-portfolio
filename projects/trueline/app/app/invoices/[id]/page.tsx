@@ -79,7 +79,12 @@ export default function InvoiceReview() {
         <h1 className="text-xl font-semibold">{invoice.invoiceNumber}</h1>
         <StatusBadge status={invoice.status} />
         <span className="text-sm text-[--color-muted]">
-          {invoice.vendor} · vs {invoice.poNumber} · {providerLabel(invoice.extractionProvider, invoice.extractionModel)}
+          {invoice.vendor} · vs {invoice.poNumber} ·{" "}
+          {providerLabel(invoice.extractionProvider, invoice.extractionModel)}
+          {invoice.latencyMs != null ? ` · ${(invoice.latencyMs / 1000).toFixed(1)}s` : ""}
+          {invoice.costUsd != null
+            ? ` · ${invoice.costUsd === 0 ? "$0" : "~$" + invoice.costUsd}`
+            : ""}
         </span>
         <div className="ml-auto flex items-center gap-3">
           <div className="text-right">

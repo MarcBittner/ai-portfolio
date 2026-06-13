@@ -47,9 +47,10 @@ export function StatusBadge({ status }: { status: string }) {
       className={cn(
         "rounded-full px-2 py-0.5 text-xs font-medium",
         tone[status] ?? "bg-white/10 text-[--color-muted]",
+        status === "extracting" && "animate-pulse",
       )}
     >
-      {status.replace("_", " ")}
+      {status === "extracting" ? "extracting…" : status.replace("_", " ")}
     </span>
   );
 }
