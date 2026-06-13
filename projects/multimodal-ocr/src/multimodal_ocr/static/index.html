@@ -1,165 +1,582 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>multimodal-ocr</title>
-    <style>
-      :root {
-        --bg: #0b0e14; --panel: #131722; --border: #232838; --fg: #e6e9ef;
-        --muted: #8b93a7; --accent: #6ea8fe; --bad: #ff6b6b;
-      }
-      * { box-sizing: border-box; }
-      body { margin: 0; background: var(--bg); color: var(--fg);
-        font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
-      main { max-width: 900px; margin: 0 auto; padding: 28px 20px 60px; }
-      h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -0.01em; }
-      p.lede { color: var(--muted); margin: 0 0 16px; }
-      .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 10px 0; }
-      .spacer { flex: 1; }
-      label { font-size: 13px; color: var(--muted); }
-      select, button { background: #1b2230; color: var(--fg); border: 1px solid var(--border);
-        border-radius: 7px; padding: 6px 12px; font-size: 13px; cursor: pointer; }
-      button.primary { background: var(--accent); color: #07101f; border-color: var(--accent); font-weight: 600; }
-      .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-top: 14px; }
-      .panel h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin: 0 0 10px; }
-      svg { background: #f6f6f2; border-radius: 6px; width: 100%; }
-      svg text { fill: #1a1d24; font-family: ui-monospace, Menlo, monospace; }
-      pre { white-space: pre-wrap; word-break: break-word; background: #0e1320; border: 1px solid var(--border);
-        border-radius: 8px; padding: 10px; font: 12px/1.5 ui-monospace, Menlo, monospace; }
-      table { width: 100%; border-collapse: collapse; font-size: 13px; }
-      th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--border); }
-      th { color: var(--muted); font-weight: 500; font-size: 11px; text-transform: uppercase; }
-      .grid2 { display: grid; gap: 14px; grid-template-columns: 1fr 1fr; }
-      @media (max-width: 760px){ .grid2 { grid-template-columns: 1fr; } }
-      .small { color: var(--muted); font-size: 12px; }
-      a { color: var(--accent); }
-    </style>
-  </head>
-  <body>
-    <main>
-      <h1>multimodal-ocr</h1>
-      <p class="lede">
-        OCR → PII detection → <b>box-level redaction</b>. The pipeline maps each
-        detected PII span back to the OCR tokens it covers and blacks out their
-        boxes. Offline on bundled samples; real OCR (Tesseract) is opt-in.
-      </p>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>multimodal-ocr — OCR → PII → box-level redaction</title>
+<!-- POLISH KIT: theme-init (apply before paint, no flash) -->
+<script>
+(function(){
+  try{
+    var t=localStorage.getItem("theme")||"system";
+    var dark = t==="dark" || (t==="system" && !window.matchMedia("(prefers-color-scheme: light)").matches);
+    if(!dark) document.documentElement.classList.add("light");
+  }catch(e){}
+})();
+</script>
+<style>
+  /* ============================ design system ============================ */
+  :root{
+    --bg:#0a0d14; --bg-grad-1:#0e1322; --bg-grad-2:#0a0d14;
+    --surface:#131826; --surface-2:#1a2032; --surface-3:#212a40;
+    --line:#263149; --line-2:#33405d;
+    --ink:#e9eef7; --ink-dim:#97a3ba; --ink-faint:#67728a;
+    --accent:#6aa1ff; --accent-2:#9b86ff; --accent-ink:#06101f;
+    --ok:#43c98a; --warn:#e6ad52; --bad:#f15b6c; --info:#6aa1ff; --violet:#9b86ff;
+    --r:15px; --r-sm:10px; --r-xs:7px;
+    --sh:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.5);
+    --sh-lg:0 1px 2px rgba(0,0,0,.4), 0 24px 64px -24px rgba(0,0,0,.7);
+    --grad:linear-gradient(135deg,var(--accent),var(--accent-2));
+    --ease:cubic-bezier(.22,.61,.36,1);
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+    --header-bg:rgba(10,13,20,.72);
+    --bg-radial-1:rgba(107,130,255,.10); --bg-radial-2:rgba(67,201,138,.05);
+    --mark-bg:#ffd54f; --mark-ink:#111;
+    --doc-bg:#f6f6f2; --doc-ink:#1a1d24;
+  }
+  /* POLISH KIT: theme toggle — LIGHT palette overrides (same accents, light surfaces, dark ink) */
+  html.light{
+    --bg:#f4f6fb; --bg-grad-1:#eef2fb; --bg-grad-2:#f4f6fb;
+    --surface:#ffffff; --surface-2:#f1f4fa; --surface-3:#e6ebf5;
+    --line:#d8dfec; --line-2:#c2ccde;
+    --ink:#16203a; --ink-dim:#566184; --ink-faint:#8b95ad;
+    --accent:#3a6ff0; --accent-2:#7c5cf5; --accent-ink:#ffffff;
+    --ok:#1f9d63; --warn:#b9791f; --bad:#d83a4d; --info:#3a6ff0; --violet:#6f53d6;
+    --sh:0 1px 2px rgba(20,32,58,.06), 0 8px 24px -14px rgba(20,32,58,.18);
+    --sh-lg:0 1px 2px rgba(20,32,58,.08), 0 24px 64px -28px rgba(20,32,58,.28);
+    --header-bg:rgba(255,255,255,.78);
+    --bg-radial-1:rgba(58,111,240,.10); --bg-radial-2:rgba(31,157,99,.06);
+    --mark-bg:#ffe08a; --mark-ink:#3a2c00;
+    --doc-bg:#ffffff; --doc-ink:#1a1d24;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;
+    font:15px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Inter,sans-serif;
+    background-image:radial-gradient(1200px 600px at 80% -10%,var(--bg-radial-1),transparent 60%),
+      radial-gradient(900px 500px at 0% 0%,var(--bg-radial-2),transparent 55%);
+    background-attachment:fixed;min-height:100vh;transition:background-color .25s var(--ease),color .25s var(--ease)}
+  ::selection{background:rgba(106,161,255,.3)}
+  a{color:var(--accent);text-decoration:none}
+  /* header */
+  header{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:14px;
+    padding:14px 24px;border-bottom:1px solid var(--line);
+    background:var(--header-bg);backdrop-filter:blur(14px) saturate(140%)}
+  .brand{display:flex;align-items:center;gap:11px;font-weight:650;font-size:16px;letter-spacing:.2px}
+  .logo{width:30px;height:30px;border-radius:9px;background:var(--grad);position:relative;
+    box-shadow:0 4px 16px -4px rgba(106,161,255,.6);flex:none}
+  .logo::after{content:"";position:absolute;inset:7px;border-radius:5px;
+    border:2px solid rgba(255,255,255,.85);border-right-color:transparent;
+    animation:spin 3.5s linear infinite}
+  .brand .tag{color:var(--ink-dim);font-size:12.5px;font-weight:400}
+  .spacer{flex:1}
+  .status{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--ink-dim);
+    padding:5px 11px;border:1px solid var(--line);border-radius:999px;background:var(--surface)}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--ink-faint)}
+  .dot.ok{background:var(--ok);box-shadow:0 0 0 0 rgba(67,201,138,.5);animation:pulse 2s infinite}
+  .pill{font-size:12px;color:var(--ink-dim);border:1px solid var(--line);border-radius:999px;
+    padding:5px 12px;background:var(--surface);white-space:nowrap}
+  .iconbtn{width:36px;height:36px;border-radius:10px;border:1px solid var(--line);background:var(--surface);
+    color:var(--ink-dim);cursor:pointer;display:grid;place-items:center;transition:.18s var(--ease)}
+  .iconbtn:hover{color:var(--ink);border-color:var(--line-2);transform:translateY(-1px);background:var(--surface-2)}
+  .iconbtn svg{width:18px;height:18px}
+  /* layout */
+  main{max-width:1160px;margin:0 auto;padding:26px 24px 64px;display:grid;gap:18px;
+    grid-template-columns:1fr 1fr}
+  .full{grid-column:1/-1}
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+    box-shadow:var(--sh);overflow:hidden;transition:.25s var(--ease)}
+  .panel:hover{border-color:var(--line-2)}
+  .panel h2{margin:0;padding:14px 18px;font-size:11.5px;font-weight:600;letter-spacing:.7px;
+    text-transform:uppercase;color:var(--ink-dim);border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:10px}
+  .panel .body{padding:18px}
+  /* controls */
+  textarea,select,input{font:inherit;color:var(--ink);background:var(--surface-2);
+    border:1px solid var(--line);border-radius:var(--r-sm);padding:11px 13px;transition:.16s var(--ease);width:100%}
+  textarea:focus,select:focus,input:focus{outline:none;border-color:var(--accent);
+    box-shadow:0 0 0 3px rgba(106,161,255,.16)}
+  .btn{font:inherit;font-weight:600;cursor:pointer;border-radius:var(--r-sm);padding:11px 17px;
+    border:1px solid var(--line);background:var(--surface-2);color:var(--ink);
+    transition:.16s var(--ease);display:inline-flex;align-items:center;gap:8px;position:relative}
+  .btn:hover{transform:translateY(-1px);border-color:var(--line-2)}
+  .btn:active{transform:translateY(0)}
+  .btn.primary{background:var(--grad);border:none;color:var(--accent-ink);
+    box-shadow:0 6px 20px -8px rgba(106,161,255,.7)}
+  .btn.primary:hover{box-shadow:0 10px 28px -8px rgba(106,161,255,.8)}
+  .btn[disabled]{opacity:.6;pointer-events:none}
+  .btn .spin{width:14px;height:14px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;
+    border-radius:50%;animation:spin .7s linear infinite;display:none}
+  .btn.primary .spin{border-color:rgba(6,16,31,.35);border-top-color:#06101f}
+  .btn.loading .spin{display:block}.btn.loading .lbl{opacity:.7}
+  .row{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+  /* labeled field control */
+  .ctl{display:flex;flex-direction:column;gap:6px}
+  .ctl>span{font-size:11px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:var(--ink-faint)}
+  .ctls{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:13px;align-items:end}
+  .check{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-dim);cursor:pointer;
+    padding:11px 13px;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm)}
+  .check input{width:auto}
+  /* badges */
+  .badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:700;
+    text-transform:uppercase;letter-spacing:.3px}
+  .b-info{background:rgba(106,161,255,.15);color:var(--info)}
+  .b-pii{background:rgba(155,134,255,.16);color:var(--violet)}
+  .mono{font-family:var(--mono);font-size:12px}
+  /* document SVG canvases */
+  svg.doc{background:var(--doc-bg);border-radius:var(--r-sm);width:100%;border:1px solid var(--line);display:block}
+  svg.doc text{fill:var(--doc-ink);font-family:var(--mono)}
+  /* extracted text */
+  pre{white-space:pre-wrap;word-break:break-word;background:var(--surface-2);border:1px solid var(--line);
+    border-radius:var(--r-sm);padding:12px;margin:0;font:12px/1.5 var(--mono);color:var(--ink);max-height:240px;overflow:auto}
+  pre mark{background:var(--mark-bg);color:var(--mark-ink);border-radius:3px;padding:0 3px}
+  /* table */
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th,td{text-align:left;padding:9px 14px;border-bottom:1px solid var(--line)}
+  th{color:var(--ink-faint);font-size:11px;font-weight:600;letter-spacing:.4px;text-transform:uppercase}
+  tbody tr{transition:.14s var(--ease)}tbody tr:hover{background:var(--surface-2)}
+  tbody tr.fresh{animation:rowIn .5s var(--ease)}
+  .muted{color:var(--ink-dim);font-size:12.5px}
+  code{background:var(--surface-2);padding:1px 6px;border-radius:6px;font-family:var(--mono);font-size:12px}
+  /* reveal on load */
+  .reveal{opacity:0;transform:translateY(14px)}
+  .reveal.in{opacity:1;transform:none;transition:.55s var(--ease)}
+  /* settings drawer */
+  .scrim{position:fixed;inset:0;background:rgba(5,8,14,.55);backdrop-filter:blur(2px);z-index:50;
+    opacity:0;pointer-events:none;transition:.25s var(--ease)}
+  .scrim.open{opacity:1;pointer-events:auto}
+  .drawer{position:fixed;top:0;right:0;height:100%;width:380px;max-width:92vw;z-index:60;
+    background:var(--surface);border-left:1px solid var(--line);box-shadow:var(--sh-lg);
+    transform:translateX(100%);transition:transform .3s var(--ease);display:flex;flex-direction:column}
+  .drawer.open{transform:none}
+  .drawer header{position:static;background:none;backdrop-filter:none;border-bottom:1px solid var(--line)}
+  .drawer h3{margin:0;font-size:15px;font-weight:650}
+  .drawer .body{padding:20px;overflow:auto;display:grid;gap:18px}
+  .field{display:grid;gap:7px}
+  .field label{font-size:12px;color:var(--ink-dim);font-weight:600;display:flex;justify-content:space-between}
+  .field .hint{font-size:11.5px;color:var(--ink-faint);font-weight:400}
+  .seg{display:flex;gap:6px;flex-wrap:wrap}
+  /* POLISH KIT: segmented control (theme + routing mode) */
+  .seg .segbtn{font:inherit;font-size:12px;cursor:pointer;border:1px solid var(--line);background:var(--surface-2);
+    color:var(--ink-dim);border-radius:var(--r-sm);padding:7px 11px;transition:.16s var(--ease)}
+  .seg .segbtn:hover{color:var(--ink);border-color:var(--line-2)}
+  .seg .segbtn[aria-pressed="true"]{background:var(--grad);border-color:transparent;color:var(--accent-ink);font-weight:600}
+  .pstat{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12.5px;
+    padding:7px 11px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface-2)}
+  .pstat .pdot{width:8px;height:8px;border-radius:50%;background:var(--ink-faint);flex:none}
+  .pstat .pdot.on{background:var(--ok);box-shadow:0 0 0 3px rgba(67,201,138,.18)}
+  .chainline{font-family:var(--mono);font-size:11.5px;color:var(--ink-dim);
+    background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);padding:8px 11px;word-break:break-word}
+  .drawer .foot{margin-top:auto;padding:16px 20px;border-top:1px solid var(--line);display:flex;gap:10px}
+  /* POLISH KIT: help modal (centered dialog, reuses scrim) */
+  #help{position:fixed;top:50%;left:50%;transform:translate(-50%,calc(-50% + 12px));z-index:70;
+    width:560px;max-width:94vw;max-height:86vh;overflow:auto;opacity:0;pointer-events:none;
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh-lg);
+    transition:opacity .25s var(--ease),transform .25s var(--ease)}
+  #help.open{opacity:1;pointer-events:auto;transform:translate(-50%,-50%)}
+  #help header{position:static;background:none;backdrop-filter:none;border-bottom:1px solid var(--line)}
+  #help .body{padding:20px;display:grid;gap:16px}
+  #help h4{margin:0 0 6px;font-size:11.5px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--ink-dim)}
+  #help p{margin:0;color:var(--ink-dim);font-size:13.5px}
+  #help ol{margin:0;padding-left:20px;color:var(--ink-dim);font-size:13.5px;display:grid;gap:4px}
+  #help .kbd{font-family:var(--mono);font-size:11.5px;background:var(--surface-2);border:1px solid var(--line);
+    border-bottom-width:2px;border-radius:6px;padding:1px 7px;color:var(--ink)}
+  #help .eps{display:flex;gap:7px;flex-wrap:wrap}
+  /* toast */
+  #toasts{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:80;
+    display:flex;flex-direction:column;gap:10px;align-items:center}
+  .toast{background:var(--surface-3);border:1px solid var(--line-2);border-radius:11px;padding:11px 16px;
+    box-shadow:var(--sh-lg);font-size:13px;display:flex;align-items:center;gap:10px;
+    animation:toastIn .3s var(--ease)}
+  .toast .tdot{width:8px;height:8px;border-radius:50%}
+  .toast.ok .tdot{background:var(--ok)}.toast.bad .tdot{background:var(--bad)}.toast.info .tdot{background:var(--info)}
+  /* cold-start overlay */
+  #boot{position:fixed;inset:0;z-index:90;background:var(--bg);display:grid;place-items:center;
+    transition:opacity .5s var(--ease)}
+  #boot.hide{opacity:0;pointer-events:none}
+  .boot-card{text-align:center;display:grid;gap:18px;justify-items:center}
+  .boot-card .logo{width:54px;height:54px}
+  .boot-card .ring{width:38px;height:38px;border:3px solid var(--line);border-top-color:var(--accent);
+    border-radius:50%;animation:spin .8s linear infinite}
+  .boot-card .msg{color:var(--ink-dim);font-size:13.5px}
+  .boot-card .sub{color:var(--ink-faint);font-size:12px;max-width:280px}
+  /* keyframes */
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(67,201,138,.5)}70%{box-shadow:0 0 0 6px rgba(67,201,138,0)}100%{box-shadow:0 0 0 0 rgba(67,201,138,0)}}
+  @keyframes rowIn{from{background:rgba(106,161,255,.14)}to{background:transparent}}
+  @keyframes toastIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  @media(max-width:860px){main{grid-template-columns:1fr}}
+  @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+<div id="boot"><div class="boot-card">
+  <div class="logo"></div><div class="ring"></div>
+  <div><div class="msg" id="bootmsg">Waking the demo…</div>
+  <div class="sub">Free-tier instances sleep when idle — first load takes ~30–60s.</div></div>
+</div></div>
 
-      <div class="row">
-        <label>Sample document</label>
-        <select id="sample"></select>
-        <label><input type="checkbox" id="useLlm" checked /> LLM NER</label>
-        <label>provider <select id="provider"><option value="auto">auto</option></select></label>
-        <label>model <input id="model" placeholder="(default)" style="width:120px" /></label>
-        <div class="spacer"></div>
-        <button class="primary" id="run">Detect &amp; redact</button>
+<header>
+  <div class="brand"><span class="logo"></span> multimodal-ocr
+    <span class="tag">OCR · PII detection · box-level redaction</span></div>
+  <span class="spacer"></span>
+  <span class="status"><span class="dot" id="hdot"></span><span id="hstat">connecting…</span></span>
+  <span class="pill" id="backendpill">backend …</span>
+  <!-- POLISH KIT: theme toggle -->
+  <button class="iconbtn" id="themebtn" title="Toggle theme" aria-label="Toggle light/dark theme"><span id="themeicon">☾</span></button>
+  <!-- POLISH KIT: help modal trigger -->
+  <button class="iconbtn" id="helpbtn" title="Help (?)" aria-label="Help">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 1 1 4.6 3c-.8.6-1.7 1-1.7 2.2"/><line x1="12" y1="17.5" x2="12" y2="17.51"/></svg>
+  </button>
+  <button class="iconbtn" id="gear" title="Settings" aria-label="Settings">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+  </button>
+</header>
+
+<main>
+  <div class="panel full reveal">
+    <h2>Pipeline <span class="muted" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">pick a document, then detect &amp; redact</span></h2>
+    <div class="body">
+      <div class="ctls">
+        <label class="ctl"><span>sample document</span><select id="sample"></select></label>
+        <label class="ctl"><span>provider</span><select id="provider"><option value="auto">auto</option></select></label>
+        <label class="ctl"><span>model override</span><input id="model" placeholder="(default)" /></label>
+        <label class="check"><input type="checkbox" id="useLlm" checked> LLM NER</label>
+        <button class="btn primary" id="run"><span class="spin"></span><span class="lbl">Detect &amp; redact</span></button>
       </div>
-      <div id="routing" style="font-size:12px;color:var(--muted);font-family:ui-monospace,Menlo,monospace;margin:4px 0"></div>
-
-      <div class="grid2">
-        <div class="panel"><h2>Document</h2><svg id="orig"></svg></div>
-        <div class="panel"><h2>Redacted</h2><svg id="redacted"></svg></div>
+      <div class="row" style="margin-top:12px">
+        <span class="muted" id="routing">Run the pipeline to map detected PII spans back to OCR token boxes.</span>
       </div>
+    </div>
+  </div>
 
-      <div class="panel" id="findpanel" style="display:none">
-        <h2>Detections</h2>
-        <table id="findings"></table>
-        <div class="grid2" style="margin-top:12px">
-          <div><h2>Extracted text</h2><pre id="text"></pre></div>
-          <div><h2>Redacted text</h2><pre id="rtext"></pre></div>
-        </div>
+  <div class="panel reveal">
+    <h2>Document <span class="muted" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">OCR tokens</span></h2>
+    <div class="body"><svg id="orig" class="doc"></svg></div>
+  </div>
+
+  <div class="panel reveal">
+    <h2>Redacted <span class="muted" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">PII boxes blacked out</span></h2>
+    <div class="body"><svg id="redacted" class="doc"></svg></div>
+  </div>
+
+  <div class="panel full reveal" id="findpanel" style="display:none">
+    <h2>Detections <span class="muted" id="findmeta" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">—</span></h2>
+    <div class="body" style="padding:0;overflow-x:auto"><table id="findings"></table></div>
+    <div class="body">
+      <div style="display:grid;gap:14px;grid-template-columns:1fr 1fr">
+        <div><div class="muted" style="margin-bottom:6px;text-transform:uppercase;font-size:11px;letter-spacing:.4px">Extracted text</div><pre id="text"></pre></div>
+        <div><div class="muted" style="margin-bottom:6px;text-transform:uppercase;font-size:11px;letter-spacing:.4px">Redacted text</div><pre id="rtext"></pre></div>
       </div>
+    </div>
+  </div>
+</main>
 
-      <p class="small" id="backend"></p>
-      <p class="small">
-        <code>POST /process</code> · <code>GET /samples</code> ·
-        <code>POST /ocr</code> (opt-in). Synthetic data only. Part of the
-        <a href="https://github.com/MarcBittner/ai-portfolio">ai-portfolio</a>.
-      </p>
-    </main>
+<!-- settings drawer -->
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-hidden="true">
+  <header><div class="brand" style="font-size:15px"><span class="logo" style="width:24px;height:24px"></span> Settings</div>
+    <span class="spacer"></span><button class="iconbtn" id="closedrawer" aria-label="Close">✕</button></header>
+  <div class="body">
+    <div class="field">
+      <label>Default sample <span class="hint">prefills the picker</span></label>
+      <select id="cfgSample"><option value="">— first available —</option></select>
+    </div>
+    <div class="field">
+      <label class="check" style="justify-content:flex-start"><input type="checkbox" id="cfgUseLlm" checked> LLM NER on by default</label>
+      <span class="hint">deterministic regex detectors always run; the LLM adds free-text NER on top.</span>
+    </div>
 
-    <script>
-      const $ = (id) => document.getElementById(id);
-      const SVGNS = "http://www.w3.org/2000/svg";
-      let SAMPLES = {};
+    <!-- POLISH KIT: theme segmented control -->
+    <div class="field">
+      <label>Theme <span class="hint">appearance</span></label>
+      <div class="seg" id="themeseg">
+        <button type="button" class="segbtn" data-theme="dark">Dark</button>
+        <button type="button" class="segbtn" data-theme="light">Light</button>
+        <button type="button" class="segbtn" data-theme="system">System</button>
+      </div>
+    </div>
 
-      async function load() {
-        const list = await fetch("/samples").then((r) => r.json());
-        SAMPLES = Object.fromEntries(list.map((s) => [s.name, s.tokens]));
-        $("sample").innerHTML = list.map((s) => `<option>${s.name}</option>`).join("");
-        const h = await fetch("/health").then((r) => r.json());
-        $("backend").textContent = `OCR backend: ${h.ocr_backend}` +
-          (h.ocr_backend === "samples-only" ? " (install the 'ocr' extra + tesseract for real image OCR)" : "");
-        try {
-          const p = await fetch("/providers").then((r) => r.json());
-          const shortName = (m) => (m || "").split("/").pop().replace(/:free$/, "");
-          const sel = $("provider");
-          sel.innerHTML = `<option value="auto" selected>Auto (recommended)</option>`;
-          if (p.available.free)
-            sel.insertAdjacentHTML("beforeend",
-              `<option value="free">Free · ${shortName(p.free_models && p.free_models[0])}</option>`);
-          sel.insertAdjacentHTML("beforeend",
-            `<option value="offline">Offline (deterministic)</option>`);
-          if (p.available.paid)
-            sel.insertAdjacentHTML("beforeend",
-              `<option value="paid">Paid (your key)</option>`);
-          const liveNote = document.createElement("span");
-          liveNote.style.cssText = "font-size:12px;color:var(--muted);margin-left:8px";
-          liveNote.textContent = "Live: " + p.active_mode +
-            (p.active_mode === "free" && p.free_models && p.free_models[0]
-              ? " · " + shortName(p.free_models[0]) : "");
-          sel.parentNode.appendChild(liveNote);
-        } catch { /* optional */ }
-        renderDoc("orig", SAMPLES[$("sample").value], []);
-        $("redacted").innerHTML = "";
-      }
+    <!-- POLISH KIT: routing config -->
+    <div class="field">
+      <label>Routing mode <span class="hint">which provider LLM NER uses</span></label>
+      <div class="seg" id="modeseg">
+        <button type="button" class="segbtn" data-mode="auto">auto</button>
+        <button type="button" class="segbtn" data-mode="free">free</button>
+        <button type="button" class="segbtn" data-mode="paid">paid</button>
+        <button type="button" class="segbtn" data-mode="offline">offline</button>
+      </div>
+      <div class="hint" id="modeblurb">auto = free if keyed, else paid, else local Ollama, else mock.</div>
+    </div>
+    <div class="field">
+      <label for="cfgModel">Model override <span class="hint">optional</span></label>
+      <input id="cfgModel" type="text" placeholder="provider default" />
+    </div>
+    <div class="field">
+      <label>Provider status <span class="hint" id="modeactive">active: auto</span></label>
+      <div style="display:grid;gap:6px" id="provrows"></div>
+    </div>
+    <div class="field">
+      <label>Fallback chain <span class="hint">→ on failure</span></label>
+      <div class="chainline" id="chainline">offline (deterministic)</div>
+    </div>
+    <div class="muted" style="font-size:11.5px">Provider keys live server-side; this selects which available provider a run uses.
+      Redaction itself is always deterministic — the LLM only proposes spans.</div>
+  </div>
+  <div class="foot">
+    <button class="btn" id="resetcfg">Reset</button>
+    <button class="btn primary" id="savecfg" style="flex:1"><span class="lbl">Save</span></button>
+  </div>
+</aside>
 
-      function extent(tokens) {
-        const W = Math.max(...tokens.map((t) => t.x + t.w), 100) + 12;
-        const H = Math.max(...tokens.map((t) => t.y + t.h), 30) + 12;
-        return [W, H];
-      }
-      function renderDoc(id, tokens, boxes) {
-        const svg = $(id);
-        const [W, H] = extent(tokens);
-        svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
-        const el = (tag, attrs, text) => {
-          const e = document.createElementNS(SVGNS, tag);
-          for (const k in attrs) e.setAttribute(k, attrs[k]);
-          if (text != null) e.textContent = text;
-          svg.appendChild(e); return e;
-        };
-        svg.innerHTML = "";
-        for (const t of tokens)
-          el("text", { x: t.x, y: t.y + 15, "font-size": "14" }, t.text);
-        for (const b of boxes)
-          el("rect", { x: b.x - 1, y: b.y, width: b.w + 2, height: b.h, fill: "#000" });
-      }
+<!-- POLISH KIT: help modal -->
+<aside id="help" role="dialog" aria-modal="true" aria-labelledby="helptitle" aria-hidden="true">
+  <header><div class="brand" style="font-size:15px"><span class="logo" style="width:24px;height:24px"></span>
+    <span id="helptitle">Help · multimodal-ocr</span></div>
+    <span class="spacer"></span><button class="iconbtn" id="closehelp" aria-label="Close help">✕</button></header>
+  <div class="body">
+    <div><h4>What it is</h4><p>A document redaction pipeline: <b>OCR</b> turns an image into positioned text tokens,
+      <b>PII detection</b> finds sensitive spans (deterministic regex + optional LLM NER), and
+      <b>box-level redaction</b> maps each PII span back to the OCR tokens it covers and blacks out their boxes —
+      so the redaction is visual, not just textual.</p></div>
+    <div><h4>How to use</h4><ol>
+      <li><b>Pick a document</b> — choose a bundled sample from the picker.</li>
+      <li><b>Choose detection</b> — leave <i>LLM NER</i> on for free-text entities, or pick a provider/model.</li>
+      <li><b>Detect &amp; redact</b> — see the original vs. redacted document side-by-side, the detections table, and extracted vs. redacted text.</li>
+      <li><b>Tune routing</b> — open <i>Settings</i> to set the routing mode and inspect provider availability.</li>
+    </ol></div>
+    <div><h4>Endpoints</h4><div class="eps">
+      <code>GET /health</code><code>GET /samples</code><code>GET /providers</code>
+      <code>POST /process</code><code>POST /ocr</code></div></div>
+    <div><h4>Keyboard shortcuts</h4><p><span class="kbd">?</span> open this help · <span class="kbd">Esc</span> close any overlay</p></div>
+    <div><p class="muted" style="font-size:11.5px">All documents are <b>synthetic</b> — no real PII. Real image OCR (Tesseract) is opt-in via <code>POST /ocr</code>.</p></div>
+  </div>
+</aside>
 
-      async function run() {
-        const sample = $("sample").value;
-        const data = await fetch("/process", {
-          method: "POST", headers: { "content-type": "application/json" },
-          body: JSON.stringify({ sample, use_llm: $("useLlm").checked,
-            provider: $("provider").value, model: $("model").value || null }),
-        }).then((r) => r.json());
-        $("routing").textContent = data.routing
-          ? `LLM NER routed via ${data.routing.provider} (${data.routing.model})` : "";
-        renderDoc("orig", data.tokens, []);
-        renderDoc("redacted", data.tokens, data.boxes);
-        $("findpanel").style.display = "block";
-        $("text").textContent = data.text;
-        $("rtext").textContent = data.redacted_text;
-        $("findings").innerHTML =
-          "<thead><tr><th>type</th><th>span</th><th>match</th></tr></thead><tbody>" +
-          data.findings.map((f) => `<tr><td>${f.type}</td><td>${f.start}–${f.end}</td><td>${f.snippet}</td></tr>`).join("") +
-          "</tbody>" +
-          (data.findings.length ? "" : "<tbody><tr><td class='small'>no PII detected</td></tr></tbody>");
-      }
+<div id="toasts"></div>
 
-      $("sample").addEventListener("change", () => { renderDoc("orig", SAMPLES[$("sample").value], []); $("redacted").innerHTML=""; $("findpanel").style.display="none"; });
-      $("run").addEventListener("click", run);
-      load();
-    </script>
-  </body>
+<script>
+const $=id=>document.getElementById(id), $$=s=>[...document.querySelectorAll(s)];
+const j=async(u,o)=>(await fetch(u,o)).json();
+const SVGNS="http://www.w3.org/2000/svg";
+const CFG_KEY="multimodal-ocr.cfg";
+let SAMPLES={};
+let provStatus={};         // last GET /providers
+let cfg={sample:"",useLlm:true,mode:"auto",model:""};
+
+function toast(msg,type="info"){
+  const t=document.createElement("div");t.className=`toast ${type}`;
+  t.innerHTML=`<span class="tdot"></span>${msg}`;$("toasts").appendChild(t);
+  setTimeout(()=>{t.style.opacity="0";t.style.transition="opacity .3s";setTimeout(()=>t.remove(),300)},2600);
+}
+function loadCfg(){try{cfg={...cfg,...JSON.parse(localStorage.getItem(CFG_KEY)||"{}")}}catch{}}
+function applyCfgToForm(){
+  if(cfg.sample && $("cfgSample").querySelector(`option[value="${cfg.sample}"]`))$("cfgSample").value=cfg.sample;
+  $("cfgUseLlm").checked=cfg.useLlm!==false;
+  $("cfgModel").value=cfg.model||"";
+  selectMode(cfg.mode||"auto");
+  syncThemeSeg();
+}
+function applyCfgToConsole(){
+  if(cfg.sample && $("sample").querySelector(`option[value="${cfg.sample}"]`))$("sample").value=cfg.sample;
+  $("useLlm").checked=cfg.useLlm!==false;
+  $("model").value=cfg.model||"";
+  syncProvider();
+}
+// keep the inline provider picker in sync with the routing mode
+function syncProvider(){
+  const m=cfg.mode||"auto";
+  if($("provider").querySelector(`option[value="${m}"]`))$("provider").value=m;
+}
+
+/* ===================== drawer ===================== */
+function openDrawer(){applyCfgToForm();$("scrim").classList.add("open");$("drawer").classList.add("open");$("drawer").setAttribute("aria-hidden","false")}
+function closeDrawer(){$("scrim").classList.remove("open");$("drawer").classList.remove("open");$("drawer").setAttribute("aria-hidden","true")}
+$("gear").onclick=openDrawer;$("closedrawer").onclick=closeDrawer;
+$("savecfg").onclick=()=>{cfg={sample:$("cfgSample").value,useLlm:$("cfgUseLlm").checked,
+    mode:$("modeseg").querySelector('[aria-pressed="true"]')?.dataset.mode||"auto",
+    model:$("cfgModel").value.trim()};
+  localStorage.setItem(CFG_KEY,JSON.stringify(cfg));applyCfgToConsole();renderRouting();closeDrawer();toast("Settings saved","ok")};
+$("resetcfg").onclick=()=>{cfg={sample:"",useLlm:true,mode:"auto",model:""};localStorage.removeItem(CFG_KEY);applyCfgToForm();applyCfgToConsole();renderRouting();toast("Reset to defaults","info")};
+
+/* ===================== document rendering (preserved) ===================== */
+function extent(tokens){
+  const W=Math.max(...tokens.map(t=>t.x+t.w),100)+12;
+  const H=Math.max(...tokens.map(t=>t.y+t.h),30)+12;
+  return [W,H];
+}
+function renderDoc(id,tokens,boxes){
+  const svg=$(id);
+  if(!tokens||!tokens.length){svg.innerHTML="";svg.removeAttribute("viewBox");return;}
+  const [W,H]=extent(tokens);
+  svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+  const el=(tag,attrs,text)=>{
+    const e=document.createElementNS(SVGNS,tag);
+    for(const k in attrs)e.setAttribute(k,attrs[k]);
+    if(text!=null)e.textContent=text;
+    svg.appendChild(e);return e;
+  };
+  svg.innerHTML="";
+  for(const t of tokens)el("text",{x:t.x,y:t.y+15,"font-size":"14"},t.text);
+  for(const b of boxes)el("rect",{x:b.x-1,y:b.y,width:b.w+2,height:b.h,fill:"#000"});
+}
+
+async function run(){
+  const btn=$("run");btn.classList.add("loading");
+  const sample=$("sample").value;
+  try{
+    const data=await j("/process",{method:"POST",headers:{"content-type":"application/json"},
+      body:JSON.stringify({sample,use_llm:$("useLlm").checked,
+        provider:$("provider").value,model:$("model").value||null})});
+    $("routing").innerHTML=data.routing
+      ? `LLM NER routed via <code>${data.routing.provider}</code> (<code>${data.routing.model}</code>)`
+      : `<span class="muted">deterministic detectors only (no LLM call)</span>`;
+    renderDoc("orig",data.tokens,[]);
+    renderDoc("redacted",data.tokens,data.boxes);
+    $("findpanel").style.display="block";
+    $("text").textContent=data.text;
+    // highlight redaction placeholders like [TYPE] in the redacted text
+    $("rtext").innerHTML=(data.redacted_text||"").replace(/&/g,"&amp;").replace(/</g,"&lt;")
+      .replace(/\[([A-Z_]+)\]/g,'<mark>[$1]</mark>');
+    const counts=Object.entries(data.counts||{}).map(([k,v])=>`${k}×${v}`).join(", ")||"none";
+    $("findmeta").textContent=`${data.findings.length} span(s) · ${counts}`;
+    $("findings").innerHTML=
+      `<thead><tr><th>type</th><th>span</th><th>match</th></tr></thead><tbody>`+
+      (data.findings.length
+        ? data.findings.map(f=>`<tr class="fresh"><td><span class="badge b-pii">${f.type}</span></td>
+            <td class="mono">${f.start}–${f.end}</td><td class="mono">${f.snippet}</td></tr>`).join("")
+        : `<tr><td colspan="3" class="muted" style="padding:14px">no PII detected</td></tr>`)+
+      `</tbody>`;
+    toast(`${data.findings.length} PII span(s) redacted`, data.findings.length?"ok":"info");
+  }catch(e){
+    $("routing").innerHTML=`<span class="badge" style="background:rgba(241,91,108,.18);color:var(--bad)">ERROR</span> request failed`;
+    toast("Request failed","bad");
+  }
+  btn.classList.remove("loading");
+}
+$("run").onclick=run;
+$("sample").addEventListener("change",()=>{renderDoc("orig",SAMPLES[$("sample").value],[]);$("redacted").innerHTML="";$("findpanel").style.display="none";});
+
+/* ===================== POLISH KIT: theme toggle ===================== */
+const THEME_KEY="theme";
+function getTheme(){try{return localStorage.getItem(THEME_KEY)||"system"}catch{return "system"}}
+function effectiveDark(t){
+  if(t==="dark")return true; if(t==="light")return false;
+  return !window.matchMedia("(prefers-color-scheme: light)").matches;
+}
+function applyTheme(t){
+  const dark=effectiveDark(t);
+  document.documentElement.classList.toggle("light",!dark);
+  $("themeicon").textContent=dark?"☾":"☀";
+  $("themebtn").title=`Theme: ${t}`;
+}
+function setTheme(t){try{localStorage.setItem(THEME_KEY,t)}catch{} applyTheme(t); syncThemeSeg();}
+function syncThemeSeg(){const cur=getTheme();
+  $$("#themeseg .segbtn").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.theme===cur)));}
+$("themebtn").onclick=()=>{const cur=getTheme();const next=effectiveDark(cur)?"light":"dark";setTheme(next);};
+$$("#themeseg .segbtn").forEach(b=>b.onclick=()=>setTheme(b.dataset.theme));
+window.matchMedia("(prefers-color-scheme: light)").addEventListener?.("change",()=>{if(getTheme()==="system")applyTheme("system");});
+applyTheme(getTheme());
+
+/* ===================== POLISH KIT: help modal ===================== */
+function openHelp(){$("scrim").classList.add("open");$("help").classList.add("open");
+  $("help").setAttribute("aria-hidden","false");$("closehelp").focus();}
+function closeHelp(){$("scrim").classList.remove("open");$("help").classList.remove("open");
+  $("help").setAttribute("aria-hidden","true");}
+$("helpbtn").onclick=openHelp;$("closehelp").onclick=closeHelp;
+$("scrim").onclick=()=>{closeDrawer();closeHelp();};
+document.addEventListener("keydown",e=>{
+  const typing=/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName||"")||document.activeElement?.isContentEditable;
+  if(e.key==="Escape"){closeDrawer();closeHelp();}
+  else if(e.key==="?"&&!typing&&!$("help").classList.contains("open")){e.preventDefault();openHelp();}
+});
+
+/* ===================== POLISH KIT: routing config ===================== */
+const MODE_BLURBS={
+  auto:"auto = free if keyed, else paid, else local Ollama, else mock.",
+  free:"free = OpenRouter free models only.",
+  paid:"paid = Anthropic, then OpenAI (your key).",
+  offline:"offline = deterministic detectors only (no LLM call).",
+};
+const MODE_CHAIN={
+  auto:["openrouter","anthropic","openai","ollama","mock"],
+  free:["openrouter","mock"], paid:["anthropic","openai","mock"], offline:[],
+};
+const PROVIDERS=["openrouter","anthropic","openai","ollama"];
+function selectMode(m){
+  $$("#modeseg .segbtn").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.mode===m)));
+  $("modeblurb").textContent=MODE_BLURBS[m]||"";
+  $("modeactive").textContent=`active: ${m}`;
+}
+function currentMode(){return $("modeseg").querySelector('[aria-pressed="true"]')?.dataset.mode||"auto";}
+function renderRouting(){
+  const m=currentMode();
+  $("modeactive").textContent=`active: ${m}`;
+  const avail=provStatus.available||{};
+  const rows=PROVIDERS.map(p=>{
+    const on=!!avail[p];
+    return `<div class="pstat"><span>${p}</span><span class="pdot ${on?'on':''}" title="${on?'available':'not configured'}"></span></div>`;
+  }).join("")+
+    `<div class="pstat"><span>offline (deterministic)</span><span class="pdot on" title="always available"></span></div>`;
+  $("provrows").innerHTML=rows;
+  const chain=(MODE_CHAIN[m]||[]).filter(p=>avail[p]||p==="mock");
+  const display=[...chain,"offline (deterministic)"];
+  $("chainline").textContent=display.join("  →  ");
+}
+$$("#modeseg .segbtn").forEach(b=>b.onclick=()=>{selectMode(b.dataset.mode);renderRouting();});
+
+/* ===================== provider picker (preserved /providers wiring) ===================== */
+function syncThemeSegSafe(){try{syncThemeSeg()}catch{}}
+async function loadProviders(){
+  try{
+    const p=await j("/providers");provStatus=p;
+    const shortName=m=>(m||"").split("/").pop().replace(/:free$/,"");
+    const sel=$("provider");
+    sel.innerHTML=`<option value="auto">Auto (recommended)</option>`;
+    if(p.available && p.available.free)
+      sel.insertAdjacentHTML("beforeend",
+        `<option value="free">Free · ${shortName(p.free_models&&p.free_models[0])}</option>`);
+    sel.insertAdjacentHTML("beforeend",`<option value="offline">Offline (deterministic)</option>`);
+    if(p.available && p.available.paid)
+      sel.insertAdjacentHTML("beforeend",`<option value="paid">Paid (your key)</option>`);
+    syncProvider();
+    renderRouting();
+  }catch{/* optional */}
+}
+
+/* ===================== boot ===================== */
+async function boot(){
+  loadCfg();
+  selectMode(cfg.mode||"auto");  // seed routing segment before drawer opens
+  // cold-start: poll health until ready, then reveal
+  let ready=false,h=null;
+  for(let i=0;i<60 && !ready;i++){
+    try{const r=await fetch("/health");if(r.ok){ready=true;h=await r.json();break}}catch{}
+    if(i===4)$("bootmsg").textContent="Still waking up…";
+    await new Promise(r=>setTimeout(r,1500));
+  }
+  $("hdot").className="dot ok";$("hstat").textContent="live";
+  if(h){
+    $("backendpill").textContent=`backend · ${h.ocr_backend}`;
+  }
+  $("boot").classList.add("hide");setTimeout(()=>$("boot").remove(),600);
+  $$(".reveal").forEach((el,i)=>setTimeout(()=>el.classList.add("in"),90*i));
+  // populate samples
+  try{
+    const list=await j("/samples");
+    SAMPLES=Object.fromEntries(list.map(s=>[s.name,s.tokens]));
+    $("sample").innerHTML=list.map(s=>`<option>${s.name}</option>`).join("");
+    $("cfgSample").innerHTML=`<option value="">— first available —</option>`+
+      list.map(s=>`<option>${s.name}</option>`).join("");
+  }catch{}
+  await loadProviders();
+  applyCfgToConsole();
+  renderDoc("orig",SAMPLES[$("sample").value],[]);
+  $("redacted").innerHTML="";
+  // run once so the side-by-side redaction is populated on load
+  try{await run();}catch{}
+}
+boot();
+</script>
+</body>
 </html>
