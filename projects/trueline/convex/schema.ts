@@ -115,6 +115,7 @@ export default defineSchema({
     orgId: v.string(),
     mode: v.union(
       v.literal("auto"),
+      v.literal("local"),
       v.literal("free"),
       v.literal("paid"),
       v.literal("offline"),

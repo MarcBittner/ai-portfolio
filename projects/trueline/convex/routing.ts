@@ -1,9 +1,15 @@
 import { v } from "convex/values";
 import { internalQuery, mutation, query } from "./_generated/server";
-import { DEFAULT_FREE_MODEL, DEFAULT_PAID_MODEL, keyStatus } from "./lib/llm";
+import {
+  DEFAULT_FREE_MODEL,
+  DEFAULT_LOCAL_MODEL,
+  DEFAULT_PAID_MODEL,
+  keyStatus,
+} from "./lib/llm";
 
 const modeValidator = v.union(
   v.literal("auto"),
+  v.literal("local"),
   v.literal("free"),
   v.literal("paid"),
   v.literal("offline"),
@@ -21,7 +27,7 @@ export const get = query({
   handler: async (ctx) => {
     const oid = await tenant(ctx);
     const keys = keyStatus(); // { free, paid } — which provider keys exist
-    let mode: "auto" | "free" | "paid" | "offline" = "auto";
+    let mode: "auto" | "local" | "free" | "paid" | "offline" = "auto";
     let model: string | null = null;
     if (oid) {
       const row = await ctx.db
@@ -34,11 +40,20 @@ export const get = query({
       }
     }
     const activeMode =
-      mode !== "auto" ? mode : keys.paid ? "paid" : keys.free ? "free" : "offline";
+      mode !== "auto"
+        ? mode
+        : keys.local
+          ? "local"
+          : keys.paid
+            ? "paid"
+            : keys.free
+              ? "free"
+              : "offline";
     return {
       mode,
       model,
       keys,
+      defaultLocalModel: DEFAULT_LOCAL_MODEL,
       defaultFreeModel: DEFAULT_FREE_MODEL,
       defaultPaidModel: DEFAULT_PAID_MODEL,
       activeMode,

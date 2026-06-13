@@ -12,7 +12,7 @@ export const benchmark = action({
       | { subject: string; org_id?: string }
       | null;
     const orgId = id ? (id.org_id ?? `user:${id.subject}`) : null;
-    const modes: RoutingMode[] = ["offline", "free", "paid"];
+    const modes: RoutingMode[] = ["offline", "local", "free", "paid"];
     const results: {
       mode: string;
       provider: string;

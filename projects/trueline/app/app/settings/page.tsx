@@ -5,10 +5,11 @@ import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Nav } from "@/app/components/nav";
 
-type Mode = "auto" | "free" | "paid" | "offline";
+type Mode = "auto" | "local" | "free" | "paid" | "offline";
 
 const MODES: { id: Mode; label: string; blurb: string }[] = [
-  { id: "auto", label: "Auto", blurb: "Paid if a key is set, else free, else offline." },
+  { id: "auto", label: "Auto", blurb: "Local if reachable, else paid, else free, else offline." },
+  { id: "local", label: "Local", blurb: "Ollama on your machine (if reachable). Private; no cost." },
   { id: "free", label: "Free", blurb: "OpenRouter free models. No cost; rate-limited." },
   { id: "paid", label: "Paid", blurb: "Anthropic / Claude. Best quality; your key." },
   { id: "offline", label: "Offline", blurb: "Deterministic engine. No model, no network." },
@@ -16,7 +17,8 @@ const MODES: { id: Mode; label: string; blurb: string }[] = [
 
 // The provider chain each mode tries, in order (offline always terminal).
 const CHAIN: Record<Mode, string[]> = {
-  auto: ["Anthropic (paid)", "OpenRouter (free)", "Offline (deterministic)"],
+  auto: ["Ollama (local)", "Anthropic (paid)", "OpenRouter (free)", "Offline (deterministic)"],
+  local: ["Ollama (local)", "Offline (deterministic)"],
   free: ["OpenRouter (free)", "Offline (deterministic)"],
   paid: ["Anthropic (paid)", "Offline (deterministic)"],
   offline: ["Offline (deterministic)"],
@@ -48,7 +50,13 @@ export default function Configuration() {
   }
 
   const placeholder =
-    mode === "paid" ? cfg.defaultPaidModel : mode === "free" ? cfg.defaultFreeModel : "—";
+    mode === "paid"
+      ? cfg.defaultPaidModel
+      : mode === "free"
+        ? cfg.defaultFreeModel
+        : mode === "local"
+          ? cfg.defaultLocalModel
+          : "—";
 
   async function onSave() {
     await save({ mode, model: model.trim() || undefined });
@@ -68,7 +76,7 @@ export default function Configuration() {
       {/* mode selector */}
       <section className="glass p-5">
         <div className="text-sm font-semibold">Mode</div>
-        <div className="mt-3 grid gap-2 sm:grid-cols-4">
+        <div className="mt-3 grid gap-2 sm:grid-cols-5">
           {MODES.map((m) => (
             <button
               key={m.id}
@@ -135,6 +143,15 @@ export default function Configuration() {
       <section className="glass mt-4 p-5">
         <div className="text-sm font-semibold">Provider status</div>
         <div className="mt-3 space-y-2 text-sm">
+          <Row
+            ok={cfg.keys.local}
+            label="Local — Ollama"
+            detail={
+              cfg.keys.local
+                ? `reachable · ${cfg.defaultLocalModel}`
+                : "set OLLAMA_BASE_URL (to a reachable host) to enable"
+            }
+          />
           <Row
             ok={cfg.keys.paid}
             label="Paid — Anthropic / Claude"

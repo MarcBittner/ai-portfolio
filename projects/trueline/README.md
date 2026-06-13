@@ -27,7 +27,7 @@ TypeScript.
 | Frontend | Next.js 16 (App Router, RSC), React 19, Tailwind v4 |
 | Backend / DB / realtime | Convex (queries · mutations · actions · scheduler) |
 | Auth / multi-tenancy | Clerk (orgs; JWT → Convex) |
-| LLM | Anthropic · OpenRouter (free) · deterministic mock — selected by routing config |
+| LLM | local Ollama · Anthropic · OpenRouter (free) · deterministic mock — selected by routing config |
 | Host | Render (Next) + Convex Cloud + Clerk |
 
 ## Managed services — what each does, and why
@@ -255,16 +255,21 @@ passes it to `extractLineItems`, which sets the provider attempt order **explici
 mode (deterministic mock is always the terminal fallback):
 
 ```
-offline → []                         → mock
-free    → [openrouter]               → mock
-paid    → [anthropic]                → mock
-auto    → [anthropic, openrouter]    → mock     (paid if keyed, else free, else offline)
+offline → []                                 → mock
+local   → [ollama]                           → mock
+free    → [openrouter]                        → mock
+paid    → [anthropic]                         → mock
+auto    → [ollama?, anthropic, openrouter]    → mock   (local if reachable → paid → free → offline)
 ```
 
-A provider is attempted only if its key is present (`keyStatus()` reads env). `model`
-overrides the default for the chosen provider. Defaults:
-`OPENROUTER_MODEL=google/gemma-4-31b-it:free`, `ANTHROPIC_MODEL=claude-haiku-4-5-20251001`.
-Keys live as **Convex deployment env vars** (server-side), never in the browser bundle.
+A provider is attempted only if available (`keyStatus()` reads env): local Ollama when
+`OLLAMA_BASE_URL` is set to a reachable host (the action runs in Convex's cloud, so it's
+gated on the URL to avoid a per-run timeout — and fails fast over an 8s `AbortSignal` if
+unreachable, falling through), free when `OPENROUTER_API_KEY` is set, paid when
+`ANTHROPIC_API_KEY` is set. `model` overrides the default for the chosen provider.
+Defaults: `OLLAMA_MODEL=llama3.1:8b`, `OPENROUTER_MODEL=google/gemma-4-31b-it:free`,
+`ANTHROPIC_MODEL=claude-haiku-4-5-20251001`.
+Keys/URLs live as **Convex deployment env vars** (server-side), never in the browser bundle.
 OpenRouter free tier is 50 req/day; past that a run resolves to the mock (shown on the
 review header + Diagnostics).
 
@@ -320,6 +325,7 @@ NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY # public
 CLERK_SECRET_KEY                  # Next server
 CLERK_JWT_ISSUER_DOMAIN           # Convex deployment env (auth.config)
 OPENROUTER_API_KEY / OPENROUTER_MODEL   # Convex deployment env (free LLM)
+OLLAMA_BASE_URL    / OLLAMA_MODEL        # Convex deployment env (local LLM; set URL to enable)
 ANTHROPIC_API_KEY  / ANTHROPIC_MODEL    # Convex deployment env (paid LLM)
 ```
 

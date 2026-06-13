@@ -260,6 +260,7 @@ export default function InvoiceReview() {
 function providerLabel(provider?: string, model?: string): string {
   const short = (model ?? "").split("/").pop()?.replace(":free", "") || model || "";
   if (!provider) return "not yet extracted";
+  if (provider === "ollama") return `extracted by local Ollama (${short})`;
   if (provider === "openrouter") return `extracted by free model (${short})`;
   if (provider === "anthropic") return `extracted by Claude (${short})`;
   if (provider === "openai") return `extracted by OpenAI (${short})`;

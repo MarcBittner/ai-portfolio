@@ -75,14 +75,40 @@ async function post(url: string, body: unknown, headers: Record<string, string>)
 
 export const DEFAULT_FREE_MODEL = process.env.OPENROUTER_MODEL ?? "google/gemma-4-31b-it:free";
 export const DEFAULT_PAID_MODEL = process.env.ANTHROPIC_MODEL ?? "claude-haiku-4-5-20251001";
+export const DEFAULT_LOCAL_MODEL = process.env.OLLAMA_MODEL ?? "llama3.1:8b";
+// Local Ollama is enabled only when a reachable base URL is configured (no
+// default — the extract action runs in Convex's cloud, so localhost is only
+// reachable under self-hosting/a tunnel; gating avoids a per-run timeout).
+const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL;
 
-export type RoutingMode = "auto" | "free" | "paid" | "offline";
+export type RoutingMode = "auto" | "local" | "free" | "paid" | "offline";
 
 export function keyStatus() {
   return {
+    local: !!OLLAMA_BASE_URL, // local Ollama (OLLAMA_BASE_URL set)
     free: !!process.env.OPENROUTER_API_KEY, // OpenRouter free models
     paid: !!process.env.ANTHROPIC_API_KEY, // Anthropic / Claude
   };
+}
+
+async function callOllama(model: string, userMsg: string): Promise<ExtractedLine[]> {
+  const res = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      model,
+      stream: false,
+      format: "json",
+      messages: [
+        { role: "system", content: SYSTEM },
+        { role: "user", content: userMsg },
+      ],
+    }),
+    signal: AbortSignal.timeout(8000), // fail fast if the host isn't reachable
+  });
+  if (!res.ok) throw new Error(`ollama ${res.status}`);
+  const data = await res.json();
+  return coerceLines(parseJsonLoose(data?.message?.content ?? ""));
 }
 
 async function callAnthropic(model: string, userMsg: string): Promise<ExtractedLine[]> {
@@ -117,20 +143,30 @@ export async function extractLineItems(
 ): Promise<ExtractResult> {
   const mode = routing.mode ?? "auto";
   const userMsg = `Extract every line item from this invoice:\n\n${rawText}`;
-  const { free, paid } = keyStatus();
+  const { free, paid, local } = keyStatus();
 
-  // provider attempt order, defined explicitly by mode
-  const order: ("anthropic" | "openrouter")[] =
+  // provider attempt order, defined explicitly by mode. auto prefers local
+  // Ollama (if reachable) → paid → free → offline.
+  const order: ("ollama" | "anthropic" | "openrouter")[] =
     mode === "offline"
       ? []
-      : mode === "free"
-        ? ["openrouter"]
-        : mode === "paid"
-          ? ["anthropic"]
-          : ["anthropic", "openrouter"]; // auto: paid first if available, else free
+      : mode === "local"
+        ? ["ollama"]
+        : mode === "free"
+          ? ["openrouter"]
+          : mode === "paid"
+            ? ["anthropic"]
+            : local
+              ? ["ollama", "anthropic", "openrouter"]
+              : ["anthropic", "openrouter"]; // auto
 
   for (const provider of order) {
     try {
+      if (provider === "ollama" && local) {
+        const model = routing.model || DEFAULT_LOCAL_MODEL;
+        const lines = await callOllama(model, userMsg);
+        if (lines.length) return { lines, provider, model };
+      }
       if (provider === "anthropic" && paid) {
         const model = routing.model || DEFAULT_PAID_MODEL;
         const lines = await callAnthropic(model, userMsg);
