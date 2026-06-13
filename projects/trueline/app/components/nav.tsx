@@ -9,7 +9,15 @@ export function Nav() {
       <Link href="/app" className="font-semibold tracking-tight">
         <span className="text-[--color-accent]">true</span>line
       </Link>
-      <span className="text-xs text-[--color-muted]">invoice line-item verification</span>
+      <Link href="/app" className="rounded-md px-2 py-1 text-sm text-[--color-muted] hover:text-[--color-ink]">
+        Dashboard
+      </Link>
+      <Link
+        href="/app/settings"
+        className="rounded-md px-2 py-1 text-sm text-[--color-muted] hover:text-[--color-ink]"
+      >
+        Configuration
+      </Link>
       <div className="ml-auto flex items-center gap-3">
         <OrganizationSwitcher
           hidePersonal={false}

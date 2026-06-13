@@ -15,6 +15,7 @@ import type * as lib_demoData from "../lib/demoData.js";
 import type * as lib_llm from "../lib/llm.js";
 import type * as lib_parse from "../lib/parse.js";
 import type * as lib_reconcile from "../lib/reconcile.js";
+import type * as routing from "../routing.js";
 
 import type {
   ApiFromModules,
@@ -30,6 +31,7 @@ declare const fullApi: ApiFromModules<{
   "lib/llm": typeof lib_llm;
   "lib/parse": typeof lib_parse;
   "lib/reconcile": typeof lib_reconcile;
+  routing: typeof routing;
 }>;
 
 /**

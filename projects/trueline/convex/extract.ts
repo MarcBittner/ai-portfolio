@@ -22,7 +22,8 @@ export const run = internalAction({
     try {
       const inv = await ctx.runQuery(internal.extract._getRaw, { invoiceId });
       if (!inv) return;
-      const { lines, provider, model } = await extractLineItems(inv.rawText);
+      const routing = await ctx.runQuery(internal.routing._forExtract, { orgId });
+      const { lines, provider, model } = await extractLineItems(inv.rawText, routing);
       // batch all DB writes into a single mutation (one transaction)
       await ctx.runMutation(internal.invoices.writeResults, {
         invoiceId,

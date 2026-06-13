@@ -99,6 +99,18 @@ export default defineSchema({
     .index("by_invoice", ["invoiceId"])
     .index("by_org_decision", ["orgId", "decision"]),
 
+  // Per-tenant LLM routing configuration (set on the Configuration page).
+  settings: defineTable({
+    orgId: v.string(),
+    mode: v.union(
+      v.literal("auto"),
+      v.literal("free"),
+      v.literal("paid"),
+      v.literal("offline"),
+    ),
+    model: v.optional(v.string()), // override the model for the chosen mode
+  }).index("by_org", ["orgId"]),
+
   // Eval runs: extraction accuracy + flag precision/recall over a labeled set.
   evalRuns: defineTable({
     orgId: v.string(),

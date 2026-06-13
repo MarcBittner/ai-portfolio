@@ -73,44 +73,76 @@ async function post(url: string, body: unknown, headers: Record<string, string>)
   return res.json();
 }
 
-export async function extractLineItems(rawText: string): Promise<ExtractResult> {
-  const anthropicKey = process.env.ANTHROPIC_API_KEY;
-  const openrouterKey = process.env.OPENROUTER_API_KEY;
+export const DEFAULT_FREE_MODEL = process.env.OPENROUTER_MODEL ?? "google/gemma-4-31b-it:free";
+export const DEFAULT_PAID_MODEL = process.env.ANTHROPIC_MODEL ?? "claude-haiku-4-5-20251001";
+
+export type RoutingMode = "auto" | "free" | "paid" | "offline";
+
+export function keyStatus() {
+  return {
+    free: !!process.env.OPENROUTER_API_KEY, // OpenRouter free models
+    paid: !!process.env.ANTHROPIC_API_KEY, // Anthropic / Claude
+  };
+}
+
+async function callAnthropic(model: string, userMsg: string): Promise<ExtractedLine[]> {
+  const data = await post(
+    "https://api.anthropic.com/v1/messages",
+    { model, max_tokens: 2048, system: SYSTEM, messages: [{ role: "user", content: userMsg }] },
+    { "x-api-key": process.env.ANTHROPIC_API_KEY ?? "", "anthropic-version": "2023-06-01" },
+  );
+  return coerceLines(parseJsonLoose(data?.content?.[0]?.text ?? ""));
+}
+
+async function callOpenRouter(model: string, userMsg: string): Promise<ExtractedLine[]> {
+  const data = await post(
+    "https://openrouter.ai/api/v1/chat/completions",
+    {
+      model,
+      messages: [
+        { role: "system", content: SYSTEM },
+        { role: "user", content: userMsg },
+      ],
+    },
+    { authorization: `Bearer ${process.env.OPENROUTER_API_KEY ?? ""}` },
+  );
+  return coerceLines(parseJsonLoose(data?.choices?.[0]?.message?.content ?? ""));
+}
+
+// Honor the tenant's explicit routing config. The deterministic offline engine
+// is always the terminal fallback, so a run completes even with no/failed model.
+export async function extractLineItems(
+  rawText: string,
+  routing: { mode?: RoutingMode; model?: string } = {},
+): Promise<ExtractResult> {
+  const mode = routing.mode ?? "auto";
   const userMsg = `Extract every line item from this invoice:\n\n${rawText}`;
+  const { free, paid } = keyStatus();
 
-  if (anthropicKey) {
-    const model = process.env.ANTHROPIC_MODEL ?? "claude-haiku-4-5-20251001";
-    try {
-      const data = await post(
-        "https://api.anthropic.com/v1/messages",
-        { model, max_tokens: 2048, system: SYSTEM, messages: [{ role: "user", content: userMsg }] },
-        { "x-api-key": anthropicKey, "anthropic-version": "2023-06-01" },
-      );
-      const lines = coerceLines(parseJsonLoose(data?.content?.[0]?.text ?? ""));
-      if (lines.length) return { lines, provider: "anthropic", model };
-    } catch {
-      /* fall through */
-    }
-  }
+  // provider attempt order, defined explicitly by mode
+  const order: ("anthropic" | "openrouter")[] =
+    mode === "offline"
+      ? []
+      : mode === "free"
+        ? ["openrouter"]
+        : mode === "paid"
+          ? ["anthropic"]
+          : ["anthropic", "openrouter"]; // auto: paid first if available, else free
 
-  if (openrouterKey) {
-    const model = process.env.OPENROUTER_MODEL ?? "google/gemma-4-31b-it:free";
+  for (const provider of order) {
     try {
-      const data = await post(
-        "https://openrouter.ai/api/v1/chat/completions",
-        {
-          model,
-          messages: [
-            { role: "system", content: SYSTEM },
-            { role: "user", content: userMsg },
-          ],
-        },
-        { authorization: `Bearer ${openrouterKey}` },
-      );
-      const lines = coerceLines(parseJsonLoose(data?.choices?.[0]?.message?.content ?? ""));
-      if (lines.length) return { lines, provider: "openrouter", model };
+      if (provider === "anthropic" && paid) {
+        const model = routing.model || DEFAULT_PAID_MODEL;
+        const lines = await callAnthropic(model, userMsg);
+        if (lines.length) return { lines, provider, model };
+      }
+      if (provider === "openrouter" && free) {
+        const model = routing.model || DEFAULT_FREE_MODEL;
+        const lines = await callOpenRouter(model, userMsg);
+        if (lines.length) return { lines, provider, model };
+      }
     } catch {
-      /* fall through */
+      /* try the next provider, then the offline fallback */
     }
   }
 
