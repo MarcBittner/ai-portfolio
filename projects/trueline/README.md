@@ -1,180 +1,242 @@
 # trueline
 
-**Invoice line-item verification.** Read a vendor invoice, **verify the math in
-code**, reconcile every line against the purchase order and catalog rates, flag
-overcharges with a recoverable-dollar estimate, and route the money-path lines to
-a human — with the flag engine's accuracy *measured* by an eval, not asserted.
+[![demo](https://img.shields.io/badge/demo-live-43c98a)](https://trueline-moys.onrender.com)
+[![Next.js](https://img.shields.io/badge/Next.js-16-000?logo=nextdotjs&logoColor=white)](https://nextjs.org)
+[![React](https://img.shields.io/badge/React-19-61dafb?logo=react&logoColor=000)](https://react.dev)
+[![Convex](https://img.shields.io/badge/Convex-backend-ee342f)](https://convex.dev)
+[![Clerk](https://img.shields.io/badge/Clerk-auth%20%2B%20orgs-6c47ff?logo=clerk&logoColor=white)](https://clerk.com)
+[![Tailwind](https://img.shields.io/badge/Tailwind-v4-38bdf8?logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![license](https://img.shields.io/badge/license-proprietary-red)](LICENSE)
 
-> Stack: **Next.js 16 · React 19 · Tailwind v4 · Convex · Clerk · LLM**. The worked
-> example is vendor-vs-PO reconciliation (industrial/MRO supply); the engine is
-> domain-generic. Synthetic, fictional data only.
+Invoice line-item verification: extract → verify math in code → reconcile vs purchase
+order + catalog rates → flag recoverable overcharges → human review → eval. The LLM
+reads the document into structured JSON; all arithmetic and every flag is deterministic
+TypeScript.
 
-**Live demo:** https://trueline-moys.onrender.com — sign in, then the workspace walks
-you through it (download contract + invoices → upload → review). *(Hosted on Render;
-CO-Ver's stack uses Vercel — identical code, see [Infrastructure](#infrastructure-decisions).)*
+**Live:** https://trueline-moys.onrender.com · synthetic data only.
 
-The governing principle: **the model reads; deterministic code decides.** The LLM
-turns a messy invoice into structured line items with per-line confidence and a
-source quote — it never computes a total or makes a flag call. Every number that
-touches money is recomputed and judged in plain TypeScript.
+![trueline](docs/screenshot.png)
 
 ---
 
-## Request lifecycle (one upload, end to end)
+## Stack
+
+| Layer | Tech |
+|---|---|
+| Frontend | Next.js 16 (App Router, RSC), React 19, Tailwind v4 |
+| Backend / DB / realtime | Convex (queries · mutations · actions · scheduler) |
+| Auth / multi-tenancy | Clerk (orgs; JWT → Convex) |
+| LLM | Anthropic · OpenRouter (free) · deterministic mock — selected by routing config |
+| Host | Render (Next) + Convex Cloud + Clerk |
+
+## Request lifecycle
 
 ```
- Browser (RSC + client components)         Convex Cloud (giddy-marmot-130)        LLM
- ─────────────────────────────────         ──────────────────────────────        ───
- Dashboard upload                           
-   └─ useMutation(createInvoiceFromText) ─▶ mutation  (transactional write)
-                                              • insert invoices{status:"extracting"}
-                                              • insert logs{event:"upload"}
-                                              • scheduler.runAfter(0, extract.run) ── hop ──▶ action (extract.run)
-                                                                                              • runQuery _getRaw  (own txn)
-                                                                                              • runQuery routing._forExtract
-                                                                                              • extractLineItems(text,{mode}) ─▶ Anthropic / OpenRouter
-                                                                                                                                 (free) / mock
-                                                                                              • reconcileLine() ×N  (pure code)
-                                              mutation (writeResults) ◀── runMutation ───────── • measure latency + cost
-   live ◀═ useQuery(getInvoice) re-runs ◀──   • clear+insert invoiceLines (idempotent)
-   (reactive — no refresh)                     • patch invoices{status,totals,latency,cost}
-                                               • appendLog{event:"extract"}
+client                                  Convex (giddy-marmot-130)                 external
+──────                                  ─────────────────────────                 ────────
+useMutation(createInvoiceFromText) ──▶ mutation: insert invoices{status:extracting}
+                                        insert logs; scheduler.runAfter(0, extract.run)
+                                          │ schedule
+                                          ▼
+                                        action extract.run
+                                          runQuery extract._getRaw
+                                          runQuery routing._forExtract  ──▶ {mode,model}
+                                          extractLineItems(text,routing) ───────────────▶ Anthropic / OpenRouter
+                                          reconcileLine() × N  (pure)        429/none ──▶  ↳ deterministic mock
+                                          runMutation writeResults  ◀────────┘
+                                            clear+insert invoiceLines (idempotent on _id)
+                                            patch invoices{status,totals,latencyMs,costUsd}
+useQuery(getInvoice) re-runs ◀── reactive push (no polling) ── appendLog{event:extract}
 ```
 
-The dashboard/review are **reactive `useQuery` subscriptions**: the instant
-`writeResults` commits, Convex re-runs the affected queries and pushes new data to
-the browser — the "extracting…" row populates live with zero polling.
+## Persistence layer (`convex/schema.ts`)
 
----
+Every row is `orgId`-scoped (the active Clerk org, else `user:<subject>`); reads filter
+through a `by_org*` index, so tenants are isolated. Auto fields: `_id`, `_creationTime`.
 
-## The pipeline, step by step (with codepaths)
+```ts
+purchaseOrders { orgId, poNumber, vendor,
+                 lines: [{ sku?, description, unit, quantity, unitPrice }] }
+                 .index by_org [orgId]  .index by_org_po [orgId, poNumber]
 
-| # | Step | Where it happens | Convex primitive | Tables |
-|---|---|---|---|---|
-| 0 | **Upload contract (baseline)** | `app/app/page.tsx` (stepper) → `invoices.setBaselineFromText` parses a PO file (`lib/parse.ts:parsePoText`) | mutation | `purchaseOrders`, `catalog` |
-| 1 | **Upload invoice** | `app/app/page.tsx` → `invoices.createInvoiceFromText` inserts the record and **schedules** the action | mutation + `ctx.scheduler` | `invoices`, `logs` |
-| 2 | **Extract (LLM)** | `extract.ts:run` → `lib/llm.ts:extractLineItems(text,{mode,model})` calls Anthropic/OpenRouter with a strict JSON schema (per-line `confidence` + `sourceQuote`); falls back to `lib/parse.ts:parsePipeInvoice` (deterministic) so a run never fails | **action** (only place external I/O is legal) | reads via `runQuery` |
-| 3 | **Verify math** | `lib/reconcile.ts:reconcileLine` recomputes `extension = qty × unitPrice`; mismatch → flagged. *The LLM's arithmetic is never trusted.* | pure function | — |
-| 4 | **Reconcile** | `lib/reconcile.ts:reconcileLine` matches each line to the **PO line** and **catalog rate** (SKU, else fuzzy token-overlap on the description), computes variance vs each baseline | pure function | reads `purchaseOrders`, `catalog` |
-| 5 | **Flag + recoverable $** | `lib/reconcile.ts:reconcileLine` → red/yellow/green from variance, math errors, missing matches, low confidence; `recoverableUsd` = overcharge vs the *lower* baseline | pure function | — |
-| 6 | **Write back** | `invoices.writeResults` (called by the action) — **one transaction**, **idempotent on the invoice `_id`** (clears + re-inserts lines, because actions aren't auto-retried) | internal mutation | writes `invoiceLines`, patches `invoices`, `logs` |
-| 7 | **Review** | `app/app/invoices/[id]/page.tsx` ← `invoices.getInvoice` (reactive). Color-coded line costs; `reviewLine` / `correctLine` (re-runs reconcile) / `setInvoiceStatus` | query + mutations | `invoiceLines`, `invoices` |
-| 8 | **Eval** | `evals.ts:runEval` scores flag precision/recall + math-consistency on the labeled set (`lib/demoData.ts:DEMO_EVAL_LABELS`); shown at `app/app/evals` | mutation + query | `evalRuns` |
+catalog        { orgId, sku, description, unit, marketPrice, category? }      // market rates
+                 .index by_org [orgId]  .index by_org_sku [orgId, sku]
 
-**Routing** (`convex/routing.ts` + `app/app/settings`): the tenant picks a mode
-(auto/free/paid/offline) + model; `extract.run` reads it via `routing._forExtract`
-and passes it to `extractLineItems`, which defines the provider order explicitly per
-mode (offline→mock; free→OpenRouter→mock; paid→Anthropic→mock; auto→paid→free→mock).
+invoices       { orgId, invoiceNumber, vendor, poNumber?, rawText,
+                 status: "extracting"|"needs_review"|"approved"|"rejected",
+                 claimedTotal?, recoverableUsd?,
+                 extractionProvider?, extractionModel?, latencyMs?, costUsd?,
+                 error?, uploadedBy? }
+                 .index by_org [orgId]  .index by_org_status [orgId, status]
 
-**Diagnostics** (`app/app/diagnostics` + `convex/diagnostics.ts`): request traces
-(per-run provider/model/latency/cost/flags), the `logs` event stream, and a
-`benchmark` action that runs one invoice through every mode to compare them.
+invoiceLines   { orgId, invoiceId→invoices, lineNo,
+                 // LLM-read (it only reads):
+                 description, sku?, unit, quantity, unitPrice, claimedExtension,
+                 confidence (0..1), sourceQuote,
+                 // code-decided:
+                 computedExtension, mathOk, poUnitPrice?, catalogPrice?,
+                 matchedBy: "sku"|"description"|"none",
+                 varianceVsPoPct?, varianceVsMarketPct?,
+                 flag: "green"|"yellow"|"red", reasons[], recoverableUsd,
+                 // human-in-the-loop:
+                 decision: "pending"|"approved"|"edited"|"rejected", reviewer? }
+                 .index by_invoice [invoiceId]  .index by_org_decision [orgId, decision]
 
----
+evalRuns       { orgId, provider, model, n,
+                 extractionAccuracy, flagPrecision, flagRecall, createdBy? }  .index by_org
+logs           { orgId, level: "info"|"warn"|"error", event, detail, latencyMs? }  .index by_org
+settings       { orgId, mode: "auto"|"free"|"paid"|"offline", model? }  .index by_org
+```
 
-## Architecture decisions
+No ORM: types are generated from this schema (`convex/_generated`) and flow to the React
+`useQuery`/`useMutation` hooks. Relationships are `v.id(...)` references resolved in code;
+no SQL joins.
 
-**Convex — three function types, deliberately.**
-- **Queries** (`listInvoices`, `getInvoice`, `stats`, `baseline`, `recentLogs`,
-  `evals.listEvals`) are read-only and **reactive** — the UI subscribes and Convex
-  pushes updates. This is why no websocket/polling code exists.
-- **Mutations** (`createInvoiceFromText`, `setBaselineFromText`, `reviewLine`,
-  `correctLine`, `writeResults`, …) are **serializable ACID transactions**;
-  deterministic, so Convex can auto-retry them on conflict — which is *why* they may
-  not do external I/O.
-- **Actions** (`extract.run`, `diagnostics.benchmark`) are the **escape hatch** for
-  external I/O (the LLM call). Not transactional, not auto-retried, no `ctx.db` —
-  they reach data via `runQuery`/`runMutation`. A mutation **schedules** the action
-  (`runAfter(0, …)`), the standard hop.
+## API (Convex functions)
 
-**No ORM, and it doesn't need one.** Convex's query layer is built in; types flow
-end-to-end from `convex/schema.ts` through codegen (`convex/_generated`) to the React
-hooks. Relationships are `v.id(...)` references resolved in code with explicit indexes
-(`by_org`, `by_invoice`, …). Trade-off: no ad-hoc SQL joins — modeled in code /
-denormalized — in exchange for reactivity + transactions + far less plumbing.
+`query` = reactive read · `mutation` = ACID transaction · `action` = external I/O ·
+`internal*` = not client-callable.
 
-**Idempotency is the action's job.** Convex auto-retries mutations *because* they're
-deterministic; actions aren't, so `writeResults` is keyed on the invoice `_id`
-(delete-then-insert lines) and is safe to re-run — it can't double-insert or
-double-charge the model.
+```
+convex/invoices.ts
+  query    listInvoices()                              → (Invoice & {lineCount,red,yellow,green})[]
+  query    getInvoice({ invoiceId })                   → { invoice, lines[] } | null
+  query    stats()                                     → { invoices, recoverableUsd, needsReview, latestEval }
+  query    baseline()                                  → { hasPo, poLines, poNumber, vendor }
+  query    recentLogs()                                → Log[]  (60, desc)
+  mutation seedIfEmpty()                               → { seeded }
+  mutation setBaselineFromText({ rawText, poNumber? }) → { poLines }     // parsePoText → PO + catalog
+  mutation createInvoiceFromText({ invoiceNumber, rawText, poNumber? }) → Id  // schedules extract.run
+  mutation reviewLine({ lineId, decision })            // approved | rejected
+  mutation correctLine({ lineId, unitPrice, quantity? })  // re-runs reconcileLine, decision="edited"
+  mutation setInvoiceStatus({ invoiceId, status })
+  mutation resetDemo()                                 // clears the tenant
+  internalMutation writeResults / markError / appendLog
+convex/extract.ts
+  internalQuery  _getRaw({ invoiceId })                → { rawText, invoiceNumber }
+  internalAction run({ invoiceId, orgId })             // LLM → reconcile → writeResults (+ latency/cost/log)
+convex/routing.ts
+  query    get()    → { mode, model, keys:{free,paid}, defaultFreeModel, defaultPaidModel, activeMode }
+  mutation set({ mode, model? })
+  internalQuery _forExtract({ orgId }) → { mode, model }
+convex/evals.ts        mutation runEval() → EvalRun · query listEvals() → EvalRun[]
+convex/diagnostics.ts  action benchmark({ invoiceText }) → [{ mode, provider, model, latencyMs, lines, error }]
+```
 
-**LLM proposes, calculator verifies.** Pure-LLM number reads hallucinate and give no
-uncertainty signal — fatal when the output is dollars. The model is confined to
-*reading* into a typed shape (`lib/llm.ts`); all arithmetic and every flag is
-deterministic (`lib/reconcile.ts`), which makes the eval exact and reproducible.
+HTTP equivalents (used by the client + testable directly):
+`POST {CONVEX_URL}/api/query` and `/api/mutation` with `{ path, args, format:"json" }` and a
+`Authorization: Bearer <clerk-jwt>` header.
 
-**Multi-tenancy via Clerk → Convex.** Clerk mints a JWT (the `convex` template);
-`app/providers.tsx`'s `ConvexProviderWithClerk` attaches it; Convex validates it via
-`convex/auth.config.ts`; every function derives `orgId` from
-`ctx.auth.getUserIdentity()` and filters through a `by_org` index. A signed-in user
-with no active org gets a private `user:<id>` tenant (so the demo is friction-free).
-Read queries use an `optionalOrg` helper that returns empty instead of throwing while
-auth settles, so the UI never white-screens.
+## LLM integration (`convex/lib/llm.ts`)
 
-**Provider-agnostic LLM via plain `fetch`** (no SDK lock-in) so the same action runs
-in Convex's default runtime against Anthropic, OpenRouter, or the deterministic mock,
-selected by the routing config.
+System prompt (verbatim):
 
----
+```
+You extract line items from a vendor invoice into strict JSON. You ONLY read values
+that appear in the document — never invent or compute. Return a JSON object
+{"lines": [...]} where each line is {"description": string, "sku": string|null,
+"quantity": number, "unit": string, "unitPrice": number, "extension": number,
+"confidence": number (0..1), "sourceQuote": string}. confidence reflects how
+legible/certain the source was. sourceQuote is the verbatim snippet the numbers came
+from. Output JSON only.
+```
 
-## Infrastructure decisions
+- User message: `Extract every line item from this invoice:\n\n<rawText>`.
+- Transport: plain `fetch` (no SDK). Anthropic → `POST /v1/messages` (`x-api-key`,
+  `anthropic-version: 2023-06-01`). OpenRouter → `POST /v1/chat/completions`
+  (`Authorization: Bearer`). Response JSON is recovered with a fence/brace-tolerant
+  parser (`parseJsonLoose`) and coerced/clamped (`coerceLines`) — numbers stripped of
+  `$,`, confidence clamped 0..1, `sourceQuote` capped 280 chars.
+- `extractLineItems(rawText, { mode, model })` returns `{ lines, provider, model }`.
+  **The model never computes**: `extension` it returns is ignored — `reconcileLine`
+  recomputes it. Output is never trusted for math or the flag decision.
 
-- **Next.js on Render** (native Node service: `npm install && npm run build` /
-  `npm run start`). CO-Ver's stack uses **Vercel** — the code is identical; Render was
-  chosen here only because it needed no new account. Build command on Vercel would be
-  `npx convex deploy --cmd 'npm run build'`.
-- **Convex Cloud** hosts the backend/DB/realtime (dev: `canny-goshawk-927`, prod:
-  `giddy-marmot-130`). Provider API keys + the Clerk issuer are set as **Convex
-  deployment env vars** (server-side; the LLM action runs there), never in the browser
-  bundle.
-- **Clerk** for auth/orgs; only `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` is public.
-- `convex/_generated` is **committed** so the git-based host build has the types
-  without a Convex deploy step in CI.
-- **LLM is free-by-default**: `OPENROUTER_API_KEY` + a free model
-  (`google/gemma-4-31b-it:free`). Free tier is 50 req/day — past that, runs fall to the
-  deterministic engine (visible on the review header + Diagnostics). Set
-  `ANTHROPIC_API_KEY` and choose **Paid** for production-grade extraction.
+## Routing config (`convex/routing.ts`, UI `app/app/settings`)
+
+Per-tenant `settings{ mode, model }`. The extract action reads it via `_forExtract` and
+passes it to `extractLineItems`, which sets the provider attempt order **explicitly** by
+mode (deterministic mock is always the terminal fallback):
+
+```
+offline → []                         → mock
+free    → [openrouter]               → mock
+paid    → [anthropic]                → mock
+auto    → [anthropic, openrouter]    → mock     (paid if keyed, else free, else offline)
+```
+
+A provider is attempted only if its key is present (`keyStatus()` reads env). `model`
+overrides the default for the chosen provider. Defaults:
+`OPENROUTER_MODEL=google/gemma-4-31b-it:free`, `ANTHROPIC_MODEL=claude-haiku-4-5-20251001`.
+Keys live as **Convex deployment env vars** (server-side), never in the browser bundle.
+OpenRouter free tier is 50 req/day; past that a run resolves to the mock (shown on the
+review header + Diagnostics).
+
+## Reconcile algorithm (`convex/lib/reconcile.ts`, pure)
+
+```
+computedExtension = round2(quantity × unitPrice);  mathOk = |computed − claimed| ≤ 0.015
+match → PO line then catalog: by sku; else best description token-overlap ≥ 0.40 (FUZZY_MIN)
+variance%(base) = (unitPrice − base) / base × 100,  for PO and market
+flag: red   if !mathOk, or worst variance > 10% (RED_PCT)
+      yellow if no match, or confidence < 0.60, or worst variance > 3% (YELLOW_PCT)
+      green  otherwise
+recoverableUsd = max(0, unitPrice − min(poUnitPrice, catalogPrice)) × quantity
+```
+
+## Evals (`convex/evals.ts`)
+
+`runEval()` scores the engine on a labeled set (`lib/demoData.ts:DEMO_EVAL_LABELS`):
+per labeled invoice, predicted = any red line, truth = should-flag → **flag
+precision/recall**; plus **math-consistency** = share of lines with `mathOk`. Persisted to
+`evalRuns`; shown at `/app/evals`. This is the CI gate before shipping a threshold/prompt/
+model change.
+
+## Auth & multi-tenancy
+
+Clerk JWT (`convex` template, `aud=convex`) → `ConvexProviderWithClerk`
+(`app/providers.tsx`) → validated by `convex/auth.config.ts` (`CLERK_JWT_ISSUER_DOMAIN`) →
+functions derive `orgId` from `ctx.auth.getUserIdentity()`. `middleware.ts` gates `/app(.*)`.
+Read queries use an `optionalOrg` helper (return empty instead of throwing while auth
+settles) so the client never crashes; the extract action writes idempotently (keyed on the
+invoice `_id`) because actions are not auto-retried.
 
 ## Code map
 
 ```
-convex/
-  schema.ts          tables: purchaseOrders, catalog, invoices, invoiceLines,
-                     evalRuns, settings, logs (+ indexes)
-  auth.config.ts     trust Clerk-issued JWTs (CLERK_JWT_ISSUER_DOMAIN)
-  invoices.ts        queries (list/get/stats/baseline/recentLogs) + mutations
-                     (create/setBaseline/review/correct/setStatus/reset/seed) +
-                     internal writeResults/markError/appendLog + reconcile-and-insert
-  extract.ts         internalAction run (LLM) + internalQuery _getRaw
-  routing.ts         get/set routing config + internal _forExtract
-  evals.ts           runEval + listEvals
-  diagnostics.ts     benchmark action (run one invoice through every mode)
-  lib/llm.ts         extractLineItems({mode,model}) — Anthropic/OpenRouter/mock
-  lib/reconcile.ts   reconcileLine — verify math, match, variance, flag, recoverable $
-  lib/parse.ts       parsePipeInvoice (invoice) + parsePoText (contract)
-  lib/demoData.ts    synthetic contract, catalog, invoices, eval labels
-app/
-  layout.tsx providers.tsx middleware.ts   Clerk + Convex wiring, /app route gate
-  page.tsx                                  public landing (stack + pipeline)
-  app/page.tsx                              dashboard — 4-step guided walkthrough
-  app/invoices/[id]/page.tsx                review — color-coded line reconciliation
-  app/settings/page.tsx                     Configuration — explicit LLM routing
-  app/evals/page.tsx                        Evals — precision/recall + history
-  app/diagnostics/page.tsx                  Diagnostics — traces, log, benchmark
-  app/about/page.tsx                        About — the stack + principles
-  components/nav.tsx ui.tsx                  nav + shared UI (usd, FlagBadge, …)
+convex/  schema.ts auth.config.ts invoices.ts extract.ts routing.ts evals.ts diagnostics.ts
+         lib/{ llm.ts reconcile.ts parse.ts demoData.ts }
+app/     layout.tsx providers.tsx middleware.ts page.tsx(landing)
+         app/page.tsx(dashboard·4-step) app/invoices/[id]/page.tsx(review)
+         app/settings(routing) app/evals app/diagnostics(traces·log·benchmark) app/about
+         components/{ nav.tsx ui.tsx }
 ```
 
-## Local development
+## Env (`.env.example`)
+
+```
+NEXT_PUBLIC_CONVEX_URL            # set by `convex dev`/`deploy`
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY # public
+CLERK_SECRET_KEY                  # Next server
+CLERK_JWT_ISSUER_DOMAIN           # Convex deployment env (auth.config)
+OPENROUTER_API_KEY / OPENROUTER_MODEL   # Convex deployment env (free LLM)
+ANTHROPIC_API_KEY  / ANTHROPIC_MODEL    # Convex deployment env (paid LLM)
+```
+
+## Local dev
 
 ```bash
 npm install
-npx convex dev          # provisions a dev deployment, generates types, watches
+npx convex dev          # dev deployment + codegen + watch
 npm run dev             # http://localhost:3000
+npx convex env set OPENROUTER_API_KEY …   # the action runs server-side
 ```
-`.env.local` (see `.env.example`): Clerk keys + `CLERK_JWT_ISSUER_DOMAIN`; one LLM key
-(or none for the mock). Set the LLM key on the **Convex** deployment
-(`npx convex env set OPENROUTER_API_KEY …`) since the action runs there.
 
-Part of the [ai-portfolio](https://github.com/MarcBittner/ai-portfolio). Synthetic
-data only; no secrets in the repo.
+## Deploy
+
+Convex: `npx convex deploy`. Host: Render native Node (`npm install && npm run build` /
+`npm run start`) — on Vercel the build command would be
+`npx convex deploy --cmd 'npm run build'`. `convex/_generated` is committed so a git-based
+build needs no Convex step. Set the Clerk + LLM env on Convex; set `NEXT_PUBLIC_*` on the host.
+
+Part of the [ai-portfolio](https://github.com/MarcBittner/ai-portfolio).

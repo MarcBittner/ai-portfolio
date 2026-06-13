@@ -37,7 +37,7 @@ const STACK: { group: string; items: [string, string][] }[] = [
   {
     group: "Hosting & ops",
     items: [
-      ["Render", "hosts the Next.js app (CO-Ver's stack uses Vercel — same code)"],
+      ["Render", "hosts the Next.js app (Vercel is the canonical host for this stack — same code)"],
       ["Convex Cloud", "managed backend + database + realtime"],
       ["GitHub", "source + CI quality gate"],
     ],

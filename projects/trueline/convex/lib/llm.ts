@@ -1,7 +1,7 @@
 // The LLM only *reads* the invoice into a strict JSON shape — it never computes
 // money or makes the flag decision (that is reconcile.ts, deterministic code).
 // Plain fetch, so it runs in Convex's default runtime. Provider order:
-// Anthropic (CO-Ver's exact provider) → OpenRouter free models → deterministic
+// Anthropic (the paid path) → OpenRouter free models → deterministic
 // mock, so the pipeline always completes, even with zero API keys.
 
 import { type ExtractedLine, parsePipeInvoice } from "./parse";
