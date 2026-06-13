@@ -48,3 +48,22 @@ SERVICES = [
      "tls_expired": False, "hsts": False, "auth_required": None,
      "internet_exposed": True, "dangling": True, "cors_wildcard": False},
 ]
+
+# What the surface looks like after the two critical findings are remediated:
+# the admin web interface now requires auth (SSO/MFA), and the database is moved
+# off the public edge (no longer internet-exposed). Everything else is unchanged,
+# so the before/after diff isolates the effect of fixing the criticals — the
+# posture jumps and the controls they hit flip fail → pass.
+_REMEDIATED = {
+    "admin": {"auth_required": True},          # fixes ADMIN_NO_AUTH (critical)
+    "db": {"internet_exposed": False},         # fixes DB_EXPOSED (critical)
+}
+
+
+def remediated_services() -> list[dict]:
+    """SERVICES with the two critical findings remediated (the 'after' state)."""
+    out: list[dict] = []
+    for svc in SERVICES:
+        patch = _REMEDIATED.get(svc["subdomain"])
+        out.append({**svc, **patch} if patch else dict(svc))
+    return out

@@ -149,3 +149,36 @@ def test_regression_is_deterministic(client):
 
 def test_regression_invalid_mode_rejected(client):
     assert client.post("/scan", json={"mode": "aggressive"}).status_code == 422
+
+
+def test_smoke_llm_status(client):
+    s = client.get("/llm").json()
+    assert set(s["providers"]) == {"anthropic", "openai", "ollama", "openrouter"}
+    assert s["offline_fallback"] is True
+
+
+def test_smoke_exec_narrative(client):
+    n = client.post("/report/narrative", json={"mode": "offline"}).json()
+    assert n["summary"].strip() and n["remediations"]
+    covered = {r["rule_id"] for r in n["remediations"]}
+    assert {"ADMIN_NO_AUTH", "DB_EXPOSED"} <= covered  # every critical covered
+
+
+def test_smoke_evals_cover_criticals(client):
+    e = client.get("/evals").json()
+    assert e["criticals_covered"] is True and e["coverage_complete"] is True
+
+
+def test_regression_remediation_diff(client):
+    d = client.get("/report/diff").json()
+    assert d["before"]["posture"]["score"] < d["after"]["posture"]["score"]
+    assert set(d["fixed_findings"]) == {"ADMIN_NO_AUTH", "DB_EXPOSED"}
+    assert d["before"]["posture"]["grade"] == "D"
+    assert d["after"]["posture"]["grade"] == "B"
+    assert {"ISO:A.5.15", "ISO:A.8.20"} <= set(d["controls_remediated"])
+
+
+def test_regression_narrative_no_secrets(client):
+    blob = str(client.get("/llm").json()).lower()
+    for token in ("password", "secret", "sk-ant", "sk-or", "api_key"):
+        assert token not in blob
