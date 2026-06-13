@@ -1,206 +1,585 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>pii-redactor</title>
-    <style>
-      :root {
-        --bg: #0b0e14; --panel: #131722; --border: #232838; --fg: #e6e9ef;
-        --muted: #8b93a7; --accent: #6ea8fe; --danger: #ff6b6b; --llm: #b197fc;
-      }
-      * { box-sizing: border-box; }
-      body { margin: 0; background: var(--bg); color: var(--fg);
-        font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
-      main { max-width: 1040px; margin: 0 auto; padding: 28px 20px 60px; }
-      h1 { font-size: 22px; margin: 0 0 4px; }
-      p.lede { color: var(--muted); margin: 0 0 18px; }
-      .grid { display: grid; gap: 16px; grid-template-columns: 1fr 1fr; }
-      @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
-      .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
-      .panel h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 0 0 10px; }
-      textarea { width: 100%; min-height: 240px; resize: vertical; background: #0e1320; color: var(--fg);
-        border: 1px solid var(--border); border-radius: 8px; padding: 10px;
-        font: 13px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; }
-      .out { min-height: 240px; white-space: pre-wrap; word-break: break-word; background: #0e1320;
-        border: 1px solid var(--border); border-radius: 8px; padding: 10px;
-        font: 13px/1.55 ui-monospace, Menlo, monospace; }
-      .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 12px 0; }
-      .spacer { flex: 1; }
-      label { font-size: 13px; color: var(--muted); }
-      button, select, input { background: #1b2230; color: var(--fg); border: 1px solid var(--border);
-        border-radius: 7px; padding: 6px 10px; font-size: 13px; }
-      button { cursor: pointer; }
-      button.primary { background: var(--accent); color: #07101f; border-color: var(--accent); font-weight: 600; }
-      .settings { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
-      .settings .pill { font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); }
-      .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-      .chip { font-size: 12px; padding: 3px 8px; border-radius: 999px; border: 1px solid var(--border); }
-      mark { border-radius: 3px; padding: 0 2px; color: #07101f; font-weight: 600; background: var(--accent); }
-      mark.llm { background: var(--llm); }
-      .routing { font-size: 12px; color: var(--muted); margin-top: 8px; font-family: ui-monospace, Menlo, monospace; }
-      .swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
-      footer { color: var(--muted); font-size: 12px; margin-top: 22px; }
-      a { color: var(--accent); }
-      .empty { color: var(--muted); }
-    </style>
-  </head>
-  <body>
-    <main>
-      <h1>pii-redactor</h1>
-      <p class="lede">
-        Deterministic PII detection &amp; redaction (regex + checksums) with an
-        optional <b>LLM named-entity pass</b> for names, orgs, and places —
-        routed to local Ollama by default, falling back to the deterministic
-        core when no model is available.
-      </p>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>pii-redactor — deterministic PII detect &amp; redact</title>
+<!-- POLISH KIT: theme-init (apply before paint, no flash) -->
+<script>
+(function(){
+  try{
+    var t=localStorage.getItem("theme")||"system";
+    var dark = t==="dark" || (t==="system" && !window.matchMedia("(prefers-color-scheme: light)").matches);
+    if(!dark) document.documentElement.classList.add("light");
+  }catch(e){}
+})();
+</script>
+<style>
+  /* ============================ design system ============================ */
+  :root{
+    --bg:#0a0d14; --bg-grad-1:#0e1322; --bg-grad-2:#0a0d14;
+    --surface:#131826; --surface-2:#1a2032; --surface-3:#212a40;
+    --line:#263149; --line-2:#33405d;
+    --ink:#e9eef7; --ink-dim:#97a3ba; --ink-faint:#67728a;
+    --accent:#6aa1ff; --accent-2:#9b86ff; --accent-ink:#06101f;
+    --ok:#43c98a; --warn:#e6ad52; --bad:#f15b6c; --info:#6aa1ff; --violet:#9b86ff;
+    --r:15px; --r-sm:10px; --r-xs:7px;
+    --sh:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.5);
+    --sh-lg:0 1px 2px rgba(0,0,0,.4), 0 24px 64px -24px rgba(0,0,0,.7);
+    --grad:linear-gradient(135deg,var(--accent),var(--accent-2));
+    --ease:cubic-bezier(.22,.61,.36,1);
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+    --header-bg:rgba(10,13,20,.72);
+    --bg-radial-1:rgba(107,130,255,.10); --bg-radial-2:rgba(67,201,138,.05);
+    --mark-bg:#ffd54f; --mark-ink:#111;
+  }
+  /* POLISH KIT: theme toggle — LIGHT palette overrides (same accents, light surfaces, dark ink) */
+  html.light{
+    --bg:#f4f6fb; --bg-grad-1:#eef2fb; --bg-grad-2:#f4f6fb;
+    --surface:#ffffff; --surface-2:#f1f4fa; --surface-3:#e6ebf5;
+    --line:#d8dfec; --line-2:#c2ccde;
+    --ink:#16203a; --ink-dim:#566184; --ink-faint:#8b95ad;
+    --accent:#3a6ff0; --accent-2:#7c5cf5; --accent-ink:#ffffff;
+    --ok:#1f9d63; --warn:#b9791f; --bad:#d83a4d; --info:#3a6ff0; --violet:#6f53d6;
+    --sh:0 1px 2px rgba(20,32,58,.06), 0 8px 24px -14px rgba(20,32,58,.18);
+    --sh-lg:0 1px 2px rgba(20,32,58,.08), 0 24px 64px -28px rgba(20,32,58,.28);
+    --header-bg:rgba(255,255,255,.78);
+    --bg-radial-1:rgba(58,111,240,.10); --bg-radial-2:rgba(31,157,99,.06);
+    --mark-bg:#ffe08a; --mark-ink:#3a2c00;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;
+    font:15px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Inter,sans-serif;
+    background-image:radial-gradient(1200px 600px at 80% -10%,var(--bg-radial-1),transparent 60%),
+      radial-gradient(900px 500px at 0% 0%,var(--bg-radial-2),transparent 55%);
+    background-attachment:fixed;min-height:100vh;transition:background-color .25s var(--ease),color .25s var(--ease)}
+  ::selection{background:rgba(106,161,255,.3)}
+  a{color:var(--accent);text-decoration:none}
+  /* header */
+  header{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:14px;
+    padding:14px 24px;border-bottom:1px solid var(--line);
+    background:var(--header-bg);backdrop-filter:blur(14px) saturate(140%)}
+  .brand{display:flex;align-items:center;gap:11px;font-weight:650;font-size:16px;letter-spacing:.2px}
+  .logo{width:30px;height:30px;border-radius:9px;background:var(--grad);position:relative;
+    box-shadow:0 4px 16px -4px rgba(106,161,255,.6);flex:none}
+  .logo::after{content:"";position:absolute;inset:7px;border-radius:5px;
+    border:2px solid rgba(255,255,255,.85);border-right-color:transparent;
+    animation:spin 3.5s linear infinite}
+  .brand .tag{color:var(--ink-dim);font-size:12.5px;font-weight:400}
+  .spacer{flex:1}
+  .status{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--ink-dim);
+    padding:5px 11px;border:1px solid var(--line);border-radius:999px;background:var(--surface)}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--ink-faint)}
+  .dot.ok{background:var(--ok);box-shadow:0 0 0 0 rgba(67,201,138,.5);animation:pulse 2s infinite}
+  .pill{font-size:12px;color:var(--ink-dim);border:1px solid var(--line);border-radius:999px;
+    padding:5px 12px;background:var(--surface);white-space:nowrap}
+  .iconbtn{width:36px;height:36px;border-radius:10px;border:1px solid var(--line);background:var(--surface);
+    color:var(--ink-dim);cursor:pointer;display:grid;place-items:center;transition:.18s var(--ease)}
+  .iconbtn:hover{color:var(--ink);border-color:var(--line-2);transform:translateY(-1px);background:var(--surface-2)}
+  .iconbtn svg{width:18px;height:18px}
+  /* layout */
+  main{max-width:1160px;margin:0 auto;padding:26px 24px 64px;display:grid;gap:18px;
+    grid-template-columns:1fr 1fr}
+  .full{grid-column:1/-1}
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+    box-shadow:var(--sh);overflow:hidden;transition:.25s var(--ease)}
+  .panel:hover{border-color:var(--line-2)}
+  .panel h2{margin:0;padding:14px 18px;font-size:11.5px;font-weight:600;letter-spacing:.7px;
+    text-transform:uppercase;color:var(--ink-dim);border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:10px}
+  .panel .body{padding:18px}
+  /* controls */
+  textarea,select,input{font:inherit;color:var(--ink);background:var(--surface-2);
+    border:1px solid var(--line);border-radius:var(--r-sm);padding:11px 13px;transition:.16s var(--ease);width:100%}
+  textarea:focus,select:focus,input:focus{outline:none;border-color:var(--accent);
+    box-shadow:0 0 0 3px rgba(106,161,255,.16)}
+  textarea{min-height:240px;resize:vertical;font-family:var(--mono);font-size:13px;line-height:1.55}
+  .btn{font:inherit;font-weight:600;cursor:pointer;border-radius:var(--r-sm);padding:11px 17px;
+    border:1px solid var(--line);background:var(--surface-2);color:var(--ink);
+    transition:.16s var(--ease);display:inline-flex;align-items:center;gap:8px;position:relative}
+  .btn:hover{transform:translateY(-1px);border-color:var(--line-2)}
+  .btn:active{transform:translateY(0)}
+  .btn.primary{background:var(--grad);border:none;color:var(--accent-ink);
+    box-shadow:0 6px 20px -8px rgba(106,161,255,.7)}
+  .btn.primary:hover{box-shadow:0 10px 28px -8px rgba(106,161,255,.8)}
+  .btn[disabled]{opacity:.6;pointer-events:none}
+  .btn .spin{width:14px;height:14px;border:2px solid rgba(6,16,31,.35);border-top-color:#06101f;
+    border-radius:50%;animation:spin .7s linear infinite;display:none}
+  .btn.loading .spin{display:block}.btn.loading .lbl{opacity:.7}
+  .chip{font:inherit;font-size:12px;cursor:pointer;border:1px dashed var(--line);background:transparent;
+    color:var(--ink-dim);border-radius:999px;padding:5px 12px;transition:.16s var(--ease);
+    display:inline-flex;align-items:center;gap:7px}
+  .chip:hover{color:var(--ink);border-color:var(--accent);border-style:solid;
+    background:rgba(106,161,255,.08)}
+  .chip.static{cursor:default}
+  .chip.static:hover{color:var(--ink-dim);border-color:var(--line);border-style:dashed;background:transparent}
+  .row{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+  /* labeled field control */
+  .ctl{display:flex;flex-direction:column;gap:6px}
+  .ctl>span{font-size:11px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:var(--ink-faint)}
+  .ctls{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:13px;align-items:end}
+  .check{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-dim);cursor:pointer;
+    padding:11px 13px;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm)}
+  .check input{width:auto}
+  /* badges */
+  .badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:700;
+    text-transform:uppercase;letter-spacing:.3px}
+  .b-info{background:rgba(106,161,255,.15);color:var(--info)}
+  .mono{font-family:var(--mono);font-size:12px}
+  /* output surface (highlight + redacted) */
+  .out{min-height:240px;white-space:pre-wrap;word-break:break-word;background:var(--surface-2);
+    border:1px solid var(--line);border-radius:var(--r-sm);padding:12px 13px;
+    font-family:var(--mono);font-size:13px;line-height:1.6;transition:.16s var(--ease)}
+  .out mark{border-radius:4px;padding:0 3px;color:#07101f;font-weight:600}
+  .swatch{width:10px;height:10px;border-radius:3px;display:inline-block;vertical-align:middle}
+  .routing{font-size:12px;color:var(--ink-dim);margin-top:10px;font-family:var(--mono);word-break:break-word}
+  .muted{color:var(--ink-dim);font-size:12.5px}
+  .empty{color:var(--ink-faint)}
+  code{background:var(--surface-2);padding:1px 6px;border-radius:6px;font-family:var(--mono);font-size:12px}
+  /* reveal on load */
+  .reveal{opacity:0;transform:translateY(14px)}
+  .reveal.in{opacity:1;transform:none;transition:.55s var(--ease)}
+  /* settings drawer */
+  .scrim{position:fixed;inset:0;background:rgba(5,8,14,.55);backdrop-filter:blur(2px);z-index:50;
+    opacity:0;pointer-events:none;transition:.25s var(--ease)}
+  .scrim.open{opacity:1;pointer-events:auto}
+  .drawer{position:fixed;top:0;right:0;height:100%;width:380px;max-width:92vw;z-index:60;
+    background:var(--surface);border-left:1px solid var(--line);box-shadow:var(--sh-lg);
+    transform:translateX(100%);transition:transform .3s var(--ease);display:flex;flex-direction:column}
+  .drawer.open{transform:none}
+  .drawer header{position:static;background:none;backdrop-filter:none;border-bottom:1px solid var(--line)}
+  .drawer h3{margin:0;font-size:15px;font-weight:650}
+  .drawer .body{padding:20px;overflow:auto;display:grid;gap:18px}
+  .field{display:grid;gap:7px}
+  .field label{font-size:12px;color:var(--ink-dim);font-weight:600;display:flex;justify-content:space-between}
+  .field .hint{font-size:11.5px;color:var(--ink-faint);font-weight:400}
+  .seg{display:flex;gap:6px;flex-wrap:wrap}
+  /* POLISH KIT: segmented control (theme + routing mode) */
+  .seg .segbtn{font:inherit;font-size:12px;cursor:pointer;border:1px solid var(--line);background:var(--surface-2);
+    color:var(--ink-dim);border-radius:var(--r-sm);padding:7px 11px;transition:.16s var(--ease)}
+  .seg .segbtn:hover{color:var(--ink);border-color:var(--line-2)}
+  .seg .segbtn[aria-pressed="true"]{background:var(--grad);border-color:transparent;color:var(--accent-ink);font-weight:600}
+  .pstat{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12.5px;
+    padding:7px 11px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface-2)}
+  .pstat .pdot{width:8px;height:8px;border-radius:50%;background:var(--ink-faint);flex:none}
+  .pstat .pdot.on{background:var(--ok);box-shadow:0 0 0 3px rgba(67,201,138,.18)}
+  .chainline{font-family:var(--mono);font-size:11.5px;color:var(--ink-dim);
+    background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);padding:8px 11px;word-break:break-word}
+  .drawer .foot{margin-top:auto;padding:16px 20px;border-top:1px solid var(--line);display:flex;gap:10px}
+  /* POLISH KIT: help modal (centered dialog, reuses scrim) */
+  #help{position:fixed;top:50%;left:50%;transform:translate(-50%,calc(-50% + 12px));z-index:70;
+    width:560px;max-width:94vw;max-height:86vh;overflow:auto;opacity:0;pointer-events:none;
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh-lg);
+    transition:opacity .25s var(--ease),transform .25s var(--ease)}
+  #help.open{opacity:1;pointer-events:auto;transform:translate(-50%,-50%)}
+  #help header{position:static;background:none;backdrop-filter:none;border-bottom:1px solid var(--line)}
+  #help .body{padding:20px;display:grid;gap:16px}
+  #help h4{margin:0 0 6px;font-size:11.5px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--ink-dim)}
+  #help p{margin:0;color:var(--ink-dim);font-size:13.5px}
+  #help ol{margin:0;padding-left:20px;color:var(--ink-dim);font-size:13.5px;display:grid;gap:4px}
+  #help .kbd{font-family:var(--mono);font-size:11.5px;background:var(--surface-2);border:1px solid var(--line);
+    border-bottom-width:2px;border-radius:6px;padding:1px 7px;color:var(--ink)}
+  #help .eps{display:flex;gap:7px;flex-wrap:wrap}
+  /* toast */
+  #toasts{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:80;
+    display:flex;flex-direction:column;gap:10px;align-items:center}
+  .toast{background:var(--surface-3);border:1px solid var(--line-2);border-radius:11px;padding:11px 16px;
+    box-shadow:var(--sh-lg);font-size:13px;display:flex;align-items:center;gap:10px;
+    animation:toastIn .3s var(--ease)}
+  .toast .tdot{width:8px;height:8px;border-radius:50%}
+  .toast.ok .tdot{background:var(--ok)}.toast.bad .tdot{background:var(--bad)}.toast.info .tdot{background:var(--info)}
+  /* cold-start overlay */
+  #boot{position:fixed;inset:0;z-index:90;background:var(--bg);display:grid;place-items:center;
+    transition:opacity .5s var(--ease)}
+  #boot.hide{opacity:0;pointer-events:none}
+  .boot-card{text-align:center;display:grid;gap:18px;justify-items:center}
+  .boot-card .logo{width:54px;height:54px}
+  .boot-card .ring{width:38px;height:38px;border:3px solid var(--line);border-top-color:var(--accent);
+    border-radius:50%;animation:spin .8s linear infinite}
+  .boot-card .msg{color:var(--ink-dim);font-size:13.5px}
+  .boot-card .sub{color:var(--ink-faint);font-size:12px;max-width:280px}
+  /* keyframes */
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(67,201,138,.5)}70%{box-shadow:0 0 0 6px rgba(67,201,138,0)}100%{box-shadow:0 0 0 0 rgba(67,201,138,0)}}
+  @keyframes toastIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  @media(max-width:860px){main{grid-template-columns:1fr}}
+  @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+<div id="boot"><div class="boot-card">
+  <div class="logo"></div><div class="ring"></div>
+  <div><div class="msg" id="bootmsg">Waking the demo…</div>
+  <div class="sub">Free-tier instances sleep when idle — first load takes ~30–60s.</div></div>
+</div></div>
 
-      <div class="panel" style="margin-bottom:16px">
-        <h2>Routing &amp; options</h2>
-        <div class="settings">
-          <label><input type="checkbox" id="useLlm" checked /> LLM NER pass</label>
-          <label>Provider
-            <select id="provider"><option value="auto">Auto (recommended)</option></select>
-            <span class="pill" id="providerState" style="font-size:11px;margin-left:4px"></span>
-          </label>
-          <label>Model <input id="model" placeholder="(default)" style="width:160px" /></label>
-          <label>Redaction style
-            <select id="style">
-              <option value="token">token</option><option value="label">label</option>
-              <option value="mask">mask</option><option value="partial">partial</option>
-              <option value="hash">hash</option>
-            </select>
-          </label>
-          <span class="spacer"></span>
-          <span class="pill" id="ollamaStatus">checking Ollama…</span>
-        </div>
+<header>
+  <div class="brand"><span class="logo"></span> pii-redactor
+    <span class="tag">deterministic PII detect &amp; redact · regex+checksum core · optional LLM NER</span></div>
+  <span class="spacer"></span>
+  <span class="status"><span class="dot" id="hdot"></span><span id="hstat">connecting…</span></span>
+  <span class="pill" id="modepill">routing: —</span>
+  <!-- POLISH KIT: theme toggle -->
+  <button class="iconbtn" id="themebtn" title="Toggle theme" aria-label="Toggle light/dark theme"><span id="themeicon">☾</span></button>
+  <!-- POLISH KIT: help modal trigger -->
+  <button class="iconbtn" id="helpbtn" title="Help (?)" aria-label="Help">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 1 1 4.6 3c-.8.6-1.7 1-1.7 2.2"/><line x1="12" y1="17.5" x2="12" y2="17.51"/></svg>
+  </button>
+  <button class="iconbtn" id="gear" title="Settings" aria-label="Settings">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+  </button>
+</header>
+
+<main>
+  <div class="panel reveal">
+    <h2>Input <span class="muted" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">paste text containing PII</span></h2>
+    <div class="body">
+      <textarea id="input" spellcheck="false" placeholder="Paste text containing PII…"></textarea>
+      <div class="row" style="margin-top:14px">
+        <button class="chip" id="sample">Load sample</button>
+        <button class="chip" id="clear">Clear</button>
+        <span class="spacer"></span>
+        <button class="btn primary" id="run"><span class="spin"></span><span class="lbl">Detect &amp; redact</span></button>
       </div>
+    </div>
+  </div>
 
-      <div class="grid">
-        <div class="panel">
-          <h2>Input</h2>
-          <textarea id="input" spellcheck="false" placeholder="Paste text containing PII…"></textarea>
-          <div class="row">
-            <button id="sample">Load sample</button>
-            <button id="clear">Clear</button>
-            <span class="spacer"></span>
-            <button class="primary" id="run">Detect &amp; redact</button>
-          </div>
-        </div>
-        <div class="panel">
-          <h2>Detected
-            <span style="font-weight:400;text-transform:none">
-              <span class="swatch" style="background:var(--accent)"></span>regex
-              <span class="swatch" style="background:var(--llm)"></span>llm</span>
-          </h2>
-          <div class="out" id="highlight"><span class="empty">Detected PII appears here.</span></div>
-          <div class="chips" id="counts"></div>
-          <div class="routing" id="routing"></div>
-        </div>
+  <div class="panel reveal">
+    <h2>Detected
+      <span class="muted" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">
+        <span class="swatch" style="background:var(--accent)"></span> regex
+        <span class="swatch" style="background:var(--violet)"></span> llm</span>
+    </h2>
+    <div class="body">
+      <div class="out" id="highlight"><span class="empty">Detected PII appears here.</span></div>
+      <div class="row" id="counts" style="margin-top:12px"></div>
+      <div class="routing" id="routing"></div>
+    </div>
+  </div>
+
+  <div class="panel full reveal">
+    <h2>Redacted output <span class="muted" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">style: <span id="stylelabel">token</span> · redaction is fully deterministic</span></h2>
+    <div class="body">
+      <div class="row" style="margin-bottom:12px">
+        <label class="ctl" style="flex:0 0 auto"><span>redaction style</span>
+          <select id="style" style="width:auto">
+            <option value="token">token</option>
+            <option value="label">label</option>
+            <option value="mask">mask</option>
+            <option value="partial">partial</option>
+            <option value="hash">hash</option>
+          </select>
+        </label>
+        <span class="spacer"></span>
+        <button class="btn" id="copy"><span class="lbl">Copy</span></button>
       </div>
+      <div class="out" id="redacted"><span class="empty">Redacted text appears here.</span></div>
+    </div>
+  </div>
+</main>
 
-      <div class="panel" style="margin-top:16px">
-        <div class="row" style="margin:0 0 8px"><h2 style="margin:0">Redacted output</h2>
-          <span class="spacer"></span><button id="copy">Copy</button></div>
-        <div class="out" id="redacted"><span class="empty">Redacted text appears here.</span></div>
+<!-- settings drawer -->
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-hidden="true">
+  <header><div class="brand" style="font-size:15px"><span class="logo" style="width:24px;height:24px"></span> Settings</div>
+    <span class="spacer"></span><button class="iconbtn" id="closedrawer" aria-label="Close">✕</button></header>
+  <div class="body">
+    <!-- POLISH KIT: theme segmented control -->
+    <div class="field">
+      <label>Theme <span class="hint">appearance</span></label>
+      <div class="seg" id="themeseg">
+        <button type="button" class="segbtn" data-theme="dark">Dark</button>
+        <button type="button" class="segbtn" data-theme="light">Light</button>
+        <button type="button" class="segbtn" data-theme="system">System</button>
       </div>
+    </div>
 
-      <footer>
-        <code>POST /detect</code> · <code>POST /redact</code> ·
-        <code>GET /providers</code>. Synthetic data only. Part of the
-        <a href="https://github.com/MarcBittner/ai-portfolio">ai-portfolio</a>.
-      </footer>
-    </main>
+    <div class="field">
+      <label for="cfgStyle">Default redaction style <span class="hint">how PII is rewritten</span></label>
+      <select id="cfgStyle">
+        <option value="token">token — [EMAIL_1]</option>
+        <option value="label">label — [EMAIL]</option>
+        <option value="mask">mask — ●●●●</option>
+        <option value="partial">partial — j***@e***</option>
+        <option value="hash">hash — short digest</option>
+      </select>
+    </div>
+    <label class="check"><input type="checkbox" id="cfgUseLlm" checked> LLM named-entity pass <span class="hint" style="margin-left:auto">names · orgs · places</span></label>
+    <div class="muted" style="font-size:11.5px">Detection finds PII spans; <b>redaction is always deterministic</b> (regex+checksum core). The LLM pass only adds named-entity spans the regex rules can't catch — it never rewrites text.</div>
 
-    <script>
-      const $ = (id) => document.getElementById(id);
-      const SAMPLE =
-        "Hi, I'm Jane Doe from Northwind Labs in Seattle.\n" +
-        "Reach me at jane.doe@example.com or (415) 555-0132.\n" +
-        "SSN 123-45-6789, card 4111 1111 1111 1111.";
-      const COLORS = { EMAIL: "#6ea8fe", PHONE: "#63e6be", SSN: "#ffd43b",
-        CREDIT_CARD: "#ff8787", IP_ADDRESS: "#da77f2", IBAN: "#ffa94d",
-        STREET_ADDRESS: "#8ce99a", PERSON: "#b197fc", ORG: "#b197fc", LOCATION: "#b197fc" };
+    <!-- POLISH KIT: routing config -->
+    <div class="field">
+      <label>Routing mode <span class="hint">which provider the NER pass uses</span></label>
+      <div class="seg" id="modeseg">
+        <button type="button" class="segbtn" data-mode="auto">auto</button>
+        <button type="button" class="segbtn" data-mode="free">free</button>
+        <button type="button" class="segbtn" data-mode="paid">paid</button>
+        <button type="button" class="segbtn" data-mode="offline">offline</button>
+      </div>
+      <div class="hint" id="modeblurb">auto = free if keyed, else paid, else local Ollama, else mock.</div>
+    </div>
+    <div class="field">
+      <label for="cfgModel">Model override <span class="hint">optional</span></label>
+      <input id="cfgModel" type="text" placeholder="provider default" />
+    </div>
+    <div class="field">
+      <label>Provider status <span class="hint" id="modeactive">active: auto</span></label>
+      <div style="display:grid;gap:6px" id="provrows"></div>
+    </div>
+    <div class="field">
+      <label>Fallback chain <span class="hint">→ on failure</span></label>
+      <div class="chainline" id="chainline">mock (deterministic)</div>
+    </div>
+    <div class="muted" style="font-size:11.5px">Provider keys live server-side; this selects which available provider a run uses. The chain always ends at the offline mock, so detection never fails.</div>
+  </div>
+  <div class="foot">
+    <button class="btn" id="resetcfg">Reset</button>
+    <button class="btn primary" id="savecfg" style="flex:1"><span class="lbl">Save</span></button>
+  </div>
+</aside>
 
-      function esc(s){return s.replace(/[&<>]/g,(c)=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));}
+<!-- POLISH KIT: help modal -->
+<aside id="help" role="dialog" aria-modal="true" aria-labelledby="helptitle" aria-hidden="true">
+  <header><div class="brand" style="font-size:15px"><span class="logo" style="width:24px;height:24px"></span>
+    <span id="helptitle">Help · pii-redactor</span></div>
+    <span class="spacer"></span><button class="iconbtn" id="closehelp" aria-label="Close help">✕</button></header>
+  <div class="body">
+    <div><h4>What it is</h4><p>Deterministic PII detection &amp; redaction. A regex+checksum core
+      (Luhn-validated cards, mod-97 IBANs) finds structured identifiers with no model;
+      an optional <b>LLM named-entity pass</b> adds names, orgs, and places. Detection
+      may use a model, but <b>redaction is always deterministic</b>.</p></div>
+    <div><h4>How to use</h4><ol>
+      <li><b>Paste text</b> into <i>Input</i> (or click <i>Load sample</i>).</li>
+      <li><b>Detect &amp; redact</b> — see PII highlighted by type with per-type counts.</li>
+      <li><b>Switch redaction style</b> — token / label / mask / partial / hash.</li>
+      <li><b>Copy</b> the redacted output.</li>
+    </ol></div>
+    <div><h4>Endpoints</h4><div class="eps">
+      <code>POST /detect</code><code>POST /redact</code><code>GET /providers</code>
+      <code>GET /types</code><code>GET /health</code></div></div>
+    <div><h4>Keyboard shortcuts</h4><p><span class="kbd">?</span> open this help · <span class="kbd">Esc</span> close any overlay</p></div>
+    <div><p class="muted" style="font-size:11.5px">All sample text is <b>synthetic</b> — no real PII.</p></div>
+  </div>
+</aside>
 
-      function shortName(m) {
-        if (!m) return "";
-        return (m.split("/").pop() || m).replace(/:free$/, "");
-      }
+<div id="toasts"></div>
 
-      async function init() {
-        try {
-          const p = await fetch("/providers").then((r) => r.json());
-          const sel = $("provider");
-          // Remove default placeholder; we build the curated list below
-          sel.innerHTML = "";
+<script>
+const $=id=>document.getElementById(id);
+const $$=s=>[...document.querySelectorAll(s)];
+const CFG_KEY="pii-redactor.cfg";
+const SAMPLE =
+  "Hi, I'm Jane Doe from Northwind Labs in Seattle.\n" +
+  "Reach me at jane.doe@example.com or (415) 555-0132.\n" +
+  "SSN 123-45-6789, card 4111 1111 1111 1111.";
+const COLORS = { EMAIL:"#6aa1ff", PHONE:"#43c98a", SSN:"#e6ad52",
+  CREDIT_CARD:"#f15b6c", IP_ADDRESS:"#c77dff", IBAN:"#ffa94d",
+  STREET_ADDRESS:"#69db7c", PERSON:"#9b86ff", ORG:"#9b86ff", LOCATION:"#9b86ff" };
 
-          const add = (value, text, selected) => {
-            const o = document.createElement("option");
-            o.value = value; o.textContent = text;
-            if (selected) o.selected = true;
-            sel.appendChild(o);
-          };
+let cfg={style:"token",useLlm:true,mode:"auto",model:""};
+let provStatus={};        // last GET /providers payload
 
-          add("auto", "Auto (recommended)", true);
-          add("free", "Free · " + shortName((p.free_models || [])[0]));
-          add("offline", "Offline (deterministic)");
-          if (p.available.paid) add("paid", "Paid (your key)");
+function toast(msg,type="info"){
+  const t=document.createElement("div");t.className=`toast ${type}`;
+  t.innerHTML=`<span class="tdot"></span>${msg}`;$("toasts").appendChild(t);
+  setTimeout(()=>{t.style.opacity="0";t.style.transition="opacity .3s";setTimeout(()=>t.remove(),300)},2600);
+}
+function esc(s){return s.replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));}
+function shortName(m){if(!m)return "";return (m.split("/").pop()||m).replace(/:free$/,"");}
 
-          // Live-state note
-          const freeLabel = p.active_mode === "free" ? " · " + shortName((p.free_models || [])[0]) : "";
-          $("providerState").textContent = "Live: " + p.active_mode + freeLabel;
+/* ===================== config ===================== */
+function loadCfg(){try{cfg={...cfg,...JSON.parse(localStorage.getItem(CFG_KEY)||"{}")}}catch{}}
+function applyCfgToForm(){
+  $("cfgStyle").value=cfg.style;
+  $("cfgUseLlm").checked=!!cfg.useLlm;
+  $("cfgModel").value=cfg.model||"";
+  selectMode(cfg.mode||"auto");
+  syncThemeSeg();
+}
+function applyCfgToConsole(){
+  $("style").value=cfg.style;
+  $("stylelabel").textContent=cfg.style;
+}
+function openDrawer(){applyCfgToForm();$("scrim").classList.add("open");$("drawer").classList.add("open");$("drawer").setAttribute("aria-hidden","false")}
+function closeDrawer(){$("scrim").classList.remove("open");$("drawer").classList.remove("open");$("drawer").setAttribute("aria-hidden","true")}
+$("gear").onclick=openDrawer;$("closedrawer").onclick=closeDrawer;
+$("savecfg").onclick=()=>{
+  cfg={style:$("cfgStyle").value,useLlm:$("cfgUseLlm").checked,
+    mode:$("modeseg").querySelector('[aria-pressed="true"]')?.dataset.mode||"auto",
+    model:$("cfgModel").value.trim()};
+  localStorage.setItem(CFG_KEY,JSON.stringify(cfg));
+  applyCfgToConsole();renderRouting();closeDrawer();toast("Settings saved","ok");
+};
+$("resetcfg").onclick=()=>{cfg={style:"token",useLlm:true,mode:"auto",model:""};
+  localStorage.removeItem(CFG_KEY);applyCfgToForm();applyCfgToConsole();renderRouting();toast("Reset to defaults","info")};
 
-          $("ollamaStatus").textContent = p.available.ollama
-            ? `Ollama: reachable (${p.models.ollama})` : "Ollama: not reachable → mock fallback";
-        } catch { $("ollamaStatus").textContent = "providers: unavailable"; }
-      }
+/* the main-panel style select mirrors cfg.style so a switch re-runs immediately */
+$("style").onchange=()=>{cfg.style=$("style").value;$("stylelabel").textContent=cfg.style;
+  localStorage.setItem(CFG_KEY,JSON.stringify(cfg));if($("input").value.trim())run();};
 
-      async function run() {
-        const text = $("input").value;
-        if (!text.trim()) return;
-        const body = { text, use_llm: $("useLlm").checked,
-          provider: $("provider").value, model: $("model").value || null };
-        const [det, red] = await Promise.all([
-          post("/detect", body),
-          post("/redact", { ...body, style: $("style").value }),
-        ]);
-        renderHighlight(text, det.spans); renderCounts(det.counts);
-        $("routing").textContent = det.routing
-          ? `routed via ${det.routing.provider} (${det.routing.model})` +
-            (det.routing.fallbacks.length ? ` · fallbacks: ${det.routing.fallbacks.join(", ")}` : "")
-          : "regex only";
-        $("redacted").textContent = red.redacted;
-      }
-      async function post(path, body) {
-        const r = await fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-        if (!r.ok) { throw new Error(await r.text()); }
-        return r.json();
-      }
-      function renderHighlight(text, spans) {
-        let html = "", cursor = 0;
-        for (const s of [...spans].sort((a,b)=>a.start-b.start)) {
-          if (s.start < cursor) continue;
-          html += esc(text.slice(cursor, s.start));
-          const cls = s.source === "llm" ? "llm" : "";
-          html += `<mark class="${cls}" style="background:${COLORS[s.type]||'#adb5bd'}" title="${s.type} (${s.source})">${esc(text.slice(s.start, s.end))}</mark>`;
-          cursor = s.end;
-        }
-        html += esc(text.slice(cursor));
-        $("highlight").innerHTML = html || '<span class="empty">No PII detected.</span>';
-      }
-      function renderCounts(counts) {
-        const e = $("counts"); const ks = Object.keys(counts);
-        e.innerHTML = ks.length ? ks.map((t) => `<span class="chip"><span class="swatch" style="background:${COLORS[t]||'#adb5bd'}"></span> ${t} <b>${counts[t]}</b></span>`).join("")
-          : '<span class="chip empty">no PII detected</span>';
-      }
+/* ===================== detect / redact ===================== */
+async function post(path, body){
+  const r=await fetch(path,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
+  if(!r.ok)throw new Error(await r.text());
+  return r.json();
+}
+function renderHighlight(text, spans){
+  let html="",cursor=0;
+  for(const s of [...spans].sort((a,b)=>a.start-b.start)){
+    if(s.start<cursor)continue;
+    html+=esc(text.slice(cursor,s.start));
+    html+=`<mark style="background:${COLORS[s.type]||'var(--ink-faint)'}" title="${s.type} (${s.source})">${esc(text.slice(s.start,s.end))}</mark>`;
+    cursor=s.end;
+  }
+  html+=esc(text.slice(cursor));
+  $("highlight").innerHTML=html||'<span class="empty">No PII detected.</span>';
+}
+function renderCounts(counts){
+  const e=$("counts");const ks=Object.keys(counts);
+  e.innerHTML=ks.length
+    ? ks.map(t=>`<span class="chip static"><span class="swatch" style="background:${COLORS[t]||'var(--ink-faint)'}"></span> ${t} <b>${counts[t]}</b></span>`).join("")
+    : '<span class="chip static empty">no PII detected</span>';
+}
+async function run(){
+  const text=$("input").value;
+  if(!text.trim())return;
+  const btn=$("run");btn.classList.add("loading");
+  const body={text,use_llm:cfg.useLlm,provider:cfg.mode||"auto",model:cfg.model||null};
+  try{
+    const [det,red]=await Promise.all([
+      post("/detect",body),
+      post("/redact",{...body,style:cfg.style}),
+    ]);
+    renderHighlight(text,det.spans);
+    renderCounts(det.counts);
+    $("routing").textContent=det.routing
+      ? `routed via ${det.routing.provider} (${det.routing.model})`+
+        (det.routing.fallbacks.length?` · fallbacks: ${det.routing.fallbacks.join(", ")}`:"")
+      : "regex only";
+    $("redacted").textContent=red.redacted;
+    toast(`${det.total} PII span${det.total===1?"":"s"} detected`, det.total?"ok":"info");
+  }catch(e){
+    $("highlight").innerHTML='<span class="empty">detection failed</span>';
+    toast("Request failed","bad");
+  }
+  btn.classList.remove("loading");
+}
+$("run").onclick=run;
+$("sample").onclick=()=>{$("input").value=SAMPLE;run();};
+$("clear").onclick=()=>{$("input").value="";
+  $("highlight").innerHTML='<span class="empty">Detected PII appears here.</span>';
+  $("counts").innerHTML="";$("redacted").innerHTML='<span class="empty">Redacted text appears here.</span>';
+  $("routing").textContent="";};
+$("copy").onclick=async e=>{
+  const txt=$("redacted").textContent||"";
+  if(!txt.trim()||$("redacted").querySelector(".empty")){toast("Nothing to copy yet","info");return;}
+  try{await navigator.clipboard?.writeText(txt);}catch{}
+  const lbl=e.currentTarget.querySelector(".lbl");const old=lbl.textContent;
+  lbl.textContent="Copied";toast("Copied redacted text","ok");
+  setTimeout(()=>lbl.textContent=old,1200);
+};
 
-      $("sample").addEventListener("click", () => { $("input").value = SAMPLE; run(); });
-      $("clear").addEventListener("click", () => { $("input").value = ""; $("highlight").innerHTML = ""; $("counts").innerHTML=""; $("redacted").innerHTML=""; $("routing").textContent=""; });
-      $("run").addEventListener("click", run);
-      $("copy").addEventListener("click", async (e) => { await navigator.clipboard?.writeText($("redacted").textContent||""); e.target.textContent="Copied"; setTimeout(()=>e.target.textContent="Copy",1200); });
-      init();
-    </script>
-  </body>
+/* ===================== POLISH KIT: theme toggle ===================== */
+const THEME_KEY="theme";
+function getTheme(){try{return localStorage.getItem(THEME_KEY)||"system"}catch{return "system"}}
+function effectiveDark(t){
+  if(t==="dark")return true; if(t==="light")return false;
+  return !window.matchMedia("(prefers-color-scheme: light)").matches;
+}
+function applyTheme(t){
+  const dark=effectiveDark(t);
+  document.documentElement.classList.toggle("light",!dark);
+  $("themeicon").textContent=dark?"☾":"☀";
+  $("themebtn").title=`Theme: ${t}`;
+}
+function setTheme(t){try{localStorage.setItem(THEME_KEY,t)}catch{} applyTheme(t); syncThemeSeg();}
+function syncThemeSeg(){const cur=getTheme();
+  $$("#themeseg .segbtn").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.theme===cur)));}
+$("themebtn").onclick=()=>{const cur=getTheme();const next=effectiveDark(cur)?"light":"dark";setTheme(next);};
+$$("#themeseg .segbtn").forEach(b=>b.onclick=()=>setTheme(b.dataset.theme));
+window.matchMedia("(prefers-color-scheme: light)").addEventListener?.("change",()=>{if(getTheme()==="system")applyTheme("system");});
+applyTheme(getTheme());
+
+/* ===================== POLISH KIT: help modal ===================== */
+function openHelp(){$("scrim").classList.add("open");$("help").classList.add("open");
+  $("help").setAttribute("aria-hidden","false");$("closehelp").focus();}
+function closeHelp(){$("scrim").classList.remove("open");$("help").classList.remove("open");
+  $("help").setAttribute("aria-hidden","true");}
+$("helpbtn").onclick=openHelp;$("closehelp").onclick=closeHelp;
+$("scrim").onclick=()=>{closeDrawer();closeHelp();};
+document.addEventListener("keydown",e=>{
+  const typing=/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName||"")||document.activeElement?.isContentEditable;
+  if(e.key==="Escape"){closeDrawer();closeHelp();}
+  else if(e.key==="?"&&!typing&&!$("help").classList.contains("open")){e.preventDefault();openHelp();}
+});
+
+/* ===================== POLISH KIT: routing config ===================== */
+const MODE_BLURBS={
+  auto:"auto = free if keyed, else paid, else local Ollama, else mock.",
+  free:"free = OpenRouter free models only, else mock.",
+  paid:"paid = Anthropic, then OpenAI (your key), else mock.",
+  offline:"offline = local Ollama if reachable, else deterministic mock.",
+};
+const MODE_CHAIN={
+  auto:["openrouter","anthropic","openai","ollama"],
+  free:["openrouter"], paid:["anthropic","openai"], offline:["ollama"],
+};
+const PROVIDERS=["openrouter","anthropic","openai","ollama"];
+function selectMode(m){
+  $$("#modeseg .segbtn").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.mode===m)));
+  $("modeblurb").textContent=MODE_BLURBS[m]||"";
+  $("modeactive").textContent=`active: ${m}`;
+}
+function currentMode(){return $("modeseg").querySelector('[aria-pressed="true"]')?.dataset.mode||"auto";}
+function renderRouting(){
+  const m=currentMode();
+  $("modeactive").textContent=`active: ${m}`;
+  const avail=provStatus.available||{};
+  const rows=PROVIDERS.map(p=>{
+    const on=!!avail[p];
+    return `<div class="pstat"><span>${p}</span><span class="pdot ${on?'on':''}" title="${on?'available':'not configured'}"></span></div>`;
+  }).join("")+
+    `<div class="pstat"><span>mock (deterministic)</span><span class="pdot on" title="always available"></span></div>`;
+  $("provrows").innerHTML=rows;
+  const chain=(MODE_CHAIN[m]||[]).filter(p=>avail[p]);
+  const display=[...chain,"mock (deterministic)"];
+  $("chainline").textContent=display.join("  →  ");
+}
+$$("#modeseg .segbtn").forEach(b=>b.onclick=()=>{selectMode(b.dataset.mode);renderRouting();});
+
+async function loadProviders(){
+  try{
+    provStatus=await fetch("/providers").then(r=>r.json());
+    const am=provStatus.active_mode||"offline";
+    const freeLabel=am==="free"?" · "+shortName((provStatus.free_models||[])[0]):"";
+    $("modepill").textContent=`routing: ${am}${freeLabel}`;
+    renderRouting();
+  }catch{$("modepill").textContent="routing: unavailable";}
+}
+
+/* ===================== boot ===================== */
+async function boot(){
+  loadCfg();
+  selectMode(cfg.mode||"auto");  // seed routing segment before drawer opens
+  applyCfgToConsole();
+  let ready=false;
+  for(let i=0;i<60 && !ready;i++){
+    try{const r=await fetch("/health");if(r.ok){ready=true;break}}catch{}
+    if(i===4)$("bootmsg").textContent="Still waking up…";
+    await new Promise(r=>setTimeout(r,1500));
+  }
+  $("hdot").className="dot ok";$("hstat").textContent="live";
+  $("boot").classList.add("hide");setTimeout(()=>$("boot").remove(),600);
+  $$(".reveal").forEach((el,i)=>setTimeout(()=>el.classList.add("in"),90*i));
+  await loadProviders();
+  // seed with the sample so the panels are populated on first paint
+  $("input").value=SAMPLE;
+  try{await run();}catch{}
+}
+boot();
+// keep header status pill fresh
+setInterval(()=>{fetch("/health").then(r=>{if(r.ok){$("hdot").className="dot ok";$("hstat").textContent="live";}}).catch(()=>{});},20000);
+</script>
+</body>
 </html>
