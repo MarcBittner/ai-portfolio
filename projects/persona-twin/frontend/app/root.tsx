@@ -1,6 +1,7 @@
 import { Links, Meta, Outlet, Scripts, ScrollRestoration } from "react-router";
 import type { Route } from "./+types/root";
 import "./app.css";
+import { THEME_BOOTSTRAP } from "./lib/prefs";
 
 export const meta: Route.MetaFunction = () => [
   { title: "persona-twin" },
@@ -18,6 +19,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <Meta />
         <Links />
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
       </head>
       <body className="h-full bg-background text-foreground antialiased">
         {children}

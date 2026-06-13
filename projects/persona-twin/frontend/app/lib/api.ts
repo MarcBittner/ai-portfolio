@@ -94,6 +94,34 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+export interface Health {
+  status: string;
+  version: string;
+  vector_backend: string;
+  embedding_backend: string;
+  llm_backends: string[];
+  route_objective: string;
+  cache_backend: string;
+  chunks_indexed: number;
+  personas: number;
+}
+
+export function getHealth(): Promise<Health> {
+  return request<Health>("/health");
+}
+
+// Friendly model-tier label derived from the configured LLM backends.
+export function modelTier(h: Health): { tier: string; detail: string } {
+  const backends = h.llm_backends.filter((b) => b !== "mock");
+  if (backends.length === 0) return { tier: "offline", detail: "deterministic mock" };
+  const first = backends[0];
+  if (first === "openrouter") return { tier: "free", detail: "OpenRouter free models" };
+  if (first === "ollama") return { tier: "local", detail: "Ollama" };
+  if (first === "anthropic" || first === "openai")
+    return { tier: "paid", detail: first };
+  return { tier: first, detail: first };
+}
+
 export function listPersonas(): Promise<Persona[]> {
   return request<Persona[]>("/personas");
 }

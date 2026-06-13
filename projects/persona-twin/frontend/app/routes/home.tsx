@@ -20,6 +20,7 @@ import {
 } from "~/lib/api";
 import { cn } from "~/lib/utils";
 import { Nav } from "~/components/nav";
+import { loadPrefs } from "~/lib/prefs";
 
 export async function clientLoader() {
   return { personas: await listPersonas() };
@@ -27,7 +28,10 @@ export async function clientLoader() {
 
 export default function Home({ loaderData }: Route.ComponentProps) {
   const { personas } = loaderData;
-  const [selected, setSelected] = useState<Persona | null>(personas[0] ?? null);
+  const [selected, setSelected] = useState<Persona | null>(() => {
+    const pref = loadPrefs().defaultPersona;
+    return personas.find((p) => p.persona_id === pref) ?? personas[0] ?? null;
+  });
   const [question, setQuestion] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -147,7 +151,7 @@ function HexacoBars({ hexaco }: { hexaco: HexacoProfile }) {
 }
 
 function AnswerPanel({ response }: { response: AskResponse }) {
-  const [showDebug, setShowDebug] = useState(false);
+  const [showDebug, setShowDebug] = useState(() => loadPrefs().debug);
   const routing = response.debug?.routing ?? null;
   return (
     <Card>

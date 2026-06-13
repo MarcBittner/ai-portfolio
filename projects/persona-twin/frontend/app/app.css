@@ -16,3 +16,25 @@
   --color-destructive: oklch(0.55 0.18 25);
   --radius: 0.625rem;
 }
+
+/* Dark theme — toggled by the `.dark` class on <html> (see lib/prefs.ts).
+   Overrides the same custom properties the Tailwind color utilities read. */
+.dark {
+  --color-background: oklch(0.17 0.012 260);
+  --color-foreground: oklch(0.92 0.008 90);
+  --color-card: oklch(0.21 0.014 260);
+  --color-card-foreground: oklch(0.92 0.008 90);
+  --color-primary: oklch(0.68 0.12 250);
+  --color-primary-foreground: oklch(0.16 0.012 260);
+  --color-muted: oklch(0.27 0.014 260);
+  --color-muted-foreground: oklch(0.7 0.015 260);
+  --color-accent: oklch(0.32 0.045 160);
+  --color-accent-foreground: oklch(0.86 0.05 160);
+  --color-border: oklch(0.32 0.012 260);
+  --color-destructive: oklch(0.66 0.17 25);
+}
+
+html { color-scheme: light; }
+html.dark { color-scheme: dark; }
+/* anchor offset so Help deep-links don't tuck under surrounding chrome */
+[data-help-section] { scroll-margin-top: 1rem; }
