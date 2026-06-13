@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>quorum — governed multi-agent orchestration</title>
+<style>
+  :root{
+    --bg:#0a0d14; --surface:#131826; --surface-2:#1a2032; --surface-3:#212a40;
+    --line:#263149; --line-2:#33405d;
+    --ink:#e9eef7; --ink-dim:#97a3ba; --ink-faint:#67728a;
+    --accent:#6aa1ff; --accent-2:#9b86ff;
+    --ok:#43c98a; --warn:#e6ad52; --bad:#f15b6c; --info:#6aa1ff; --violet:#9b86ff;
+    --r:15px; --r-sm:10px; --r-xs:7px;
+    --sh:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.5);
+    --sh-lg:0 1px 2px rgba(0,0,0,.4), 0 24px 64px -24px rgba(0,0,0,.7);
+    --grad:linear-gradient(135deg,var(--accent),var(--accent-2));
+    --ease:cubic-bezier(.22,.61,.36,1);
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;
+    font:15px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Inter,sans-serif;
+    background-image:radial-gradient(1200px 600px at 80% -10%,rgba(107,130,255,.10),transparent 60%),
+      radial-gradient(900px 500px at 0% 0%,rgba(155,134,255,.06),transparent 55%);
+    background-attachment:fixed;min-height:100vh}
+  ::selection{background:rgba(106,161,255,.3)}
+  a{color:var(--accent);text-decoration:none}
+  header{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:14px;
+    padding:14px 24px;border-bottom:1px solid var(--line);
+    background:rgba(10,13,20,.72);backdrop-filter:blur(14px) saturate(140%)}
+  .brand{display:flex;align-items:center;gap:11px;font-weight:650;font-size:16px;letter-spacing:.2px}
+  .logo{width:30px;height:30px;border-radius:9px;background:var(--grad);position:relative;
+    box-shadow:0 4px 16px -4px rgba(106,161,255,.6);flex:none}
+  .logo::after{content:"";position:absolute;inset:7px;border-radius:5px;
+    border:2px solid rgba(255,255,255,.85);border-right-color:transparent;
+    animation:spin 3.5s linear infinite}
+  .brand .tag{color:var(--ink-dim);font-size:12.5px;font-weight:400}
+  .spacer{flex:1}
+  .status{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--ink-dim);
+    padding:5px 11px;border:1px solid var(--line);border-radius:999px;background:var(--surface)}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--ink-faint)}
+  .dot.ok{background:var(--ok);animation:pulse 2s infinite}
+  .pill{font-size:12px;color:var(--ink-dim);border:1px solid var(--line);border-radius:999px;
+    padding:5px 12px;background:var(--surface);white-space:nowrap}
+  main{max-width:1160px;margin:0 auto;padding:26px 24px 64px;display:grid;gap:18px;
+    grid-template-columns:1fr 1fr}
+  .full{grid-column:1/-1}
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+    box-shadow:var(--sh);overflow:hidden;transition:.25s var(--ease)}
+  .panel:hover{border-color:var(--line-2)}
+  .panel h2{margin:0;padding:14px 18px;font-size:11.5px;font-weight:600;letter-spacing:.7px;
+    text-transform:uppercase;color:var(--ink-dim);border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:10px}
+  .panel .body{padding:18px}
+  textarea,select,input{font:inherit;color:var(--ink);background:var(--surface-2);
+    border:1px solid var(--line);border-radius:var(--r-sm);padding:11px 13px;transition:.16s var(--ease);width:100%}
+  textarea:focus,select:focus,input:focus{outline:none;border-color:var(--accent);
+    box-shadow:0 0 0 3px rgba(106,161,255,.16)}
+  textarea{min-height:120px;resize:vertical;font-family:var(--mono);font-size:13px;line-height:1.5}
+  .btn{font:inherit;font-weight:600;cursor:pointer;border-radius:var(--r-sm);padding:11px 17px;
+    border:1px solid var(--line);background:var(--surface-2);color:var(--ink);
+    transition:.16s var(--ease);display:inline-flex;align-items:center;gap:8px;position:relative}
+  .btn:hover{transform:translateY(-1px);border-color:var(--line-2)}
+  .btn.primary{background:var(--grad);border:none;color:#06101f;
+    box-shadow:0 6px 20px -8px rgba(106,161,255,.7)}
+  .btn[disabled]{opacity:.6;pointer-events:none}
+  .btn .spin{width:14px;height:14px;border:2px solid rgba(6,16,31,.35);border-top-color:#06101f;
+    border-radius:50%;animation:spin .7s linear infinite;display:none}
+  .btn.loading .spin{display:block}.btn.loading .lbl{opacity:.7}
+  .chip{font:inherit;font-size:12px;cursor:pointer;border:1px dashed var(--line);background:transparent;
+    color:var(--ink-dim);border-radius:999px;padding:5px 12px;transition:.16s var(--ease)}
+  .chip:hover{color:var(--ink);border-color:var(--accent);border-style:solid;background:rgba(106,161,255,.08)}
+  .row{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+  .ctl{display:flex;flex-direction:column;gap:6px}
+  .ctl>span{font-size:11px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:var(--ink-faint)}
+  .ctls{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:13px;align-items:end}
+  .badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:700;
+    text-transform:uppercase;letter-spacing:.3px}
+  .b-ok{background:rgba(67,201,138,.16);color:var(--ok)}
+  .b-high{background:rgba(241,91,108,.18);color:var(--bad)}
+  .b-med{background:rgba(230,173,82,.16);color:var(--warn)}
+  .b-low{background:rgba(106,161,255,.15);color:var(--info)}
+  .b-info{background:rgba(106,161,255,.15);color:var(--info)}
+  .b-violet{background:rgba(155,134,255,.15);color:var(--violet)}
+  .mono{font-family:var(--mono);font-size:12px}
+  .muted{color:var(--ink-dim);font-size:12.5px}
+  code{background:var(--surface-2);padding:1px 6px;border-radius:6px;font-family:var(--mono);font-size:12px}
+  /* agent pipeline */
+  .pipe{display:flex;flex-direction:column;gap:0}
+  .stage{display:flex;align-items:stretch;gap:10px;padding:6px 0}
+  .stage .arrow{color:var(--ink-faint);align-self:center;font-size:18px}
+  .agents{display:flex;flex-wrap:wrap;gap:8px;flex:1}
+  .acard{flex:1;min-width:150px;border:1px solid var(--line);border-radius:var(--r-sm);
+    background:var(--surface-2);padding:10px 12px;transition:.18s var(--ease)}
+  .acard.run{border-color:var(--accent);box-shadow:0 0 0 3px rgba(106,161,255,.12)}
+  .acard.done{border-color:rgba(67,201,138,.4)}
+  .acard .nm{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--ink)}
+  .acard .role{font-size:11px;color:var(--ink-faint);margin-top:2px}
+  .acard .tel{font-size:11px;color:var(--ink-dim);margin-top:7px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .tier{font-family:var(--mono);font-size:10.5px;padding:1px 6px;border-radius:5px;
+    background:rgba(155,134,255,.14);color:var(--violet)}
+  .par{font-size:11px;color:var(--ink-faint);writing-mode:vertical-rl;text-orientation:mixed;
+    padding:4px 0;border-left:2px solid var(--line-2);margin-left:2px}
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th,td{text-align:left;padding:9px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--ink-faint);font-size:11px;font-weight:600;letter-spacing:.4px;text-transform:uppercase}
+  tbody tr:hover{background:var(--surface-2)}
+  .summary{padding:14px 16px;border:1px solid rgba(106,161,255,.3);border-radius:var(--r-sm);
+    background:rgba(106,161,255,.06);font-size:13.5px;line-height:1.6}
+  .verifybar{padding:13px 18px;border-top:1px solid var(--line);display:flex;gap:10px;align-items:center}
+  .reveal{opacity:0;transform:translateY(14px)}
+  .reveal.in{opacity:1;transform:none;transition:.55s var(--ease)}
+  .kv{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--ink-dim)}
+  .kv b{color:var(--ink);font-family:var(--mono)}
+  #boot{position:fixed;inset:0;z-index:90;background:var(--bg);display:grid;place-items:center;transition:opacity .5s var(--ease)}
+  #boot.hide{opacity:0;pointer-events:none}
+  .boot-card{text-align:center;display:grid;gap:18px;justify-items:center}
+  .boot-card .logo{width:54px;height:54px}
+  .boot-card .ring{width:38px;height:38px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+  .boot-card .msg{color:var(--ink-dim);font-size:13.5px}
+  .boot-card .sub{color:var(--ink-faint);font-size:12px;max-width:300px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(67,201,138,.5)}70%{box-shadow:0 0 0 6px rgba(67,201,138,0)}100%{box-shadow:0 0 0 0 rgba(67,201,138,0)}}
+  @media(max-width:860px){main{grid-template-columns:1fr}}
+  @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+<div id="boot"><div class="boot-card">
+  <div class="logo"></div><div class="ring"></div>
+  <div><div class="msg" id="bootmsg">Waking the demo…</div>
+  <div class="sub">Free-tier instances sleep when idle — first load takes ~30–60s.</div></div>
+</div></div>
+
+<header>
+  <div class="brand"><span class="logo"></span> quorum
+    <span class="tag">vendor-neutral · governed · multi-agent orchestration</span></div>
+  <span class="spacer"></span>
+  <span class="status"><span class="dot" id="hdot"></span><span id="hstat">connecting…</span></span>
+  <span class="pill" id="llmpill">routing: offline</span>
+</header>
+
+<main>
+  <div class="panel full reveal">
+    <h2>Run a governed workflow <span class="muted" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">contract-review · the headline multi-agent pipeline</span></h2>
+    <div class="body">
+      <div class="ctls">
+        <label class="ctl"><span>contract</span><select id="contract"></select></label>
+        <label class="ctl"><span>routing mode</span>
+          <select id="mode">
+            <option value="">auto (chain)</option>
+            <option value="paid">paid</option>
+            <option value="local">local</option>
+            <option value="free">free</option>
+            <option value="offline">offline</option>
+          </select></label>
+        <button class="btn primary" id="go"><span class="spin"></span><span class="lbl">Review contract</span></button>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <span class="muted">or paste a contract:</span>
+      </div>
+      <textarea id="text" placeholder="Paste contract text with 'Clause N: ...' lines, or pick a sample above."></textarea>
+      <div class="kv" id="runmeta" style="margin-top:12px"></div>
+    </div>
+  </div>
+
+  <div class="panel full reveal">
+    <h2>Agent pipeline <span class="muted" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">coordinator → agents → synthesis · each step shows its routing tier</span></h2>
+    <div class="body"><div class="pipe" id="pipe"><span class="muted">Run a review to see the agent DAG light up.</span></div></div>
+  </div>
+
+  <div class="panel reveal">
+    <h2>Risk report <span class="muted" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">flagged clauses</span></h2>
+    <div class="body" style="padding:0;overflow-x:auto"><table id="risks"><tbody><tr><td class="muted" style="padding:16px">No run yet.</td></tr></tbody></table></div>
+  </div>
+
+  <div class="panel reveal">
+    <h2>Exec summary &amp; redlines</h2>
+    <div class="body"><div id="summary"><span class="muted">No run yet.</span></div></div>
+  </div>
+
+  <div class="panel full reveal">
+    <h2>Per-step trace <span class="muted" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">provider · model · latency · cost · PII redacted before model+audit</span></h2>
+    <div class="body" style="padding:0;overflow-x:auto"><table id="trace"><tbody><tr><td class="muted" style="padding:16px">No run yet.</td></tr></tbody></table></div>
+  </div>
+
+  <div class="panel full reveal">
+    <h2>Tamper-evident audit chain <span class="muted" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">value-light · hash-chained</span></h2>
+    <div class="body" style="padding:0;max-height:280px;overflow:auto"><table id="audit"><tbody><tr><td class="muted" style="padding:16px">No run yet.</td></tr></tbody></table></div>
+    <div class="verifybar">
+      <span id="vres" class="muted">—</span>
+    </div>
+  </div>
+
+  <div class="panel full reveal">
+    <h2>Replicable pattern <span class="muted" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">same engine, a different spec → policy-qa</span></h2>
+    <div class="body">
+      <div class="row">
+        <input id="q" style="flex:1;min-width:240px" value="What is the refund window and how does it work?" />
+        <button class="btn" id="askbtn"><span class="spin"></span><span class="lbl">Run policy-qa</span></button>
+      </div>
+      <div id="qares" style="margin-top:12px"><span class="muted">new client = new WorkflowSpec, same governed engine. Ask a policy question.</span></div>
+    </div>
+  </div>
+</main>
+
+<script>
+const $=s=>document.querySelector(s);
+const j=async(u,o)=>(await fetch(u,o)).json();
+const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+const sevBadge=s=>`<span class="badge ${s==='high'?'b-high':s==='medium'?'b-med':'b-low'}">${s}</span>`;
+const tierName=p=>p==='offline'?'offline':p;
+let lastRunId=null;
+
+function renderPipe(trace){
+  // group into stages: extractor | [risk_*] | drafter (generic-ish)
+  const risk=trace.filter(s=>s.step.startsWith("risk_"));
+  const head=trace.filter(s=>!s.step.startsWith("risk_")&&s===trace[0]);
+  const tail=trace.filter(s=>!s.step.startsWith("risk_")&&s!==trace[0]);
+  const card=s=>`<div class="acard done"><div class="nm">${esc(s.step)}</div>
+    <div class="role">${esc(s.role)}</div>
+    <div class="tel"><span class="tier">${tierName(s.provider)}</span>
+      <span>${s.latency_ms}ms</span><span>$${(s.cost_usd||0).toFixed(6)}</span></div></div>`;
+  let html="";
+  if(head.length){html+=`<div class="stage"><div class="agents">${head.map(card).join("")}</div></div>`;
+    html+=`<div class="stage"><span class="arrow">↓</span></div>`;}
+  if(risk.length){html+=`<div class="stage"><span class="par">parallel fan-out · ${risk.length} risk scorers</span>
+    <div class="agents">${risk.map(card).join("")}</div></div>`;
+    html+=`<div class="stage"><span class="arrow">↓</span></div>`;}
+  if(tail.length){html+=`<div class="stage"><div class="agents">${tail.map(card).join("")}</div></div>`;}
+  $("#pipe").innerHTML=html||'<span class="muted">no steps</span>';
+}
+function renderRisks(report){
+  const rows=report.flagged.map(f=>`<tr>
+    <td class="mono">clause ${esc(f.clause_id)}</td>
+    <td>${esc(f.risk_label||f.risk_class)}</td>
+    <td>${sevBadge(f.severity||'medium')}</td>
+    <td class="muted">${esc(f.rationale||'')}</td></tr>`).join("");
+  $("#risks").innerHTML=`<thead><tr><th>clause</th><th>risk class</th><th>severity</th><th>rationale</th></tr></thead>
+    <tbody>${rows||'<tr><td colspan="4" class="muted" style="padding:16px">No risks flagged — clauses appear standard.</td></tr>'}</tbody>`;
+}
+function renderTrace(trace){
+  const rows=trace.map(s=>{
+    const pii=Object.entries(s.prompt_summary?{}:{}).length;
+    return `<tr><td class="mono">${esc(s.step)}</td><td><span class="tier">${tierName(s.provider)}</span></td>
+      <td class="mono">${esc(s.model)}</td><td>${s.latency_ms}ms</td><td>$${(s.cost_usd||0).toFixed(6)}</td>
+      <td class="muted">${esc(s.prompt_summary||'').slice(0,80)}</td></tr>`;
+  }).join("");
+  $("#trace").innerHTML=`<thead><tr><th>step</th><th>tier</th><th>model</th><th>latency</th><th>cost</th><th>prompt (redacted)</th></tr></thead><tbody>${rows}</tbody>`;
+}
+function renderSummary(r){
+  const reds=(r.redlines||[]).map(x=>`<li><span class="mono">clause ${esc(x.clause_id)}</span> — ${esc(x.recommendation)}</li>`).join("");
+  $("#summary").innerHTML=`<div class="summary">${esc(r.exec_summary||'—')}</div>
+    ${reds?`<ul style="margin:12px 0 0;padding-left:18px;font-size:13px">${reds}</ul>`:''}`;
+}
+async function renderAudit(runId){
+  const t=await j(`trace/${runId}`);
+  const rows=t.audit.map(e=>`<tr><td>${e.seq}</td><td class="mono">${esc(e.step)}</td>
+    <td><span class="tier">${tierName(e.provider)}</span></td>
+    <td>${Object.keys(e.pii_redacted||{}).length?`<span class="badge b-violet">PII ${esc(JSON.stringify(e.pii_redacted))}</span>`:'<span class="muted">—</span>'}</td>
+    <td class="mono muted" title="${esc(e.hash)}">${esc((e.hash||'').slice(0,12))}…</td></tr>`).join("");
+  $("#audit").innerHTML=`<thead><tr><th>#</th><th>step</th><th>tier</th><th>PII redacted (counts)</th><th>hash</th></tr></thead><tbody>${rows}</tbody>`;
+  $("#vres").innerHTML=t.audit_verified
+    ?`<span class="badge b-ok">chain verified</span> ${t.audit.length} steps · rollup ${t.rollup.total_latency_ms}ms · $${(t.rollup.total_cost_usd||0).toFixed(6)} · ${JSON.stringify(t.rollup.by_provider)}`
+    :`<span class="badge b-high">chain broken</span>`;
+}
+async function review(){
+  const btn=$("#go");btn.classList.add("loading");
+  const body={mode:$("#mode").value||null};
+  const txt=$("#text").value.trim();
+  if(txt){body.text=txt;}else{body.contract_id=$("#contract").value;}
+  try{
+    const r=await j("review",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
+    lastRunId=r.run_id;
+    renderPipe(r.trace); renderRisks(r.risk_report); renderTrace(r.trace); renderSummary(r);
+    await renderAudit(r.run_id);
+    $("#runmeta").innerHTML=`<span>run <b>${esc(r.run_id)}</b></span>
+      <span>flagged <b>${r.risk_report.count}</b> risk(s)</span>
+      <span>across <b>${Object.keys(r.risk_report.by_class).length}</b> class(es)</span>
+      <span>audit <b>${r.audit_verified?'verified':'BROKEN'}</b></span>
+      <span>cost <b>$${(r.rollup.total_cost_usd||0).toFixed(6)}</b></span>`;
+  }catch(e){$("#pipe").innerHTML='<span class="muted">run failed</span>';}
+  btn.classList.remove("loading");
+}
+$("#go").onclick=review;
+$("#contract").onchange=()=>{$("#text").value="";};
+
+async function ask(){
+  const btn=$("#askbtn");btn.classList.add("loading");
+  try{
+    const r=await j("run",{method:"POST",headers:{"content-type":"application/json"},
+      body:JSON.stringify({workflow:"policy-qa",payload:{question:$("#q").value}})});
+    const steps=r.trace.map(s=>`<span class="tier">${esc(s.step)} · ${tierName(s.provider)}</span>`).join(" → ");
+    $("#qares").innerHTML=`<div class="muted" style="margin-bottom:8px">${steps}</div>
+      <div class="summary">${esc(r.result.answer||'—')}</div>
+      <div class="kv" style="margin-top:10px">
+        <span>grounded <b>${r.result.grounded}</b></span>
+        <span>cited <b>${esc(JSON.stringify(r.result.cited||r.result.unsupported||[]))}</b></span>
+        <span>audit <b>${r.audit_verified?'verified':'BROKEN'}</b></span></div>`;
+  }catch(e){$("#qares").innerHTML='<span class="muted">run failed</span>';}
+  btn.classList.remove("loading");
+}
+$("#askbtn").onclick=ask;
+
+async function loadLlm(){
+  try{const s=await j("llm");const active=Object.entries(s.providers).find(e=>e[1]);
+    $("#llmpill").textContent=`routing: ${active?active[0]:"offline (deterministic)"}`;}catch{}
+}
+async function boot(){
+  let ready=false;
+  for(let i=0;i<60 && !ready;i++){
+    try{const r=await fetch("health");if(r.ok){ready=true;break}}catch{}
+    if(i===4)$("#bootmsg").textContent="Still waking up…";
+    await new Promise(r=>setTimeout(r,1500));
+  }
+  $("#hdot").className="dot ok";$("#hstat").textContent="live";
+  $("#boot").classList.add("hide");setTimeout(()=>$("#boot").remove(),600);
+  document.querySelectorAll(".reveal").forEach((el,i)=>setTimeout(()=>el.classList.add("in"),90*i));
+  try{
+    const cs=(await j("contracts")).contracts;
+    $("#contract").innerHTML=cs.map(c=>`<option value="${c.id}">${esc(c.title)} (${c.clauses} clauses)</option>`).join("");
+  }catch{}
+  loadLlm();
+  try{await review();}catch{}     // run the headline workflow on load
+  try{await ask();}catch{}        // populate the replicable-pattern panel
+}
+boot();
+</script>
+</body>
+</html>

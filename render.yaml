@@ -49,6 +49,14 @@ services:
         value: "1"
       - key: LLM_MODE
         value: auto
+  # quorum — vendor-neutral multi-agent orchestration framework.
+  - type: web
+    name: quorum
+    runtime: docker
+    plan: free
+    dockerfilePath: ./projects/quorum/Dockerfile
+    dockerContext: ./projects/quorum
+    healthCheckPath: /health
 
 databases:
   - name: cycleledger-db
