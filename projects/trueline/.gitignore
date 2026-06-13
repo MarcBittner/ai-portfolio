@@ -5,6 +5,7 @@ build/
 .env
 .env*.local
 .vercel
-convex/_generated/
+# convex/_generated is committed so the Render (git-based) build has the types
+# without a Convex deploy step in CI.
 *.tsbuildinfo
 next-env.d.ts
