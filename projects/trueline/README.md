@@ -30,9 +30,9 @@ TypeScript.
 | LLM | Anthropic · OpenRouter (free) · deterministic mock — selected by routing config |
 | Host | Render (Next) + Convex Cloud + Clerk |
 
-## Managed services — role & value
+## Managed services — what each does, and why
 
-| Service | What it does here | Value it adds (vs rolling your own) |
+| Service | What it does here | Why it's used instead of building it |
 |---|---|---|
 | **Convex** | Document DB + serverless TS functions + **realtime subscriptions** + scheduler. Stores invoices/lines/PO/catalog/evals/logs/settings; runs the queries, mutations, and the extract action. | One TS-native platform in place of Postgres + an ORM + an API server + a websocket layer + a job queue. Reactive `useQuery` makes the review UI update live with zero polling; mutations are ACID with auto-retry; `action` + `scheduler` give a managed async job for the LLM call. No connection pools, migrations, or socket plumbing. |
 | **Clerk** | Sign-in/sessions, **multi-tenant organizations**, billing; mints the JWT that Convex trusts. | Production auth (social, MFA, sessions) + a tenant model + a billing surface, drop-in. The org id rides in the JWT and scopes every Convex row — no hand-rolled auth/session/RBAC. |
