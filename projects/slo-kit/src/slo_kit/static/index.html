@@ -239,6 +239,14 @@
     background-size:auto,auto,cover,cover !important;
     background-position:center,center,center,center !important;
     background-repeat:no-repeat !important; background-attachment:fixed !important; }
+
+  /* POLISH KIT: glass — translucent surfaces + blur so the wallpaper shows through */
+  :root{ --surface:rgba(19,24,38,.64); --surface-2:rgba(26,32,50,.70); --surface-3:rgba(33,42,64,.78);
+         --header-bg:rgba(10,13,20,.55); }
+  html.light{ --surface:rgba(255,255,255,.68); --surface-2:rgba(241,244,250,.74); --surface-3:rgba(230,235,245,.82);
+              --header-bg:rgba(255,255,255,.58); }
+  .panel,.drawer,#drawer,#help,.help{ backdrop-filter:blur(11px) saturate(135%);
+    -webkit-backdrop-filter:blur(11px) saturate(135%); }
 </style>
 </head>
 <body>
