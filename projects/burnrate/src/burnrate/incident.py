@@ -233,14 +233,41 @@ def _parse(text: str, fallback: dict) -> dict:
     return {"summary": summary, "severity": severity, "suggested_steps": steps}
 
 
-def summarize(state: dict | None = None, *, mode: str | None = None) -> dict:
+def summarize(state: dict | None = None, *, mode: str | None = None,
+              client_summary: str | None = None) -> dict:
     """Generate an incident summary via the routing chain. Severity is classified
     deterministically from the burn policy regardless of the path; the offline
-    drafter is the terminal fallback so this never fails for lack of a key."""
+    drafter is the terminal fallback so this never fails for lack of a key.
+
+    ``client_summary`` is the narrative the BROWSER obtained from a host-local
+    Ollama (browser→host); when supplied the server skips its own LLM call and
+    uses it as the summary prose. The severity + runbook steps stay deterministic,
+    exactly as on the server path. Lets a cloud-hosted demo run a real local model
+    the server itself cannot reach.
+    """
     from burnrate import llm
     if state is None:
         state = collect_state()
     c = classify(state)
+    fallback = {
+        "summary": _draft_summary(state, c),
+        "severity": c["severity"],
+        "suggested_steps": _steps_for(c["situation"]),
+    }
+    if client_summary and client_summary.strip():
+        # Browser ran the model on the user's host Ollama and submitted the prose;
+        # use it instead of a server-side provider. Severity stays deterministic.
+        return {
+            "summary": client_summary.strip(),
+            "severity": c["severity"],
+            "suggested_steps": fallback["suggested_steps"],
+            "situation": c["situation"],
+            "action": c["action"],
+            "burn_rate": c["burn_rate"],
+            "budget_remaining": c["budget_remaining"],
+            "provider": "ollama (browser→host)", "model": "host", "mode": "local",
+            "latency_ms": 0, "cost_usd": 0.0, "fallbacks": [],
+        }
     user = (
         "Draft an incident summary from this state. The pre-computed severity is "
         f"{c['severity']} (situation: {c['situation']}, burn policy: {c['action']}); "
@@ -249,11 +276,6 @@ def summarize(state: dict | None = None, *, mode: str | None = None) -> dict:
     )
     res = llm.complete(SYSTEM, user, offline=_offline_draft, mode=mode,
                        json_mode=True, max_tokens=700)
-    fallback = {
-        "summary": _draft_summary(state, c),
-        "severity": c["severity"],
-        "suggested_steps": _steps_for(c["situation"]),
-    }
     draft = _parse(res.text, fallback)
     draft["severity"] = c["severity"]      # authoritative from the classifier
     return {
