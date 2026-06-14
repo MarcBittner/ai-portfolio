@@ -811,6 +811,23 @@ boot();
   document.getElementById("lc-search").addEventListener("input",function(e){render(e.target.value);});
   document.addEventListener("keydown",function(e){if(e.key==="Escape")close();});
 })();
+
+/* PROJECT LAUNCHER SHORTCUT */
+(function(){
+  var mac=/Mac|iPhone|iPad/.test(navigator.platform||navigator.userAgent);
+  var combo=mac?"\u2318K":"Ctrl+K";
+  var b=document.getElementById("appsbtn"); if(b) b.title="Browse all demos ("+combo+" or G)";
+  document.addEventListener("keydown",function(e){
+    var t=document.activeElement;
+    var typing=/^(INPUT|TEXTAREA|SELECT)$/.test((t&&t.tagName)||"")||(t&&t.isContentEditable);
+    var btn=document.getElementById("appsbtn"); if(!btn) return;
+    var open=(document.getElementById("applauncher")||{}).classList;
+    if((e.metaKey||e.ctrlKey)&&(e.key==="k"||e.key==="K")){ e.preventDefault();
+      if(open&&open.contains("open")){ var c=document.getElementById("lc-close"); if(c)c.click(); } else { btn.click(); } }
+    else if((e.key==="g"||e.key==="G")&&!typing&&!e.metaKey&&!e.ctrlKey&&!e.altKey){
+      if(open&&open.contains("open")) return; e.preventDefault(); btn.click(); }
+  });
+})();
 </script>
 </body>
 </html>
