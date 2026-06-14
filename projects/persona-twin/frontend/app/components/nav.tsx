@@ -58,6 +58,18 @@ export function Nav({ active }: { active: Active }) {
       if (!typing && e.key === "?") {
         e.preventDefault();
         setHelp(true);
+      } else if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "K")) {
+        e.preventDefault();
+        setLauncher((o) => !o);
+      } else if (
+        !typing &&
+        (e.key === "g" || e.key === "G") &&
+        !e.metaKey &&
+        !e.ctrlKey &&
+        !e.altKey
+      ) {
+        e.preventDefault();
+        setLauncher(true);
       }
     };
     const onPrefs = () =>
@@ -115,7 +127,7 @@ export function Nav({ active }: { active: Active }) {
           <button
             onClick={() => setLauncher(true)}
             aria-label="Browse all demos"
-            title="Browse all demos"
+            title="Browse all demos (⌘K / G)"
             className="rounded-md px-2 py-1 text-sm hover:bg-muted"
           >
             <svg

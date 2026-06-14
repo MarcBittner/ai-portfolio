@@ -69,6 +69,30 @@ export function AppLauncher() {
     return () => document.removeEventListener("keydown", onKey);
   }, [open]);
 
+  // global open shortcut (⌘K / Ctrl+K toggles, "G" opens) — the header button still works
+  useEffect(() => {
+    function onShortcut(e: KeyboardEvent) {
+      const t = document.activeElement as HTMLElement | null;
+      const typing =
+        !!t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable);
+      if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "K")) {
+        e.preventDefault();
+        setOpen((o) => !o);
+      } else if (
+        (e.key === "g" || e.key === "G") &&
+        !typing &&
+        !e.metaKey &&
+        !e.ctrlKey &&
+        !e.altKey
+      ) {
+        e.preventDefault();
+        setOpen(true);
+      }
+    }
+    document.addEventListener("keydown", onShortcut);
+    return () => document.removeEventListener("keydown", onShortcut);
+  }, []);
+
   function isCurrent(url: string): boolean {
     return currentHost !== null && hostOf(url) === currentHost;
   }
@@ -88,7 +112,7 @@ export function AppLauncher() {
         }}
         aria-label="Browse all portfolio demos"
         aria-haspopup="dialog"
-        title="Browse all demos"
+        title="Browse all demos (⌘K / G)"
         className="rounded-md px-2 py-1 text-[--color-muted] hover:text-[--color-ink]"
       >
         <svg
