@@ -67,7 +67,10 @@ def run_generate(request: GenerateRequest):
         fields = [f.model_dump() for f in request.fields]
     else:
         raise HTTPException(status_code=422, detail="provide a preset or fields")
-    if request.provider not in VALID_PROVIDERS:
+    # The provider only matters for server-side LLM calls. When the browser supplies
+    # client_fields (browser→host Ollama), the server makes no LLM call, so accept the
+    # client's "local" mode hint without validating it as a server provider.
+    if not request.client_fields and request.provider not in VALID_PROVIDERS:
         raise HTTPException(status_code=422, detail="unknown provider")
 
     try:
@@ -78,14 +81,26 @@ def run_generate(request: GenerateRequest):
     routing = None
     if request.use_llm:
         for f in fields:
-            if f.get("type") == "llm":
+            if f.get("type") != "llm":
+                continue
+            name = f["name"]
+            client_vals = (request.client_fields or {}).get(name)
+            if client_vals is not None:
+                # Browser ran the LLM on the user's host Ollama and submitted the
+                # values; use them instead of calling a server-side provider. The
+                # deterministic generation above already ran and is unchanged.
+                routing = RoutingInfo(provider="ollama (browser→host)",
+                                      model=request.model or "host", fallbacks=[])
+                for row, v in zip(rows, client_vals, strict=False):
+                    row[name] = v
+            else:
                 vals, result = fill_column(f.get("description", ""), len(rows),
                                            request.provider, request.model)
                 routing = RoutingInfo(provider=result.provider, model=result.model,
                                       fallbacks=result.fallbacks)
                 if vals:
                     for row, v in zip(rows, vals, strict=False):
-                        row[f["name"]] = v
+                        row[name] = v
 
     if request.fmt == "csv":
         return PlainTextResponse(to_csv(rows), media_type="text/csv")
