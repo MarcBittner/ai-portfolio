@@ -69,7 +69,9 @@ def notes_detect(req: NoteRequest) -> JSONResponse:
     if not note:
         return JSONResponse({"error": "provide 'note' or a known 'record_id'"},
                             status_code=400)
-    return JSONResponse(notes.detect(note, mode=req.mode))
+    client_spans = ([s.model_dump() for s in req.client_spans]
+                    if req.client_spans is not None else None)
+    return JSONResponse(notes.detect(note, mode=req.mode, client_spans=client_spans))
 
 
 @app.get("/privacy")
