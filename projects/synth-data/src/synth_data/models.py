@@ -23,6 +23,13 @@ class GenerateRequest(BaseModel):
     use_llm: bool = True            # fill `llm`-typed fields via the router
     provider: str = "auto"
     model: str | None = None
+    # LLM field values the BROWSER obtained from a host-local Ollama (browser→host),
+    # mapping each `llm`-typed field name to its list of generated values. A
+    # cloud-hosted server can't reach your machine's Ollama, but the browser can;
+    # when these are supplied the server skips its own LLM call and uses them for
+    # those columns. Deterministic generation (and its PII-free guarantee) is
+    # unchanged. Other providers stay server-side.
+    client_fields: dict[str, list[str]] | None = None
 
 
 class RoutingInfo(BaseModel):

@@ -33,6 +33,20 @@ def test_llm_field_mock_falls_back_to_placeholder():
     assert len(body["rows"]) == 3 and all(r["review"] for r in body["rows"])
 
 
+def test_client_fields_browser_host_ollama():
+    # Browser-supplied LLM field values (browser→host Ollama) are used verbatim
+    # for the `llm` column; routing reports the browser→host provider and the
+    # server makes no LLM call. Deterministic columns are unaffected.
+    body = client.post("/generate", json={
+        "fields": [{"name": "id", "type": "integer", "min": 1, "max": 9},
+                   {"name": "review", "type": "llm", "description": "a short review"}],
+        "n": 2, "seed": 1, "use_llm": True, "provider": "local",
+        "client_fields": {"review": ["loved it", "great value"]}}).json()
+    assert body["routing"]["provider"] == "ollama (browser→host)"
+    assert [r["review"] for r in body["rows"]] == ["loved it", "great value"]
+    assert all(1 <= r["id"] <= 9 for r in body["rows"])
+
+
 def test_generate_preset_json():
     body = client.post("/generate", json={"preset": "users", "n": 5, "seed": 42}).json()
     assert body["n"] == 5 and body["seed"] == 42
