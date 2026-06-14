@@ -175,18 +175,42 @@ def _parse(text: str, report: dict) -> dict:
             "remediation": remediation, "residual_risk": residual}
 
 
-def generate(report: dict, *, mode: str | None = None) -> dict:
+def _slim(report: dict) -> dict:
+    """Trim the heavy extras blob out of the prompt; the narrative only needs the
+    computed posture, findings, controls, and roll-up. This is the exact JSON the
+    browser→host Ollama prompt also serializes, so both paths parse identically."""
+    return {k: report[k] for k in
+            ("surface", "posture", "findings", "severity_counts",
+             "controls", "framework_rollup") if k in report}
+
+
+def generate(report: dict, *, mode: str | None = None,
+             client_narrative: str | None = None) -> dict:
     """Generate the board/exec risk report for a governed posture report.
 
     The model reads the deterministic report and writes prose; findings, scores,
     control mappings, and the framework roll-up are never re-derived here.
+
+    If ``client_narrative`` is supplied, the browser already ran this same prompt
+    against the user's host Ollama (browser→host) and submitted the model's raw
+    output; we parse it (with the same deterministic shape guard) instead of
+    calling a server-side provider, so a cloud-hosted demo can run a real local
+    model. Other providers stay server-side.
     """
     surface = report.get("surface", "exposure")
-    # Trim the heavy extras blob out of the prompt; the narrative only needs the
-    # computed posture, findings, controls, and roll-up.
-    slim = {k: report[k] for k in
-            ("surface", "posture", "findings", "severity_counts",
-             "controls", "framework_rollup") if k in report}
+    slim = _slim(report)
+    if client_narrative is not None:
+        parsed = _parse(client_narrative, slim)
+        return {
+            "surface": surface,
+            "summary": parsed["summary"],
+            "top_risks": parsed["top_risks"],
+            "remediation": parsed["remediation"],
+            "residual_risk": parsed["residual_risk"],
+            "posture": report["posture"],
+            "provider": "ollama (browser→host)", "model": "host",
+            "mode": "local", "latency_ms": 0, "cost_usd": 0.0, "fallbacks": [],
+        }
     user = "Posture report (JSON):\n" + json.dumps(slim)
     res = llm.complete(_system(surface), user, offline=_offline_narrative,
                        mode=mode, json_mode=True, max_tokens=1000)

@@ -17,3 +17,9 @@ class ReportRequest(BaseModel):
     surface: str = "exposure"
     remediated: bool = False
     mode: str | None = None
+    # Raw board-report text the BROWSER obtained from a host-local Ollama
+    # (browser→host). The cloud server can't reach your machine's Ollama; the
+    # browser can, so when this is supplied the server skips its own LLM call and
+    # parses this instead — letting a cloud-hosted demo run a real local model.
+    # Other providers stay server-side. The deterministic shape guard still runs.
+    client_narrative: str | None = None
