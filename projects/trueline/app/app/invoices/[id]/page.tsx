@@ -38,13 +38,17 @@ export default function InvoiceReview() {
   const yellowCount = lines.filter((l) => l.flag === "yellow").length;
   // inline styles so the colors are guaranteed to render (no Tailwind ambiguity)
   const flagColor = (f: string) =>
-    f === "red" ? "#f15b6c" : f === "yellow" ? "#e6ad52" : "#43c98a";
+    f === "red"
+      ? "var(--color-bad)"
+      : f === "yellow"
+        ? "var(--color-warn)"
+        : "var(--color-ok)";
   const flagBg = (f: string) =>
     f === "red"
-      ? "rgba(241,91,108,0.12)"
+      ? "color-mix(in oklch, var(--color-bad) 12%, transparent)"
       : f === "yellow"
-        ? "rgba(230,173,82,0.12)"
-        : "rgba(67,201,138,0.08)";
+        ? "color-mix(in oklch, var(--color-warn) 12%, transparent)"
+        : "color-mix(in oklch, var(--color-ok) 8%, transparent)";
 
   async function correct(l: {
     _id: Id<"invoiceLines">;
@@ -232,7 +236,7 @@ export default function InvoiceReview() {
                       </button>
                       <button
                         onClick={() => correct(l)}
-                        className="rounded bg-white/5 px-2 py-0.5 text-xs"
+                        className="rounded bg-[color-mix(in_oklch,_var(--color-ink)_6%,_transparent)] px-2 py-0.5 text-xs"
                         title="set the unit price to the agreed PO price"
                       >
                         {l.poUnitPrice != null || l.catalogPrice != null

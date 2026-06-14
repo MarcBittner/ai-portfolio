@@ -1,7 +1,41 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { OrganizationSwitcher, UserButton } from "@clerk/nextjs";
+
+function ThemeToggle() {
+  // `null` until mounted so SSR markup matches the bootstrap-set class
+  // (avoids a hydration mismatch on the icon).
+  const [light, setLight] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    setLight(document.documentElement.classList.contains("light"));
+  }, []);
+
+  function toggle() {
+    const next = !document.documentElement.classList.contains("light");
+    document.documentElement.classList.toggle("light", next);
+    try {
+      localStorage.setItem("theme", next ? "light" : "dark");
+    } catch {
+      /* ignore storage failures (private mode, etc.) */
+    }
+    setLight(next);
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      aria-label="Toggle light / dark theme"
+      title="Toggle light / dark theme"
+      className="rounded-md px-2 py-1 text-sm text-[--color-muted] hover:text-[--color-ink]"
+    >
+      {light ? "☾" : "☀"}
+    </button>
+  );
+}
 
 export function Nav() {
   return (
@@ -37,6 +71,7 @@ export function Nav() {
         About
       </Link>
       <div className="ml-auto flex items-center gap-3">
+        <ThemeToggle />
         <OrganizationSwitcher
           hidePersonal={false}
           appearance={{ elements: { rootBox: "flex items-center" } }}
