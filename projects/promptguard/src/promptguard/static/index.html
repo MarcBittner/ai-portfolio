@@ -295,6 +295,21 @@
   @media (prefers-reduced-motion:reduce){
     .brand,header::after,.btn.primary{ animation:none } .panel::after{ display:none }
     .reveal{ opacity:1; transform:none; filter:none; transition:none } }
+
+  /* SHOWCASE: richer effects */
+  #topbar{ position:fixed; top:0; left:0; height:2.5px; width:100%; z-index:100;
+    background:linear-gradient(90deg,transparent,var(--accent),var(--accent-2),transparent); background-size:200% 100%;
+    opacity:0; transition:opacity .35s var(--ease); }
+  #topbar.on{ opacity:1; animation:topbarSlide 1.1s var(--ease) infinite; }
+  @keyframes topbarSlide{ 0%{background-position:120% 0} 100%{background-position:-120% 0} }
+  .panel h2::before{ content:""; display:inline-block; width:3px; height:12px; border-radius:2px; flex:none;
+    background:var(--grad); box-shadow:0 0 8px color-mix(in oklch,var(--accent) 55%,transparent); }
+  @keyframes fxRise{ from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:none} }
+  .fx-in{ animation:fxRise .45s var(--ease); }
+  table tr td{ transition:background-color .15s var(--ease); }
+  table tbody tr:hover td, table tr:hover td{ background:color-mix(in oklch,var(--accent) 9%,transparent); }
+  mark{ transition:filter .2s var(--ease); } mark:hover{ filter:brightness(1.12); }
+  @media (prefers-reduced-motion:reduce){ #topbar.on{animation:none} .fx-in{animation:none} }
 </style>
 </head>
 <body>
@@ -690,6 +705,18 @@ boot();
     +'</div>'
     +'<p style="margin:0;font-size:11.5px;color:var(--ink-faint)"><b>LLM routing:</b> '+llm+'</p>';
   h.appendChild(d);
+})();
+
+/* SHOWCASE: loading bar + result fade-in (generic) */
+(function(){
+  var bar=document.createElement("div"); bar.id="topbar"; document.body.appendChild(bar);
+  var inflight=0,_f=window.fetch;
+  window.fetch=function(){ inflight++; bar.classList.add("on");
+    return _f.apply(this,arguments).finally(function(){ inflight=Math.max(0,inflight-1);
+      if(inflight===0) setTimeout(function(){ if(inflight===0) bar.classList.remove("on"); },220); }); };
+  document.querySelectorAll(".panel .body").forEach(function(el){
+    new MutationObserver(function(){ el.classList.remove("fx-in"); void el.offsetWidth; el.classList.add("fx-in"); })
+      .observe(el,{childList:true}); });
 })();
 </script>
 </body>
