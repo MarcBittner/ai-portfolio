@@ -51,5 +51,33 @@ def test_run_default_template_and_bad_template():
     assert bad.status_code == 422
 
 
+def test_tool_endpoint_executes_server_side():
+    # the browser→host Ollama loop dispatches each step here; tools run server-side
+    r = client.post("/tool", json={"tool": "calculator",
+                                    "args": {"expression": "3 * (4 + 5)"}})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["ok"] is True and body["observation"] == "27"
+    assert body["tool"] == "calculator"
+
+
+def test_tool_endpoint_enforces_allowlist():
+    # a crafted browser request can't run a tool outside the agent's allowlist
+    r = client.post("/tool", json={"tool": "calculator",
+                                   "args": {"expression": "1+1"},
+                                   "tools": ["kb_search"]})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["ok"] is False and "not in allowlist" in body["observation"]
+
+
+def test_tool_endpoint_unknown_tool_and_bad_args():
+    assert client.post("/tool", json={"tool": "ghost", "args": {}}).status_code == 422
+    # validation failure becomes a failed observation, never a 500
+    bad = client.post("/tool", json={"tool": "calculator",
+                                     "args": {"wrong": "x"}})
+    assert bad.status_code == 200 and bad.json()["ok"] is False
+
+
 def test_index_served():
     assert client.get("/").status_code == 200
