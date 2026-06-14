@@ -460,7 +460,7 @@ function applyCfgToForm(){
   selectMode(cfg.routeMode||"auto");
   syncThemeSeg();
 }
-function openDrawer(){applyCfgToForm();$("#scrim").classList.add("open");$("#drawer").classList.add("open");$("#drawer").setAttribute("aria-hidden","false")}
+function openDrawer(){applyCfgToForm();refreshClientOllama();$("#scrim").classList.add("open");$("#drawer").classList.add("open");$("#drawer").setAttribute("aria-hidden","false")}
 function closeDrawer(){$("#scrim").classList.remove("open");$("#drawer").classList.remove("open");$("#drawer").setAttribute("aria-hidden","true")}
 $("#gear").onclick=openDrawer;$("#closedrawer").onclick=closeDrawer;
 $("#savecfg").onclick=()=>{cfg={mode:$("#cfgMode").value,domain:$("#cfgDomain").value.trim()||"example-corp.test",
@@ -496,10 +496,10 @@ function renderReport(r){
     r.controls.map(c=>`<tr><td><span class="ctlchip">${esc(c.id)}</span></td><td>${esc(c.framework)}</td><td>${esc(c.title)}</td>
       <td><span class="badge b-${c.status}">${c.status}</span></td><td>${c.finding_count}</td></tr>`).join("")+`</tbody>`;
   $("#narrativePanel").style.display="";$("#diffPanel").style.display="";
-  renderNarrative();renderDiff();
+  renderNarrative(report);renderDiff();
 }
 
-function renderNarrative(n){
+async function renderNarrative(report){
   $("#narrsummary").textContent="Generating board-ready risk summary…";
   $("#narrrems").innerHTML="";
   const apply=n=>{
@@ -510,9 +510,17 @@ function renderNarrative(n){
         <span class="rf">${esc(r.finding)}</span>
         <div class="rs">${esc(r.steps)}</div></div>`).join("");
   };
-  if(n)return apply(n);
+  const mode=cfg.routeMode||"auto";
   const body={};
-  if(cfg.routeMode&&cfg.routeMode!=="auto")body.mode=cfg.routeMode;
+  if(mode!=="auto")body.mode=mode;
+  // Ollama check + call run in the BROWSER (browser→host); other providers server-side.
+  if(report&&(mode==="local"||mode==="auto")){
+    try{
+      const base=await probeOllama();
+      if(base)body.client_narrative=await ollamaNarrative(base,report);
+      else if(mode==="local")toast("Host Ollama not reachable — using offline fallback","info");
+    }catch{toast("Host Ollama call failed — falling back","info");}
+  }
   j("report/narrative",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)})
     .then(apply).catch(()=>{$("#narrsummary").textContent="Narrative unavailable."});
 }
@@ -588,35 +596,91 @@ document.addEventListener("keydown",e=>{
 
 /* ===================== POLISH KIT: routing config ===================== */
 const MODE_BLURBS={
-  auto:"auto = paid if keyed, else local, else free, else offline.",
-  local:"local = Ollama only (on-box, zero cost).",
+  auto:"auto = local host Ollama if your browser can reach it, else paid, else free, else offline.",
+  local:"local = your host Ollama, called straight from the browser (browser→host). Runs a real model for free, even on the cloud demo.",
   free:"free = OpenRouter free models only.",
   paid:"paid = Anthropic, then OpenAI.",
   offline:"offline = deterministic narrative only (no LLM call).",
 };
 const MODE_CHAIN={
-  auto:["anthropic","openai","ollama","openrouter"],
-  local:["ollama"], free:["openrouter"], paid:["anthropic","openai"], offline:[],
+  auto:["ollama (browser→host)","anthropic","openai","openrouter"],
+  local:["ollama (browser→host)"], free:["openrouter"],
+  paid:["anthropic","openai"], offline:[],
 };
 const PROVIDERS=["anthropic","openai","ollama","openrouter"];
+
+/* ===================== OLLAMA BRIDGE (browser→host) =====================
+   Only the Ollama check + call run in the BROWSER (your machine can reach
+   localhost; the cloud server can't). Every other provider stays server-side. */
+const OLLAMA_CANDIDATES=["http://localhost:11434","http://localhost:11435"];
+// Mirrors narrative.py's SYSTEM/user prompt so the host model returns the exact
+// JSON shape the server's _parse() expects: {summary, remediations:[...]}.
+const NARR_SYSTEM=
+  "You are a GRC (governance, risk & compliance) analyst writing for a board / "+
+  "executive audience. You are given the machine-computed output of an "+
+  "attack-surface scan: a posture score and grade, severity counts, the open "+
+  "findings, and the SOC 2 / ISO 27001 controls each finding affects. Write a "+
+  "board-ready risk narrative. Return STRICT JSON "+
+  '{"summary": <2-4 sentence plain-prose risk summary naming the grade, the '+
+  "severity profile, and the top critical exposures and the controls they put "+
+  'at risk>, "remediations": [{"rule_id": <the finding rule id>, "finding": '+
+  '<short finding name>, "steps": <one concrete, prioritized remediation '+
+  "sentence>}]}. Cover EVERY critical and high finding in remediations, highest "+
+  "severity first. Use ONLY the findings, scores, and controls given — never "+
+  "invent exposures, numbers, or controls. Output JSON only.";
+let _ollamaProbe={base:null,at:0};
+async function probeOllama(){
+  const now=Date.now();
+  if(now-_ollamaProbe.at<30000)return _ollamaProbe.base;
+  let base=null;
+  for(const c of OLLAMA_CANDIDATES){
+    try{const r=await fetch(`${c}/api/tags`,{signal:AbortSignal.timeout(1500)});if(r.ok){base=c;break;}}catch{}
+  }
+  _ollamaProbe={base,at:now};return base;
+}
+// Run narrative.py's prompt against the host model; return the raw text the
+// server submits as `client_narrative` (the server parses it the same way).
+async function ollamaNarrative(base, report){
+  const user="Scan report (JSON):\n"+JSON.stringify(report);
+  const r=await fetch(`${base}/api/chat`,{method:"POST",headers:{"content-type":"application/json"},
+    body:JSON.stringify({model:cfg.model||"llama3.1:8b",stream:false,format:"json",
+      messages:[{role:"system",content:NARR_SYSTEM},{role:"user",content:user}]}),
+    signal:AbortSignal.timeout(120000)});
+  if(!r.ok)throw new Error("ollama "+r.status);
+  const data=await r.json();
+  return (data?.message?.content||"").trim();
+}
+
 function selectMode(m){
   $$("#modeseg .segbtn").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.mode===m)));
   $("#modeblurb").textContent=MODE_BLURBS[m]||"";
   $("#modeactive").textContent=`active: ${m}`;
 }
 function currentMode(){return $("#modeseg").querySelector('[aria-pressed="true"]')?.dataset.mode||"auto";}
+let clientOllama=false;   // browser→host Ollama reachability (browser-probed)
 function renderRouting(){
   const m=currentMode();
   $("#modeactive").textContent=`active: ${m}`;
   const rows=PROVIDERS.map(p=>{
-    const on=!!llmProviders[p];
-    return `<div class="pstat"><span>${p}</span><span class="pdot ${on?'on':''}" title="${on?'available':'not configured'}"></span></div>`;
+    // Ollama is checked in the BROWSER (browser→host); other providers server-side.
+    const on= p==="ollama" ? clientOllama : !!llmProviders[p];
+    const label= p==="ollama" ? "ollama (browser→host)" : p;
+    const title= p==="ollama" ? (on?"reachable from your browser":"not reachable from your browser")
+                              : (on?"available":"not configured");
+    return `<div class="pstat"><span>${label}</span><span class="pdot ${on?'on':''}" title="${title}"></span></div>`;
   }).join("")+
     `<div class="pstat"><span>offline (deterministic)</span><span class="pdot on" title="always available"></span></div>`;
   $("#provrows").innerHTML=rows;
-  const chain=(MODE_CHAIN[m]||[]).filter(p=>llmProviders[p]);
+  const chain=(MODE_CHAIN[m]||[]).filter(p=>{
+    if(p.startsWith("ollama"))return clientOllama;
+    return llmProviders[p];
+  });
   const display=[...chain,"offline (deterministic)"];
   $("#chainline").textContent=display.join("  →  ");
+}
+async function refreshClientOllama(){
+  clientOllama = !!(await probeOllama());
+  renderRouting();
 }
 $$("#modeseg .segbtn").forEach(b=>b.onclick=()=>{selectMode(b.dataset.mode);renderRouting();});
 async function loadLlm(){
@@ -654,6 +718,7 @@ async function boot(){
   $("#boot").classList.add("hide");setTimeout(()=>$("#boot").remove(),600);
   $$(".reveal").forEach((el,i)=>setTimeout(()=>el.classList.add("in"),90*i));
   loadLlm();
+  refreshClientOllama();   // browser-side Ollama check (browser→host)
   // first load: always show the populated fixture report
   try{const r=await j("scan");renderReport(r);}catch{}
 }

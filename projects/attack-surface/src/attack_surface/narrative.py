@@ -155,12 +155,27 @@ def _parse(text: str, report: dict) -> dict:
     return {"summary": summary, "remediations": rems}
 
 
-def generate(report: dict, *, mode: str | None = None) -> dict:
+def generate(report: dict, *, mode: str | None = None,
+             client_narrative: str | None = None) -> dict:
     """Generate the exec narrative + remediation guidance for a scan report.
 
     The model reads the deterministic report and writes prose; findings, scores,
     and control mappings are never re-derived here.
+
+    If ``client_narrative`` is supplied, the browser already ran this same prompt
+    against the user's host Ollama (browser→host) and submitted the model's raw
+    output; we parse it instead of calling a server-side provider, so a
+    cloud-hosted demo can run a real local model. Other providers stay server-side.
     """
+    if client_narrative is not None:
+        parsed = _parse(client_narrative, report)
+        return {
+            "summary": parsed["summary"],
+            "remediations": parsed["remediations"],
+            "posture": report["posture"],
+            "provider": "ollama (browser→host)", "model": "host",
+            "mode": "local", "latency_ms": 0, "cost_usd": 0.0, "fallbacks": [],
+        }
     user = "Scan report (JSON):\n" + json.dumps(report)
     res = llm.complete(SYSTEM, user, offline=_offline_narrative, mode=mode,
                        json_mode=True, max_tokens=900)
