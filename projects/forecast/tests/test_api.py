@@ -51,6 +51,22 @@ def test_summary_mock_uses_template():
     assert body["summary"] and "linear_trend" in body["summary"]
 
 
+def test_client_narrative_routes_browser_to_host():
+    # When the browser supplies a narrative from a host-local Ollama (browser→host),
+    # the server uses it as the summary and reports the browser→host provider — the
+    # deterministic forecast math is unchanged.
+    narrative = "The linear_trend model projects a rising trend."
+    body = client.post("/forecast", json={
+        "series": [1, 2, 3, 4, 5, 6, 7, 8], "horizon": 3, "method": "linear_trend",
+        "use_llm": True, "provider": "local",
+        "client_narrative": narrative}).json()
+    assert body["routing"]["provider"] == "ollama (browser→host)"
+    assert body["summary"] == narrative
+    assert body["method"] == "linear_trend"
+    assert len(body["forecast"]) == 3
+    assert body["backtest"] is not None
+
+
 def test_forecast_auto():
     body = client.post("/forecast", json={
         "series": [2, 4, 6, 8, 10, 12, 14, 16], "horizon": 2}).json()
