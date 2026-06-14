@@ -19,6 +19,25 @@ _SYSTEM = (
 )
 
 
+def _build_filled(text: str, fields, raw_values: dict) -> list[Extracted]:
+    """Turn a {field_name: raw value} mapping into validated Extracted records."""
+    filled: list[Extracted] = []
+    for f in fields:
+        raw = raw_values.get(f.name)
+        if not isinstance(raw, (str, int, float)) or not str(raw).strip():
+            continue
+        value = str(raw).strip()
+        valid, normalized = _validate(f.type, value)
+        idx = text.find(value)
+        filled.append(Extracted(
+            name=f.name, type=f.type, found=True, value=value,
+            normalized=normalized, valid=valid, confidence=0.7,
+            start=idx if idx != -1 else None,
+            end=(idx + len(value)) if idx != -1 else None, method="llm",
+        ))
+    return filled
+
+
 def llm_fill(text: str, schema_name: str, missing: set[str],
              provider: str | None = "auto", model: str | None = None):
     """Return (list[Extracted] for filled fields, LLMResult|None)."""
@@ -29,19 +48,14 @@ def llm_fill(text: str, schema_name: str, missing: set[str],
     spec = "\n".join(f"- {f.name} ({f.type}): {f.description}" for f in fields)
     parsed, result = llm.complete_json(
         f"FIELDS:\n{spec}\n\nDOCUMENT:\n{text}", _SYSTEM, provider, model)
-    filled: list[Extracted] = []
-    if isinstance(parsed, dict):
-        for f in fields:
-            raw = parsed.get(f.name)
-            if not isinstance(raw, (str, int, float)) or not str(raw).strip():
-                continue
-            value = str(raw).strip()
-            valid, normalized = _validate(f.type, value)
-            idx = text.find(value)
-            filled.append(Extracted(
-                name=f.name, type=f.type, found=True, value=value,
-                normalized=normalized, valid=valid, confidence=0.7,
-                start=idx if idx != -1 else None,
-                end=(idx + len(value)) if idx != -1 else None, method="llm",
-            ))
-    return filled, result
+    raw = parsed if isinstance(parsed, dict) else {}
+    return _build_filled(text, fields, raw), result
+
+
+def client_fill(text: str, schema_name: str, missing: set[str], client_fields):
+    """Browser→host Ollama fill: build Extracted records from values the BROWSER
+    obtained off the user's local Ollama, instead of calling a server provider."""
+    schema = SCHEMAS[schema_name]
+    fields = [f for f in schema.fields if f.name in missing]
+    raw = {cf.name: cf.value for cf in client_fields}
+    return _build_filled(text, fields, raw)

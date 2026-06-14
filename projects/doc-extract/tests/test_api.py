@@ -52,6 +52,31 @@ def test_llm_fill_mock_changes_nothing():
     assert all(f["method"] != "llm" for f in r["fields"] if f["found"])
 
 
+def test_client_fields_browser_to_host():
+    # Browser ran the LLM on the user's host Ollama and submitted the filled
+    # fields; the server uses them instead of a server-side provider and reports
+    # browser→host routing. Deterministic extraction still runs first.
+    doc = "Invoice #: INV-9\nTotal due: $42.00"  # no email in the doc
+    r = client.post("/extract", json={
+        "text": doc, "schema": "invoice", "use_llm": True,
+        "provider": "local",  # not a server provider — must not 422 with client_fields
+        "client_fields": [{"name": "vendor_email", "value": "sales@acme.com"}],
+    }).json()
+    assert r["routing"]["provider"] == "ollama (browser→host)"
+    found = {f["name"]: f for f in r["fields"] if f["found"]}
+    assert found["invoice_number"]["value"] == "INV-9"      # deterministic, ran first
+    assert found["vendor_email"]["value"] == "sales@acme.com"  # browser-supplied
+    assert found["vendor_email"]["method"] == "llm"
+
+
+def test_client_fields_unreachable_falls_back_to_server():
+    # Absent client_fields -> today's behavior unchanged (server LLM path / mock).
+    r = client.post("/extract", json={
+        "text": "Invoice #: INV-9", "schema": "invoice",
+        "use_llm": True, "provider": "mock"}).json()
+    assert r["routing"]["provider"] == "mock"
+
+
 def test_extract_unknown_schema_422():
     r = client.post("/extract", json={"text": "x", "schema": "nope"})
     assert r.status_code == 422
