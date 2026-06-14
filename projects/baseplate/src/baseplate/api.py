@@ -44,7 +44,16 @@ def scaffold_service(req: ScaffoldRequest) -> JSONResponse:
     the routing telemetry, and every generated paved-road file.
     """
     routing: dict = {"provider": "explicit", "model": "n/a", "fallbacks": []}
-    if req.name:
+    if req.client_spec is not None and req.mode in (None, "auto", "local"):
+        # The browser ran the spec extraction on the user's host Ollama
+        # (browser→host) and submitted the result. Use it instead of calling a
+        # server-side provider — but re-validate/normalize it through the exact
+        # same path as the LLM's own spec output (never trust raw browser input).
+        spec = scaffold.spec_from_raw(req.client_spec,
+                                      fallback_name=req.description or "")
+        routing = {"provider": "ollama (browser→host)",
+                   "model": req.model or "host", "fallbacks": []}
+    elif req.name:
         spec = ServiceSpec(
             name=req.name,
             language=req.language or "python",

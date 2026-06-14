@@ -143,18 +143,31 @@ def extract_spec(description: str, *,
     res = llm.complete(_SYSTEM, description, offline=offline_parse, mode=mode,
                        json_mode=True, max_tokens=200)
     raw = _coerce_json(res.text) or {}
-    spec = ServiceSpec(
-        name=str(raw.get("name") or _slug(description) or "new-service"),
-        language=str(raw.get("language") or "python"),
-        needs_db=bool(raw.get("needs_db", False)),
-        exposes_http=bool(raw.get("exposes_http", True)),
-    ).normalized()
+    spec = spec_from_raw(raw, fallback_name=description)
     routing = {
         "provider": res.provider, "model": res.model, "mode": res.mode,
         "latency_ms": res.latency_ms, "cost_usd": res.cost_usd,
         "fallbacks": res.fallbacks,
     }
     return spec, routing
+
+
+def spec_from_raw(raw: dict, *, fallback_name: str = "") -> ServiceSpec:
+    """Validate + normalize a raw spec dict into a ServiceSpec.
+
+    This is the single trust boundary for spec input: it coerces every field to
+    the expected type, fills defaults, then runs ``.normalized()`` (slugging the
+    name, mapping language aliases, clamping to a supported language). The LLM's
+    JSON output goes through here, and so does a browser-supplied ``client_spec``
+    (browser→host Ollama) — the server never trusts a raw spec, it re-validates.
+    """
+    raw = raw or {}
+    return ServiceSpec(
+        name=str(raw.get("name") or _slug(fallback_name) or "new-service"),
+        language=str(raw.get("language") or "python"),
+        needs_db=bool(raw.get("needs_db", False)),
+        exposes_http=bool(raw.get("exposes_http", True)),
+    ).normalized()
 
 
 def _coerce_json(text: str) -> dict | None:
