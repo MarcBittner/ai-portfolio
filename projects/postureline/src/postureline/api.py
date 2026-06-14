@@ -119,10 +119,16 @@ def report_get(surface: str = "exposure", remediated: bool = False,
 
 @app.post("/report")
 def report_post(req: ReportRequest) -> dict:
-    """LLM board/exec risk report (POST: ``{surface, remediated, mode}``)."""
+    """LLM board/exec risk report (POST: ``{surface, remediated, mode}``).
+
+    When ``client_narrative`` is present the browser ran the prompt against the
+    user's host Ollama (browser→host); the server parses it instead of calling a
+    provider. Absent, behavior is unchanged.
+    """
     _require_surface(req.surface)
     return narrative.generate(
-        scan.run(req.surface, remediated=req.remediated), mode=req.mode)
+        scan.run(req.surface, remediated=req.remediated), mode=req.mode,
+        client_narrative=req.client_narrative)
 
 
 @app.get("/evidence")
