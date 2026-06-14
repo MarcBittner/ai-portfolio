@@ -460,7 +460,7 @@ function applyCfgToMint(){
   $("#vroom").value=cfg.room;
   if($("#template").querySelector(`option[value="${cfg.template}"]`))$("#template").value=cfg.template;
 }
-function openDrawer(){applyCfgToForm();$("#scrim").classList.add("open");$("#drawer").classList.add("open");$("#drawer").setAttribute("aria-hidden","false")}
+function openDrawer(){applyCfgToForm();refreshClientOllama();$("#scrim").classList.add("open");$("#drawer").classList.add("open");$("#drawer").setAttribute("aria-hidden","false")}
 function closeDrawer(){$("#scrim").classList.remove("open");$("#drawer").classList.remove("open");$("#drawer").setAttribute("aria-hidden","true")}
 $("#gear").onclick=openDrawer;$("#closedrawer").onclick=closeDrawer;
 $("#savecfg").onclick=()=>{
@@ -498,6 +498,7 @@ async function boot(){
   try{renderAdv(await j("adversary"));}catch{$("#advpill").style.display="none"}
   try{renderThreats((await j("threat-model")).threats);}catch{}
   loadLlm();
+  refreshClientOllama();   // browser-side Ollama check (browser→host)
   mintToken({silent:true}); // populate the grant panel with a sample token
   try{await auditGrant({silent:true});}catch{} // populate the auditor with the over-grant example
 }
@@ -551,9 +552,23 @@ AUDIT_CAPS.forEach(c=>{const el=$("#a"+c);if(el)el.onclick=()=>toggleCap(el);});
 const SEV_BADGE={high:"b-block",medium:"b-flag",low:"b-info"};
 async function auditGrant(opts={}){
   const btn=$("#audit");btn.classList.add("loading");
+  const mode=cfg.mode||"auto";
   const body={identity:$("#aidentity").value,room:$("#aroom").value,
-    role:$("#arole").value,ttl:+$("#attl").value,mode:cfg.mode||null};
+    role:$("#arole").value,ttl:+$("#attl").value,mode};
   AUDIT_CAPS.forEach(c=>{body[c]=$("#a"+c).classList.contains("on");});
+  // Ollama check + audit LLM call run in the BROWSER (browser→host); others server-side.
+  if(mode==="local"||mode==="auto"){
+    try{
+      const base=await probeOllama();
+      if(base){
+        const ca=await ollamaAudit(base,body);
+        if(ca)body.client_audit={explanation:ca.explanation};
+      }else if(mode==="local"){ toast("Host Ollama not reachable — using offline fallback","info"); }
+    }catch{ toast("Host Ollama call failed — falling back","info"); }
+  }
+  // the server has no "local" provider; when we didn't get a browser→host result,
+  // fall back to "offline" so the request still routes deterministically.
+  if(body.mode==="local" && !body.client_audit) body.mode="offline";
   $("#auditres").innerHTML='<span class="muted">auditing…</span>';
   try{
     const r=await j("grant/audit",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
@@ -635,17 +650,73 @@ document.addEventListener("keydown",e=>{
 
 /* ===================== POLISH KIT: routing config ===================== */
 const MODE_BLURBS={
-  auto:"auto = local if reachable, else paid, else free, else offline.",
-  local:"local = Ollama only (on-box, zero cost).",
+  auto:"auto = local host Ollama if your browser can reach it, else paid, else free, else offline.",
+  local:"local = your host Ollama, called straight from the browser (browser→host). Runs a real model for free, even on the cloud demo.",
   free:"free = OpenRouter free models only.",
   paid:"paid = Anthropic, then OpenAI.",
   offline:"offline = deterministic auditor only (no LLM call).",
 };
 const MODE_CHAIN={
-  auto:["anthropic","openai","ollama","openrouter"],
-  local:["ollama"], free:["openrouter"], paid:["anthropic","openai"], offline:[],
+  auto:["ollama (browser→host)","anthropic","openai","openrouter"],
+  local:["ollama (browser→host)"], free:["openrouter"], paid:["anthropic","openai"], offline:[],
 };
 const PROVIDERS=["anthropic","openai","ollama","openrouter"];
+/* ===================== OLLAMA BRIDGE (browser→host) =====================
+   Only the Ollama check + the audit LLM call run in the BROWSER (your machine
+   can reach localhost; the cloud server can't). Every other provider stays
+   server-side. The system + user prompt below MIRROR grant_audit.py exactly so
+   the browser→host run produces the same audit shape the server would. */
+const OLLAMA_CANDIDATES=["http://localhost:11434","http://localhost:11435"];
+const AUDIT_CAPS_ORDER=["roomJoin","canSubscribe","canPublish","canPublishData"];
+// MIRROR of grant_audit.py SYSTEM (least-privilege auditor prompt).
+const AUDIT_SYSTEM=
+  "You are a least-privilege auditor for WebRTC real-time access-token grants. "+
+  "A grant names an identity, a target room, capability flags "+
+  "("+AUDIT_CAPS_ORDER.join(", ")+"), a declared role, and a TTL in seconds. Return STRICT "+
+  'JSON {"explanation": <one plain-English sentence of exactly what this grant '+
+  'lets the holder do>, "findings": [{"severity": <high|medium|low>, "issue": '+
+  '<the over-permission or risk>, "recommendation": <the least-privilege fix>}]}. '+
+  "Flag any capability beyond what the declared role needs, a missing/empty room "+
+  "(an unscoped grant valid in EVERY room), an over-long TTL (a real-time join "+
+  "token should be minutes, not hours), and data-channel publish enabled for a "+
+  "pure consumer (a prompt-injection vector into the agent). If the grant is "+
+  "already least-privilege, return an empty findings list. Output JSON only.";
+function auditUserPrompt(grant){
+  // MIRROR of grant_audit.build_prompt user line: caps first, then identity/room/role/ttl.
+  const obj={};
+  AUDIT_CAPS_ORDER.forEach(c=>obj[c]=!!grant[c]);
+  obj.identity=grant.identity||""; obj.room=grant.room||"";
+  obj.role=(grant.role||""); obj.ttl=+grant.ttl||0;
+  return "Audit this proposed real-time token grant against least privilege.\n"+JSON.stringify(obj);
+}
+let _ollamaProbe={base:null,at:0};
+async function probeOllama(){
+  const now=Date.now();
+  if(now-_ollamaProbe.at<30000)return _ollamaProbe.base;
+  let base=null;
+  for(const c of OLLAMA_CANDIDATES){
+    try{const r=await fetch(`${c}/api/tags`,{signal:AbortSignal.timeout(1500)});if(r.ok){base=c;break;}}catch{}
+  }
+  _ollamaProbe={base,at:now};return base;
+}
+async function ollamaAudit(base, grant){
+  // Run the grant-audit LLM call on the host Ollama (browser→host). Returns the
+  // audit JSON {explanation, findings:[...]}; the server keeps the deterministic
+  // findings — we only need the narration, but we parse both for parity.
+  const r=await fetch(`${base}/api/chat`,{method:"POST",headers:{"content-type":"application/json"},
+    body:JSON.stringify({model:cfg.model||"llama3.1:8b",stream:false,format:"json",
+      messages:[{role:"system",content:AUDIT_SYSTEM},{role:"user",content:auditUserPrompt(grant)}]}),
+    signal:AbortSignal.timeout(120000)});
+  if(!r.ok)throw new Error("ollama "+r.status);
+  const data=await r.json(); let s=(data?.message?.content||"").trim();
+  if(s.includes("```"))s=s.split("```")[1]?.replace(/^json/i,"").trim()||s;
+  const a=s.indexOf("{"),b=s.lastIndexOf("}");
+  let parsed; try{parsed=JSON.parse(a>=0?s.slice(a,b+1):s);}catch{return null;}
+  if(!parsed||typeof parsed!=="object")return null;
+  return {explanation:String(parsed.explanation||"").trim(),
+          findings:Array.isArray(parsed.findings)?parsed.findings:[]};
+}
+let clientOllama=false;   // browser→host Ollama reachability (browser-probed)
 function selectMode(m){
   $$("#modeseg .segbtn").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.mode===m)));
   $("#modeblurb").textContent=MODE_BLURBS[m]||"";
@@ -655,17 +726,28 @@ function currentMode(){return $("#modeseg").querySelector('[aria-pressed="true"]
 function renderRouting(){
   const m=currentMode();
   $("#modeactive").textContent=`active: ${m}`;
-  // provider status rows + always-on offline row
+  // provider status rows + always-on offline row.
   const rows=PROVIDERS.map(p=>{
-    const on=!!llmProviders[p];
-    return `<div class="pstat"><span>${p}</span><span class="pdot ${on?'on':''}" title="${on?'available':'not configured'}"></span></div>`;
+    // Ollama is checked in the BROWSER (browser→host); other providers server-side.
+    const on= p==="ollama" ? clientOllama : !!llmProviders[p];
+    const label= p==="ollama" ? "ollama (browser→host)" : p;
+    const title= p==="ollama" ? (on?"reachable from your browser":"not reachable from your browser")
+                              : (on?"available":"not configured");
+    return `<div class="pstat"><span>${label}</span><span class="pdot ${on?'on':''}" title="${title}"></span></div>`;
   }).join("")+
     `<div class="pstat"><span>offline (deterministic)</span><span class="pdot on" title="always available"></span></div>`;
   $("#provrows").innerHTML=rows;
-  // resolved fallback chain for the selected mode (available providers, then offline)
-  const chain=(MODE_CHAIN[m]||[]).filter(p=>llmProviders[p]);
+  // resolved fallback chain for the selected mode (available providers, then offline).
+  const chain=(MODE_CHAIN[m]||[]).filter(p=>{
+    if(p.startsWith("ollama"))return clientOllama;
+    return llmProviders[p];
+  });
   const display=[...chain,"offline (deterministic)"];
   $("#chainline").textContent=display.join("  →  ");
+}
+async function refreshClientOllama(){
+  clientOllama = !!(await probeOllama());
+  renderRouting();
 }
 $$("#modeseg .segbtn").forEach(b=>b.onclick=()=>{selectMode(b.dataset.mode);renderRouting();});
 

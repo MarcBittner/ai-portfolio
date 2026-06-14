@@ -66,8 +66,14 @@ def run_adversary() -> dict:
 @app.post("/grant/audit")
 def audit_grant(req: GrantAuditRequest) -> dict:
     """LLM-assisted least-privilege audit of a proposed grant: a plain-English
-    explanation + over-permissioning findings (deterministic offline fallback)."""
-    return grant_audit.audit(req.model_dump(exclude={"mode"}), mode=req.mode)
+    explanation + over-permissioning findings (deterministic offline fallback).
+
+    When the BROWSER reached a host-local Ollama and submitted ``client_audit``,
+    the server skips its own LLM call and uses that narration (browser→host);
+    the deterministic rule findings still run server-side. Otherwise unchanged."""
+    grant = req.model_dump(exclude={"mode", "client_audit"})
+    client_audit = req.client_audit.model_dump() if req.client_audit else None
+    return grant_audit.audit(grant, mode=req.mode, client_audit=client_audit)
 
 
 @app.get("/evals")

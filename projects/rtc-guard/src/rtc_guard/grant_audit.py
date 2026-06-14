@@ -201,16 +201,41 @@ def _parse(text: str) -> dict:
     }
 
 
-def audit(grant: dict, *, mode: str | None = None) -> dict:
-    """Audit a proposed grant via the routing chain. The LLM explains + judges;
-    the offline rule auditor is the deterministic fallback (same shape)."""
+def build_prompt(grant: dict) -> tuple[str, str]:
+    """The (system, user) prompt pair sent to the LLM. Exposed so the browser→host
+    Ollama bridge mirrors EXACTLY the prompt the server-side path uses."""
     g = _norm(grant)
     user = ("Audit this proposed real-time token grant against least privilege.\n"
             + json.dumps({**{c: g["caps"][c] for c in CAPS}, "identity": g["identity"],
                           "room": g["room"], "role": g["role"], "ttl": g["ttl"]}))
-    res = llm.complete(SYSTEM, user, offline=_offline_audit, mode=mode,
-                       json_mode=True, max_tokens=700)
-    parsed = _parse(res.text)
+    return SYSTEM, user
+
+
+def audit(grant: dict, *, mode: str | None = None,
+          client_audit: dict | None = None) -> dict:
+    """Audit a proposed grant via the routing chain. The LLM explains + judges;
+    the offline rule auditor is the deterministic fallback (same shape).
+
+    When ``client_audit`` is supplied, the BROWSER already ran the LLM call on the
+    user's host Ollama (browser→host) and submitted the narration; the server skips
+    its own LLM call and uses that explanation. The deterministic rule findings are
+    still computed server-side — the LLM only narrates — so the audit's judgment is
+    never weakened by an untrusted client.
+    """
+    g = _norm(grant)
+    _system, user = build_prompt(grant)
+    if client_audit is not None:
+        # Browser→host Ollama narrated the grant; keep the deterministic findings.
+        rule = json.loads(_offline_audit(_system, user))
+        explanation = str(client_audit.get("explanation", "")).strip() or _explain(g)
+        parsed = {"explanation": explanation, "findings": rule["findings"]}
+        res = llm.LLMResult(text="", provider="ollama (browser→host)",
+                            model="host", mode=mode or "local",
+                            latency_ms=0, cost_usd=0.0, fallbacks=[])
+    else:
+        res = llm.complete(SYSTEM, user, offline=_offline_audit, mode=mode,
+                           json_mode=True, max_tokens=700)
+        parsed = _parse(res.text)
     if not parsed["explanation"]:
         parsed["explanation"] = _explain(g)
     sev_counts = {s: 0 for s in SEVERITIES}
