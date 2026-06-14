@@ -80,8 +80,21 @@ def incident_summary(req: IncidentRequest) -> dict:
     """Compress the current SLO snapshot + error spans into an on-call incident
     summary, a deterministically-classified severity, and the matching runbook
     steps. Routes through the LLM chain; the offline drafter is the terminal,
-    zero-key fallback."""
-    return incident.summarize(mode=req.mode)
+    zero-key fallback. When ``client_summary`` is present (browser→host Ollama),
+    the server uses it as the narrative instead of calling its own LLM."""
+    return incident.summarize(mode=req.mode, client_summary=req.client_summary)
+
+
+@app.get("/incident/state")
+def incident_state() -> dict:
+    """The exact inputs incident.summarize() feeds the LLM: the live snapshot, the
+    deterministic classification, and the matching runbook steps. The browser uses
+    this to build incident.py's prompt verbatim for a browser→host Ollama call, so
+    the local path mirrors the server path instead of recomputing SLO math in JS."""
+    state = incident.collect_state()
+    c = incident.classify(state)
+    return {"state": state, "classify": c,
+            "suggested_steps": incident._steps_for(c["situation"])}
 
 
 @app.get("/evals")
