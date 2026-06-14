@@ -224,6 +224,30 @@
               --header-bg:rgba(255,255,255,.58); }
   .panel,.drawer,#drawer,#help,.help{ backdrop-filter:blur(11px) saturate(135%);
     -webkit-backdrop-filter:blur(11px) saturate(135%); }
+
+  /* POLISH KIT: fancy — premium micro-interactions, glass edges, scrollbars */
+  :root{ --fancy-ring:0 0 0 3px color-mix(in oklch,var(--accent) 30%,transparent); }
+  *,*::before,*::after{ transition:background-color .22s var(--ease),border-color .22s var(--ease),box-shadow .22s var(--ease),color .2s var(--ease); }
+  .panel{ box-shadow:var(--sh),inset 0 1px 0 rgba(255,255,255,.05);
+    transition:transform .3s var(--ease),border-color .22s var(--ease),box-shadow .3s var(--ease); }
+  .panel:hover{ transform:translateY(-2px);
+    border-color:color-mix(in oklch,var(--accent) 26%,var(--line));
+    box-shadow:var(--sh-lg),inset 0 1px 0 rgba(255,255,255,.08),0 0 0 1px color-mix(in oklch,var(--accent) 14%,transparent); }
+  .btn,.chip,.iconbtn,.segbtn,select,input,textarea{
+    transition:transform .16s var(--ease),background-color .2s var(--ease),border-color .2s var(--ease),box-shadow .2s var(--ease); }
+  .btn:active,.iconbtn:active,.chip:active{ transform:translateY(0) scale(.97); }
+  .btn.primary{ background-size:200% 100%;
+    transition:background-position .45s var(--ease),box-shadow .25s var(--ease),transform .16s var(--ease); }
+  .btn.primary:hover{ background-position:100% 0;
+    box-shadow:0 10px 30px -10px color-mix(in oklch,var(--accent) 65%,transparent); }
+  :focus-visible{ outline:none!important; box-shadow:var(--fancy-ring)!important; }
+  html{ scrollbar-width:thin; scrollbar-color:var(--line-2) transparent; }
+  ::-webkit-scrollbar{ width:10px;height:10px; }
+  ::-webkit-scrollbar-thumb{ background:var(--line-2); border-radius:999px; border:2px solid transparent; background-clip:content-box; }
+  ::-webkit-scrollbar-thumb:hover{ background:var(--ink-faint); background-clip:content-box; }
+  .logo{ background-size:180% 180%; animation:logoShimmer 9s var(--ease) infinite; }
+  @keyframes logoShimmer{ 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
+  @media (prefers-reduced-motion:reduce){ *,*::before,*::after{animation:none!important;transition:none!important} .panel:hover{transform:none} }
 </style>
 </head>
 <body>

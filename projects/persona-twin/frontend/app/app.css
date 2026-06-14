@@ -60,3 +60,12 @@ body {
     linear-gradient(oklch(0.15 0.012 260 / 0.34), oklch(0.15 0.012 260 / 0.46)),
     url("/bg-dark.jpg");
 }
+
+/* fancy polish — consistent micro-interactions */
+* { transition: background-color .22s ease, border-color .22s ease, box-shadow .22s ease, color .2s ease; }
+:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in oklch, var(--color-primary) 32%, transparent); }
+html { scrollbar-width: thin; scrollbar-color: var(--color-border) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 999px; border: 2px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-muted-foreground); background-clip: content-box; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }

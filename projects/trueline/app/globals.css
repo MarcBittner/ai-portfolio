@@ -79,3 +79,16 @@ html.light body {
   height: 0.6rem;
   border-radius: 999px;
 }
+
+/* fancy polish — consistent micro-interactions */
+* { transition: background-color .22s ease, border-color .22s ease, box-shadow .22s ease, color .2s ease; }
+.glass { transition: transform .3s ease, border-color .22s ease, box-shadow .3s ease; }
+.glass:hover { transform: translateY(-2px);
+  border-color: color-mix(in oklch, var(--color-accent) 26%, var(--color-line));
+  box-shadow: 0 18px 50px -24px rgba(0,0,0,.6), 0 0 0 1px color-mix(in oklch, var(--color-accent) 14%, transparent); }
+:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in oklch, var(--color-accent) 30%, transparent); }
+html { scrollbar-width: thin; scrollbar-color: var(--color-line) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--color-line); border-radius: 999px; border: 2px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-muted); background-clip: content-box; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } .glass:hover { transform: none; } }
