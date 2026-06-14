@@ -53,13 +53,34 @@ def _check_provider(provider: str) -> None:
         )
 
 
+def _client_ner_spans(text: str, client_ner) -> list[Span]:
+    """Map browser→host Ollama NER entities back to spans in the source text."""
+    spans: list[Span] = []
+    for ent in client_ner:
+        etype, value = ent.type.upper(), ent.text
+        if etype in LLM_TYPES and value:
+            idx = text.find(value)
+            if idx != -1:
+                spans.append(Span(etype, idx, idx + len(value), value))
+    return spans
+
+
 def _gather(
-    text, types, use_llm, provider, model
+    text, types, use_llm, provider, model, client_ner=None
 ) -> tuple[list[Span], RoutingInfo | None]:
     wanted = _valid_types(types)
     spans = detect(text, wanted)
     routing = None
-    if use_llm:
+    if use_llm and client_ner is not None:
+        # Browser ran the NER on the user's host Ollama and submitted the entities;
+        # use them instead of calling a server-side provider.
+        llm_spans = _client_ner_spans(text, client_ner)
+        if wanted is not None:
+            llm_spans = [s for s in llm_spans if s.type in wanted]
+        spans = merge(spans, llm_spans)
+        routing = RoutingInfo(provider="ollama (browser→host)",
+                              model=model or "host", fallbacks=[])
+    elif use_llm:
         _check_provider(provider)
         llm_spans, result = llm_entities(text, provider, model)
         if wanted is not None:
@@ -99,7 +120,7 @@ def list_types() -> list[TypeInfo]:
 @app.post("/detect", response_model=DetectResponse)
 def detect_pii(request: DetectRequest) -> DetectResponse:
     spans, routing = _gather(request.text, request.types, request.use_llm,
-                             request.provider, request.model)
+                             request.provider, request.model, request.client_ner)
     return DetectResponse(
         spans=[SpanOut(type=s.type, start=s.start, end=s.end,
                        source="llm" if s.type in LLM_TYPES else "regex") for s in spans],
@@ -112,7 +133,7 @@ def redact_pii(request: RedactRequest) -> RedactResponse:
     if request.style not in STYLES:
         raise HTTPException(status_code=422, detail=f"unknown style; valid: {STYLES}")
     spans, routing = _gather(request.text, request.types, request.use_llm,
-                             request.provider, request.model)
+                             request.provider, request.model, request.client_ner)
     redacted, counts = redact_spans(request.text, spans, request.style)
     return RedactResponse(redacted=redacted, counts=counts, total=sum(counts.values()),
                           style=request.style, routing=routing)
