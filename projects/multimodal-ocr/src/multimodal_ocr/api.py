@@ -97,7 +97,7 @@ def run_process(request: ProcessRequest) -> ProcessResponse:
         raise HTTPException(status_code=422, detail="unknown provider")
 
     result = process(tokens, _types(request.types), request.use_llm,
-                     request.provider, request.model)
+                     request.provider, request.model, request.client_ner)
     _text, ordered, _spans = tokens_to_text(tokens)
     routing = None
     if result.routing is not None:
