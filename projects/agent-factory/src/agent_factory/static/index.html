@@ -465,7 +465,7 @@ function render(r){
   const route=r.routing?`${r.routing.provider} / ${esc(shortModel(r.routing.model)||r.routing.model)}`:'—';
   const meta=[
     badge(r.planner==='llm'?'b-info':'', `planner: ${r.planner}`),
-    r.routing?badge('', `route: ${route}`):'',
+    r.routing?badge(r.client?'b-info':'', `route: ${route}`):'',
     badge('', `${(r.steps||[]).length} step(s)`),
     badge('', `~${r.tokens_estimated} tok`),
     badge('', `${r.elapsed_ms} ms`),
@@ -482,10 +482,41 @@ function render(r){
     ${steps?`<div class="card reveal"><h2 class="k">Trace — thought → action → observation</h2><div class="trace">${steps}</div></div>`:''}`;
 }
 
+// Resolve the spec the run will use (custom drawer spec, or the template's).
+function specForRun(){
+  if($("#useCustom").checked)return currentSpec();
+  return defaultSpec(sel)||{name:sel,tools:(TOOLS||[]).map(t=>t.name),
+    system_prompt:"You are a helpful, precise assistant.",planner:"auto",
+    max_steps:6,answer_style:"concise"};
+}
 async function run(){
   const task=$("#task").value.trim(); if(!task){toast("Enter a task first");return}
   const btn=$("#run"); btn.classList.add("loading"); btn.disabled=true;
+  const mode=currentMode();
+  const spc=specForRun();
   try{
+    // PREFERRED PATH: in local/auto mode, if the browser can reach host Ollama and
+    // the planner isn't pinned to "rule", drive the LLM reasoning in the browser
+    // (tools still execute server-side via /tool).
+    const wantLocal=(mode==="local"||mode==="auto") && (spc.planner!=="rule");
+    if(wantLocal){
+      let base=null;
+      try{base=await probeOllama();}catch{}
+      clientOllama=!!base; renderRouting();
+      if(base){
+        try{
+          const r=await runViaHostOllama(base,spc.model||cfg.model||"llama3.1:8b",spc,task);
+          render(r); toast("Ran on your host Ollama (browser→host)","ok");
+          return;
+        }catch(e){
+          // local→offline fallback guard: a browser-loop failure drops to the server path.
+          if(mode==="local")toast("Host Ollama run failed — using server fallback");
+        }
+      }else if(mode==="local"){
+        toast("Host Ollama not reachable — using server fallback");
+      }
+    }
+    // SERVER PATH: every other provider (and the local→offline fallback) runs here.
     const body=$("#useCustom").checked?{task,spec:currentSpec()}:{task,template:sel};
     const r=await j("/run",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
     render(r);
@@ -540,22 +571,119 @@ document.addEventListener("keydown",e=>{
   else if(e.key==="?"&&!typing&&!$("#help").classList.contains("open")){e.preventDefault();openHelp();}
 });
 
+/* ===================== OLLAMA BRIDGE (browser→host) =====================
+   The cloud server can't reach your machine's Ollama; your browser can. So in
+   local/auto mode, when the browser probes a reachable host Ollama, it drives
+   the agent's LLM REASONING (plan + answer) against that local model right here,
+   and dispatches every tool call back to POST /tool — so the allowlist,
+   validation, and the sandboxed tool implementations all stay SERVER-SIDE. The
+   browser never executes tools; only Ollama check + LLM reasoning run here. */
+const OLLAMA_CANDIDATES=["http://localhost:11434","http://localhost:11435"];
+let _ollamaProbe={base:null,at:0};
+async function probeOllama(){
+  const now=Date.now();
+  if(now-_ollamaProbe.at<30000)return _ollamaProbe.base;
+  let base=null;
+  for(const c of OLLAMA_CANDIDATES){
+    try{const r=await fetch(`${c}/api/tags`,{signal:AbortSignal.timeout(1500)});if(r.ok){base=c;break;}}catch{}
+  }
+  _ollamaProbe={base,at:now};return base;
+}
+// Mirror of agent_factory/llm_planner.py — kept in sync so a browser-driven run
+// reproduces the server's planning/answer prompts against the host model.
+const PLAN_SYS=
+  "You are the planner for a tool-using agent. Given a task and a list of "+
+  "available tools, output a minimal JSON plan: a list of steps, each an object "+
+  '{"thought": str, "tool": str, "args": object}. Use ONLY the listed tools and '+
+  "their named arguments. To feed one step's result into a later step, put the "+
+  'placeholder {0}, {1}, ... (the index of the earlier step) in a string arg. '+
+  "Output ONLY the JSON array, no prose.";
+function catalogText(toolNames){
+  return TOOLS.filter(t=>toolNames.includes(t.name)).map(t=>{
+    const args=(t.params||[]).map(p=>`${p.name}:${p.type}`).join(", ");
+    return `- ${t.name}(${args}) — ${t.description}`;
+  }).join("\n");
+}
+async function ollamaChat(base,model,system,prompt){
+  const r=await fetch(`${base}/api/chat`,{method:"POST",headers:{"content-type":"application/json"},
+    body:JSON.stringify({model,stream:false,
+      messages:[{role:"system",content:system},{role:"user",content:prompt}]}),
+    signal:AbortSignal.timeout(120000)});
+  if(!r.ok)throw new Error("ollama "+r.status);
+  const data=await r.json();
+  return (data?.message?.content||"").trim();
+}
+function parseJsonArray(s){
+  let raw=String(s||"").trim();
+  if(raw.includes("```"))raw=raw.split("```")[1]?.replace(/^json/i,"").trim()||raw;
+  const a=raw.indexOf("["),b=raw.lastIndexOf("]");
+  if(a<0||b<0)return null;
+  try{const v=JSON.parse(raw.slice(a,b+1));return Array.isArray(v)?v:null;}catch{return null;}
+}
+function fillArgs(args,observations){
+  const out={};
+  for(const[k,v]of Object.entries(args||{})){
+    out[k]=typeof v==="string"?observations.reduce((s,o,i)=>s.replaceAll(`{${i}}`,o),v):v;
+  }
+  return out;
+}
+// Run the whole agent loop in the browser against host Ollama; tools via /tool.
+async function runViaHostOllama(base,model,spec,task){
+  const allowed=spec.tools||[];
+  // 1) plan — LLM reasoning in the browser
+  const planPrompt=`Task:\n${task}\n\nAvailable tools:\n${catalogText(allowed)}\n\n`+
+    `Plan (JSON array, at most ${spec.max_steps} steps):`;
+  const planRaw=await ollamaChat(base,model,PLAN_SYS,planPrompt);
+  const parsed=parseJsonArray(planRaw);
+  if(!parsed)throw new Error("planner returned no JSON plan");
+  const steps=parsed.slice(0,spec.max_steps).filter(s=>s&&allowed.includes(s.tool));
+  if(!steps.length)throw new Error("planner produced no allowed steps");
+  // 2) act — tools execute SERVER-SIDE via /tool (allowlist + validation enforced)
+  const observations=[],trace=[];
+  for(const s of steps){
+    const args=fillArgs(s.args,observations);
+    const res=await j("/tool",{method:"POST",headers:{"content-type":"application/json"},
+      body:JSON.stringify({tool:s.tool,args,tools:allowed})});
+    observations.push(res.observation);
+    trace.push({thought:String(s.thought||`Use ${s.tool}.`),tool:res.tool,args:res.args,
+      observation:res.observation,ok:res.ok});
+  }
+  // 3) answer synthesis — LLM reasoning in the browser
+  const style=spec.answer_style==="concise"?"Answer in one or two sentences."
+    :"Answer thoroughly, explaining the reasoning.";
+  const obs=observations.map((o,i)=>`[${i}] ${o}`).join("\n")||"(none)";
+  const ansPrompt=`Task:\n${task}\n\nTool observations:\n${obs}\n\n`+
+    `Write the final answer grounded in the observations. ${style}`;
+  let answer=(await ollamaChat(base,model,spec.system_prompt,ansPrompt)).trim();
+  if(!answer){const good=trace.filter(t=>t.ok);answer=good.length?good[good.length-1].observation
+    :(observations.length?observations[observations.length-1]:"I couldn't find a tool that fits this task.");}
+  const est=Math.floor((spec.system_prompt.length+task.length+
+    observations.reduce((n,o)=>n+o.length,0)+answer.length)/4);
+  return {agent:spec.name,task,answer,planner:"llm",blocked:false,steps:trace,
+    routing:{provider:"ollama (browser→host)",model:model||"host",fallbacks:[]},
+    input_findings:[],output_findings:[],tokens_estimated:est,elapsed_ms:0,
+    client:true};
+}
+
 /* ===================== POLISH KIT: routing config ===================== */
 // UI exposes 5 modes; the backend AgentSpec.model_mode accepts auto|free|paid|offline.
-// "local" is a UI label for the local-first (Ollama) path the backend calls "offline".
+// "local" routes the LLM reasoning to host Ollama from the browser (browser→host);
+// the backend maps it to "offline" when no browser→host result is produced.
 const MODE_BLURBS={
-  auto:"auto = OpenRouter (free) if keyed, else paid, else local Ollama, else mock.",
-  local:"local = local Ollama if reachable, else deterministic mock (zero cost).",
+  auto:"auto = host Ollama if your browser can reach it (browser→host), else OpenRouter (free), else paid, else mock.",
+  local:"local = your host Ollama, driven straight from the browser (browser→host). Tools still run server-side.",
   free:"free = OpenRouter free models, else mock.",
   paid:"paid = your Anthropic key, then OpenAI, else mock.",
-  offline:"offline = deterministic mock only (local Ollama if up, no paid call).",
+  offline:"offline = deterministic mock only (no model call).",
 };
 const MODE_CHAIN={
-  auto:["openrouter","anthropic","openai","ollama"],
-  local:["ollama"], free:["openrouter"], paid:["anthropic","openai"], offline:["ollama"],
+  auto:["ollama","openrouter","anthropic","openai"],
+  local:["ollama"], free:["openrouter"], paid:["anthropic","openai"], offline:[],
 };
 const PROVIDERS=["ollama","anthropic","openrouter","openai"];
-const PLABEL={ollama:"ollama (local)",anthropic:"anthropic",openrouter:"openrouter (free)",openai:"openai"};
+const PLABEL={ollama:"ollama (browser→host)",anthropic:"anthropic",openrouter:"openrouter (free)",openai:"openai"};
+let clientOllama=false;   // browser→host Ollama reachability (browser-probed)
+async function refreshClientOllama(){clientOllama=!!(await probeOllama());renderRouting();}
 // map UI mode <-> backend model_mode
 function backendMode(m){return m==="local"?"offline":m;}
 function uiMode(m){return m==="offline"?"offline":m;}  // backend offline shows as offline by default
@@ -565,14 +693,17 @@ function selectMode(m){
   $("#modeactive").textContent=`active: ${m}`;
 }
 function currentMode(){return $("#modeseg").querySelector('[aria-pressed="true"]')?.dataset.mode||"auto";}
-function provOn(p){const a=PROV.available||{}; return p==="ollama"?!!a.ollama:!!a[p];}
+// Ollama reachability is checked in the BROWSER (browser→host); other providers server-side.
+function provOn(p){const a=PROV.available||{}; return p==="ollama"?clientOllama:!!a[p];}
 function renderRouting(){
   const m=currentMode();
   $("#modeblurb").textContent=MODE_BLURBS[m]||"";
   $("#modeactive").textContent=`active: ${m}`;
   const rows=PROVIDERS.map(p=>{
     const on=provOn(p);
-    return `<div class="pstat"><span>${PLABEL[p]}</span><span class="pdot ${on?'on':''}" title="${on?'available':'not configured'}"></span></div>`;
+    const title=p==="ollama"?(on?"reachable from your browser":"not reachable from your browser")
+                            :(on?"available":"not configured");
+    return `<div class="pstat"><span>${PLABEL[p]}</span><span class="pdot ${on?'on':''}" title="${title}"></span></div>`;
   }).join("")+
     `<div class="pstat"><span>mock (deterministic)</span><span class="pdot on" title="always available"></span></div>`;
   $("#provrows").innerHTML=rows;
@@ -580,7 +711,8 @@ function renderRouting(){
   const display=[...chain,"mock (deterministic)"];
   $("#chainline").textContent=display.join("  →  ");
 }
-$$("#modeseg .segbtn").forEach(b=>b.onclick=()=>{selectMode(b.dataset.mode);renderRouting();saveCfg();updateSummary();});
+$$("#modeseg .segbtn").forEach(b=>b.onclick=()=>{selectMode(b.dataset.mode);renderRouting();saveCfg();updateSummary();
+  if(b.dataset.mode==="local"||b.dataset.mode==="auto")refreshClientOllama();});
 $("#sModel").oninput=()=>saveCfg();
 
 async function boot(){
@@ -595,6 +727,7 @@ async function boot(){
     $("#dot").classList.add("live"); $("#statusTxt").textContent="live";
     $("#modeName").textContent = PROV.active_mode==='free'?('free · '+(shortModel(FREE[0])||'OpenRouter')) : PROV.active_mode;
     renderTemplates(); renderSamples(); renderRouting(); updateSummary();
+    refreshClientOllama();   // browser-side Ollama check (browser→host)
   }catch(e){ $("#statusTxt").textContent="offline"; toast("Could not reach the API"); }
   finally{ renderRouting(); $("#boot").classList.add("gone"); }
 }
