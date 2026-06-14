@@ -75,12 +75,28 @@ def run_evaluate(request: EvaluateRequest) -> EvaluateResponse:
     routing = None
     if JUDGE_NAME in metrics:
         scores = []
-        for (pred, ref), row in zip(pairs, per_item, strict=True):
-            s, result = judge(pred, ref, request.provider, request.model)
-            row[JUDGE_NAME] = s
-            scores.append(s)
-            routing = RoutingInfo(provider=result.provider, model=result.model,
-                                  fallbacks=result.fallbacks)
+        client_judgments = request.client_judgments
+        if client_judgments is not None:
+            # Browser ran the LLM-judge on the user's host Ollama and submitted the
+            # per-item verdicts; use them instead of calling a server-side provider.
+            # Deterministic metric math, thresholds, and the gate stay unchanged.
+            if len(client_judgments) != len(pairs):
+                raise HTTPException(
+                    status_code=422,
+                    detail="client_judgments must have one entry per item")
+            for cj, row in zip(client_judgments, per_item, strict=True):
+                s = 1.0 if cj.correct else 0.0
+                row[JUDGE_NAME] = s
+                scores.append(s)
+            routing = RoutingInfo(provider="ollama (browser→host)",
+                                  model=request.model or "host", fallbacks=[])
+        else:
+            for (pred, ref), row in zip(pairs, per_item, strict=True):
+                s, result = judge(pred, ref, request.provider, request.model)
+                row[JUDGE_NAME] = s
+                scores.append(s)
+                routing = RoutingInfo(provider=result.provider, model=result.model,
+                                      fallbacks=result.fallbacks)
         aggregate[JUDGE_NAME] = round(sum(scores) / len(scores), 4) if scores else 0.0
 
     gate_result = None

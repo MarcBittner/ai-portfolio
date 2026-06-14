@@ -36,6 +36,33 @@ def test_llm_judge_metric_mock_fallback():
     assert r["aggregate"]["llm_judge"] in (0.0, 1.0)
 
 
+def test_llm_judge_client_judgments_browser_to_host():
+    # browser→host: client supplies the judge verdicts; server skips its own LLM call
+    # and reports routing as "ollama (browser→host)". Deterministic gate still applies.
+    r = client.post("/evaluate", json={
+        "items": [
+            {"prediction": "Paris", "reference": "Paris"},
+            {"prediction": "Berlin", "reference": "Paris"},
+        ],
+        "metrics": ["llm_judge"],
+        "client_judgments": [{"correct": True}, {"correct": False}],
+        "thresholds": {"llm_judge": 0.6},
+    }).json()
+    assert r["routing"]["provider"] == "ollama (browser→host)"
+    assert r["per_item"][0]["scores"]["llm_judge"] == 1.0
+    assert r["per_item"][1]["scores"]["llm_judge"] == 0.0
+    assert r["aggregate"]["llm_judge"] == 0.5
+    assert r["gate"]["passed"] is False  # 0.5 < 0.6
+
+
+def test_client_judgments_length_mismatch_422():
+    r = client.post("/evaluate", json={
+        "items": [{"prediction": "a", "reference": "a"}],
+        "metrics": ["llm_judge"],
+        "client_judgments": [{"correct": True}, {"correct": False}]})
+    assert r.status_code == 422
+
+
 def test_evaluate_with_gate():
     r = client.post("/evaluate", json={
         "items": [
