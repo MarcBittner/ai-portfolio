@@ -128,7 +128,7 @@ function Stepper({ step }: { step: number }) {
                   ? "bg-[--color-ok] text-[--color-accent-ink]"
                   : state === "now"
                     ? "bg-[--color-accent] text-[--color-accent-ink]"
-                    : "bg-white/10"
+                    : "bg-[color-mix(in_oklch,_var(--color-ink)_10%,_transparent)]"
               }`}
             >
               {state === "done" ? "✓" : n}

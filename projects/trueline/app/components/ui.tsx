@@ -26,7 +26,8 @@ export function FlagBadge({ flag }: { flag: string }) {
     <span
       className={cn(
         "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium",
-        FLAG_TONE[flag] ?? "bg-white/10 text-[--color-muted]",
+        FLAG_TONE[flag] ??
+          "bg-[color-mix(in_oklch,_var(--color-ink)_10%,_transparent)] text-[--color-muted]",
       )}
     >
       <span className={cn("flagdot", FLAG_DOT[flag])} />
@@ -46,7 +47,8 @@ export function StatusBadge({ status }: { status: string }) {
     <span
       className={cn(
         "rounded-full px-2 py-0.5 text-xs font-medium",
-        tone[status] ?? "bg-white/10 text-[--color-muted]",
+        tone[status] ??
+          "bg-[color-mix(in_oklch,_var(--color-ink)_10%,_transparent)] text-[--color-muted]",
         status === "extracting" && "animate-pulse",
       )}
     >

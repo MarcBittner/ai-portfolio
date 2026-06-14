@@ -160,7 +160,11 @@ export default function Diagnostics() {
               <span
                 style={{
                   color:
-                    l.level === "error" ? "#f15b6c" : l.level === "warn" ? "#e6ad52" : "#43c98a",
+                    l.level === "error"
+                      ? "var(--color-bad)"
+                      : l.level === "warn"
+                        ? "var(--color-warn)"
+                        : "var(--color-ok)",
                 }}
               >
                 {l.level}

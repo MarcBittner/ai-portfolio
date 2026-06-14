@@ -96,7 +96,12 @@ export default function Evals() {
 }
 
 function Metric({ label, v, hint }: { label: string; v: number; hint: string }) {
-  const color = v >= 0.9 ? "#43c98a" : v >= 0.7 ? "#e6ad52" : "#f15b6c";
+  const color =
+    v >= 0.9
+      ? "var(--color-ok)"
+      : v >= 0.7
+        ? "var(--color-warn)"
+        : "var(--color-bad)";
   return (
     <div className="rounded-lg border border-[--color-line] p-3">
       <div className="text-xs text-[--color-muted]">{label}</div>

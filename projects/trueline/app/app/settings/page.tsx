@@ -103,7 +103,7 @@ export default function Configuration() {
             onChange={(e) => setModel(e.target.value)}
             placeholder={placeholder}
             disabled={mode === "offline"}
-            className="mt-1 w-full rounded-md border border-[--color-line] bg-black/20 px-3 py-2 text-sm disabled:opacity-40"
+            className="mt-1 w-full rounded-md border border-[--color-line] bg-[--color-surface] px-3 py-2 text-sm disabled:opacity-40"
           />
         </div>
 
@@ -124,7 +124,7 @@ export default function Configuration() {
         <ol className="mt-3 space-y-1 text-sm">
           {CHAIN[mode].map((step, i) => (
             <li key={step} className="flex items-center gap-2">
-              <span className="grid h-5 w-5 place-items-center rounded-full bg-white/10 text-xs">
+              <span className="grid h-5 w-5 place-items-center rounded-full bg-[color-mix(in_oklch,_var(--color-ink)_10%,_transparent)] text-xs">
                 {i + 1}
               </span>
               <span>{step}</span>
@@ -182,7 +182,7 @@ export default function Configuration() {
 function Row({ ok, label, detail }: { ok: boolean; label: string; detail: string }) {
   return (
     <div className="flex items-center gap-2">
-      <span style={{ color: ok ? "#43c98a" : "#8b93a7" }}>{ok ? "●" : "○"}</span>
+      <span style={{ color: ok ? "var(--color-ok)" : "var(--color-muted)" }}>{ok ? "●" : "○"}</span>
       <span className="font-medium">{label}</span>
       <span className="text-xs text-[--color-muted]">— {detail}</span>
     </div>
