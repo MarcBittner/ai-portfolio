@@ -401,7 +401,7 @@ function applyCfgToForm(){
   selectMode(cfg.mode||"auto");
   syncThemeSeg();
 }
-function openDrawer(){applyCfgToForm();renderRouting();$("scrim").classList.add("open");$("drawer").classList.add("open");$("drawer").setAttribute("aria-hidden","false")}
+function openDrawer(){applyCfgToForm();refreshClientOllama();$("scrim").classList.add("open");$("drawer").classList.add("open");$("drawer").setAttribute("aria-hidden","false")}
 function closeDrawer(){$("scrim").classList.remove("open");$("drawer").classList.remove("open");$("drawer").setAttribute("aria-hidden","true")}
 $("gear").onclick=openDrawer;$("closedrawer").onclick=closeDrawer;
 $("savecfg").onclick=()=>{cfg={mode:currentMode(),model:$("cfgModel").value.trim()};
@@ -450,7 +450,22 @@ async function reset(){busy('b-reset',true);
     await refresh();$('out').textContent='recovered: fault cleared, fresh window.';toast('Recovered — fresh window','ok');}
   catch{$('out').textContent='reset failed.';toast('Reset failed','bad');}busy('b-reset',false);}
 async function summary(){busy('b-summary',true);$('out').textContent='generating incident summary…';
-  try{const r=await jr('POST','/incident/summary',{mode:cfg.mode||null});
+  try{
+    const mode=cfg.mode||"auto";
+    const body={mode:mode!=="auto"?mode:null};
+    // local/auto: run the model on the user's host Ollama from the BROWSER and
+    // submit just the prose via client_summary; other providers stay server-side.
+    if(mode==="local"||mode==="auto"){
+      const base=await probeOllama();
+      if(base){
+        try{
+          const state=await fetchIncidentState();
+          const sm=await ollamaSummary(base,state);
+          if(sm)body.client_summary=sm;
+        }catch{ if(mode==="local")toast("Host Ollama call failed — using offline fallback","info"); }
+      }else if(mode==="local"){ toast("Host Ollama not reachable — using offline fallback","info"); }
+    }
+    const r=await jr('POST','/incident/summary',body);
     $('out').textContent='['+r.severity.toUpperCase()+'] action='+r.action+'  provider='+r.provider+'  mode='+r.mode+
       '\n\n'+r.summary+'\n\nNext steps:\n'+r.suggested_steps.map((s,i)=>(i+1)+'. '+s).join('\n');
     toast('Summary via '+r.provider,'info');}
@@ -506,35 +521,100 @@ document.addEventListener("keydown",e=>{
 
 /* ===================== POLISH KIT: routing config ===================== */
 const MODE_BLURBS={
-  auto:"auto = local if reachable, else paid, else free, else offline.",
-  local:"local = Ollama only (on-box, zero cost).",
+  auto:"auto = local host Ollama if your browser can reach it, else paid, else free, else offline.",
+  local:"local = your host Ollama, called straight from the browser (browser→host). Runs a real model for free, even on the cloud demo.",
   free:"free = OpenRouter free models only.",
   paid:"paid = Anthropic, then OpenAI.",
   offline:"offline = deterministic incident summary only (no LLM call).",
 };
 const MODE_CHAIN={
-  auto:["anthropic","openai","ollama","openrouter"],
+  auto:["ollama","anthropic","openai","openrouter"],
   local:["ollama"], free:["openrouter"], paid:["anthropic","openai"], offline:[],
 };
-const PROVIDERS=["anthropic","openai","ollama","openrouter"];
+const PROVIDERS=["ollama","anthropic","openai","openrouter"];
+
+/* ===================== OLLAMA BRIDGE (browser→host) =====================
+   Only the Ollama check + LLM call run in the BROWSER (your machine can reach
+   localhost; the cloud server can't). Every other provider stays server-side.
+   The browser sends incident.py's exact SYSTEM+user prompt to the host model,
+   parses the {summary,...} JSON, and submits just the summary prose back via the
+   `client_summary` field; the server keeps severity + steps deterministic. */
+const OLLAMA_CANDIDATES=["http://localhost:11434","http://localhost:11435"];
+const SEVERITIES=["none","sev3","sev2","sev1"];
+// mirrors incident.SYSTEM
+const SUMMARY_SYSTEM=
+  "You are an on-call SRE writing an incident summary for a service's error-budget "+
+  "page. You are given a JSON snapshot of the current SLO state (with a multiwindow "+
+  "burn-rate policy), RED metrics, plus a pre-computed severity and the matching "+
+  'runbook steps. Return STRICT JSON {"summary": <2-3 sentence on-call summary: what '+
+  'is burning, how fast (burn rate), blast radius, and why it matters for the error '+
+  'budget>, "severity": <echo the given severity verbatim: one of '+SEVERITIES.join(", ")+
+  '>, "suggested_steps": [<the given runbook steps, lightly tightened, in order>]}. '+
+  "Do not invent numbers — use only what the snapshot gives you. Output JSON only.";
+let _ollamaProbe={base:null,at:0};
+async function probeOllama(){
+  const now=Date.now();
+  if(now-_ollamaProbe.at<30000)return _ollamaProbe.base;
+  let base=null;
+  for(const c of OLLAMA_CANDIDATES){
+    try{const r=await fetch(`${c}/api/tags`,{signal:AbortSignal.timeout(1500)});if(r.ok){base=c;break;}}catch{}
+  }
+  _ollamaProbe={base,at:now};return base;
+}
+// Fetch the server-computed SLO state + deterministic severity/steps so the
+// browser can rebuild incident.py's exact user message.
+async function fetchIncidentState(){ return jr('GET','/incident/state'); }
+// Build incident.py's user message verbatim from the server-computed state.
+function buildSummaryUser(state){
+  const c=state.classify, steps=state.suggested_steps;
+  return "Draft an incident summary from this state. The pre-computed severity is "+
+    `${c.severity} (situation: ${c.situation}, burn policy: ${c.action}); use these `+
+    `runbook steps in order: ${JSON.stringify(steps)}.\n${JSON.stringify(state.state)}`;
+}
+// Run incident.py's prompt on the host Ollama; return just the summary prose
+// (severity + steps stay deterministic on the server via client_summary).
+async function ollamaSummary(base, state){
+  const user=buildSummaryUser(state);
+  const r=await fetch(`${base}/api/chat`,{method:"POST",headers:{"content-type":"application/json"},
+    body:JSON.stringify({model:cfg.model||"llama3.1:8b",stream:false,format:"json",
+      messages:[{role:"system",content:SUMMARY_SYSTEM},{role:"user",content:user}]}),
+    signal:AbortSignal.timeout(120000)});
+  if(!r.ok)throw new Error("ollama "+r.status);
+  const data=await r.json(); let s=(data?.message?.content||"").trim();
+  if(s.includes("```"))s=s.split("```")[1]?.replace(/^json/i,"").trim()||s;
+  const a=s.indexOf("{"),b=s.lastIndexOf("}");
+  let parsed; try{parsed=JSON.parse(a>=0?s.slice(a,b+1):s);}catch{return "";}
+  return parsed&&parsed.summary?String(parsed.summary).trim():"";
+}
+
 function selectMode(m){
   $$("#modeseg .segbtn").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.mode===m)));
   $("modeblurb").textContent=MODE_BLURBS[m]||"";
   $("modeactive").textContent=`active: ${m}`;
 }
 function currentMode(){return document.querySelector('#modeseg .segbtn[aria-pressed="true"]')?.dataset.mode||"auto";}
+let clientOllama=false;   // browser→host Ollama reachability (browser-probed)
 function renderRouting(){
   const m=currentMode();
   $("modeactive").textContent=`active: ${m}`;
   const rows=PROVIDERS.map(p=>{
-    const on=!!llmProviders[p];
-    return `<div class="pstat"><span>${p}</span><span class="pdot ${on?'on':''}" title="${on?'available':'not configured'}"></span></div>`;
+    // Ollama is checked in the BROWSER (browser→host); other providers server-side.
+    const on= p==="ollama" ? clientOllama : !!llmProviders[p];
+    const label= p==="ollama" ? "ollama (browser→host)" : p;
+    const title= p==="ollama" ? (on?"reachable from your browser":"not reachable from your browser")
+                              : (on?"available":"not configured");
+    return `<div class="pstat"><span>${label}</span><span class="pdot ${on?'on':''}" title="${title}"></span></div>`;
   }).join("")+
     `<div class="pstat"><span>offline (deterministic)</span><span class="pdot on" title="always available"></span></div>`;
   $("provrows").innerHTML=rows;
-  const chain=(MODE_CHAIN[m]||[]).filter(p=>llmProviders[p]);
+  const chain=(MODE_CHAIN[m]||[]).filter(p=>p==="ollama"?clientOllama:llmProviders[p])
+    .map(p=>p==="ollama"?"ollama (browser→host)":p);
   const display=[...chain,"offline (deterministic)"];
   $("chainline").textContent=display.join("  →  ");
+}
+async function refreshClientOllama(){
+  clientOllama = !!(await probeOllama());
+  renderRouting();
 }
 $$("#modeseg .segbtn").forEach(b=>b.onclick=()=>{selectMode(b.dataset.mode);renderRouting();});
 
@@ -551,7 +631,7 @@ async function boot(){
   $("hdot").className="dot ok";$("hstat").textContent="live";
   $("boot").classList.add("hide");setTimeout(()=>$("boot").remove(),600);
   $$(".reveal").forEach((el,i)=>setTimeout(()=>el.classList.add("in"),90*i));
-  badges(); await refresh(); loadLlm();
+  badges(); await refresh(); loadLlm(); refreshClientOllama();  // browser→host Ollama probe
   // live-status pill keeps polling /healthz
   setInterval(async()=>{
     try{const h=await j('/healthz');$("hdot").className="dot ok";$("hstat").textContent="live";

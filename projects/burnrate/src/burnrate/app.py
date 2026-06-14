@@ -103,7 +103,24 @@ def create_app() -> Flask:
     @app.post("/incident/summary")
     def incident_summary():
         body = request.get_json(silent=True) or {}
-        return jsonify(incident.summarize(mode=body.get("mode")))
+        # ``client_summary`` is the prose the BROWSER got from a host-local Ollama
+        # (browser→host); when present the server uses it instead of its own LLM
+        # call. Severity + runbook steps stay deterministic either way.
+        cs = body.get("client_summary")
+        return jsonify(incident.summarize(
+            mode=body.get("mode"),
+            client_summary=cs if isinstance(cs, str) else None,
+        ))
+
+    @app.get("/incident/state")
+    def incident_state():
+        # The browser→host Ollama bridge needs the server-computed SLO state +
+        # deterministic severity/steps to rebuild incident.py's exact prompt
+        # client-side (the server can't reach the user's localhost Ollama).
+        state = incident.collect_state()
+        c = incident.classify(state)
+        return jsonify(state=state, classify=c,
+                       suggested_steps=incident._steps_for(c["situation"]))
 
     @app.get("/evals")
     def evals():
