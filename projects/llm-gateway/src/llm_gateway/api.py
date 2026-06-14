@@ -58,7 +58,10 @@ def rules() -> list[dict]:
 @app.post("/v1/complete")
 def complete(req: CompleteRequest) -> dict:
     _check_provider(req.provider)
-    return gateway.complete(req.prompt, req.system, req.provider, req.model).as_dict()
+    return gateway.complete(
+        req.prompt, req.system, req.provider, req.model,
+        client_completion=req.client_completion,
+    ).as_dict()
 
 
 @app.post("/v1/extract")

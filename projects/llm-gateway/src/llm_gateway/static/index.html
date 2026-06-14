@@ -394,7 +394,7 @@ function toast(msg,type="info"){
 function loadCfg(){try{cfg={...cfg,...JSON.parse(localStorage.getItem(CFG_KEY)||"{}")}}catch{}}
 function applyCfgToForm(){$("#cfgModel").value=cfg.model||"";$("#cfgSystem").value=cfg.system;
   selectMode(cfg.mode||"auto");syncThemeSeg();}
-function openDrawer(){applyCfgToForm();$("#scrim").classList.add("open");$("#drawer").classList.add("open");$("#drawer").setAttribute("aria-hidden","false")}
+function openDrawer(){applyCfgToForm();refreshClientOllama();$("#scrim").classList.add("open");$("#drawer").classList.add("open");$("#drawer").setAttribute("aria-hidden","false")}
 function closeDrawer(){$("#scrim").classList.remove("open");$("#drawer").classList.remove("open");$("#drawer").setAttribute("aria-hidden","true")}
 $("#gear").onclick=openDrawer;$("#closedrawer").onclick=closeDrawer;
 $("#savecfg").onclick=()=>{cfg={mode:currentMode(),model:$("#cfgModel").value.trim(),system:$("#cfgSystem").value};
@@ -427,6 +427,7 @@ async function boot(){
     liveActive=pr.active_mode||pr.mode||"";
     renderRouting();
   }catch{}
+  refreshClientOllama();   // browser-side Ollama check (browser→host)
   try{const e=await j("eval");const s=e.summary;
     $("#evalpill").innerHTML=`firewall · <b>${(s.input_detection_rate*100)|0}%</b> caught · <b>${(s.input_false_positive_rate*100)|0}%</b> FP`;
   }catch{$("#evalpill").style.display="none"}
@@ -438,8 +439,23 @@ $("#send").onclick=async()=>{
   const btn=$("#send");btn.classList.add("loading");
   $("#path").innerHTML=`<div class="muted">Running the governed pipeline…</div>`;
   try{
+    const promptText=$("#prompt").value;
+    const mode=cfg.mode||"auto";
+    const body={prompt:promptText,provider:mode,model:cfg.model||null,system:cfg.system};
+    // Ollama check + LLM call run in the BROWSER (browser→host); other providers
+    // stay server-side. The server still runs ALL governance around the completion.
+    if(mode==="local"||mode==="auto"){
+      try{
+        const base=await probeOllama();
+        if(base){ body.client_completion=await ollamaComplete(base,cfg.system,promptText); }
+        else if(mode==="local"){ toast("Host Ollama not reachable — using offline fallback","info"); }
+      }catch{ toast("Host Ollama call failed — falling back","info"); }
+    }
+    // the gateway has no "local" provider literal; when we didn't get a browser→host
+    // completion, fall back to "offline" so the request doesn't 422.
+    if(body.provider==="local" && body.client_completion==null) body.provider="offline";
     const r=await j("v1/complete",{method:"POST",headers:{"content-type":"application/json"},
-      body:JSON.stringify({prompt:$("#prompt").value,provider:cfg.mode,model:cfg.model||null,system:cfg.system})});
+      body:JSON.stringify(body)});
     const redin=r.redactions.input.map(x=>`<span class="redchip">${x.type}×${x.count}</span>`).join("")||'<span class="muted">none</span>';
     const fb=r.routing_fallbacks.length?` · fallbacks: ${r.routing_fallbacks.join(", ")}`:"";
     const stages=[
@@ -509,17 +525,49 @@ document.addEventListener("keydown",e=>{
   else if(e.key==="?"&&!typing&&!$("#help").classList.contains("open")){e.preventDefault();openHelp();}
 });
 
+/* ===================== OLLAMA BRIDGE (browser→host) =====================
+   Only the Ollama check + completion call run in the BROWSER (your machine can
+   reach localhost; the cloud server can't). The server still runs the FULL
+   governance pipeline around the supplied completion. Every other provider
+   stays server-side. */
+const OLLAMA_CANDIDATES=["http://localhost:11434","http://localhost:11435"];
+let _ollamaProbe={base:null,at:0};
+async function probeOllama(){
+  const now=Date.now();
+  if(now-_ollamaProbe.at<30000)return _ollamaProbe.base;
+  let base=null;
+  for(const c of OLLAMA_CANDIDATES){
+    try{const r=await fetch(`${c}/api/tags`,{signal:AbortSignal.timeout(1500)});if(r.ok){base=c;break;}}catch{}
+  }
+  _ollamaProbe={base,at:now};return base;
+}
+async function ollamaComplete(base, system, user){
+  const r=await fetch(`${base}/api/chat`,{method:"POST",headers:{"content-type":"application/json"},
+    body:JSON.stringify({model:cfg.model||"llama3.1:8b",stream:false,
+      messages:[{role:"system",content:system||"You are a precise assistant."},
+                {role:"user",content:user}]}),
+    signal:AbortSignal.timeout(120000)});
+  if(!r.ok)throw new Error("ollama "+r.status);
+  const data=await r.json();
+  return (data?.message?.content||"").trim();
+}
+let clientOllama=false;   // browser→host Ollama reachability (browser-probed)
+async function refreshClientOllama(){
+  clientOllama = !!(await probeOllama());
+  renderRouting();
+}
+
 /* ===================== POLISH KIT: routing config ===================== */
 let liveActive="";
 const MODE_BLURBS={
-  auto:"auto = paid if keyed, else local, else free, else offline.",
-  local:"local = Ollama only (on-box, zero cost).",
+  auto:"auto = browser→host Ollama if reachable, else paid, else free, else offline.",
+  local:"local = your host Ollama, called straight from the browser (browser→host).",
   free:"free = OpenRouter free models only.",
   paid:"paid = Anthropic, then OpenAI.",
   offline:"offline = deterministic mock only (no LLM call).",
 };
 const MODE_CHAIN={
-  auto:["paid","local","free"],
+  auto:["local","paid","free"],
   local:["local"], free:["free"], paid:["paid"], offline:[],
 };
 const ROUTE_TIERS=["paid","local","free"];
@@ -532,15 +580,19 @@ function currentMode(){return $("#modeseg").querySelector('[aria-pressed="true"]
 function renderRouting(){
   const m=currentMode();
   $("#modeactive").textContent=liveActive?`active: ${m} · live: ${liveActive}`:`active: ${m}`;
-  // provider/tier status rows + always-on offline row
+  // provider/tier status rows + always-on offline row. "local" is checked in the
+  // BROWSER (browser→host Ollama); other tiers come from GET /providers (server).
   const rows=ROUTE_TIERS.map(p=>{
-    const on=!!provStatus[p];
-    return `<div class="pstat"><span>${p}</span><span class="pdot ${on?'on':''}" title="${on?'available':'not configured'}"></span></div>`;
+    const on= p==="local" ? clientOllama : !!provStatus[p];
+    const label= p==="local" ? "local (browser→host Ollama)" : p;
+    const title= p==="local" ? (on?"reachable from your browser":"not reachable from your browser")
+                             : (on?"available":"not configured");
+    return `<div class="pstat"><span>${label}</span><span class="pdot ${on?'on':''}" title="${title}"></span></div>`;
   }).join("")+
     `<div class="pstat"><span>offline (deterministic)</span><span class="pdot on" title="always available"></span></div>`;
   $("#provrows").innerHTML=rows;
   // resolved fallback chain for the selected mode (available tiers, then offline)
-  const chain=(MODE_CHAIN[m]||[]).filter(p=>provStatus[p]);
+  const chain=(MODE_CHAIN[m]||[]).filter(p=> p==="local" ? clientOllama : provStatus[p]);
   const display=[...chain,"offline (deterministic)"];
   $("#chainline").textContent=display.join("  →  ");
 }

@@ -35,6 +35,34 @@ def test_complete_redacts_pii():
     assert any(x["type"] == "SSN" for x in r.json()["redactions"]["input"])
 
 
+def test_client_completion_browser_to_host_still_governed():
+    # Browser→host: the browser ran the model on host Ollama and supplies the
+    # completion. The server must skip provider routing but STILL run the full
+    # governance pipeline (output firewall + redaction + audit) around it.
+    before = client.get("/v1/audit").json()["length"]
+    r = client.post("/v1/complete", json={
+        "prompt": "Say hello.",
+        "client_completion": "Sure! Also here is a key sk-EXAMPLE0123456789ABCDEF01.",
+    })
+    assert r.status_code == 200
+    b = r.json()
+    # routed provider reflects the browser→host path, no server provider call
+    assert b["provider"] == "ollama (browser→host)"
+    # governance ran: a planted secret in the supplied completion is redacted
+    assert b["redactions"]["output"], "output redaction did not run"
+    assert "sk-EXAMPLE0123456789ABCDEF01" not in b["output"]
+    # audit ran: a new sequence was appended
+    assert isinstance(b["audit_seq"], int)
+    assert client.get("/v1/audit").json()["length"] == before + 1
+
+
+def test_client_completion_absent_unchanged():
+    # Absent client_completion → server routing path, behavior unchanged.
+    r = client.post("/v1/complete", json={"prompt": "Summarize this."})
+    assert r.status_code == 200
+    assert r.json()["provider"] != "ollama (browser→host)"
+
+
 def test_unknown_provider_422():
     r = client.post("/v1/complete", json={"prompt": "hi", "provider": "nope"})
     assert r.status_code == 422

@@ -36,7 +36,8 @@ class GovernedResult:
 
 def complete(prompt: str, system: str = "You are a precise assistant.",
              provider: str | None = "auto", model: str | None = None,
-             policy: Policy = DEFAULT) -> GovernedResult:
+             policy: Policy = DEFAULT,
+             client_completion: str | None = None) -> GovernedResult:
     # 1. input firewall (always scanned for visibility; enforced per policy)
     in_v = firewall.scan(prompt, "input")
     if policy.firewall_input and in_v.verdict == "block":
@@ -50,8 +51,19 @@ def complete(prompt: str, system: str = "You are a precise assistant.",
     # 2. redact PII/secrets before the provider ever sees them
     sent, in_red = redact.redact(prompt) if policy.redact_input else (prompt, [])
 
-    # 3. route to a provider (offline-first; mock terminal)
-    result = llm.complete(sent, system, provider, model)
+    # 3. obtain the completion.
+    if client_completion is not None:
+        # Browser→host: the browser already ran the model completion on the user's
+        # host Ollama and supplied it here. Skip server-side provider routing — but
+        # the FULL governance pipeline below (output firewall + redact + audit) still
+        # runs on the supplied completion. Governance is never bypassed.
+        result = llm.LLMResult(
+            text=client_completion, provider="ollama (browser→host)",
+            model=model or "host", latency_ms=0.0, fallbacks=[],
+        )
+    else:
+        # route to a provider (offline-first; mock terminal)
+        result = llm.complete(sent, system, provider, model)
 
     # 4. output firewall + 5. redact output
     out_v = firewall.scan(result.text, "output")
