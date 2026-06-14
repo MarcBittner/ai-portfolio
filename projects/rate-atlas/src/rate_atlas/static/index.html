@@ -429,7 +429,7 @@ function applyCfgToForm(){
   selectMode(cfg.mode||"auto");
   syncThemeSeg();
 }
-function openDrawer(){applyCfgToForm();$("#scrim").classList.add("open");$("#drawer").classList.add("open");$("#drawer").setAttribute("aria-hidden","false")}
+function openDrawer(){applyCfgToForm();refreshClientOllama();$("#scrim").classList.add("open");$("#drawer").classList.add("open");$("#drawer").setAttribute("aria-hidden","false")}
 function closeDrawer(){$("#scrim").classList.remove("open");$("#drawer").classList.remove("open");$("#drawer").setAttribute("aria-hidden","true")}
 $("#gear").onclick=openDrawer;$("#closedrawer").onclick=closeDrawer;$("#scrim").onclick=closeDrawer;
 $("#savecfg").onclick=async()=>{
@@ -473,6 +473,7 @@ async function boot(){
     const active=Object.entries(llmProviders).find(e=>e[1]);
     $("#llmmode").textContent=active?active[0]:(l.mode||"offline");
     renderRouting();}catch{}
+  refreshClientOllama();   // browser-side Ollama check (browser→host)
   // outliers + first comparison
   await loadOutliers();
   await compare();
@@ -488,9 +489,20 @@ $("#loadsample").onclick=()=>{$("#sample").value=SAMPLE;
 async function assistMap(){
   const btn=$("#amap");btn.classList.add("loading");
   try{
-    const body={sample:$("#sample").value||null,
+    const sample=$("#sample").value||null;
+    const mode=cfg.mode||"auto";
+    const body={sample,
       hospital:$("#ahospital").value||null,ingest:true,
       mode:cfg.mode||null};
+    // Ollama check + mapping call run in the BROWSER (browser→host); others server-side.
+    if(mode==="local"||mode==="auto"){
+      try{
+        const base=await probeOllama();
+        if(base){const cm=await ollamaMap(base,sample||SAMPLE);
+          if(cm)body.client_mapping=cm;}
+        else if(mode==="local"){toast("Host Ollama not reachable — using offline fallback","info");}
+      }catch{toast("Host Ollama call failed — falling back","info");}
+    }
     const a=await j("normalize/assist",{method:"POST",
       headers:{"content-type":"application/json"},body:JSON.stringify(body)});
     $("#ameta").innerHTML=`detected <code>${esc(a.detected_kind)}</code> · mapped via
@@ -611,15 +623,16 @@ document.addEventListener("keydown",e=>{
 
 /* ===================== POLISH KIT: routing config ===================== */
 const MODE_BLURBS={
-  auto:"auto = paid if keyed, else local, else free, else offline.",
-  local:"local = Ollama only (on-box, zero cost).",
+  auto:"auto = local host Ollama if your browser can reach it, else paid, else free, else offline.",
+  local:"local = your host Ollama, called straight from the browser (browser→host). Maps columns with a real model for free, even on the cloud demo.",
   free:"free = OpenRouter free models only.",
   paid:"paid = Anthropic, then OpenAI.",
   offline:"offline = deterministic synonym matcher only (no LLM call).",
 };
 const MODE_CHAIN={
-  auto:["anthropic","openai","ollama","openrouter"],
-  local:["ollama"], free:["openrouter"], paid:["anthropic","openai"], offline:[],
+  auto:["ollama (browser→host)","anthropic","openai","openrouter"],
+  local:["ollama (browser→host)"], free:["openrouter"],
+  paid:["anthropic","openai"], offline:[],
 };
 const PROVIDERS=["anthropic","openai","ollama","openrouter"];
 function selectMode(m){
@@ -628,20 +641,98 @@ function selectMode(m){
   $("#modeactive").textContent=`active: ${m}`;
 }
 function currentMode(){return $("#modeseg").querySelector('[aria-pressed="true"]')?.dataset.mode||"auto";}
+let clientOllama=false;   // browser→host Ollama reachability (browser-probed)
 function renderRouting(){
   const m=currentMode();
   $("#modeactive").textContent=`active: ${m}`;
   const rows=PROVIDERS.map(p=>{
-    const on=!!llmProviders[p];
-    return `<div class="pstat"><span>${p}</span><span class="pdot ${on?'on':''}" title="${on?'available':'not configured'}"></span></div>`;
+    // Ollama is checked in the BROWSER (browser→host); other providers server-side.
+    const on= p==="ollama" ? clientOllama : !!llmProviders[p];
+    const label= p==="ollama" ? "ollama (browser→host)" : p;
+    const title= p==="ollama" ? (on?"reachable from your browser":"not reachable from your browser")
+                              : (on?"available":"not configured");
+    return `<div class="pstat"><span>${label}</span><span class="pdot ${on?'on':''}" title="${title}"></span></div>`;
   }).join("")+
     `<div class="pstat"><span>offline (deterministic)</span><span class="pdot on" title="always available"></span></div>`;
   $("#provrows").innerHTML=rows;
-  const chain=(MODE_CHAIN[m]||[]).filter(p=>llmProviders[p]);
+  const chain=(MODE_CHAIN[m]||[]).filter(p=>{
+    if(p.startsWith("ollama"))return clientOllama;
+    return llmProviders[p];
+  });
   const display=[...chain,"offline (deterministic)"];
   $("#chainline").textContent=display.join("  →  ");
 }
+async function refreshClientOllama(){
+  clientOllama = !!(await probeOllama());
+  renderRouting();
+}
 $$("#modeseg .segbtn").forEach(b=>b.onclick=()=>{selectMode(b.dataset.mode);renderRouting();});
+
+/* ===================== OLLAMA BRIDGE (browser→host) =====================
+   Only the Ollama check + mapping call run in the BROWSER (your machine can reach
+   localhost; the cloud server can't). Every other provider stays server-side.
+   The system prompt + mapping shape mirror assist.py so the result is identical
+   to the server path; the server validates and applies the returned mapping. */
+const OLLAMA_CANDIDATES=["http://localhost:11434","http://localhost:11435"];
+const CANONICAL_FIELDS=["code","code_type","payer","plan","rate","hospital","description"];
+const MAP_SYSTEM="You are a schema-mapping engine for hospital price-transparency files. "+
+  "The canonical schema has these fields: "+CANONICAL_FIELDS.join(", ")+". Given the source "+
+  "columns (header names) and a few sample rows of an unknown-format file, map EACH source "+
+  "column to exactly one canonical field, or to null if it has no canonical equivalent. "+
+  'Return STRICT JSON {"mapping": {<source_column>: <canonical_field_or_null>}}. Use only the '+
+  "canonical field names listed above. Output JSON only.";
+function buildMapPrompt(columns, rows){
+  // mirrors assist.py::_build_prompt (first 3 rows)
+  return `Source columns: ${columns.join(", ")}\n`+
+    `Sample rows (JSON): ${JSON.stringify(rows.slice(0,3))}\n`+
+    "Map each source column to a canonical field.";
+}
+// mirrors assist.py::_parse_sample structural sniffing (JSON array, or delimited).
+function parseSample(raw){
+  raw=(raw||"").trim();
+  try{const obj=JSON.parse(raw);
+    if(Array.isArray(obj)&&obj.length&&typeof obj[0]==="object"){
+      return {columns:Object.keys(obj[0]),rows:obj};}
+  }catch{}
+  const lines=raw.split(/\r?\n/).filter(l=>l.length);
+  const first=lines[0]||"";
+  const delim=["|",",","\t"].reduce((a,d)=>(first.split(d).length>first.split(a).length?d:a),",");
+  const cols=first.split(delim).map(s=>s.trim());
+  const rows=lines.slice(1).map(line=>{const vals=line.split(delim);
+    const o={};cols.forEach((c,i)=>o[c]=(vals[i]??"").trim());return o;});
+  return {columns:cols,rows};
+}
+let _ollamaProbe={base:null,at:0};
+async function probeOllama(){
+  const now=Date.now();
+  if(now-_ollamaProbe.at<30000)return _ollamaProbe.base;
+  let base=null;
+  for(const c of OLLAMA_CANDIDATES){
+    try{const r=await fetch(`${c}/api/tags`,{signal:AbortSignal.timeout(1500)});if(r.ok){base=c;break;}}catch{}
+  }
+  _ollamaProbe={base,at:now};return base;
+}
+async function ollamaMap(base, sample){
+  // Run assist.py's column→canonical mapping on the host Ollama from the browser.
+  const {columns,rows}=parseSample(sample);
+  const r=await fetch(`${base}/api/chat`,{method:"POST",headers:{"content-type":"application/json"},
+    body:JSON.stringify({model:cfg.model||"llama3.1:8b",stream:false,format:"json",
+      messages:[{role:"system",content:MAP_SYSTEM},{role:"user",content:buildMapPrompt(columns,rows)}]}),
+    signal:AbortSignal.timeout(120000)});
+  if(!r.ok)throw new Error("ollama "+r.status);
+  const data=await r.json(); let s=(data?.message?.content||"").trim();
+  if(s.includes("```"))s=s.split("```")[1]?.replace(/^json/i,"").trim()||s;
+  const a=s.indexOf("{"),b=s.lastIndexOf("}");
+  let obj; try{obj=JSON.parse(a>=0?s.slice(a,b+1):s);}catch{return null;}
+  const raw=(obj&&typeof obj==="object")?(obj.mapping||obj):{};
+  // mirrors assist.py::_parse_mapping — only known columns + canonical fields.
+  const mapping={};
+  for(const col of columns){
+    const v=raw?raw[col]:null;
+    mapping[col]=CANONICAL_FIELDS.includes(v)?v:null;
+  }
+  return mapping;
+}
 
 boot();
 </script>

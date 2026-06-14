@@ -64,10 +64,15 @@ def normalize_assist(req: AssistRequest) -> dict:
     canonical schema (routing chain → deterministic offline matcher), then apply
     the mapping deterministically. With ``ingest`` true, load the rows so they
     immediately appear in ``/compare`` / ``/outliers`` alongside the known shapes.
+
+    If the client supplies ``client_mapping`` (the browser ran the mapping on the
+    user's host-local Ollama, browser→host), the server applies it directly and
+    skips its own LLM call; other providers stay server-side.
     """
     sample = req.sample if req.sample and req.sample.strip() else UNKNOWN_SAMPLE
     hospital = req.hospital or UNKNOWN_HOSPITAL
-    result = assist.assist(hospital, sample, mode=req.mode)
+    result = assist.assist(hospital, sample, mode=req.mode,
+                           client_mapping=req.client_mapping)
     if req.ingest and result["records"]:
         source = hospital.lower().replace(" ", "-")
         ingested = store.ingest_records(source, hospital, result["records"])
