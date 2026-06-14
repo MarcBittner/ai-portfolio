@@ -377,7 +377,7 @@
       <li><b>Try the pattern</b> — the same engine runs <i>policy-qa</i> from a different spec in <i>Replicable pattern</i>.</li>
     </ol></div>
     <div><h4>Endpoints</h4><div class="eps">
-      <code>/review</code><code>/run</code><code>/trace/{run_id}</code>
+      <code>/review</code><code>/run</code><code>/plan</code><code>/trace/{run_id}</code>
       <code>/workflows</code><code>/contracts</code><code>/evals</code><code>/llm</code></div></div>
     <div><h4>Keyboard shortcuts</h4><p><span class="kbd">?</span> open this help · <span class="kbd">Esc</span> close any overlay</p></div>
     <div><p class="muted" style="font-size:11.5px">All contracts, clauses and policy docs are <b>synthetic</b> — no real data, no secrets.</p></div>
@@ -471,6 +471,25 @@ async function review(){
   const body={mode:(m==="auto")?null:m};
   const txt=$("#text").value.trim();
   if(txt){body.text=txt;}else{body.contract_id=$("#contract").value;}
+  // For local/auto, run each agent's LLM call in the BROWSER against host Ollama
+  // (browser→host); orchestration + governance stay server-side. We need the
+  // resolved text to plan prompts, so fetch the contract text when an id is used.
+  if(m==="local"||m==="auto"){
+    try{
+      let planText=body.text;
+      if(planText===undefined){
+        const c=await j(`contracts/${body.contract_id}`);
+        planText=`CONTRACT: ${c.title||""}\n\n`+
+          (c.clauses||[]).map((cl,i)=>`Clause ${cl.clause_id||i+1}: ${cl.text}`).join("\n");
+      }
+      const cr=await clientRun("contract-review",{text:planText});
+      if(cr){Object.assign(body,cr);}
+      else if(m==="local"){toast("Host Ollama not reachable — using offline fallback","info");}
+    }catch(e){toast("Host Ollama call failed — falling back","info");}
+  }
+  // Server has no key for "local"; if we got no browser→host result, fall back to
+  // offline so the run still completes deterministically (governance unchanged).
+  if(body.mode==="local" && !body.client_completions)body.mode="offline";
   try{
     const r=await j("review",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
     lastRunId=r.run_id;
@@ -493,8 +512,18 @@ async function ask(){
   const btn=$("#askbtn");btn.classList.add("loading");
   try{
     const m=runMode();
+    const payload={question:$("#q").value};
+    const reqBody={workflow:"policy-qa",mode:(m==="auto")?null:m,payload};
+    if(m==="local"||m==="auto"){
+      try{
+        const cr=await clientRun("policy-qa",payload);
+        if(cr){Object.assign(reqBody,cr);}
+        else if(m==="local"){toast("Host Ollama not reachable — using offline fallback","info");}
+      }catch(e){toast("Host Ollama call failed — falling back","info");}
+    }
+    if(reqBody.mode==="local" && !reqBody.client_completions)reqBody.mode="offline";
     const r=await j("run",{method:"POST",headers:{"content-type":"application/json"},
-      body:JSON.stringify({workflow:"policy-qa",mode:(m==="auto")?null:m,payload:{question:$("#q").value}})});
+      body:JSON.stringify(reqBody)});
     const steps=r.trace.map(s=>`<span class="tier">${esc(s.step)} · ${tierName(s.provider)}</span>`).join(" → ");
     $("#qares").innerHTML=`<div class="muted" style="margin-bottom:8px">${steps}</div>
       <div class="summary">${esc(r.result.answer||'—')}</div>
@@ -511,7 +540,8 @@ async function loadLlm(){
   try{const s=await j("llm");llmProviders=s.providers||{};
     const active=Object.entries(llmProviders).find(e=>e[1]);
     $("#llmpill").textContent=`routing: ${active?active[0]:"offline (deterministic)"}`;
-    renderRouting();}catch{}
+    renderRouting();
+    refreshClientOllama();}catch{}
 }
 
 /* ===================== POLISH KIT: settings drawer ===================== */
@@ -520,7 +550,7 @@ function applyCfgToForm(){
   selectMode(cfg.mode||"auto");
   syncThemeSeg();
 }
-function openDrawer(){applyCfgToForm();$("#scrim").classList.add("open");$("#drawer").classList.add("open");$("#drawer").setAttribute("aria-hidden","false")}
+function openDrawer(){applyCfgToForm();refreshClientOllama();$("#scrim").classList.add("open");$("#drawer").classList.add("open");$("#drawer").setAttribute("aria-hidden","false")}
 function closeDrawer(){$("#scrim").classList.remove("open");$("#drawer").classList.remove("open");$("#drawer").setAttribute("aria-hidden","true")}
 $("#gear").onclick=openDrawer;$("#closedrawer").onclick=closeDrawer;
 $("#savecfg").onclick=()=>{cfg={mode:currentMode(),model:$("#cfgModel").value.trim()};
@@ -563,17 +593,67 @@ document.addEventListener("keydown",e=>{
 
 /* ===================== POLISH KIT: routing config ===================== */
 const MODE_BLURBS={
-  auto:"auto = paid, then local, then free, then offline.",
-  local:"local = Ollama only (on-box, zero cost).",
+  auto:"auto = host Ollama (browser→host) if your browser can reach it, else paid, then free, else offline.",
+  local:"local = your host Ollama, each agent called straight from the browser (browser→host). Runs a real model for free, even on the cloud demo. Orchestration + governance stay server-side.",
   free:"free = OpenRouter free models only.",
   paid:"paid = Anthropic, then OpenAI.",
   offline:"offline = deterministic agents only (no LLM call).",
 };
 const MODE_CHAIN={
-  auto:["anthropic","openai","ollama","openrouter"],
-  local:["ollama"], free:["openrouter"], paid:["anthropic","openai"], offline:[],
+  auto:["ollama (browser→host)","anthropic","openai","openrouter"],
+  local:["ollama (browser→host)"], free:["openrouter"],
+  paid:["anthropic","openai"], offline:[],
 };
 const PROVIDERS=["anthropic","openai","ollama","openrouter"];
+
+/* ===================== OLLAMA BRIDGE (browser→host) =====================
+   Only the host-Ollama check + each agent's LLM call run in the BROWSER (your
+   machine can reach localhost; the cloud server can't). The orchestration, the
+   per-step prompts, and ALL governance (PII redaction before the model + the
+   tamper-evident audit) stay server-side. The browser asks /plan for each step's
+   already-redacted prompt, runs them on your host Ollama, and submits the
+   completions to /review or /run as client_completions. */
+const OLLAMA_CANDIDATES=["http://localhost:11434","http://localhost:11435"];
+let _ollamaProbe={base:null,at:0};
+async function probeOllama(){
+  const now=Date.now();
+  if(now-_ollamaProbe.at<30000)return _ollamaProbe.base;
+  let base=null;
+  for(const cand of OLLAMA_CANDIDATES){
+    try{const r=await fetch(`${cand}/api/tags`,{signal:AbortSignal.timeout(1500)});if(r.ok){base=cand;break;}}catch{}
+  }
+  _ollamaProbe={base,at:now};return base;
+}
+function ollamaModel(){return cfg.model||"llama3.1:8b";}
+async function ollamaComplete(base, system, user){
+  const r=await fetch(`${base}/api/chat`,{method:"POST",headers:{"content-type":"application/json"},
+    body:JSON.stringify({model:ollamaModel(),stream:false,format:"json",
+      messages:[{role:"system",content:system},{role:"user",content:user}]}),
+    signal:AbortSignal.timeout(120000)});
+  if(!r.ok)throw new Error("ollama "+r.status);
+  const data=await r.json();
+  return (data?.message?.content||"").trim();
+}
+/* Run a workflow on the user's host Ollama: ask the server for each step's
+   redacted prompt, complete them browser→host, return the client_completions map.
+   Returns null when host Ollama is unreachable (caller falls back). */
+async function clientRun(workflow, payload){
+  const base=await probeOllama();
+  if(!base)return null;
+  const plan=await j("plan",{method:"POST",headers:{"content-type":"application/json"},
+    body:JSON.stringify({workflow,payload})});
+  const comps={};
+  for(const step of (plan.steps||[])){
+    comps[step.step]=await ollamaComplete(base, step.system, step.user);
+  }
+  return {client_completions:comps, client_model:ollamaModel()};
+}
+let clientOllama=false;   // browser→host Ollama reachability (browser-probed)
+async function refreshClientOllama(){
+  clientOllama = !!(await probeOllama());
+  renderRouting();
+}
+
 function selectMode(m){
   $$("#modeseg .segbtn").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.mode===m)));
   $("#modeblurb").textContent=MODE_BLURBS[m]||"";
@@ -584,12 +664,19 @@ function renderRouting(){
   const m=currentMode();
   $("#modeactive").textContent=`active: ${m}`;
   const rows=PROVIDERS.map(p=>{
-    const on=!!llmProviders[p];
-    return `<div class="pstat"><span>${p}</span><span class="pdot ${on?'on':''}" title="${on?'available':'not configured'}"></span></div>`;
+    // Ollama is probed in the BROWSER (browser→host); others are server-side.
+    const on= p==="ollama" ? clientOllama : !!llmProviders[p];
+    const label= p==="ollama" ? "ollama (browser→host)" : p;
+    const title= p==="ollama" ? (on?"reachable from your browser":"not reachable from your browser")
+                              : (on?"available":"not configured");
+    return `<div class="pstat"><span>${label}</span><span class="pdot ${on?'on':''}" title="${title}"></span></div>`;
   }).join("")+
     `<div class="pstat"><span>offline (deterministic)</span><span class="pdot on" title="always available"></span></div>`;
   $("#provrows").innerHTML=rows;
-  const chain=(MODE_CHAIN[m]||[]).filter(p=>llmProviders[p]);
+  const chain=(MODE_CHAIN[m]||[]).filter(p=>{
+    if(p.startsWith("ollama"))return clientOllama;
+    return llmProviders[p];
+  });
   const display=[...chain,"offline (deterministic)"];
   $("#chainline").textContent=display.join("  →  ");
 }
