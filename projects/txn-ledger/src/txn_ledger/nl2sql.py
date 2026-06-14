@@ -199,23 +199,41 @@ def _offline_sql(_system: str, user: str) -> str:
 # Public ask() — route, guard, execute                                        #
 # --------------------------------------------------------------------------- #
 
-def ask(question: str, *, mode: str | None = None, max_rows: int = 50) -> dict:
+def ask(question: str, *, mode: str | None = None, max_rows: int = 50,
+        client_sql: str | None = None) -> dict:
     """Translate ``question`` → SQL via the routing chain, guard it, run it
     read-only, and return rows + the generated SQL + provider telemetry.
 
     On a guard rejection the response carries ``error`` and the offending SQL —
     the query is never executed.
+
+    ``client_sql`` (browser→host Ollama): when the browser reached the user's
+    host Ollama itself, it submits the generated SQL here and we skip the
+    server-side LLM *generation* call. SAFETY: the client SQL is NEVER trusted —
+    it goes through the exact same ``guard_sql()`` before execution. Only the
+    generation step is skipped, never the guard.
     """
     db.conn()  # ensure the dataset is built
-    res = llm.complete(SYSTEM, f"Q: {question}", offline=_offline_sql,
-                       mode=mode, max_tokens=256)
-    generated = _strip_sql(res.text)
-    telemetry = {
-        "question": question, "generated_sql": generated,
-        "provider": res.provider, "model": res.model, "mode": res.mode,
-        "latency_ms": res.latency_ms, "cost_usd": res.cost_usd,
-        "fallbacks": res.fallbacks,
-    }
+    if client_sql is not None:
+        # Browser ran the NL→SQL on the user's host Ollama (browser→host) and
+        # submitted the SQL. Skip the server-side generation call only — the
+        # guard below still runs, exactly as for server-generated SQL.
+        generated = _strip_sql(client_sql)
+        telemetry = {
+            "question": question, "generated_sql": generated,
+            "provider": "ollama (browser→host)", "model": "host", "mode": "local",
+            "latency_ms": 0, "cost_usd": 0.0, "fallbacks": [],
+        }
+    else:
+        res = llm.complete(SYSTEM, f"Q: {question}", offline=_offline_sql,
+                           mode=mode, max_tokens=256)
+        generated = _strip_sql(res.text)
+        telemetry = {
+            "question": question, "generated_sql": generated,
+            "provider": res.provider, "model": res.model, "mode": res.mode,
+            "latency_ms": res.latency_ms, "cost_usd": res.cost_usd,
+            "fallbacks": res.fallbacks,
+        }
     try:
         safe = guard_sql(generated)
     except UnsafeSQLError as exc:

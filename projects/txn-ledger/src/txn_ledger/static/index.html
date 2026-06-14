@@ -453,7 +453,7 @@ function applyCfgToForm(){
   selectMode(cfg.mode||"auto");
   syncThemeSeg();
 }
-function openDrawer(){applyCfgToForm();$("#scrim").classList.add("open");$("#drawer").classList.add("open");$("#drawer").setAttribute("aria-hidden","false")}
+function openDrawer(){applyCfgToForm();refreshClientOllama();$("#scrim").classList.add("open");$("#drawer").classList.add("open");$("#drawer").setAttribute("aria-hidden","false")}
 function closeDrawer(){$("#scrim").classList.remove("open");$("#drawer").classList.remove("open");$("#drawer").setAttribute("aria-hidden","true")}
 $("#gear").onclick=openDrawer;$("#closedrawer").onclick=closeDrawer;
 $("#savecfg").onclick=()=>{
@@ -484,6 +484,7 @@ async function boot(){
   $("#boot").classList.add("hide");setTimeout(()=>$("#boot").remove(),600);
   $$(".reveal").forEach((el,i)=>setTimeout(()=>el.classList.add("in"),90*i));
   loadLlm();  // provider availability for routing config
+  refreshClientOllama();   // browser-side Ollama check (browser→host)
   await init();
 }
 
@@ -571,9 +572,21 @@ function renderRows(rows){
 async function ask(q){
   const btn=$("#askbtn");btn.classList.add("loading");
   $("#askwrap").innerHTML=`<div class="muted" style="margin-top:12px">Translating to SQL…</div>`;
+  const mode=cfg.mode||"auto";
+  const body={question:q,mode:cfg.mode||null};
+  // Ollama check + NL→SQL call run in the BROWSER (browser→host); other
+  // providers stay server-side. The browser-generated SQL goes up as
+  // `client_sql` and the server STILL guards it before running.
+  if(mode==="local"||mode==="auto"){
+    try{
+      const base=await probeOllama();
+      if(base){ body.client_sql=await ollamaSql(base,q); }
+      else if(mode==="local"){ toast("Host Ollama not reachable — using offline fallback","info"); }
+    }catch{ toast("Host Ollama call failed — falling back","info"); }
+  }
   try{
     const r=await j("ask",{method:"POST",headers:{"content-type":"application/json"},
-      body:JSON.stringify({question:q,mode:cfg.mode||null})});
+      body:JSON.stringify(body)});
     if(!r.safe){
       $("#askwrap").innerHTML=`<div class="planbox before" style="margin-top:12px">`+
         `<div class="h"><span class="tag">rejected by guard</span></div>`+
@@ -636,17 +649,68 @@ document.addEventListener("keydown",e=>{
 
 /* ===================== POLISH KIT: routing config ===================== */
 const MODE_BLURBS={
-  auto:"auto = paid if keyed, else local, else free, else offline.",
-  local:"local = Ollama only (on-box, zero cost).",
+  auto:"auto = local host Ollama if your browser can reach it, else paid, else free, else offline.",
+  local:"local = your host Ollama, called straight from the browser (browser→host). Runs a real model for free, even on the cloud demo.",
   free:"free = OpenRouter free models only.",
   paid:"paid = Anthropic, then OpenAI.",
   offline:"offline = deterministic NL→SQL matcher only (no LLM call).",
 };
 const MODE_CHAIN={
-  auto:["anthropic","openai","ollama","openrouter"],
-  local:["ollama"], free:["openrouter"], paid:["anthropic","openai"], offline:[],
+  auto:["ollama (browser→host)","anthropic","openai","openrouter"],
+  local:["ollama (browser→host)"], free:["openrouter"],
+  paid:["anthropic","openai"], offline:[],
 };
 const PROVIDERS=["anthropic","openai","ollama","openrouter"];
+
+/* ===================== OLLAMA BRIDGE (browser→host) =====================
+   Only the Ollama check + NL→SQL call run in the BROWSER (your machine can
+   reach localhost; the cloud server can't). Every other provider stays
+   server-side. The SQL the browser gets is sent up as `client_sql` and the
+   server STILL runs its safety guard on it before executing — never trusted. */
+const OLLAMA_CANDIDATES=["http://localhost:11434","http://localhost:11435"];
+// Mirror of the server's nl2sql.py SYSTEM prompt — schema + rules + examples —
+// so the browser asks the host model for the exact same single read-only SELECT.
+const SQL_SYSTEM=
+  "You translate a plain-English question about U.S. campaign contributions "+
+  "into ONE read-only SQLite SELECT over this single table:\n"+
+  "  contributions(id INTEGER, donor_id TEXT, committee_id TEXT, cycle INTEGER, amount REAL, ts TEXT)\n"+
+  "committee_id looks like 'C-0001'. The $200 itemization threshold splits "+
+  "itemized (amount > 200) from unitemized.\n"+
+  "RULES: emit ONLY the SQL, no prose, no markdown fences, no trailing "+
+  "semicolon. A SINGLE SELECT statement only — never INSERT/UPDATE/DELETE/"+
+  "DROP/PRAGMA/ATTACH and never multiple statements. Query only the "+
+  "'contributions' table. Use literal values inline.\n"+
+  "EXAMPLES:\n"+
+  "Q: total raised in the 2024 cycle\n"+
+  "SELECT SUM(amount) AS total_raised FROM contributions WHERE cycle = 2024\n"+
+  "Q: top 5 committees by itemized total in 2024\n"+
+  "SELECT committee_id, SUM(CASE WHEN amount > 200 THEN amount ELSE 0 END) AS "+
+  "itemized FROM contributions WHERE cycle = 2024 GROUP BY committee_id "+
+  "ORDER BY itemized DESC LIMIT 5\n"+
+  "Q: how many donors gave under 200 in 2026\n"+
+  "SELECT COUNT(DISTINCT donor_id) AS donors FROM contributions WHERE "+
+  "cycle = 2026 AND amount < 200\n";
+let _ollamaProbe={base:null,at:0};
+async function probeOllama(){
+  const now=Date.now();
+  if(now-_ollamaProbe.at<30000)return _ollamaProbe.base;
+  let base=null;
+  for(const c of OLLAMA_CANDIDATES){
+    try{const r=await fetch(`${c}/api/tags`,{signal:AbortSignal.timeout(1500)});if(r.ok){base=c;break;}}catch{}
+  }
+  _ollamaProbe={base,at:now};return base;
+}
+async function ollamaSql(base, question){
+  const r=await fetch(`${base}/api/chat`,{method:"POST",headers:{"content-type":"application/json"},
+    body:JSON.stringify({model:cfg.model||"llama3.1:8b",stream:false,
+      messages:[{role:"system",content:SQL_SYSTEM},{role:"user",content:"Q: "+question}]}),
+    signal:AbortSignal.timeout(120000)});
+  if(!r.ok)throw new Error("ollama "+r.status);
+  const data=await r.json();
+  return (data?.message?.content||"").trim();
+}
+let clientOllama=false;   // browser→host Ollama reachability (browser-probed)
+
 function selectMode(m){
   $$("#modeseg .segbtn").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.mode===m)));
   $("#modeblurb").textContent=MODE_BLURBS[m]||"";
@@ -657,14 +721,25 @@ function renderRouting(){
   const m=currentMode();
   $("#modeactive").textContent=`active: ${m}`;
   const rows=PROVIDERS.map(p=>{
-    const on=!!llmProviders[p];
-    return `<div class="pstat"><span>${p}</span><span class="pdot ${on?'on':''}" title="${on?'available':'not configured'}"></span></div>`;
+    // Ollama is checked in the BROWSER (browser→host); other providers server-side.
+    const on= p==="ollama" ? clientOllama : !!llmProviders[p];
+    const label= p==="ollama" ? "ollama (browser→host)" : p;
+    const title= p==="ollama" ? (on?"reachable from your browser":"not reachable from your browser")
+                              : (on?"available":"not configured");
+    return `<div class="pstat"><span>${label}</span><span class="pdot ${on?'on':''}" title="${title}"></span></div>`;
   }).join("")+
     `<div class="pstat"><span>offline (deterministic)</span><span class="pdot on" title="always available"></span></div>`;
   $("#provrows").innerHTML=rows;
-  const chain=(MODE_CHAIN[m]||[]).filter(p=>llmProviders[p]);
+  const chain=(MODE_CHAIN[m]||[]).filter(p=>{
+    if(p.startsWith("ollama"))return clientOllama;
+    return llmProviders[p];
+  });
   const display=[...chain,"offline (deterministic)"];
   $("#chainline").textContent=display.join("  →  ");
+}
+async function refreshClientOllama(){
+  clientOllama = !!(await probeOllama());
+  renderRouting();
 }
 $$("#modeseg .segbtn").forEach(b=>b.onclick=()=>{selectMode(b.dataset.mode);renderRouting();});
 async function loadLlm(){
