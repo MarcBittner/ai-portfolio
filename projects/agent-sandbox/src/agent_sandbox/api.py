@@ -11,7 +11,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 
 from agent_sandbox import __version__, llm
-from agent_sandbox.agent import run
+from agent_sandbox.agent import exec_tool, run
 from agent_sandbox.models import (
     HealthResponse,
     RoutingInfo,
@@ -19,6 +19,8 @@ from agent_sandbox.models import (
     RunResponse,
     StepOut,
     ToolInfo,
+    ToolRequest,
+    ToolResponse,
 )
 from agent_sandbox.tools import TOOL_NAMES, TOOLS
 
@@ -65,6 +67,19 @@ def run_agent(request: RunRequest) -> RunResponse:
         answer=result.answer, n_steps=len(result.steps),
         planner=result.planner, routing=routing,
     )
+
+
+@app.post("/tool", response_model=ToolResponse)
+def run_tool(request: ToolRequest) -> ToolResponse:
+    """Execute one deterministic tool server-side and return its observation.
+
+    This is the server half of the browser-driven ReAct loop: the planner LLM
+    decision is made in the browser (browser→host Ollama), but every tool call
+    is executed here with its existing sandboxing — the browser never runs tools
+    and its tool/args are validated against the registry by ``exec_tool``.
+    """
+    observation, ok = exec_tool(request.name, request.args)
+    return ToolResponse(name=request.name, observation=observation, ok=ok)
 
 
 @app.get("/", include_in_schema=False)

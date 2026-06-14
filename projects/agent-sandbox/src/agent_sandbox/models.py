@@ -40,6 +40,21 @@ class ToolInfo(BaseModel):
     description: str
 
 
+class ToolRequest(BaseModel):
+    # One ReAct step executed server-side. When the browser drives the loop
+    # (planner LLM ran browser→host on the user's Ollama), it picks the tool and
+    # args, but the deterministic tool itself ALWAYS runs here with its existing
+    # safety (whitelisted AST eval, etc.) — browser input is never trusted to run.
+    name: str = Field(min_length=1, max_length=64)
+    args: dict[str, Any] = Field(default_factory=dict)
+
+
+class ToolResponse(BaseModel):
+    name: str
+    observation: str
+    ok: bool
+
+
 class HealthResponse(BaseModel):
     status: str
     version: str
