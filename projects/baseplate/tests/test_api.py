@@ -42,6 +42,38 @@ def test_scaffold_requires_input():
     assert client.post("/scaffold", json={}).status_code == 400
 
 
+def test_scaffold_client_spec_browser_to_host():
+    """Browser→host Ollama path: a client_spec (mode local/auto) is used instead
+    of a server LLM call, and is re-validated/normalized like the LLM's output."""
+    _reset()
+    r = client.post("/scaffold", json={
+        "description": "rates api",
+        "mode": "local",
+        # raw browser input with an alias + messy name + bogus extra key
+        "client_spec": {"name": "Rates API!!", "language": "fastapi",
+                        "needs_db": "yes", "exposes_http": True, "evil": "x"},
+    }).json()
+    assert r["routing"]["provider"] == "ollama (browser→host)"
+    # server normalized the untrusted raw spec: slugged name, alias→python
+    assert r["spec"] == {"name": "rates-api", "language": "python",
+                         "needs_db": True, "exposes_http": True}
+    assert "Dockerfile" in r["files"]
+    assert "rates-api" in r["files"]["Dockerfile"]
+    yaml.safe_load_all(r["files"]["deploy/k8s/rates-api.yaml"])
+
+
+def test_scaffold_client_spec_ignored_for_server_provider():
+    """A client_spec is only honored for browser→host modes (local/auto); a
+    server-only provider mode (paid/free) ignores it and stays server-side."""
+    _reset()
+    r = client.post("/scaffold", json={
+        "description": "a python worker that reads from postgres",
+        "mode": "paid",
+        "client_spec": {"name": "sneaky"}}).json()
+    assert r["routing"]["provider"] != "ollama (browser→host)"
+    assert r["spec"]["name"] != "sneaky"
+
+
 def test_scaffold_onboards_to_catalog():
     _reset()
     before = client.get("/catalog").json()["count"]
