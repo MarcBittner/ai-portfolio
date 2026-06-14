@@ -40,6 +40,23 @@ class AgentRun:
     routing: Routing | None = None
 
 
+def exec_tool(name: str, args: dict) -> tuple[str, bool]:
+    """Run a single tool server-side with its existing safety; never raises.
+
+    Shared by the in-process loop (:func:`run`) and the per-step ``POST /tool``
+    endpoint the browser-driven loop calls. Returns ``(observation, ok)``.
+    """
+    tool = TOOLS.get(name)
+    try:
+        if tool is None:
+            raise ToolError(f"unknown tool: {name}")
+        return tool[0](**args), True
+    except ToolError as exc:
+        return f"error: {exc}", False
+    except TypeError as exc:  # bad/missing args from an untrusted caller
+        return f"error: bad arguments for {name}: {exc}", False
+
+
 def _fill(args: dict, observations: list[str]) -> dict:
     out: dict = {}
     for key, value in args.items():
@@ -70,13 +87,7 @@ def run(query: str, use_llm: bool = False, provider: str | None = "auto",
     trace: list[TraceStep] = []
     for step in steps[:MAX_STEPS]:
         args = _fill(step.args, observations)
-        tool = TOOLS.get(step.tool)
-        try:
-            if tool is None:
-                raise ToolError(f"unknown tool: {step.tool}")
-            observation, ok = tool[0](**args), True
-        except ToolError as exc:
-            observation, ok = f"error: {exc}", False
+        observation, ok = exec_tool(step.tool, args)
         observations.append(observation)
         trace.append(TraceStep(step.thought, step.tool, args, observation, ok))
     answer = observations[-1] if observations else "I couldn't determine an answer."

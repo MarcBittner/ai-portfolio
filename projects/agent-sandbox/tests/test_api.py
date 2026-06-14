@@ -53,6 +53,38 @@ def test_run_empty_query_422():
     assert client.post("/run", json={"query": ""}).status_code == 422
 
 
+def test_tool_endpoint_executes_server_side():
+    # The browser-driven loop posts each chosen step here; the tool runs server-side.
+    body = client.post("/tool", json={
+        "name": "calculator", "args": {"expression": "20/100*31"}}).json()
+    assert body["name"] == "calculator" and body["ok"] is True
+    assert body["observation"] == "6.2"
+
+
+def test_tool_endpoint_unknown_tool_is_safe():
+    body = client.post("/tool", json={"name": "rm_rf", "args": {}}).json()
+    assert body["ok"] is False and "unknown tool" in body["observation"]
+
+
+def test_tool_endpoint_bad_args_is_safe():
+    # untrusted/wrong args must not crash the server
+    body = client.post("/tool", json={
+        "name": "calculator", "args": {"nope": 1}}).json()
+    assert body["ok"] is False and "bad arguments" in body["observation"]
+
+
+def test_tool_endpoint_drives_a_browser_loop():
+    # simulate the browser loop: plan in browser, execute each step via /tool
+    d1 = client.post("/tool", json={
+        "name": "date_diff",
+        "args": {"start": "2026-01-01", "end": "2026-02-01"}}).json()
+    assert d1["ok"] and d1["observation"] == "31"
+    d2 = client.post("/tool", json={
+        "name": "calculator",
+        "args": {"expression": f"20/100*{d1['observation']}"}}).json()
+    assert d2["ok"] and d2["observation"] == "6.2"
+
+
 def test_index_served():
     r = client.get("/")
     assert r.status_code == 200 and "agent-sandbox" in r.text.lower()
