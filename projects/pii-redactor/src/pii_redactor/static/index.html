@@ -475,6 +475,9 @@ async function run(){
       else if(mode==="local"){ toast("Host Ollama not reachable — using offline fallback","info"); }
     }catch{ toast("Host Ollama call failed — falling back","info"); }
   }
+  // the server has no "local" provider; when we didn't get a browser→host result,
+  // fall back to "offline" so the request doesn't 422.
+  if(body.provider==="local" && !body.client_ner) body.provider="offline";
   try{
     const [det,red]=await Promise.all([
       post("/detect",body),
