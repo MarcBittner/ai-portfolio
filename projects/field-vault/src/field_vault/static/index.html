@@ -450,7 +450,7 @@ function applyCfgToConsole(){
   if($("#role").querySelector(`option[value="${cfg.role}"]`))$("#role").value=cfg.role;
   $("#purpose").value=cfg.purpose;
 }
-function openDrawer(){applyCfgToForm();$("#scrim").classList.add("open");$("#drawer").classList.add("open");$("#drawer").setAttribute("aria-hidden","false")}
+function openDrawer(){applyCfgToForm();refreshClientOllama();$("#scrim").classList.add("open");$("#drawer").classList.add("open");$("#drawer").setAttribute("aria-hidden","false")}
 function closeDrawer(){$("#scrim").classList.remove("open");$("#drawer").classList.remove("open");$("#drawer").setAttribute("aria-hidden","true")}
 $("#gear").onclick=openDrawer;$("#closedrawer").onclick=closeDrawer;$("#scrim").onclick=closeDrawer;
 $("#savecfg").onclick=()=>{cfg={role:$("#cfgRole").value,purpose:$("#cfgPurpose").value,
@@ -535,8 +535,21 @@ async function scrub(){
   const note=$("#note").value;
   $("#scrubres").innerHTML='<span class="muted">detecting…</span>';
   try{
+    const mode=cfg.mode||"auto";
+    const body={note, mode:cfg.mode||null};
+    // When local/auto and the browser can reach a host Ollama, run detection there
+    // (browser→host) and submit the spans — the cloud server can't reach your box.
+    if(mode==="local"||mode==="auto"){
+      const base=await probeOllama();
+      if(base){
+        try{body.client_spans=await ollamaDetect(base,note);}
+        catch{ if(mode==="local")toast("Host Ollama call failed — using server fallback","info"); }
+      }else if(mode==="local"){
+        toast("Host Ollama not reachable — using server fallback","info");
+      }
+    }
     const r=await j("notes/detect",{method:"POST",headers:{"content-type":"application/json"},
-      body:JSON.stringify({note, mode:cfg.mode||null})});
+      body:JSON.stringify(body)});
     const red=r.redacted.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/\[(\w+)\]/g,'<mark style="background:var(--mark-bg);color:var(--mark-ink);border-radius:3px;padding:0 3px">[$1]</mark>');
     const types=Object.entries(r.by_type).map(([k,v])=>`${k}×${v}`).join(", ")||"none";
     $("#scrubres").innerHTML=`<div style="line-height:1.6">${red}</div>`;
@@ -597,17 +610,56 @@ document.addEventListener("keydown",e=>{
 
 /* ===================== POLISH KIT: routing config ===================== */
 const MODE_BLURBS={
-  auto:"auto = local if reachable, else paid, else free, else offline.",
-  local:"local = Ollama only (on-box, zero cost).",
+  auto:"auto = local host Ollama if your browser can reach it, else paid, else free, else offline.",
+  local:"local = your host Ollama, called straight from the browser (browser→host). Runs a real model for free, even on the cloud demo.",
   free:"free = OpenRouter free models only.",
   paid:"paid = Anthropic, then OpenAI.",
   offline:"offline = deterministic detector only (no LLM call).",
 };
 const MODE_CHAIN={
-  auto:["anthropic","openai","ollama","openrouter"],
-  local:["ollama"], free:["openrouter"], paid:["anthropic","openai"], offline:[],
+  auto:["ollama (browser→host)","anthropic","openai","openrouter"],
+  local:["ollama (browser→host)"], free:["openrouter"], paid:["anthropic","openai"], offline:[],
 };
 const PROVIDERS=["anthropic","openai","ollama","openrouter"];
+
+/* ===================== OLLAMA BRIDGE (browser→host) =====================
+   Only the Ollama check + call run in the BROWSER (your machine can reach
+   localhost; the cloud server can't). Every other provider stays server-side.
+   The browser sends notes.py's SYSTEM prompt verbatim and parses the {"spans":[…]}
+   shape the same way, then submits the spans to /notes/detect as client_spans. */
+const OLLAMA_CANDIDATES=["http://localhost:11434","http://localhost:11435"];
+const PHI_TYPES=["NAME","DOB","DATE","PHONE","EMAIL","SSN","MRN","ADDRESS","ZIP"];
+// mirrors field_vault/notes.py SYSTEM
+const PHI_SYSTEM="You are a PHI (protected health information) detection engine for a "+
+  "de-identification pipeline. Read the clinical note and return STRICT JSON "+
+  '{"spans": [{"text": <exact substring>, "type": <one of '+
+  PHI_TYPES.join(", ")+">}]}. Extract ONLY values that literally appear in "+
+  "the note — never invent, infer, or normalize. Output JSON only.";
+let _ollamaProbe={base:null,at:0};
+async function probeOllama(){
+  const now=Date.now();
+  if(now-_ollamaProbe.at<30000)return _ollamaProbe.base;
+  let base=null;
+  for(const c of OLLAMA_CANDIDATES){
+    try{const r=await fetch(`${c}/api/tags`,{signal:AbortSignal.timeout(1500)});if(r.ok){base=c;break;}}catch{}
+  }
+  _ollamaProbe={base,at:now};return base;
+}
+async function ollamaDetect(base, text){
+  const r=await fetch(`${base}/api/chat`,{method:"POST",headers:{"content-type":"application/json"},
+    body:JSON.stringify({model:cfg.model||"llama3.1:8b",stream:false,format:"json",
+      messages:[{role:"system",content:PHI_SYSTEM},{role:"user",content:"Clinical note:\n"+text}]}),
+    signal:AbortSignal.timeout(120000)});
+  if(!r.ok)throw new Error("ollama "+r.status);
+  const data=await r.json(); let s=(data?.message?.content||"").trim();
+  if(s.includes("```"))s=s.split("```")[1]?.replace(/^json/i,"").trim()||s;
+  const a=s.indexOf("{"),b=s.lastIndexOf("}");
+  let obj; try{obj=JSON.parse(a>=0?s.slice(a,b+1):s);}catch{return [];}
+  const spans=Array.isArray(obj?.spans)?obj.spans:[];
+  return spans.filter(e=>e&&e.text&&e.type&&PHI_TYPES.includes(String(e.type).toUpperCase()))
+    .map(e=>({text:String(e.text),type:String(e.type).toUpperCase()}));
+}
+let clientOllama=false;   // browser→host Ollama reachability (browser-probed)
 function selectMode(m){
   $$("#modeseg .segbtn").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.mode===m)));
   $("#modeblurb").textContent=MODE_BLURBS[m]||"";
@@ -617,17 +669,28 @@ function currentMode(){return $("#modeseg").querySelector('[aria-pressed="true"]
 function renderRouting(){
   const m=currentMode();
   $("#modeactive").textContent=`active: ${m}`;
-  // provider status rows + always-on offline row
+  // provider status rows + always-on offline row.
+  // Ollama is probed in the BROWSER (browser→host); other providers come from /llm.
   const rows=PROVIDERS.map(p=>{
-    const on=!!llmProviders[p];
-    return `<div class="pstat"><span>${p}</span><span class="pdot ${on?'on':''}" title="${on?'available':'not configured'}"></span></div>`;
+    const on= p==="ollama" ? clientOllama : !!llmProviders[p];
+    const label= p==="ollama" ? "ollama (browser→host)" : p;
+    const title= p==="ollama" ? (on?"reachable from your browser":"not reachable from your browser")
+                              : (on?"available":"not configured");
+    return `<div class="pstat"><span>${label}</span><span class="pdot ${on?'on':''}" title="${title}"></span></div>`;
   }).join("")+
     `<div class="pstat"><span>offline (deterministic)</span><span class="pdot on" title="always available"></span></div>`;
   $("#provrows").innerHTML=rows;
   // resolved fallback chain for the selected mode (available providers, then offline)
-  const chain=(MODE_CHAIN[m]||[]).filter(p=>llmProviders[p]);
+  const chain=(MODE_CHAIN[m]||[]).filter(p=>{
+    if(p.startsWith("ollama"))return clientOllama;
+    return llmProviders[p];
+  });
   const display=[...chain,"offline (deterministic)"];
   $("#chainline").textContent=display.join("  →  ");
+}
+async function refreshClientOllama(){
+  clientOllama = !!(await probeOllama());
+  renderRouting();
 }
 $$("#modeseg .segbtn").forEach(b=>b.onclick=()=>{selectMode(b.dataset.mode);renderRouting();});
 
@@ -658,6 +721,7 @@ async function boot(){
   try{renderScores((await j("scores")).providers);}catch{}
   await refreshAudit();
   loadLlm(); loadPrivacy();
+  refreshClientOllama();   // browser-side Ollama check (browser→host)
   try{await scrub();}catch{}
   // run the care_coordinator + treatment re-identify example so the panel is populated
   try{

@@ -100,12 +100,41 @@ def redact(note: str, spans: list[dict]) -> str:
     return redacted
 
 
-def detect(note: str, *, mode: str | None = None, audit_log: bool = True) -> dict:
+def _clean_client_spans(note: str, client_spans: list[dict]) -> list[dict]:
+    """Validate browser→host Ollama spans against the schema (same shape the LLM is
+    asked for), keeping only those that literally appear in the note — mirrors
+    ``_parse_spans``, dropping anything off-schema or invented."""
+    out = []
+    for sp in client_spans:
+        text_v = str(sp.get("text", "")).strip()
+        typ = str(sp.get("type", "")).upper()
+        if text_v and typ in PHI_TYPES and text_v in note:
+            out.append({"text": text_v, "type": typ})
+    return out
+
+
+def detect(note: str, *, mode: str | None = None, audit_log: bool = True,
+           client_spans: list[dict] | None = None) -> dict:
     """Detect PHI in a note via the routing chain, redact it, and (optionally)
-    append a value-free scrub entry to the audit log."""
-    res = llm.complete(SYSTEM, f"Clinical note:\n{note}", offline=_offline_detect,
-                       mode=mode, json_mode=True, max_tokens=512)
-    spans = _parse_spans(res.text)
+    append a value-free scrub entry to the audit log.
+
+    When ``client_spans`` is supplied, the BROWSER already ran the detection on the
+    user's host-local Ollama (browser→host) and submitted the spans; the server then
+    skips its own LLM call and uses them. The cloud server can't reach your machine's
+    Ollama, but the browser can — so a cloud-hosted demo runs a real local model.
+    Every other provider stays server-side. Absent ``client_spans``, behavior is
+    unchanged.
+    """
+    if client_spans is not None:
+        spans = _clean_client_spans(note, client_spans)
+        provider, model, mode_used = "ollama (browser→host)", "host", mode or "local"
+        latency_ms, cost_usd, fallbacks = 0, 0.0, []
+    else:
+        res = llm.complete(SYSTEM, f"Clinical note:\n{note}", offline=_offline_detect,
+                           mode=mode, json_mode=True, max_tokens=512)
+        spans = _parse_spans(res.text)
+        provider, model, mode_used = res.provider, res.model, res.mode
+        latency_ms, cost_usd, fallbacks = res.latency_ms, res.cost_usd, res.fallbacks
     redacted = redact(note, spans)
     by_type: dict[str, int] = {}
     for sp in spans:
@@ -113,14 +142,14 @@ def detect(note: str, *, mode: str | None = None, audit_log: bool = True) -> dic
     if audit_log:
         audit.log.append({
             "event": "note_scrub", "role": "system", "action": "deidentify_note",
-            "provider": res.provider, "model": res.model,
+            "provider": provider, "model": model,
             "phi_found": len(spans), "by_type": by_type, "allowed": True,
         })
     return {
         "spans": spans, "redacted": redacted, "phi_found": len(spans),
-        "by_type": by_type, "provider": res.provider, "model": res.model,
-        "mode": res.mode, "latency_ms": res.latency_ms, "cost_usd": res.cost_usd,
-        "fallbacks": res.fallbacks,
+        "by_type": by_type, "provider": provider, "model": model,
+        "mode": mode_used, "latency_ms": latency_ms, "cost_usd": cost_usd,
+        "fallbacks": fallbacks,
     }
 
 
