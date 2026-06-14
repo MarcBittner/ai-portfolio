@@ -3,6 +3,13 @@
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class ClientField(BaseModel):
+    """An LLM-filled field the BROWSER obtained from a host-local Ollama."""
+
+    name: str
+    value: str
+
+
 class ExtractRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -12,6 +19,12 @@ class ExtractRequest(BaseModel):
     use_llm: bool = True            # Ollama-on by default; fills missing fields
     provider: str = "auto"
     model: str | None = None
+    # LLM-fill results the BROWSER obtained from a host-local Ollama (browser→host).
+    # The cloud server can't reach your machine's Ollama; the browser can, so when
+    # these are supplied the server skips its own LLM call and uses them as the fill
+    # result — letting a cloud-hosted demo run a real local model. Other providers
+    # stay server-side. Deterministic extraction still runs first either way.
+    client_fields: list[ClientField] | None = None
 
 
 class FieldResult(BaseModel):

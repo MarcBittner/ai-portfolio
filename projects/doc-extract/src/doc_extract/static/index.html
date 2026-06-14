@@ -338,6 +338,7 @@
       <label>Routing mode <span class="hint">which provider LLM fill uses</span></label>
       <div class="seg" id="modeseg">
         <button type="button" class="segbtn" data-mode="auto">auto</button>
+        <button type="button" class="segbtn" data-mode="local">local</button>
         <button type="button" class="segbtn" data-mode="free">free</button>
         <button type="button" class="segbtn" data-mode="paid">paid</button>
         <button type="button" class="segbtn" data-mode="offline">offline</button>
@@ -431,7 +432,7 @@ function providerFromMode(){
   // routing mode maps directly to the /extract provider param (auto|free|paid|offline)
   return cfg.mode||"auto";
 }
-function openDrawer(){applyCfgToForm();renderRouting();$("#scrim").classList.add("open");$("#drawer").classList.add("open");$("#drawer").setAttribute("aria-hidden","false")}
+function openDrawer(){applyCfgToForm();renderRouting();refreshClientOllama();$("#scrim").classList.add("open");$("#drawer").classList.add("open");$("#drawer").setAttribute("aria-hidden","false")}
 function closeDrawer(){$("#scrim").classList.remove("open");$("#drawer").classList.remove("open");$("#drawer").setAttribute("aria-hidden","true")}
 $("#gear").onclick=openDrawer;$("#closedrawer").onclick=closeDrawer;
 $("#savecfg").onclick=()=>{cfg={schema:$("#cfgSchema").value,useLlm:$("#cfgUseLlm").checked,
@@ -457,6 +458,7 @@ async function loadProviders(){
     provInfo=p;
     const sel=$("#provider");
     const freeLabel="Free · "+shortName((p.free_models||[])[0]||"");
+    sel.insertAdjacentHTML("beforeend",`<option value="local">Local (browser→host Ollama)</option>`);
     sel.insertAdjacentHTML("beforeend",`<option value="free">${freeLabel}</option>`);
     sel.insertAdjacentHTML("beforeend",`<option value="offline">Offline (deterministic)</option>`);
     if(p.available?.paid)
@@ -464,8 +466,7 @@ async function loadProviders(){
     sel.value="auto";
     const activeShort=p.active_mode==="free"?" · "+shortName((p.free_models||[])[0]||""):"";
     $("#providerState").textContent="Live: "+(p.active_mode||"")+activeShort;
-    $("#ollamaStatus").textContent=p.available?.ollama
-      ? `Ollama: reachable (${p.models?.ollama})` : "Ollama: not reachable → deterministic only";
+    // Ollama reachability is browser-probed (browser→host), not server-reported.
     renderRouting();
   }catch{/* optional */}
 }
@@ -475,10 +476,22 @@ async function run(){
   const schema=$("#schema").value;
   if(!text.trim()){toast("Paste a document first","info");return;}
   const btn=$("#run");btn.classList.add("loading");
+  const useLlm=$("#useLlm").checked;
+  const mode=$("#provider").value;
+  const body={text,schema,use_llm:useLlm,provider:mode,model:$("#model").value||null};
+  // Ollama check + LLM fill run in the BROWSER (browser→host); other providers server-side.
+  if(useLlm && (mode==="local"||mode==="auto")){
+    try{
+      const base=await probeOllama();
+      if(base){ body.client_fields=await ollamaFill(base,text,schema); }
+      else if(mode==="local"){ toast("Host Ollama not reachable — using deterministic only","info"); }
+    }catch{ toast("Host Ollama call failed — falling back","info"); }
+  }
+  // the server has no "local" provider; without a browser→host result, use offline.
+  if(body.provider==="local" && !body.client_fields) body.provider="offline";
   try{
     const res=await fetch("extract",{method:"POST",headers:{"content-type":"application/json"},
-      body:JSON.stringify({text,schema,use_llm:$("#useLlm").checked,
-        provider:$("#provider").value,model:$("#model").value||null})});
+      body:JSON.stringify(body)});
     if(!res.ok){toast("Extract failed: "+res.status,"bad");btn.classList.remove("loading");return;}
     const data=await res.json();
     $("#routing").textContent=data.routing
@@ -569,16 +582,65 @@ document.addEventListener("keydown",e=>{
 
 /* ===================== POLISH KIT: routing config ===================== */
 const MODE_BLURBS={
-  auto:"auto = free if keyed, else paid, else local Ollama, else deterministic mock.",
+  auto:"auto = local host Ollama if your browser can reach it, else free, else paid, else deterministic mock.",
+  local:"local = your host Ollama, called straight from the browser (browser→host). Fills missing fields with a real model for free, even on the cloud demo.",
   free:"free = OpenRouter free models only.",
   paid:"paid = Anthropic, then OpenAI.",
-  offline:"offline = local Ollama, else deterministic mock (no hosted call).",
+  offline:"offline = deterministic only (no hosted call).",
 };
 const MODE_CHAIN={
-  auto:["openrouter","anthropic","openai","ollama"],
-  free:["openrouter"], paid:["anthropic","openai"], offline:["ollama"],
+  auto:["ollama (browser→host)","openrouter","anthropic","openai"],
+  local:["ollama (browser→host)"],
+  free:["openrouter"], paid:["anthropic","openai"], offline:[],
 };
 const PROVIDERS=["openrouter","anthropic","openai","ollama"];
+
+/* ===================== OLLAMA BRIDGE (browser→host) =====================
+   Only the Ollama check + LLM-fill call run in the BROWSER (your machine can
+   reach localhost; the cloud server can't). Every other provider stays
+   server-side. The fill prompt mirrors the server's llm_fill exactly. */
+const OLLAMA_CANDIDATES=["http://localhost:11434","http://localhost:11435"];
+const FILL_SYSTEM=
+  "You extract structured fields from a document. Return ONLY a JSON object "+
+  "mapping each requested field name to its value as a string, or null if the "+
+  "document does not contain it. No prose, no code fences.";
+let _ollamaProbe={base:null,at:0};
+async function probeOllama(){
+  const now=Date.now();
+  if(now-_ollamaProbe.at<30000)return _ollamaProbe.base;
+  let base=null;
+  for(const c of OLLAMA_CANDIDATES){
+    try{const r=await fetch(`${c}/api/tags`,{signal:AbortSignal.timeout(1500)});if(r.ok){base=c;break;}}catch{}
+  }
+  _ollamaProbe={base,at:now};return base;
+}
+function schemaFields(schemaName){
+  const s=SCHEMAS.find(x=>x.name===schemaName);
+  return s?s.fields:[];
+}
+async function ollamaFill(base, text, schemaName){
+  // Mirror the server's FIELDS spec so the host model gets the same instruction.
+  const fields=schemaFields(schemaName);
+  const spec=fields.map(f=>`- ${f.name} (${f.type}): ${f.description}`).join("\n");
+  const r=await fetch(`${base}/api/chat`,{method:"POST",headers:{"content-type":"application/json"},
+    body:JSON.stringify({model:$("#model").value||cfg.model||"llama3.1:8b",stream:false,format:"json",
+      messages:[{role:"system",content:FILL_SYSTEM},
+                {role:"user",content:`FIELDS:\n${spec}\n\nDOCUMENT:\n${text}`}]}),
+    signal:AbortSignal.timeout(120000)});
+  if(!r.ok)throw new Error("ollama "+r.status);
+  const data=await r.json(); let s=(data?.message?.content||"").trim();
+  if(s.includes("```"))s=s.split("```")[1]?.replace(/^json/i,"").trim()||s;
+  const a=s.indexOf("{"),b=s.lastIndexOf("}");
+  let parsed; try{parsed=JSON.parse(a>=0?s.slice(a,b+1):s);}catch{return [];}
+  if(!parsed||typeof parsed!=="object")return [];
+  // {name: value} object -> [{name, value}] for the requested fields only.
+  return fields.flatMap(f=>{
+    const v=parsed[f.name];
+    return (v!=null && String(v).trim()) ? [{name:f.name,value:String(v).trim()}] : [];
+  });
+}
+
+let clientOllama=false;   // browser→host Ollama reachability (browser-probed)
 function selectMode(m){
   $$("#modeseg .segbtn").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.mode===m)));
   $("#modeblurb").textContent=MODE_BLURBS[m]||"";
@@ -589,14 +651,28 @@ function renderRouting(){
   const m=currentMode();const avail=provInfo.available||{};
   $("#modeactive").textContent=`active: ${m}`;
   const rows=PROVIDERS.map(p=>{
-    const on=!!avail[p];
-    return `<div class="pstat"><span>${p}</span><span class="pdot ${on?'on':''}" title="${on?'available':'not configured'}"></span></div>`;
+    // Ollama is checked in the BROWSER (browser→host); other providers server-side.
+    const on= p==="ollama" ? clientOllama : !!avail[p];
+    const label= p==="ollama" ? "ollama (browser→host)" : p;
+    const title= p==="ollama" ? (on?"reachable from your browser":"not reachable from your browser")
+                              : (on?"available":"not configured");
+    return `<div class="pstat"><span>${label}</span><span class="pdot ${on?'on':''}" title="${title}"></span></div>`;
   }).join("")+
     `<div class="pstat"><span>mock (deterministic)</span><span class="pdot on" title="always available"></span></div>`;
   $("#provrows").innerHTML=rows;
-  const chain=(MODE_CHAIN[m]||[]).filter(p=>avail[p]);
+  const chain=(MODE_CHAIN[m]||[]).filter(p=>{
+    if(p.startsWith("ollama"))return clientOllama;
+    return avail[p];
+  });
   const display=[...chain,"mock (deterministic)"];
   $("#chainline").textContent=display.join("  →  ");
+}
+async function refreshClientOllama(){
+  clientOllama = !!(await probeOllama());
+  $("#ollamaStatus").textContent=clientOllama
+    ? "Ollama: reachable from your browser (browser→host)"
+    : "Ollama: not reachable from your browser → deterministic only";
+  renderRouting();
 }
 $$("#modeseg .segbtn").forEach(b=>b.onclick=()=>{selectMode(b.dataset.mode);renderRouting();});
 
@@ -620,6 +696,7 @@ async function boot(){
     applyCfgToConsole();
   }catch{}
   await loadProviders();
+  refreshClientOllama();   // browser-side Ollama check (browser→host)
   // run an initial sample so panels are populated
   try{
     $("#doc").value=SAMPLES[$("#schema").value]||"";

@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse
 
 from doc_extract import __version__, llm
 from doc_extract.extract import extract
-from doc_extract.llm_extract import llm_fill
+from doc_extract.llm_extract import client_fill, llm_fill
 from doc_extract.models import (
     ExtractRequest,
     ExtractResponse,
@@ -61,20 +61,32 @@ def run_extract(request: ExtractRequest) -> ExtractResponse:
         raise HTTPException(
             status_code=422, detail=f"unknown schema: {request.schema_name}"
         )
-    if request.provider not in VALID_PROVIDERS:
+    # client_fields means the browser ran the LLM on the user's host Ollama;
+    # the provider param is irrelevant in that case, so only validate otherwise.
+    if request.client_fields is None and request.provider not in VALID_PROVIDERS:
         raise HTTPException(status_code=422, detail="unknown provider")
 
     _schema, results = extract(request.text, request.schema_name)
     routing = None
     if request.use_llm:
         missing = {r.name for r in results if not r.found}
-        filled, result = llm_fill(request.text, request.schema_name, missing,
-                                  request.provider, request.model)
-        by_name = {f.name: f for f in filled}
-        results = [by_name.get(r.name, r) if not r.found else r for r in results]
-        if result is not None:
-            routing = RoutingInfo(provider=result.provider, model=result.model,
-                                  fallbacks=result.fallbacks)
+        if request.client_fields is not None:
+            # Browser ran the fill on the user's host Ollama and submitted the
+            # values; use them instead of calling a server-side provider.
+            filled = client_fill(request.text, request.schema_name, missing,
+                                  request.client_fields)
+            by_name = {f.name: f for f in filled}
+            results = [by_name.get(r.name, r) if not r.found else r for r in results]
+            routing = RoutingInfo(provider="ollama (browser→host)",
+                                  model=request.model or "host", fallbacks=[])
+        else:
+            filled, result = llm_fill(request.text, request.schema_name, missing,
+                                      request.provider, request.model)
+            by_name = {f.name: f for f in filled}
+            results = [by_name.get(r.name, r) if not r.found else r for r in results]
+            if result is not None:
+                routing = RoutingInfo(provider=result.provider, model=result.model,
+                                      fallbacks=result.fallbacks)
 
     fields = [FieldResult(**vars(r)) for r in results]
     return ExtractResponse(
