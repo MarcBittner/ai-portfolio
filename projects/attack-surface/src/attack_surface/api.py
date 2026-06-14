@@ -57,7 +57,8 @@ def report_narrative(req: NarrativeRequest) -> dict:
     board-ready summary; findings/scores/control mappings are not re-derived.
     """
     report = scanner.scan_fixture(remediated=req.remediated)
-    return narrative.generate(report, mode=req.mode)
+    return narrative.generate(report, mode=req.mode,
+                              client_narrative=req.client_narrative)
 
 
 @app.get("/report/exec")
