@@ -5,12 +5,22 @@ from pydantic import BaseModel, Field
 MAX_TEXT = 100_000
 
 
+class NerEntity(BaseModel):
+    type: str
+    text: str
+
+
 class DetectRequest(BaseModel):
     text: str = Field(max_length=MAX_TEXT)
     types: list[str] | None = None  # default: all supported types
     use_llm: bool = True            # Ollama-on by default; adds names/orgs/places
     provider: str = "auto"          # auto | ollama | openai | openrouter | mock
     model: str | None = None
+    # NER entities the BROWSER obtained from a host-local Ollama (browser→host).
+    # The cloud server can't reach your machine's Ollama; the browser can, so when
+    # these are supplied the server skips its own LLM call and uses them — letting a
+    # cloud-hosted demo run a real local model. Other providers stay server-side.
+    client_ner: list[NerEntity] | None = None
 
 
 class SpanOut(BaseModel):
@@ -40,6 +50,8 @@ class RedactRequest(BaseModel):
     use_llm: bool = True
     provider: str = "auto"
     model: str | None = None
+    # browser→host Ollama NER (see DetectRequest)
+    client_ner: list[NerEntity] | None = None
 
 
 class RedactResponse(BaseModel):
