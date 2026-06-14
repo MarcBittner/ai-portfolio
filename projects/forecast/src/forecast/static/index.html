@@ -266,7 +266,7 @@
       <div class="ctls" style="margin-top:14px">
         <label class="ctl"><span>method</span><select id="method"></select></label>
         <label class="ctl"><span>horizon</span><input type="number" id="horizon" value="6" min="1" max="200" /></label>
-        <label class="ctl"><span>provider</span><select id="provider"><option value="auto">Auto (recommended)</option></select></label>
+        <label class="ctl"><span>provider</span><select id="provider"><option value="auto">Auto (recommended)</option><option value="local">Local (browser→host Ollama)</option></select></label>
         <label class="check"><input type="checkbox" id="useLlm" checked /> LLM summary</label>
         <label class="check csv" style="cursor:pointer">📄 CSV
           <input type="file" id="csv" accept=".csv,text/csv" style="display:none" /></label>
@@ -327,6 +327,7 @@
       <label>Routing mode <span class="hint">which provider narrates the summary</span></label>
       <div class="seg" id="modeseg">
         <button type="button" class="segbtn" data-mode="auto">auto</button>
+        <button type="button" class="segbtn" data-mode="local">local</button>
         <button type="button" class="segbtn" data-mode="free">free</button>
         <button type="button" class="segbtn" data-mode="paid">paid</button>
         <button type="button" class="segbtn" data-mode="offline">offline</button>
@@ -415,7 +416,7 @@ function applyCfgToConsole(){
   if($("method").querySelector(`option[value="${cfg.method}"]`))$("method").value=cfg.method;
   if($("provider").querySelector(`option[value="${cfg.mode}"]`))$("provider").value=cfg.mode;
 }
-function openDrawer(){applyCfgToForm();$("scrim").classList.add("open");$("drawer").classList.add("open");$("drawer").setAttribute("aria-hidden","false")}
+function openDrawer(){applyCfgToForm();refreshClientOllama();$("scrim").classList.add("open");$("drawer").classList.add("open");$("drawer").setAttribute("aria-hidden","false")}
 function closeDrawer(){$("scrim").classList.remove("open");$("drawer").classList.remove("open");$("drawer").setAttribute("aria-hidden","true")}
 $("gear").onclick=openDrawer;$("closedrawer").onclick=closeDrawer;
 $("savecfg").onclick=()=>{cfg={horizon:Number($("cfgHorizon").value)||6,method:$("cfgMethod").value,
@@ -464,9 +465,35 @@ async function run(){
   const series=parseSeries();
   if(series.length<2){toast("Enter at least 2 numbers.","bad");return;}
   const btn=$("run");btn.classList.add("loading");
+  const mode=$("provider").value;
+  const useLlm=$("useLlm").checked;
+  const model=cfg.model||null;
   const body={series,horizon:Number($("horizon").value),method:$("method").value,
-    use_llm:$("useLlm").checked,provider:$("provider").value};
+    use_llm:useLlm,provider:mode,model};
   try{
+    // The narration (Ollama check + LLM call) runs in the BROWSER (browser→host)
+    // when mode is local/auto and the host Ollama is reachable; the deterministic
+    // forecast still runs server-side. Every other provider stays server-side.
+    if(useLlm && (mode==="local"||mode==="auto")){
+      try{
+        const base=await probeOllama();
+        if(base){
+          // 1) server computes the deterministic numbers (no server LLM call)
+          const numResp=await fetch("/forecast",{method:"POST",headers:{"content-type":"application/json"},
+            body:JSON.stringify({...body,use_llm:false})});
+          if(numResp.ok){
+            const num=await numResp.json();
+            // 2) host Ollama narrates from those numbers, in the browser
+            body.client_narrative=await ollamaNarrate(base,num);
+          }
+        }else if(mode==="local"){
+          toast("Host Ollama not reachable — using offline fallback","info");
+        }
+      }catch{ toast("Host Ollama call failed — falling back","info"); }
+    }
+    // the server has no "local" provider; when we didn't get a browser→host
+    // narrative, fall back to "offline" so the request doesn't 422.
+    if(body.provider==="local" && !body.client_narrative) body.provider="offline";
     const [fc,an]=await Promise.all([
       fetch("/forecast",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)}),
       fetch("/anomalies",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({series})}),
@@ -576,15 +603,52 @@ document.addEventListener("keydown",e=>{
 
 /* ===================== POLISH KIT: routing config ===================== */
 const MODE_BLURBS={
-  auto:"auto = free if a key is set, else paid, else local, else offline.",
+  auto:"auto = local host Ollama if your browser can reach it, else free, else paid, else offline.",
+  local:"local = your host Ollama, called straight from the browser (browser→host). Narrates the summary for free, even on the cloud demo.",
   free:"free = OpenRouter free models only.",
   paid:"paid = Anthropic, then OpenAI.",
   offline:"offline = local Ollama if reachable, else a deterministic template (no API call).",
 };
 const MODE_CHAIN={
-  auto:["openrouter","anthropic","openai","ollama"],
+  auto:["ollama (browser→host)","openrouter","anthropic","openai"],
+  local:["ollama (browser→host)"],
   free:["openrouter"], paid:["anthropic","openai"], offline:["ollama"],
 };
+/* ===================== OLLAMA BRIDGE (browser→host) =====================
+   Only the Ollama check + narration call run in the BROWSER (your machine can
+   reach localhost; the cloud server can't). Every other provider stays
+   server-side, and the forecast/anomaly math is always server-side & deterministic.
+   The system + user prompts MIRROR the server's llm_summary.py so the narrative
+   reads the same whether it comes from the browser→host bridge or the server. */
+const OLLAMA_CANDIDATES=["http://localhost:11434","http://localhost:11435"];
+const NARRATE_SYSTEM=
+  "You are a forecasting analyst. In ONE or TWO plain sentences, summarize the "+
+  "forecast for a non-technical reader: the trend, the next values, and the "+
+  "method's backtest error. No preamble, no bullet points.";
+let _ollamaProbe={base:null,at:0};
+async function probeOllama(){
+  const now=Date.now();
+  if(now-_ollamaProbe.at<30000)return _ollamaProbe.base;
+  let base=null;
+  for(const c of OLLAMA_CANDIDATES){
+    try{const r=await fetch(`${c}/api/tags`,{signal:AbortSignal.timeout(1500)});if(r.ok){base=c;break;}}catch{}
+  }
+  _ollamaProbe={base,at:now};return base;
+}
+// num: a deterministic /forecast response (method, forecast, backtest, …).
+// Returns the host model's plain-English narrative as a string.
+async function ollamaNarrate(base, num){
+  const recent=parseSeries().slice(-8);   // mirrors the server's series[-8:]
+  const prompt=`METHOD: ${num.method}\nRECENT: [${recent.join(", ")}]\n`+
+    `FORECAST: [${(num.forecast||[]).join(", ")}]\nBACKTEST: ${JSON.stringify(num.backtest)}`;
+  const r=await fetch(`${base}/api/chat`,{method:"POST",headers:{"content-type":"application/json"},
+    body:JSON.stringify({model:cfg.model||"llama3.1:8b",stream:false,
+      messages:[{role:"system",content:NARRATE_SYSTEM},{role:"user",content:prompt}]}),
+    signal:AbortSignal.timeout(120000)});
+  if(!r.ok)throw new Error("ollama "+r.status);
+  const data=await r.json();
+  return (data?.message?.content||"").trim();
+}
 const PROVIDERS=["openrouter","anthropic","openai","ollama"];
 function selectMode(m){
   $$("#modeseg .segbtn").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.mode===m)));
@@ -592,6 +656,7 @@ function selectMode(m){
   $("modeactive").textContent=`active: ${m}`;
 }
 function currentMode(){return $("modeseg").querySelector('[aria-pressed="true"]')?.dataset.mode||"auto";}
+let clientOllama=false;   // browser→host Ollama reachability (browser-probed)
 function renderRouting(){
   const m=currentMode();
   $("modeactive").textContent=`active: ${m}`;
@@ -599,16 +664,27 @@ function renderRouting(){
   const models=providerStatus.models||{};
   // provider status rows + always-on offline/mock row
   const rows=PROVIDERS.map(p=>{
-    const on=!!avail[p];
-    const mdl=models[p]?` <span class="muted">${(models[p]||"").split("/").pop()}</span>`:"";
-    return `<div class="pstat"><span>${p}${mdl}</span><span class="pdot ${on?'on':''}" title="${on?'available':'not configured'}"></span></div>`;
+    // Ollama is checked in the BROWSER (browser→host); other providers server-side.
+    const on= p==="ollama" ? clientOllama : !!avail[p];
+    const label= p==="ollama" ? "ollama (browser→host)" : p;
+    const mdl= p!=="ollama" && models[p]?` <span class="muted">${(models[p]||"").split("/").pop()}</span>`:"";
+    const title= p==="ollama" ? (on?"reachable from your browser":"not reachable from your browser")
+                              : (on?"available":"not configured");
+    return `<div class="pstat"><span>${label}${mdl}</span><span class="pdot ${on?'on':''}" title="${title}"></span></div>`;
   }).join("")+
     `<div class="pstat"><span>offline (deterministic)</span><span class="pdot on" title="always available"></span></div>`;
   $("provrows").innerHTML=rows;
   // resolved fallback chain for the selected mode (available providers, then offline)
-  const chain=(MODE_CHAIN[m]||[]).filter(p=>avail[p]);
+  const chain=(MODE_CHAIN[m]||[]).filter(p=>{
+    if(p.startsWith("ollama"))return clientOllama;
+    return avail[p];
+  });
   const display=[...chain,"offline (deterministic)"];
   $("chainline").textContent=display.join("  →  ");
+}
+async function refreshClientOllama(){
+  clientOllama = !!(await probeOllama());
+  renderRouting();
 }
 $$("#modeseg .segbtn").forEach(b=>b.onclick=()=>{selectMode(b.dataset.mode);renderRouting();});
 
@@ -629,6 +705,7 @@ async function boot(){
   // populate
   try{await loadMethods();}catch{}
   await loadProviders();
+  refreshClientOllama();   // browser-side Ollama check (browser→host)
   applyCfgToConsole();
   // run a sample so the chart is populated on first load
   try{$("series").value=SAMPLES.trend;await run();}catch{}

@@ -26,7 +26,9 @@ from forecast.models import (
 )
 
 STATIC_DIR = Path(__file__).parent / "static"
-VALID_PROVIDERS = ("auto", "free", "paid", "offline", *llm.PROVIDERS)
+# "local" = browser→host Ollama: the browser narrates and submits client_narrative;
+# the server never has a "local" provider of its own (see run_forecast).
+VALID_PROVIDERS = ("auto", "free", "paid", "offline", "local", *llm.PROVIDERS)
 
 app = FastAPI(
     title="forecast",
@@ -66,7 +68,14 @@ def run_forecast(request: ForecastRequest) -> ForecastResponse:
 
     summary = None
     routing = None
-    if request.use_llm:
+    if request.use_llm and request.client_narrative is not None:
+        # Browser ran the narration on the user's host Ollama and submitted the
+        # prose; use it directly instead of calling a server-side provider. The
+        # deterministic forecast math above is unchanged.
+        summary = request.client_narrative.strip()
+        routing = RoutingInfo(provider="ollama (browser→host)",
+                              model=request.model or "host", fallbacks=[])
+    elif request.use_llm:
         summary, res = summarize(result["method"], request.series,
                                  result["forecast"], result["backtest"],
                                  request.provider, request.model)

@@ -13,6 +13,12 @@ class ForecastRequest(BaseModel):
     use_llm: bool = True            # natural-language summary via the router
     provider: str = "auto"
     model: str | None = None
+    # Narrative the BROWSER obtained from a host-local Ollama (browser→host).
+    # The cloud server can't reach your machine's Ollama; the browser can, so when
+    # this is supplied the server skips its own LLM call and uses it as the summary —
+    # letting a cloud-hosted demo narrate with a real local model. The deterministic
+    # forecast/anomaly math is unaffected. Other providers stay server-side.
+    client_narrative: str | None = None
 
 
 class RoutingInfo(BaseModel):
