@@ -92,3 +92,12 @@ html { scrollbar-width: thin; scrollbar-color: var(--color-line) transparent; }
 ::-webkit-scrollbar-thumb { background: var(--color-line); border-radius: 999px; border: 2px solid transparent; background-clip: content-box; }
 ::-webkit-scrollbar-thumb:hover { background: var(--color-muted); background-clip: content-box; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } .glass:hover { transform: none; } }
+
+
+/* fancy-fx — sheen + animated accent */
+.glass{ position:relative; overflow:hidden; }
+.glass::after{ content:""; position:absolute; inset:0; border-radius:inherit; pointer-events:none;
+  background:linear-gradient(115deg,transparent 35%,color-mix(in oklch,var(--color-ink) 6%,transparent) 50%,transparent 65%);
+  transform:translateX(-115%); transition:transform .9s ease; }
+.glass:hover::after{ transform:translateX(115%); }
+@media (prefers-reduced-motion:reduce){ .glass::after{ display:none } }
