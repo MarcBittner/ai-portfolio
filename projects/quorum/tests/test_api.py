@@ -77,3 +77,70 @@ def test_llm_status():
     s = client.get("/llm").json()
     assert set(s["providers"]) == {"anthropic", "openai", "ollama", "openrouter"}
     assert s["offline_fallback"] is True
+
+
+def test_plan_returns_redacted_per_step_prompts():
+    text = ("CONTRACT: t\n\nClause 1: Auto-renews for successive terms; contact "
+            "jane.doe@example.com or acct 4929114450021188.")
+    p = client.post("/plan", json={"workflow": "contract-review",
+                                    "payload": {"text": text}}).json()
+    steps = [s["step"] for s in p["steps"]]
+    assert "clause_extractor" in steps and "redline_drafter" in steps
+    # every returned prompt is already PII-redacted (the browser→host call is clean)
+    import json
+    blob = json.dumps(p["steps"])
+    assert "jane.doe@example.com" not in blob and "4929114450021188" not in blob
+    assert all("system" in s and "user" in s for s in p["steps"])
+
+
+def test_plan_unknown_workflow_404():
+    r = client.post("/plan", json={"workflow": "nope", "payload": {}})
+    assert r.status_code == 404 and "available" in r.json()
+
+
+def _host_ollama_completions(workflow, payload):
+    """Simulate browser→host Ollama by returning each step's deterministic output
+    for the server-resolved prompt — exactly the shape a host model would emit."""
+    from quorum.workflows import get_spec
+    spec = get_spec(workflow)
+    agents = {a.name: a for stage in spec.stages
+              for a in (stage if isinstance(stage, list) else [stage])}
+    plan = client.post("/plan", json={"workflow": workflow,
+                                       "payload": payload}).json()
+    return {s["step"]: agents[s["step"]].offline(s["system"], s["user"])
+            for s in plan["steps"]}
+
+
+def test_browser_to_host_path_uses_supplied_completions_and_keeps_governance():
+    text = ("CONTRACT: t\n\nClause 1: Auto-renews for successive terms; contact "
+            "jane.doe@example.com or acct 4929114450021188.\n"
+            "Clause 2: Total liability is unlimited, without cap.")
+    comps = _host_ollama_completions("contract-review", {"text": text})
+    r = client.post("/review", json={
+        "text": text, "mode": "local",
+        "client_completions": comps, "client_model": "llama3.1:8b"}).json()
+    # every step ran browser→host, NOT a server-side provider
+    providers = {s["provider"] for s in r["trace"]}
+    assert providers == {"ollama (browser→host)"}
+    assert {s["model"] for s in r["trace"]} == {"llama3.1:8b"}
+    # deterministic risk tally still computed server-side
+    assert r["risk_report"]["count"] >= 1
+    # governance NOT bypassed: audit verified, PII redacted, nothing leaked
+    import json
+    audit = client.get(f"/trace/{r['run_id']}").json()["audit"]
+    blob = json.dumps(r["trace"]) + json.dumps(audit)
+    assert "jane.doe@example.com" not in blob and "4929114450021188" not in blob
+    assert r["audit_verified"] is True
+    extractor = [e for e in audit if e["step"] == "clause_extractor"][0]
+    assert extractor["pii_redacted"]["EMAIL"] == 1
+
+
+def test_browser_to_host_path_run_endpoint_policy_qa():
+    payload = {"question": "What is the uptime SLA?"}
+    comps = _host_ollama_completions("policy-qa", payload)
+    r = client.post("/run", json={
+        "workflow": "policy-qa", "mode": "local",
+        "payload": payload, "client_completions": comps}).json()
+    assert {s["provider"] for s in r["trace"]} == {"ollama (browser→host)"}
+    assert r["audit_verified"] is True
+    assert r["rollup"]["by_provider"] == {"ollama (browser→host)": len(r["trace"])}

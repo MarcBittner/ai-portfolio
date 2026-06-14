@@ -15,8 +15,8 @@ from fastapi.responses import FileResponse, JSONResponse
 
 from quorum import __version__, evaluate, llm
 from quorum.data import RISK_LABELS, contract_text, contracts, get_contract
-from quorum.models import HealthResponse, ReviewRequest, RunRequest
-from quorum.orchestrator import Orchestrator, RunResult
+from quorum.models import HealthResponse, PlanRequest, ReviewRequest, RunRequest
+from quorum.orchestrator import Orchestrator, RunResult, plan_prompts
 from quorum.workflows import get_spec, registry, tally_risks
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -87,7 +87,9 @@ def review(req: ReviewRequest) -> JSONResponse:
         return JSONResponse({"error": "provide 'text' or a known 'contract_id'"},
                             status_code=400)
     spec = get_spec("contract-review")
-    rr = Orchestrator().run(spec, {"text": text}, mode=req.mode)
+    rr = Orchestrator().run(spec, {"text": text}, mode=req.mode,
+                            client_completions=req.client_completions,
+                            client_model=req.client_model)
     _store(rr)
     tally = tally_risks({s.step: s.output for s in rr.trace})
     return JSONResponse({
@@ -117,12 +119,34 @@ def run_workflow(req: RunRequest) -> JSONResponse:
         return JSONResponse(
             {"error": f"unknown workflow '{req.workflow}'",
              "available": list(registry())}, status_code=404)
-    rr = Orchestrator().run(spec, req.payload, mode=req.mode)
+    rr = Orchestrator().run(spec, req.payload, mode=req.mode,
+                            client_completions=req.client_completions,
+                            client_model=req.client_model)
     _store(rr)
     return JSONResponse({
         "run_id": rr.run_id, "workflow": rr.workflow, "result": rr.result,
         "rollup": rr.rollup, "audit_verified": rr.audit_verified,
         "trace": _trace_json(rr),
+    })
+
+
+@app.post("/plan")
+def plan(req: PlanRequest) -> JSONResponse:
+    """Resolve each agent step's redacted {system, user} prompt for a run.
+
+    The browser calls this for a local/auto run with host Ollama reachable, runs
+    each returned prompt against the user's host Ollama (browser→host), then submits
+    the completions to /run or /review as ``client_completions``. Orchestration and
+    governance stay server-side; the returned prompts are already PII-redacted.
+    """
+    spec = get_spec(req.workflow)
+    if spec is None:
+        return JSONResponse(
+            {"error": f"unknown workflow '{req.workflow}'",
+             "available": list(registry())}, status_code=404)
+    return JSONResponse({
+        "workflow": spec.name,
+        "steps": plan_prompts(spec, req.payload),
     })
 
 

@@ -62,12 +62,22 @@ class Orchestrator:
         self.audit = audit if audit is not None else governance.AuditLog()
 
     def _run_step(self, agent: Agent, state: dict, *, mode: str | None,
-                  run_id: str) -> StepResult:
+                  run_id: str,
+                  client_completions: dict[str, str] | None = None,
+                  client_model: str | None = None) -> StepResult:
         # 1. Build the agent's prompt from shared state, then REDACT before model.
         raw_prompt = agent_prompt(agent, state)
         clean_prompt, pii_counts = governance.redact(raw_prompt)
-        # 2. Run the agent (vendor-neutral routing; offline fallback is terminal).
-        step = agent.run(clean_prompt, mode=mode)
+        # 2. Produce the step output. If the browser ran this agent's (redacted)
+        #    prompt against the user's host Ollama and submitted the completion,
+        #    use it instead of calling a server-side provider — but STILL redact
+        #    (above) and audit (below). Otherwise route through the chain.
+        supplied = (client_completions or {}).get(agent.name)
+        if supplied is not None:
+            step = agent.from_client_completion(supplied, model=client_model,
+                                                mode=mode)
+        else:
+            step = agent.run(clean_prompt, mode=mode)
         step.prompt_summary = _summarize(clean_prompt)
         # 3. Append a value-light, tamper-evident audit entry for this step.
         self.audit.append({
@@ -88,8 +98,16 @@ class Orchestrator:
         return step
 
     def run(self, spec: WorkflowSpec, payload: dict, *,
-            mode: str | None = None) -> RunResult:
-        """Execute ``spec`` over ``payload`` and return the result + full trace."""
+            mode: str | None = None,
+            client_completions: dict[str, str] | None = None,
+            client_model: str | None = None) -> RunResult:
+        """Execute ``spec`` over ``payload`` and return the result + full trace.
+
+        ``client_completions`` maps step id -> raw completion the browser obtained
+        from the user's host Ollama (browser→host). Steps with a supplied completion
+        skip the server-side provider call; orchestration + governance (redact then
+        audit) still run on every step.
+        """
         run_id = "run-" + uuid.uuid4().hex[:10]
         state: dict = {"input": payload, "steps": {}}
         trace: list[StepResult] = []
@@ -97,13 +115,17 @@ class Orchestrator:
         for stage in spec.stages:
             agents = stage if isinstance(stage, list) else [stage]
             if len(agents) == 1:
-                results = [self._run_step(agents[0], state, mode=mode,
-                                          run_id=run_id)]
+                results = [self._run_step(
+                    agents[0], state, mode=mode, run_id=run_id,
+                    client_completions=client_completions,
+                    client_model=client_model)]
             else:
                 # Parallel fan-out: independent steps over the same shared state.
                 with ThreadPoolExecutor(max_workers=len(agents)) as pool:
-                    futures = [pool.submit(self._run_step, a, state, mode=mode,
-                                           run_id=run_id) for a in agents]
+                    futures = [pool.submit(
+                        self._run_step, a, state, mode=mode, run_id=run_id,
+                        client_completions=client_completions,
+                        client_model=client_model) for a in agents]
                     results = [f.result() for f in futures]
             for step in results:
                 state["steps"][step.step] = step.output
@@ -120,6 +142,39 @@ class Orchestrator:
             rollup=governance.rollup(trace),
             audit_verified=verify["ok"],
         )
+
+
+def plan_prompts(spec: WorkflowSpec, payload: dict) -> list[dict]:
+    """Resolve each step's redacted {system, user} prompt for a browser→host run.
+
+    Walks the spec exactly as :meth:`Orchestrator.run` would, but resolves the
+    upstream state with each agent's **deterministic offline fallback** so later
+    steps' prompts are populated without any model call. Every returned ``user``
+    prompt is already PII-redacted — so even the browser→host Ollama call never
+    sees raw PII. The browser runs these prompts on the user's host Ollama and
+    submits the completions to :meth:`Orchestrator.run` as ``client_completions``;
+    the live run re-redacts and audits each step regardless.
+    """
+    state: dict = {"input": payload, "steps": {}}
+    plan: list[dict] = []
+    for stage in spec.stages:
+        agents = stage if isinstance(stage, list) else [stage]
+        for agent in agents:
+            raw_prompt = agent_prompt(agent, state)
+            clean_prompt, _ = governance.redact(raw_prompt)
+            plan.append({
+                "step": agent.name,
+                "role": agent.role,
+                "system": agent.system_prompt,
+                "user": clean_prompt,
+            })
+        # Advance shared state deterministically so downstream prompts resolve.
+        for agent in agents:
+            raw_prompt = agent_prompt(agent, state)
+            clean_prompt, _ = governance.redact(raw_prompt)
+            output = agent._shape(agent.offline(agent.system_prompt, clean_prompt))
+            state["steps"][agent.name] = output
+    return plan
 
 
 def agent_prompt(agent: Agent, state: dict) -> str:

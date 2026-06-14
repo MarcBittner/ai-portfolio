@@ -64,19 +64,40 @@ class Agent:
     output_keys: tuple[str, ...]           # the JSON output contract
     offline: Callable[[str, str], str]     # deterministic fallback (system,user)->json
 
+    def _shape(self, raw_text: str) -> dict:
+        """Parse a model response to JSON and enforce the output contract."""
+        output = _extract_json(raw_text)
+        # Enforce the output contract: every declared key is present (default []),
+        # so downstream steps and the deterministic tally can rely on the shape.
+        for k in self.output_keys:
+            output.setdefault(k, [])
+        return output
+
     def run(self, user_prompt: str, *, mode: str | None = None,
             max_tokens: int = 1024) -> StepResult:
         """Run this agent through the routing chain and validate its output."""
         res = llm.complete(self.system_prompt, user_prompt, offline=self.offline,
                            mode=mode, json_mode=True, max_tokens=max_tokens)
-        output = _extract_json(res.text)
-        # Enforce the output contract: every declared key is present (default []),
-        # so downstream steps and the deterministic tally can rely on the shape.
-        for k in self.output_keys:
-            output.setdefault(k, [])
         return StepResult(
-            step=self.name, role=self.role, output=output,
+            step=self.name, role=self.role, output=self._shape(res.text),
             provider=res.provider, model=res.model, mode=res.mode,
             latency_ms=res.latency_ms, cost_usd=res.cost_usd,
             fallbacks=res.fallbacks,
+        )
+
+    def from_client_completion(self, raw_text: str, *, model: str | None = None,
+                               mode: str | None = None) -> StepResult:
+        """Build a StepResult from a browser→host Ollama completion.
+
+        The browser ran *this agent's* prompt against the user's own host Ollama
+        (the cloud server can't reach localhost; the browser can) and submitted the
+        raw completion text. We skip the provider call and reuse the same contract
+        validation as :meth:`run`, so the output shape is identical to a server-side
+        run. The orchestrator still redacts the prompt before the browser sees it
+        and audits the step after — governance is never bypassed.
+        """
+        return StepResult(
+            step=self.name, role=self.role, output=self._shape(raw_text),
+            provider="ollama (browser→host)", model=model or "host",
+            mode=mode or "local", latency_ms=0.0, cost_usd=0.0, fallbacks=[],
         )
