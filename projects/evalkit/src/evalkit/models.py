@@ -9,12 +9,24 @@ class EvalItem(BaseModel):
     reference: str
 
 
+class ClientJudgment(BaseModel):
+    """One per-item LLM-judge verdict the BROWSER obtained from a host-local
+    Ollama (browser→host)."""
+    correct: bool
+
+
 class EvaluateRequest(BaseModel):
     items: list[EvalItem] = Field(min_length=1, max_length=2000)
     metrics: list[str] | None = None     # may include "llm_judge"
     thresholds: dict[str, float] | None = None
     provider: str = "auto"               # for the llm_judge metric
     model: str | None = None
+    # Judge verdicts the BROWSER obtained from a host-local Ollama (browser→host).
+    # The cloud server can't reach your machine's Ollama; the browser can, so when
+    # these are supplied the server skips its own LLM-judge call and uses them —
+    # letting a cloud-hosted demo grade with a real local model. The deterministic
+    # metric math, thresholds, and gate are unchanged. One entry per item, in order.
+    client_judgments: list[ClientJudgment] | None = None
 
 
 class ItemResult(BaseModel):

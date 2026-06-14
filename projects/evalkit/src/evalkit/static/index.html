@@ -334,6 +334,7 @@
       <label>LLM-judge routing mode <span class="hint">used by the <code>llm_judge</code> metric</span></label>
       <div class="seg" id="modeseg">
         <button type="button" class="segbtn" data-mode="auto">auto</button>
+        <button type="button" class="segbtn" data-mode="local">local</button>
         <button type="button" class="segbtn" data-mode="free">free</button>
         <button type="button" class="segbtn" data-mode="paid">paid</button>
         <button type="button" class="segbtn" data-mode="offline">offline</button>
@@ -421,7 +422,7 @@ function syncJudgeControls(){
   if(sel.querySelector(`option[value="${cfg.mode}"]`))sel.value=cfg.mode;
   $("#model").value=cfg.model||"";
 }
-function openDrawer(){applyCfgToForm();$("#scrim").classList.add("open");$("#drawer").classList.add("open");$("#drawer").setAttribute("aria-hidden","false")}
+function openDrawer(){applyCfgToForm();refreshClientOllama();$("#scrim").classList.add("open");$("#drawer").classList.add("open");$("#drawer").setAttribute("aria-hidden","false")}
 function closeDrawer(){$("#scrim").classList.remove("open");$("#drawer").classList.remove("open");$("#drawer").setAttribute("aria-hidden","true")}
 $("#gear").onclick=openDrawer;$("#closedrawer").onclick=closeDrawer;
 $("#savecfg").onclick=()=>{
@@ -450,6 +451,7 @@ async function loadProviders(){
     const sel=$("#provider");
     const freeLabel="Free · "+shortName((p.free_models||[])[0]||"");
     sel.insertAdjacentHTML("beforeend",
+      `<option value="local">Local (host Ollama, browser→host)</option>`+
       `<option value="free">${freeLabel}</option>`+
       `<option value="offline">Offline (deterministic)</option>`+
       (p.available.paid?`<option value="paid">Paid (your key)</option>`:""));
@@ -483,6 +485,20 @@ async function run(){
   });
   const body={items,metrics,thresholds:Object.keys(thresholds).length?thresholds:null,
     provider:$("#provider").value,model:$("#model").value.trim()||null};
+  // The Ollama check + LLM-judge call run in the BROWSER (browser→host); other
+  // providers stay server-side. When the judge metric is selected and the host
+  // Ollama is reachable, grade locally and submit the verdicts as client_judgments.
+  const mode=body.provider;
+  if(metrics.includes("llm_judge") && (mode==="local"||mode==="auto")){
+    try{
+      const base=await probeOllama();
+      if(base){ body.client_judgments=await ollamaJudge(base,items); }
+      else if(mode==="local"){ toast("Host Ollama not reachable — using offline fallback","info"); }
+    }catch{ toast("Host Ollama call failed — falling back","info"); }
+  }
+  // the server has no "local" provider; when we didn't get a browser→host result,
+  // fall back to "offline" so the request doesn't 422.
+  if(body.provider==="local" && !body.client_judgments) body.provider="offline";
   try{
     const res=await fetch("evaluate",{method:"POST",
       headers:{"content-type":"application/json"},body:JSON.stringify(body)});
@@ -564,16 +580,58 @@ document.addEventListener("keydown",e=>{
 
 /* ===================== POLISH KIT: routing config ===================== */
 const MODE_BLURBS={
-  auto:"auto = free (OpenRouter) if keyed, else paid, else local Ollama, else mock.",
+  auto:"auto = local host Ollama if your browser can reach it, else free, else paid, else mock.",
+  local:"local = your host Ollama, called straight from the browser (browser→host). Grades with a real model for free, even on the cloud demo.",
   free:"free = OpenRouter free models only, then mock.",
   paid:"paid = Anthropic, then OpenAI (your key), then mock.",
-  offline:"offline = local Ollama if reachable, else deterministic mock.",
+  offline:"offline = deterministic fallback (token-F1), no model.",
 };
 const MODE_CHAIN={
-  auto:["openrouter","anthropic","openai","ollama"],
-  free:["openrouter"], paid:["anthropic","openai"], offline:["ollama"],
+  auto:["ollama (browser→host)","openrouter","anthropic","openai"],
+  local:["ollama (browser→host)"],
+  free:["openrouter"], paid:["anthropic","openai"], offline:[],
 };
 const PROVIDERS=["openrouter","anthropic","openai","ollama"];
+
+/* ===================== OLLAMA BRIDGE (browser→host) =====================
+   Only the Ollama check + the LLM-judge call run in the BROWSER (your machine
+   can reach localhost; the cloud server can't). Every other provider stays
+   server-side. The judge prompt mirrors evalkit/judge.py exactly. */
+const OLLAMA_CANDIDATES=["http://localhost:11434","http://localhost:11435"];
+const JUDGE_SYSTEM="You are a strict grader. Given a REFERENCE answer and a candidate "+
+  'ANSWER, decide if the answer is correct. Return ONLY JSON: {"correct": true|false}.';
+let _ollamaProbe={base:null,at:0};
+async function probeOllama(){
+  const now=Date.now();
+  if(now-_ollamaProbe.at<30000)return _ollamaProbe.base;
+  let base=null;
+  for(const c of OLLAMA_CANDIDATES){
+    try{const r=await fetch(`${c}/api/tags`,{signal:AbortSignal.timeout(1500)});if(r.ok){base=c;break;}}catch{}
+  }
+  _ollamaProbe={base,at:now};return base;
+}
+async function ollamaJudgeOne(base, prediction, reference){
+  const r=await fetch(`${base}/api/chat`,{method:"POST",headers:{"content-type":"application/json"},
+    body:JSON.stringify({model:cfg.model||"llama3.1:8b",stream:false,format:"json",
+      messages:[{role:"system",content:JUDGE_SYSTEM},
+                {role:"user",content:`REFERENCE:\n${reference}\n\nANSWER:\n${prediction}`}]}),
+    signal:AbortSignal.timeout(120000)});
+  if(!r.ok)throw new Error("ollama "+r.status);
+  const data=await r.json(); let s=(data?.message?.content||"").trim();
+  if(s.includes("```"))s=s.split("```")[1]?.replace(/^json/i,"").trim()||s;
+  const a=Math.min(...["{","["].map(c=>s.indexOf(c)).filter(i=>i>=0).concat([1e9]));
+  const b=Math.max(s.lastIndexOf("}"),s.lastIndexOf("]"));
+  let parsed; try{parsed=JSON.parse(a<1e9&&b>=0?s.slice(a,b+1):s);}catch{parsed=null;}
+  return {correct: !!(parsed&&parsed.correct===true)};
+}
+/* Grade every item via host Ollama; returns one {correct} verdict per item, in order. */
+async function ollamaJudge(base, items){
+  const out=[];
+  for(const it of items){ out.push(await ollamaJudgeOne(base, it.prediction, it.reference)); }
+  return out;
+}
+
+let clientOllama=false;   // browser→host Ollama reachability (browser-probed)
 function selectMode(m){
   $$("#modeseg .segbtn").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.mode===m)));
   $("#modeblurb").textContent=MODE_BLURBS[m]||"";
@@ -585,17 +643,28 @@ function renderRouting(){
   $("#modeactive").textContent=`active: ${m}`;
   const avail=provStatus.available||{};const models=provStatus.models||{};
   const rows=PROVIDERS.map(p=>{
-    const on=!!avail[p];
-    const mdl=on?(shortName(models[p])||""):"";
-    return `<div class="pstat"><span>${p}</span>
-      <span class="pmodel">${mdl}</span><span class="pdot ${on?'on':''}" title="${on?'available':'not configured'}"></span></div>`;
+    // Ollama is checked in the BROWSER (browser→host); other providers server-side.
+    const on= p==="ollama" ? clientOllama : !!avail[p];
+    const label= p==="ollama" ? "ollama (browser→host)" : p;
+    const mdl= p==="ollama" ? (on?shortName(cfg.model||models.ollama||""):"") : (on?(shortName(models[p])||""):"");
+    const title= p==="ollama" ? (on?"reachable from your browser":"not reachable from your browser")
+                              : (on?"available":"not configured");
+    return `<div class="pstat"><span>${label}</span>
+      <span class="pmodel">${mdl}</span><span class="pdot ${on?'on':''}" title="${title}"></span></div>`;
   }).join("")+
     `<div class="pstat"><span>mock (deterministic)</span>
       <span class="pmodel">mock</span><span class="pdot on" title="always available"></span></div>`;
   $("#provrows").innerHTML=rows;
-  const chain=(MODE_CHAIN[m]||[]).filter(p=>avail[p]);
+  const chain=(MODE_CHAIN[m]||[]).filter(p=>{
+    if(p.startsWith("ollama"))return clientOllama;
+    return avail[p];
+  });
   const display=[...chain,"mock (deterministic)"];
   $("#chainline").textContent=display.join("  →  ");
+}
+async function refreshClientOllama(){
+  clientOllama = !!(await probeOllama());
+  renderRouting();
 }
 $$("#modeseg .segbtn").forEach(b=>b.onclick=()=>{selectMode(b.dataset.mode);renderRouting();});
 
@@ -614,6 +683,7 @@ async function boot(){
   $$(".reveal").forEach((el,i)=>setTimeout(()=>el.classList.add("in"),90*i));
   await loadMetrics();
   await loadProviders();
+  refreshClientOllama();   // browser-side Ollama check (browser→host)
 }
 boot();
 </script>
