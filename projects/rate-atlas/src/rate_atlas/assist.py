@@ -216,21 +216,44 @@ def apply_mapping(hospital: str, rows: list[dict],
     return records
 
 
-def assist(hospital: str, raw: str, *, mode: str | None = None) -> dict:
+def assist(hospital: str, raw: str, *, mode: str | None = None,
+           client_mapping: dict[str, str | None] | None = None) -> dict:
     """End-to-end assisted ingest of one unknown-format sample: parse → propose a
-    mapping (LLM or offline) → apply it deterministically to canonical records."""
+    mapping → apply it deterministically to canonical records.
+
+    The mapping normally comes from the routing chain (LLM or offline matcher).
+    When ``client_mapping`` is supplied, the BROWSER already ran the mapping on the
+    user's host-local Ollama (browser→host) and submitted the result; the server
+    skips its own LLM call and applies that mapping instead, validated against the
+    parsed source columns and canonical fields. Other providers stay server-side.
+    """
     columns, rows, kind = _parse_sample(raw)
-    proposed = propose_mapping(columns, rows, mode=mode)
-    records = apply_mapping(hospital, rows, proposed["mapping"])
-    mapped = sum(1 for v in proposed["mapping"].values() if v)
+    if client_mapping is not None:
+        # Validate the browser-supplied mapping against the parsed columns /
+        # canonical fields, exactly as ``_parse_mapping`` would for a server call.
+        mapping: dict[str, str | None] = {}
+        for col in columns:
+            val = client_mapping.get(col)
+            mapping[col] = val if val in CANONICAL_FIELDS else None
+        provider, model = "ollama (browser→host)", "host"
+        latency_ms, cost_usd, fallbacks = 0, 0.0, []
+        used_mode = mode or "local"
+    else:
+        proposed = propose_mapping(columns, rows, mode=mode)
+        mapping = proposed["mapping"]
+        provider, model = proposed["provider"], proposed["model"]
+        latency_ms, cost_usd = proposed["latency_ms"], proposed["cost_usd"]
+        fallbacks, used_mode = proposed["fallbacks"], proposed["mode"]
+    records = apply_mapping(hospital, rows, mapping)
+    mapped = sum(1 for v in mapping.values() if v)
     return {
         "hospital": hospital, "detected_kind": kind, "source_columns": columns,
-        "mapping": proposed["mapping"], "records": records,
+        "mapping": mapping, "records": records,
         "rows_in": len(rows), "rows_mapped": len(records),
         "columns_mapped": mapped, "columns_total": len(columns),
-        "provider": proposed["provider"], "model": proposed["model"],
-        "mode": proposed["mode"], "latency_ms": proposed["latency_ms"],
-        "cost_usd": proposed["cost_usd"], "fallbacks": proposed["fallbacks"],
+        "provider": provider, "model": model,
+        "mode": used_mode, "latency_ms": latency_ms,
+        "cost_usd": cost_usd, "fallbacks": fallbacks,
     }
 
 

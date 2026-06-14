@@ -22,3 +22,9 @@ class AssistRequest(BaseModel):
     hospital: str | None = None
     mode: str | None = None       # pin the routing tier: auto|paid|local|free|offline
     ingest: bool = True           # apply the mapping and load the rows into the store
+    # Column→canonical mapping the BROWSER obtained from a host-local Ollama
+    # (browser→host). The cloud server can't reach your machine's Ollama; the
+    # browser can, so when this is supplied the server skips its own LLM call and
+    # applies this mapping directly — letting a cloud-hosted demo run a real local
+    # model. Other providers stay server-side.
+    client_mapping: dict[str, str | None] | None = None
