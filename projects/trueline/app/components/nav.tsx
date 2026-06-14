@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { OrganizationSwitcher, UserButton } from "@clerk/nextjs";
 
+import { AppLauncher } from "./app-launcher";
+
 function ThemeToggle() {
   // `null` until mounted so SSR markup matches the bootstrap-set class
   // (avoids a hydration mismatch on the icon).
@@ -71,6 +73,7 @@ export function Nav() {
         About
       </Link>
       <div className="ml-auto flex items-center gap-3">
+        <AppLauncher />
         <ThemeToggle />
         <OrganizationSwitcher
           hidePersonal={false}

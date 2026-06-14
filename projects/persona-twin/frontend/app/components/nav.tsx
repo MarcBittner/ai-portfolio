@@ -5,6 +5,7 @@ import { getHealth, modelTier, type Health } from "~/lib/api";
 import { loadPrefs, savePrefs, type Theme } from "~/lib/prefs";
 import { Help, type HelpSection } from "~/components/help";
 import { Settings } from "~/components/settings";
+import { AppLauncher } from "~/components/app-launcher";
 
 type Active = "home" | "chat" | "interview" | "build" | "routing" | "analytics";
 
@@ -36,6 +37,7 @@ const TIER_TONE: Record<string, string> = {
 export function Nav({ active }: { active: Active }) {
   const [help, setHelp] = useState(false);
   const [settings, setSettings] = useState(false);
+  const [launcher, setLauncher] = useState(false);
   const [health, setHealth] = useState<Health | null>(null);
   const [dark, setDark] = useState(false);
 
@@ -111,6 +113,27 @@ export function Nav({ active }: { active: Active }) {
             </button>
           )}
           <button
+            onClick={() => setLauncher(true)}
+            aria-label="Browse all demos"
+            title="Browse all demos"
+            className="rounded-md px-2 py-1 text-sm hover:bg-muted"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinejoin="round"
+              aria-hidden
+              className="h-4 w-4"
+            >
+              <rect x="3" y="3" width="7" height="7" rx="1.5" />
+              <rect x="14" y="3" width="7" height="7" rx="1.5" />
+              <rect x="3" y="14" width="7" height="7" rx="1.5" />
+              <rect x="14" y="14" width="7" height="7" rx="1.5" />
+            </svg>
+          </button>
+          <button
             onClick={toggleTheme}
             aria-label="Toggle theme"
             title="Toggle light / dark"
@@ -139,6 +162,7 @@ export function Nav({ active }: { active: Active }) {
 
       <Help open={help} onClose={() => setHelp(false)} section={HELP_FOR[active]} />
       <Settings open={settings} onClose={() => setSettings(false)} />
+      <AppLauncher open={launcher} onClose={() => setLauncher(false)} />
     </>
   );
 }
