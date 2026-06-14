@@ -35,6 +35,23 @@ def llm_entities(text: str, provider: str | None = "auto",
     return spans, result
 
 
+def client_ner_spans(text: str, client_ner) -> list[Span]:
+    """Map browser→host Ollama NER entities back to spans in the source text.
+
+    The browser ran the same NER prompt against the user's host Ollama and
+    submitted the entities; this mirrors :func:`llm_entities`'s span mapping
+    without a server-side model call.
+    """
+    spans: list[Span] = []
+    for ent in client_ner:
+        etype, value = str(ent.type).upper(), str(ent.text)
+        if etype in LLM_TYPES and value:
+            idx = text.find(value)
+            if idx != -1:
+                spans.append(Span(etype, idx, idx + len(value), value))
+    return spans
+
+
 def merge(regex_spans: list[Span], llm_spans: list[Span]) -> list[Span]:
     """Combine, regex wins on overlap (structured PII > model output)."""
     claimed = [(s.start, s.end) for s in regex_spans]

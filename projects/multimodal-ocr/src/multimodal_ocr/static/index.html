@@ -321,11 +321,12 @@
       <label>Routing mode <span class="hint">which provider LLM NER uses</span></label>
       <div class="seg" id="modeseg">
         <button type="button" class="segbtn" data-mode="auto">auto</button>
+        <button type="button" class="segbtn" data-mode="local">local</button>
         <button type="button" class="segbtn" data-mode="free">free</button>
         <button type="button" class="segbtn" data-mode="paid">paid</button>
         <button type="button" class="segbtn" data-mode="offline">offline</button>
       </div>
-      <div class="hint" id="modeblurb">auto = free if keyed, else paid, else local Ollama, else mock.</div>
+      <div class="hint" id="modeblurb">auto = local host Ollama if your browser can reach it, else free, else paid, else mock.</div>
     </div>
     <div class="field">
       <label for="cfgModel">Model override <span class="hint">optional</span></label>
@@ -409,7 +410,7 @@ function syncProvider(){
 }
 
 /* ===================== drawer ===================== */
-function openDrawer(){applyCfgToForm();$("scrim").classList.add("open");$("drawer").classList.add("open");$("drawer").setAttribute("aria-hidden","false")}
+function openDrawer(){applyCfgToForm();refreshClientOllama();$("scrim").classList.add("open");$("drawer").classList.add("open");$("drawer").setAttribute("aria-hidden","false")}
 function closeDrawer(){$("scrim").classList.remove("open");$("drawer").classList.remove("open");$("drawer").setAttribute("aria-hidden","true")}
 $("gear").onclick=openDrawer;$("closedrawer").onclick=closeDrawer;
 $("savecfg").onclick=()=>{cfg={sample:$("cfgSample").value,useLlm:$("cfgUseLlm").checked,
@@ -417,6 +418,20 @@ $("savecfg").onclick=()=>{cfg={sample:$("cfgSample").value,useLlm:$("cfgUseLlm")
     model:$("cfgModel").value.trim()};
   localStorage.setItem(CFG_KEY,JSON.stringify(cfg));applyCfgToConsole();renderRouting();closeDrawer();toast("Settings saved","ok")};
 $("resetcfg").onclick=()=>{cfg={sample:"",useLlm:true,mode:"auto",model:""};localStorage.removeItem(CFG_KEY);applyCfgToForm();applyCfgToConsole();renderRouting();toast("Reset to defaults","info")};
+
+/* Join tokens into reading-order text, mirroring backend pipeline.tokens_to_text
+   (sort by y then x; newline between rows, space within a row) so host-Ollama
+   entity substrings line up with the server's char offsets. */
+function tokensToText(tokens){
+  if(!tokens||!tokens.length)return "";
+  const ordered=[...tokens].sort((a,b)=>a.y-b.y||a.x-b.x);
+  let out="",curY=null;
+  for(const t of ordered){
+    if(curY!==null)out+=(t.y!==curY)?"\n":" ";
+    curY=t.y;out+=t.text;
+  }
+  return out;
+}
 
 /* ===================== document rendering (preserved) ===================== */
 function extent(tokens){
@@ -443,10 +458,27 @@ function renderDoc(id,tokens,boxes){
 async function run(){
   const btn=$("run");btn.classList.add("loading");
   const sample=$("sample").value;
+  const useLlm=$("useLlm").checked;
+  const mode=currentMode();
+  // local has no server-side provider; on fallback the server runs its offline path.
+  const serverProvider=(mode==="local")?"offline":($("provider").value||mode);
+  const model=$("model").value||null;
+  const body={sample,use_llm:useLlm,provider:serverProvider,model};
+  // Ollama check + call run in the BROWSER (browser→host); other providers server-side.
+  if(useLlm && (mode==="local"||mode==="auto")){
+    try{
+      const base=await probeOllama();
+      if(base){
+        const text=tokensToText(SAMPLES[sample]);
+        body.client_ner=await ollamaNER(base,text);
+      }else if(mode==="local"){
+        toast("Host Ollama not reachable — using offline fallback","info");
+      }
+    }catch{ toast("Host Ollama call failed — falling back","info"); }
+  }
   try{
     const data=await j("/process",{method:"POST",headers:{"content-type":"application/json"},
-      body:JSON.stringify({sample,use_llm:$("useLlm").checked,
-        provider:$("provider").value,model:$("model").value||null})});
+      body:JSON.stringify(body)});
     $("routing").innerHTML=data.routing
       ? `LLM NER routed via <code>${data.routing.provider}</code> (<code>${data.routing.model}</code>)`
       : `<span class="muted">deterministic detectors only (no LLM call)</span>`;
@@ -512,35 +544,82 @@ document.addEventListener("keydown",e=>{
 
 /* ===================== POLISH KIT: routing config ===================== */
 const MODE_BLURBS={
-  auto:"auto = free if keyed, else paid, else local Ollama, else mock.",
+  auto:"auto = local host Ollama if your browser can reach it, else free, else paid, else mock.",
+  local:"local = your host Ollama, called straight from the browser (browser→host). Runs a real model for free, even on the cloud demo.",
   free:"free = OpenRouter free models only.",
   paid:"paid = Anthropic, then OpenAI (your key).",
   offline:"offline = deterministic detectors only (no LLM call).",
 };
 const MODE_CHAIN={
-  auto:["openrouter","anthropic","openai","ollama","mock"],
+  auto:["ollama (browser→host)","openrouter","anthropic","openai","mock"],
+  local:["ollama (browser→host)"],
   free:["openrouter","mock"], paid:["anthropic","openai","mock"], offline:[],
 };
 const PROVIDERS=["openrouter","anthropic","openai","ollama"];
+
+/* ===================== OLLAMA BRIDGE (browser→host) =====================
+   Only the Ollama check + call run in the BROWSER (your machine can reach
+   localhost; the cloud server can't). Every other provider stays server-side.
+   Mirrors the NER prompt in src/multimodal_ocr/llm_ner.py so host-Ollama
+   entities map to the same token boxes the server path would produce. */
+const OLLAMA_CANDIDATES=["http://localhost:11434","http://localhost:11435"];
+const NER_SYSTEM="You extract personal entities from OCR'd document text for redaction. "+
+  'Return ONLY a JSON array of {"type": "PERSON"|"ORG"|"LOCATION", "text": "<exact substring>"}. '+
+  "Copy the substring verbatim. No prose, no code fences.";
+let _ollamaProbe={base:null,at:0};
+async function probeOllama(){
+  const now=Date.now();
+  if(now-_ollamaProbe.at<30000)return _ollamaProbe.base;
+  let base=null;
+  for(const c of OLLAMA_CANDIDATES){
+    try{const r=await fetch(`${c}/api/tags`,{signal:AbortSignal.timeout(1500)});if(r.ok){base=c;break;}}catch{}
+  }
+  _ollamaProbe={base,at:now};return base;
+}
+async function ollamaNER(base, text){
+  const r=await fetch(`${base}/api/chat`,{method:"POST",headers:{"content-type":"application/json"},
+    body:JSON.stringify({model:cfg.model||"llama3.1:8b",stream:false,format:"json",
+      messages:[{role:"system",content:NER_SYSTEM},{role:"user",content:"TEXT:\n"+text}]}),
+    signal:AbortSignal.timeout(120000)});
+  if(!r.ok)throw new Error("ollama "+r.status);
+  const data=await r.json(); let s=(data?.message?.content||"").trim();
+  if(s.includes("```"))s=s.split("```")[1]?.replace(/^json/i,"").trim()||s;
+  const a=s.indexOf("["),b=s.lastIndexOf("]");
+  let parsed; try{parsed=JSON.parse(a>=0?s.slice(a,b+1):s);}catch{return [];}
+  return Array.isArray(parsed)?parsed.filter(e=>e&&e.type&&e.text).map(e=>({type:String(e.type).toUpperCase(),text:String(e.text)})):[];
+}
+
 function selectMode(m){
   $$("#modeseg .segbtn").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.mode===m)));
   $("modeblurb").textContent=MODE_BLURBS[m]||"";
   $("modeactive").textContent=`active: ${m}`;
 }
 function currentMode(){return $("modeseg").querySelector('[aria-pressed="true"]')?.dataset.mode||"auto";}
+let clientOllama=false;   // browser→host Ollama reachability (browser-probed)
 function renderRouting(){
   const m=currentMode();
   $("modeactive").textContent=`active: ${m}`;
   const avail=provStatus.available||{};
   const rows=PROVIDERS.map(p=>{
-    const on=!!avail[p];
-    return `<div class="pstat"><span>${p}</span><span class="pdot ${on?'on':''}" title="${on?'available':'not configured'}"></span></div>`;
+    // Ollama is checked in the BROWSER (browser→host); other providers server-side.
+    const on= p==="ollama" ? clientOllama : !!avail[p];
+    const label= p==="ollama" ? "ollama (browser→host)" : p;
+    const title= p==="ollama" ? (on?"reachable from your browser":"not reachable from your browser")
+                              : (on?"available":"not configured");
+    return `<div class="pstat"><span>${label}</span><span class="pdot ${on?'on':''}" title="${title}"></span></div>`;
   }).join("")+
     `<div class="pstat"><span>offline (deterministic)</span><span class="pdot on" title="always available"></span></div>`;
   $("provrows").innerHTML=rows;
-  const chain=(MODE_CHAIN[m]||[]).filter(p=>avail[p]||p==="mock");
+  const chain=(MODE_CHAIN[m]||[]).filter(p=>{
+    if(p.startsWith("ollama"))return clientOllama;
+    return avail[p]||p==="mock";
+  });
   const display=[...chain,"offline (deterministic)"];
   $("chainline").textContent=display.join("  →  ");
+}
+async function refreshClientOllama(){
+  clientOllama = !!(await probeOllama());
+  renderRouting();
 }
 $$("#modeseg .segbtn").forEach(b=>b.onclick=()=>{selectMode(b.dataset.mode);renderRouting();});
 
@@ -589,6 +668,7 @@ async function boot(){
       list.map(s=>`<option>${s.name}</option>`).join("");
   }catch{}
   await loadProviders();
+  refreshClientOllama();   // browser-side Ollama check (browser→host)
   applyCfgToConsole();
   renderDoc("orig",SAMPLES[$("sample").value],[]);
   $("redacted").innerHTML="";

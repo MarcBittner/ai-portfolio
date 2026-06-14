@@ -11,6 +11,11 @@ class TokenIO(BaseModel):
     h: int
 
 
+class NerEntity(BaseModel):
+    type: str
+    text: str
+
+
 class ProcessRequest(BaseModel):
     sample: str | None = None
     tokens: list[TokenIO] | None = None
@@ -18,6 +23,12 @@ class ProcessRequest(BaseModel):
     use_llm: bool = True            # LLM NER over the OCR text (names/orgs)
     provider: str = "auto"
     model: str | None = None
+    # NER entities the BROWSER obtained from a host-local Ollama (browser→host).
+    # The cloud server can't reach your machine's Ollama; the browser can, so when
+    # these are supplied the server skips its own LLM call and maps them to token
+    # boxes — letting a cloud-hosted demo run a real local model. Other providers
+    # stay server-side.
+    client_ner: list[NerEntity] | None = None
 
 
 class RoutingInfo(BaseModel):
