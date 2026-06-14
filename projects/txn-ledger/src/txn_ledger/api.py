@@ -79,8 +79,19 @@ def ask(req: AskRequest) -> dict:
     """Natural-language → SQL: translate the question via the routing chain,
     guard the generated SQL to a single read-only SELECT, run it, and return the
     rows plus the generated SQL and provider telemetry. A guard rejection returns
-    ``safe: false`` with the offending SQL and is never executed."""
-    return nl2sql.ask(req.question, mode=req.mode)
+    ``safe: false`` with the offending SQL and is never executed.
+
+    If ``client_sql`` is present the browser reached the user's host Ollama
+    itself (browser→host) and supplies the SQL; the server skips its own LLM
+    generation but STILL runs the safety guard before executing — client input
+    is never trusted. Absent → unchanged server-side routing."""
+    mode = req.mode
+    # The server has no browser→host "local" provider; if the browser couldn't
+    # reach the host Ollama (no client_sql) a "local" request would otherwise
+    # have nothing to route to, so fall back to the deterministic offline matcher.
+    if mode == "local" and not req.client_sql:
+        mode = "offline"
+    return nl2sql.ask(req.question, mode=mode, client_sql=req.client_sql)
 
 
 @app.get("/evals")
