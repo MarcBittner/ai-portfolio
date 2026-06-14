@@ -754,6 +754,20 @@ boot();
   inp.addEventListener("focus",syncOllamaModels);
   setTimeout(syncOllamaModels,1200);
 })();
+
+/* POLISH KIT: about/stack */
+(function(){
+  var h=document.getElementById("help"); if(!h || h.querySelector(".about-stack")) return;
+  var items=["Python 3.11", "FastAPI", "zero-build HTML/JS console", "HMAC tokenization", "one-way generalization", "hash-chained audit", "k-anonymity", "LLM PHI detection in notes"]; var llm="paid (Anthropic/OpenAI) \u2192 local Ollama \u2192 free (OpenRouter) \u2192 deterministic offline; the Ollama call runs in your browser (browser\u2192host)";
+  var d=document.createElement("div"); d.className="about-stack";
+  d.style.cssText="margin-top:16px;padding-top:14px;border-top:1px solid var(--line)";
+  d.innerHTML='<h4 style="margin:0 0 8px">Built with</h4>'
+    +'<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">'
+    +items.map(function(s){return '<span style="font-size:11.5px;border:1px solid var(--line);border-radius:999px;padding:3px 10px;color:var(--ink-dim);background:var(--surface-2)">'+s+'</span>';}).join('')
+    +'</div>'
+    +'<p style="margin:0;font-size:11.5px;color:var(--ink-faint)"><b>LLM routing:</b> '+llm+'</p>';
+  h.appendChild(d);
+})();
 </script>
 </body>
 </html>

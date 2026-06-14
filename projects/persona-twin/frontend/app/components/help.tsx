@@ -217,6 +217,29 @@ export function Help({
             </ul>
           </section>
 
+          <section className="space-y-2">
+            <h3 className="font-semibold">Built with</h3>
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                "Python 3.11", "FastAPI", "MongoDB Atlas ($vectorSearch)",
+                "React Router + Vite", "Tailwind v4",
+                "multi-provider LLM routing (registry + circuit breaker)",
+                "deterministic offline mock", "hashed-embedding fallback",
+              ].map((s) => (
+                <span
+                  key={s}
+                  className="rounded-full border border-border bg-muted px-2.5 py-0.5 text-xs text-muted-foreground"
+                >
+                  {s}
+                </span>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              LLM routing: paid (Anthropic/OpenAI) → local Ollama → free (OpenRouter)
+              → deterministic offline.
+            </p>
+          </section>
+
           <p className="border-t border-border pt-4 text-xs text-muted-foreground">
             All personas and documents are synthetic and fictional. PII is redacted at
             ingest; redaction reports carry counts, never values.
