@@ -1,6 +1,6 @@
 """Structural detectors over internet-intelligence host records → raw exposures.
 
-Exposure-surface helper (from perimeter). Each detector reads explicit fields the
+Exposure-surface helper. Each detector reads explicit fields the
 scanner already parsed (open port, exposure class, software + version, TLS cert
 metadata) and, when it fires, emits a raw exposure dict with a stable ``rule_id``,
 a severity, the affected ``asset`` (host:port), machine-readable ``evidence``, the

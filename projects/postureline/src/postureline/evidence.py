@@ -1,6 +1,6 @@
 """Evidence export — turn a governed report into an auditor-ready bundle.
 
-Exposure-origin artifact (from perimeter), generalized to either surface. An
+Exposure-origin artifact (from the exposure surface), generalized to either surface. An
 auditor wants, per control, the findings that failed it and the multi-framework
 crosswalk that control satisfies. This assembles that bundle (all controls, or a
 single ``control=``) and serializes it as JSON or CSV — the trace from

@@ -3,7 +3,7 @@
 One posture number for either surface. Each finding contributes a severity-weighted
 penalty; the penalty is mapped to a 0-100 score through a **saturating** curve
 (``score = 100 / (1 + penalty / K)``) rather than a raw subtraction. The curve is
-deliberate (perimeter's approach, now shared): a real estate — warehouse OR
+deliberate (the exposure surface's approach, now shared): a real estate — warehouse OR
 internet-facing — routinely carries enough open exposure to drive a linear
 ``100 − Σpenalty`` straight to zero, which loses all signal. The saturating form
 keeps the score monotonic and sensitive across the whole range, so fixing the top

@@ -1,12 +1,12 @@
 """Synthetic data for BOTH surfaces. Synthetic only; no real PHI; authorized by
 construction.
 
-- **warehouse** (from maskline): a regulated healthcare-claims warehouse —
+- **warehouse** (from the warehouse surface): a regulated healthcare-claims warehouse —
   ``MEMBERS`` (direct + quasi identifiers), ``PROVIDERS``, and ``CLAIMS`` (the fact
   table, including a free-text ``CLAIM_NOTE`` that embeds PHI in prose). Every
   member/provider/name/code/amount is invented; nothing here is real PHI. Engine is
   DuckDB driven with Snowflake-compatible SQL.
-- **exposure** (from perimeter): an internet-intelligence host inventory on
+- **exposure** (from the exposure surface): an internet-intelligence host inventory on
   **reserved documentation IPs** (RFC 5737: 192.0.2.0/24, 198.51.100.0/24,
   203.0.113.0/24) and the reserved ``.test`` TLD — hosts, open services
   (port/protocol/software/version), parsed TLS certs, ASN/geo. Planted exposures so
@@ -19,7 +19,7 @@ from __future__ import annotations
 import duckdb
 
 # =========================================================================== #
-# WAREHOUSE SURFACE (maskline)                                                 #
+# WAREHOUSE SURFACE (warehouse surface)                                                 #
 # =========================================================================== #
 
 WAREHOUSE = "ANALYTICS"
@@ -216,7 +216,7 @@ def _sf_type(duck_type: str) -> str:
 
 
 # =========================================================================== #
-# EXPOSURE SURFACE (perimeter)                                                 #
+# EXPOSURE SURFACE (exposure surface)                                                 #
 # =========================================================================== #
 
 ESTATE = "example-estate.test"

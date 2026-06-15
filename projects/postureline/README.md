@@ -195,7 +195,7 @@ bundle.
 
 The posture score is **severity-weighted** (critical 10, high 6, medium 3, low 1) and
 mapped to 0–100 through a **saturating** curve, `score = 100 / (1 + Σpenalty / 30)`
-(perimeter's approach, now shared): a real estate carries enough exposure to drive a
+(the exposure surface's approach, now shared): a real estate carries enough exposure to drive a
 linear `100 − Σpenalty` straight to zero, losing all signal; the saturating form stays
 monotonic so fixing the top risks always moves the grade. On the fixtures the
 **exposure** surface scores **25/100 (F)** and the **warehouse** surface **71/100 (C)**.

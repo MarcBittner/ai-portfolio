@@ -1,5 +1,5 @@
 """Re-identification risk: k-anonymity over the quasi-identifier columns,
-computed with SQL on the warehouse. Warehouse-surface artifact (from maskline).
+computed with SQL on the warehouse. Warehouse-surface artifact.
 
 Masking direct identifiers is necessary but not sufficient: an attacker who never
 sees a name can still single out an individual by **linking quasi-identifiers**

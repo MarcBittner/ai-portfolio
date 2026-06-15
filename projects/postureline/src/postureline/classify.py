@@ -1,6 +1,6 @@
 """Classify every warehouse column into a sensitivity class that drives policy.
 
-Warehouse-surface helper (from maskline). Two paths, one shape:
+Warehouse-surface helper (from the warehouse surface). Two paths, one shape:
 
 - **Structured columns** are classified by **name + type heuristics** — a
   ``MEMBER_NAME``/``SSN``/``EMAIL`` column is a direct identifier, ``DOB``/``ZIP``

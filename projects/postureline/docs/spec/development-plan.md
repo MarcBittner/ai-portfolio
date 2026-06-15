@@ -23,8 +23,8 @@
 ## Merge provenance
 
 This project merges two prior demos behind one engine; both retire after review.
-- **warehouse surface** ← maskline (classification, masking-policy-as-code, k-anon, gate)
-- **exposure surface** ← perimeter (inventory, fingerprint, multi-framework crosswalk,
+- **warehouse surface** ← warehouse surface (classification, masking-policy-as-code, k-anon, gate)
+- **exposure surface** ← exposure surface (inventory, fingerprint, multi-framework crosswalk,
   posture/diff, board narrative, evidence export)
 - `llm.py` was byte-identical between them and is copied verbatim.
 

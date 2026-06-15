@@ -1,6 +1,6 @@
 """Masking + row-access policy-as-code: a declarative spec compiled to Snowflake
 DDL and to Terraform, plus a coverage check that turns an uncovered sensitive
-column into a CI failure. Warehouse-surface artifact (from maskline).
+column into a CI failure. Warehouse-surface artifact (from the warehouse surface).
 
 The spec is small and declarative on purpose — a reviewer reads *what* each class
 gets, not procedural code:

@@ -451,7 +451,7 @@ target stack to show "I can build your product on your stack."
 **Security posture & compliance** — one engine, two scanners: a **warehouse** scan
 (Snowflake masking-policy-as-code + Terraform, LLM PHI classification, k-anonymity,
 CI gate) and an **internet-exposure** scan (SOC 2/HIPAA/ISO 27001/NIST/CMMC crosswalk
-+ board report). Folds the former maskline + perimeter.
++ board report) — one shared findings → control-crosswalk → posture → narrative pipeline.
 
 - **Findings → multi-framework control crosswalk → posture → LLM narrative → diff**
 - **Generates real Snowflake `MASKING`/`ROW ACCESS POLICY` DDL + Terraform**

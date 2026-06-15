@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# run.sh — dev/ops entrypoint for perimeter (replaces make).
+# run.sh — dev/ops entrypoint for postureline (replaces make).
 # Production-grade: strict mode, dependency + version checks, --flag options.
 set -euo pipefail
 

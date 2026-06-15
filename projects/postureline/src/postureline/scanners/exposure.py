@@ -1,4 +1,4 @@
-"""Exposure scanner (perimeter's logic) → canonical Findings.
+"""Exposure scanner (exposure-surface logic) → canonical Findings.
 
 Reads the synthetic internet-intelligence inventory, runs every host's services
 through the structural detectors (``fingerprint.py``), and lifts each raw exposure

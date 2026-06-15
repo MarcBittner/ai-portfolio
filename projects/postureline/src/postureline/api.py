@@ -5,7 +5,7 @@ routes through the LLM chain and degrades to a deterministic template when no
 provider is configured, so the public demo runs fully offline.
 
 Shared endpoints take a ``surface`` (warehouse | exposure); the warehouse-only
-endpoints (`/policy`, `/privacy`, `/gate`) expose maskline's distinctive artifacts.
+endpoints (`/policy`, `/privacy`, `/gate`) expose warehouse-specific artifacts.
 """
 
 from pathlib import Path
@@ -144,7 +144,7 @@ def evidence_export(surface: str = "exposure", control: str | None = None,
 
 
 # --------------------------------------------------------------------------- #
-# Warehouse-specific endpoints (maskline's distinctive artifacts)             #
+# Warehouse-specific endpoints (warehouse-specific artifacts)             #
 # --------------------------------------------------------------------------- #
 
 @app.get("/policy")

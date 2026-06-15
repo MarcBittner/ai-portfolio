@@ -1,7 +1,7 @@
 """One unified, multi-framework control catalog + crosswalk for BOTH surfaces.
 
-This is the merge's centre of gravity. maskline mapped warehouse findings to
-**SOC 2 + HIPAA**; perimeter mapped exposure findings to a **five-framework**
+This is the merge's centre of gravity. the warehouse surface mapped warehouse findings to
+**SOC 2 + HIPAA**; the exposure surface mapped exposure findings to a **five-framework**
 crosswalk (SOC 2 → ISO 27001 → NIST 800-53 → NIST 800-171 → CMMC). postureline
 folds them into ONE catalog so a single finding — whether it came from the
 warehouse or the internet-exposure scanner — is defensible across **six
@@ -15,9 +15,9 @@ expands them across frameworks, rolls per-control status up from the findings
 pass/fail picture each auditor asks for.
 
 The catalog is the union of the two origins:
-- perimeter's boundary/crypto/software controls (CC6.1, CC6.6, CC6.7, CC6.8,
+- the exposure surface's boundary/crypto/software controls (CC6.1, CC6.6, CC6.7, CC6.8,
   CC7.1, CC7.2), now also carrying a HIPAA crosswalk;
-- maskline's warehouse-specific controls — column masking (CC6.1 extended) and
+- warehouse-specific controls — column masking (CC6.1 extended) and
   **de-identification / re-identification risk** (a new ``GV1.1`` data-governance
   control anchored on HIPAA 164.514, the k-anonymity gate).
 """
@@ -63,7 +63,7 @@ CATALOG: dict[str, dict] = {
     # Warehouse-origin data-governance control: de-identification / re-id risk.
     # Anchored on HIPAA 164.514 (de-identification — Safe Harbor / Expert
     # Determination); crosswalked to the privacy/data-governance controls in the
-    # other frameworks. This is the k-anonymity gate maskline owned.
+    # other frameworks. This is the k-anonymity gate the warehouse surface owned.
     "GV1.1": {
         "title": "De-identification — re-identification risk within tolerance",
         "hipaa": "164.514(b)", "iso27001": "A.8.11", "nist_800_53": "SI-19",

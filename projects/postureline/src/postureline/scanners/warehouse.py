@@ -1,4 +1,4 @@
-"""Warehouse scanner (maskline's logic) → canonical Findings.
+"""Warehouse scanner (warehouse-surface logic) → canonical Findings.
 
 Introspects the DuckDB/Snowflake-compatible claims warehouse, classifies every
 column (name/type heuristics + an LLM for free-text PHI), and reduces the
@@ -13,7 +13,7 @@ governance gaps to the shared ``Finding`` shape:
   finding mapped to **CC6.6** (boundary protection); present by default, so it
   normally does not fire.
 
-It keeps maskline's distinctive warehouse-only artifacts as ``extras`` on the
+It keeps the warehouse surface's distinctive warehouse-only artifacts as ``extras`` on the
 ``ScanResult`` (so nothing is lost): the masking-policy-as-code (Snowflake DDL +
 Terraform), the k-anonymity generalization sweep, and the classified column set.
 ``gate()`` is the CI guardrail: any unmasked sensitive column ⇒ fail.

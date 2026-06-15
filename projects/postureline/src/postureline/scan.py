@@ -9,7 +9,7 @@ The scanner is the only surface-specific step; everything after it is identical 
 warehouse and exposure, which is the whole point of the merge. ``diff(surface)``
 runs the current and ``--remediated`` states through the same pipeline so the
 posture lift is comparable across surfaces. ``gate()`` is the warehouse CI hook
-(unmasked sensitive column ⇒ fail); ``exposure_gate()`` is perimeter's posture
+(unmasked sensitive column ⇒ fail); ``exposure_gate()`` is the exposure surface's posture
 threshold gate.
 """
 
