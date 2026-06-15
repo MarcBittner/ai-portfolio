@@ -25,15 +25,22 @@ from postureline import classify, data, kanon, warehouse_policy
 from postureline.findings import Finding, ScanResult
 
 
-def scan(remediated: bool = False, *, mode: str | None = None) -> ScanResult:
+def scan(remediated: bool = False, *, mode: str | None = None,
+         client_classify: dict | None = None) -> ScanResult:
     """Run the warehouse governance scan → ``ScanResult`` (findings + extras).
 
     ``remediated=True`` models the 'after' state: the discovered free-text PHI
     column has a masking policy added and the quasi-identifiers are generalized to
     clear the k threshold — so the before/after diff isolates the posture lift.
+
+    ``client_classify`` carries the free-text column→PHI-type labels the browser
+    obtained from the user's host Ollama (browser→host). When present it is used
+    for the LLM-classified columns instead of a server-side LLM call; the masking-
+    policy-as-code, k-anonymity, and control mapping all still re-run server-side on
+    the canonical schema, so only the classification labels come from the browser.
     """
     data.reset()
-    classified = classify.classify_all(mode=mode)
+    classified = classify.classify_all(mode=mode, client_classify=client_classify)
     coverage = warehouse_policy.coverage(classified)
     k = kanon.k_anonymity()
     sweep = kanon.generalization_sweep()
@@ -89,11 +96,20 @@ def scan(remediated: bool = False, *, mode: str | None = None) -> ScanResult:
             remediation="Apply a row-access policy that scopes claims rows to the "
                         "caller's role."))
 
+    # Routing for the free-text/LLM-classified columns: which provider produced the
+    # PHI labels. With browser→host Ollama labels supplied, the LLM columns report
+    # "ollama (browser→host)"; otherwise it's the server LLM (or offline fallback).
+    llm_providers = sorted({c["provider"] for c in classified
+                            if c["method"] == "llm"})
+    classify_routing = (llm_providers[0] if len(llm_providers) == 1
+                        else (", ".join(llm_providers) or "rule"))
+
     extras = {
         "engine": "duckdb (Snowflake-compatible SQL)",
         "warehouse": data.FQ,
         "tables": data.tables(),
         "classified": classified,
+        "classify_routing": classify_routing,
         "sensitive": sensitive,
         "coverage": coverage,
         "kanon": k,

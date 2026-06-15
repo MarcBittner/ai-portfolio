@@ -15,6 +15,7 @@ from fastapi.responses import FileResponse, PlainTextResponse
 
 from postureline import (
     __version__,
+    classify,
     controls,
     evidence,
     llm,
@@ -22,7 +23,11 @@ from postureline import (
     scan,
     scanners,
 )
-from postureline.models import HealthResponse, ReportRequest
+from postureline.models import (
+    HealthResponse,
+    ReportRequest,
+    WarehouseScanRequest,
+)
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -61,6 +66,32 @@ def scan_surface(surface: str, remediated: bool = False,
     _require_surface(surface)
     return scan.run(surface, remediated=remediated, mode=mode,
                     include_narrative=narrative)
+
+
+@app.get("/scan/warehouse/freetext")
+def warehouse_freetext_columns() -> dict:
+    """The warehouse's free-text columns + sample values — what the browser needs to
+    classify embedded PHI against the user's host Ollama (browser→host).
+
+    The browser runs classify.py's exact prompt over these samples and posts the
+    resulting labels back as ``client_classify`` to ``POST /scan/warehouse``. Only
+    the labels are trusted; masking/k-anon/control logic re-runs server-side."""
+    scan.run("warehouse")  # rebuild the canonical warehouse first
+    return {"system": classify.SYSTEM, "phi_types": list(classify.PHI_TYPES),
+            "columns": classify.free_text_columns()}
+
+
+@app.post("/scan/warehouse")
+def scan_warehouse_post(req: WarehouseScanRequest) -> dict:
+    """Warehouse posture scan (POST).
+
+    When ``client_classify`` is present the browser classified the free-text columns
+    against the user's host Ollama (browser→host); the server uses those labels for
+    the LLM-classified columns instead of calling a provider. The masking-policy-as-
+    code, k-anonymity, and control mapping all re-run server-side. Absent, behavior
+    is unchanged (server LLM → deterministic offline fallback)."""
+    return scan.run("warehouse", remediated=req.remediated, mode=req.mode,
+                    client_classify=req.client_classify)
 
 
 @app.get("/controls")

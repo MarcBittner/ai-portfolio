@@ -105,22 +105,77 @@ def _phi_to_class(phi_types: list[str]) -> str:
     return "non_sensitive"
 
 
-def classify_column(table: str, col: dict, *, mode: str | None = None) -> dict:
-    """Classify one column → ``{table, column, type, class, method, phi_types}``."""
+def is_free_text(name: str) -> bool:
+    """True iff a column is classified by the LLM (free text), not a name rule."""
+    return _structured_class(name) is None
+
+
+def free_text_columns() -> list[dict]:
+    """The free-text columns + their sampled values — exactly what the browser needs
+    to run the same classification against the host Ollama (browser→host).
+
+    Returns ``[{table, column, type, samples}]``. The browser sends back only PHI
+    *labels* (``client_classify``); the masking/policy/k-anon/control logic re-runs
+    server-side on this canonical schema, so browser input is never trusted for more
+    than the classification labels.
+    """
+    out: list[dict] = []
+    for tbl in data.schema():
+        for col in tbl["columns"]:
+            if is_free_text(col["name"]):
+                out.append({
+                    "table": tbl["table"], "column": col["name"],
+                    "type": col["type"],
+                    "samples": col.get("samples")
+                    or data.sample_values(tbl["table"], col["name"]),
+                })
+    return out
+
+
+def _client_phi_types(client_classify: dict | None,
+                      table: str, name: str) -> list[str] | None:
+    """Pull the browser's PHI labels for one free-text column, if supplied.
+
+    ``client_classify`` is keyed by ``"TABLE.COLUMN"`` → list of PHI type strings
+    (what the host Ollama returned). Only known PHI types are kept; anything else is
+    ignored, so a hostile browser can at most relabel a column's PHI types — the
+    column set, masking, k-anon, and control mapping are all re-derived server-side.
+    """
+    if not client_classify:
+        return None
+    raw = client_classify.get(f"{table}.{name}")
+    if raw is None:
+        return None
+    return [t for t in (str(x).upper() for x in raw) if t in PHI_TYPES]
+
+
+def classify_column(table: str, col: dict, *, mode: str | None = None,
+                    client_classify: dict | None = None) -> dict:
+    """Classify one column → ``{table, column, type, class, method, phi_types}``.
+
+    For a free-text column, if ``client_classify`` carries labels the browser
+    obtained from the host Ollama (browser→host), those are used instead of a
+    server-side LLM call and the provider is reported as ``ollama (browser→host)``.
+    """
     name = col["name"]
     cls = _structured_class(name)
     phi_types: list[str] = []
     method = "heuristic"
     provider = "rule"
-    if cls is None:  # free text → ask the model
-        samples = col.get("samples") or data.sample_values(table, name)
-        user = "Column: {}\nSamples:\n{}".format(name, "\n".join(samples))
-        res = llm.complete(SYSTEM, user, offline=_free_text_offline,
-                           mode=mode, json_mode=True, max_tokens=256)
-        phi_types = _parse_phi(res.text)
+    if cls is None:  # free text → ask the model (or use the browser's host-Ollama labels)
+        client_phi = _client_phi_types(client_classify, table, name)
+        if client_phi is not None:
+            phi_types = client_phi
+            provider = "ollama (browser→host)"
+        else:
+            samples = col.get("samples") or data.sample_values(table, name)
+            user = "Column: {}\nSamples:\n{}".format(name, "\n".join(samples))
+            res = llm.complete(SYSTEM, user, offline=_free_text_offline,
+                               mode=mode, json_mode=True, max_tokens=256)
+            phi_types = _parse_phi(res.text)
+            provider = res.provider
         cls = _phi_to_class(phi_types) if phi_types else "non_sensitive"
         method = "llm"
-        provider = res.provider
     return {
         "table": table, "column": name, "type": col["type"],
         "class": cls, "sensitive": cls != "non_sensitive",
@@ -128,12 +183,18 @@ def classify_column(table: str, col: dict, *, mode: str | None = None) -> dict:
     }
 
 
-def classify_all(*, mode: str | None = None) -> list[dict]:
-    """Classify every column in the warehouse."""
+def classify_all(*, mode: str | None = None,
+                 client_classify: dict | None = None) -> list[dict]:
+    """Classify every column in the warehouse.
+
+    ``client_classify`` (browser→host Ollama PHI labels for the free-text columns)
+    is used for those columns when present; everything else is unchanged.
+    """
     out = []
     for tbl in data.schema():
         for col in tbl["columns"]:
-            out.append(classify_column(tbl["table"], col, mode=mode))
+            out.append(classify_column(tbl["table"], col, mode=mode,
+                                       client_classify=client_classify))
     return out
 
 

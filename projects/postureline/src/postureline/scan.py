@@ -20,10 +20,19 @@ from postureline.scanners.warehouse import gate as warehouse_gate
 
 
 def run(surface: str, remediated: bool = False, *,
-        mode: str | None = None, include_narrative: bool = False) -> dict:
-    """Full governed report for ``surface`` (the shared core pipeline)."""
+        mode: str | None = None, include_narrative: bool = False,
+        client_classify: dict | None = None) -> dict:
+    """Full governed report for ``surface`` (the shared core pipeline).
+
+    ``client_classify`` (the warehouse free-text column→PHI labels the browser got
+    from the host Ollama, browser→host) is passed to the scanner when present; only
+    the warehouse scanner consumes it.
+    """
     scanner = scanners.get(surface)
-    result = scanner(remediated=remediated, mode=mode)
+    kw = {"remediated": remediated, "mode": mode}
+    if client_classify is not None and surface == "warehouse":
+        kw["client_classify"] = client_classify
+    result = scanner(**kw)
     findings = result.dicts()
     findings.sort(key=lambda f: (posture.SEVERITY_ORDER.get(f["severity"], 9),
                                  f["resource"]))

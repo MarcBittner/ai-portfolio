@@ -23,3 +23,16 @@ class ReportRequest(BaseModel):
     # parses this instead — letting a cloud-hosted demo run a real local model.
     # Other providers stay server-side. The deterministic shape guard still runs.
     client_narrative: str | None = None
+
+
+class WarehouseScanRequest(BaseModel):
+    # Run the warehouse governance scan. Optional `mode` pins the LLM routing tier.
+    remediated: bool = False
+    mode: str | None = None
+    # Free-text column→PHI-type labels the BROWSER obtained from a host-local Ollama
+    # (browser→host), keyed by "TABLE.COLUMN" → ["NAME","DOB",...]. The cloud server
+    # can't reach your machine's Ollama; the browser can, so when this is supplied
+    # the server uses these labels for the LLM-classified columns instead of calling
+    # its own provider. Only the labels are trusted — the column set, masking policy,
+    # k-anonymity, and control mapping all re-run server-side on the canonical schema.
+    client_classify: dict[str, list[str]] | None = None

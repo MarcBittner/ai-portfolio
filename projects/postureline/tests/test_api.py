@@ -79,6 +79,52 @@ def test_warehouse_specific_endpoints():
     assert priv["kanon"]["k_min"] == 1 and len(priv["sweep"]) >= 3
 
 
+def test_warehouse_freetext_columns_exposed():
+    # The browser-facing endpoint that hands the free-text columns + samples + the
+    # exact classify.py prompt to the host model (browser→host).
+    b = client.get("/scan/warehouse/freetext").json()
+    assert "PHI (protected health information) classifier" in b["system"]
+    assert "NAME" in b["phi_types"]
+    cols = {f"{c['table']}.{c['column']}" for c in b["columns"]}
+    assert "CLAIMS.CLAIM_NOTE" in cols  # the keystone free-text PHI column
+    note = next(c for c in b["columns"] if c["column"] == "CLAIM_NOTE")
+    assert note["samples"]  # sample values are provided for classification
+
+
+def test_warehouse_scan_client_classify_routes_browser_to_host():
+    # Browser→host: submit the host-Ollama PHI labels for the free-text column.
+    payload = {"client_classify": {"CLAIMS.CLAIM_NOTE": ["NAME", "DOB", "SSN"]}}
+    b = client.post("/scan/warehouse", json=payload).json()
+    assert b["surface"] == "warehouse"
+
+    classified = b["extras"]["classified"]
+    note = next(c for c in classified if c["column"] == "CLAIM_NOTE")
+    # The free-text column's labels came from the browser→host model, not server LLM.
+    assert note["method"] == "llm"
+    assert note["provider"] == "ollama (browser→host)"
+    assert note["class"] == "direct" and note["sensitive"] is True
+    assert b["extras"]["classify_routing"] == "ollama (browser→host)"
+
+    # Masking-policy-as-code, k-anon, and control mapping still recompute server-side.
+    assert "CREATE OR REPLACE MASKING POLICY" in b["extras"]["policy"]["snowflake_ddl"]
+    assert b["extras"]["policy"]["coverage"]["fully_covered"] is False
+    assert b["extras"]["kanon"]["k_min"] >= 0 and b["extras"]["sweep"]
+    assert b["controls"] and b["framework_rollup"]
+    # The free-text PHI column drives an UNMASKED_PHI finding mapped to a control.
+    note_res = f"{b['extras']['warehouse']}.CLAIMS.CLAIM_NOTE"
+    unmasked = [f for f in b["findings"]
+                if f["id"] == "UNMASKED_PHI" and f["resource"] == note_res]
+    assert unmasked and "CC6.1" in unmasked[0]["control_ids"]
+
+
+def test_warehouse_scan_post_no_client_classify_unchanged():
+    # Absent client_classify, the server path runs (server LLM → offline fallback).
+    b = client.post("/scan/warehouse", json={}).json()
+    note = next(c for c in b["extras"]["classified"] if c["column"] == "CLAIM_NOTE")
+    assert note["provider"] != "ollama (browser→host)"
+    assert note["sensitive"] is True  # offline fallback still catches embedded PHI
+
+
 def test_gate_both_surfaces():
     wg = client.get("/gate", params={"surface": "warehouse"}).json()
     assert wg["pass"] is False and wg["exit_code"] == 1
