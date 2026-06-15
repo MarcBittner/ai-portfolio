@@ -54,3 +54,29 @@ class RuleIn(BaseModel):
 class SimulateRequest(BaseModel):
     n: int = 60
     seed: int = 1
+
+
+class ClientCompletion(BaseModel):
+    """One browser→host-executed completion. ``model_id`` is the registry id used
+    for PRICING (the tier being simulated); ``executor`` names the actual local
+    model that produced the text, for transparency."""
+    model_id: str
+    executor: str | None = None
+    text: str
+    in_tokens: int = 0
+    out_tokens: int = 0
+    judge_score: float | None = None
+    judge_reason: str = ""
+
+
+class ClientObservation(BaseModel):
+    """A full observation executed in the browser against the host's Ollama: the
+    baseline output plus one or more cheaper-candidate outputs (each optionally
+    carrying a browser-computed judge score). The server classifies, prices,
+    runs the deterministic heuristics, and logs it — no server-side model call."""
+    messages: list[ChatMessage]
+    max_tokens: int = 400
+    temperature: float = 0.0
+    wants_json: bool = False
+    baseline: ClientCompletion
+    candidates: list[ClientCompletion] = Field(default_factory=list)

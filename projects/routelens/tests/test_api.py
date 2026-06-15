@@ -57,6 +57,35 @@ def test_models_and_rules_generate(client):
     assert "rules" in r.json()
 
 
+def test_traffic_and_judge_prompt(client):
+    t = client.get("/traffic?n=6&seed=1").json()
+    assert len(t["requests"]) >= 6 and "messages" in t["requests"][0]
+    jp = client.get("/judge-prompt").json()
+    assert "evaluation judge" in jp["system"] and "{candidate}" in jp["user_template"]
+
+
+def test_observe_client_browser_to_host(client):
+    # browser-executed observation: baseline priced as sonnet, candidate as haiku,
+    # texts identical + judge_score high -> real measured quality + real $ delta
+    client.put("/config", json={"min_samples": 1})
+    obs = {
+        "messages": [{"role": "user", "content": "classify this ticket as a bug"}],
+        "max_tokens": 200, "temperature": 0.0, "wants_json": False,
+        "baseline": {"model_id": "claude-sonnet-4-6", "executor": "qwen2.5:14b",
+                     "text": "Category: bug", "in_tokens": 120, "out_tokens": 8},
+        "candidates": [{"model_id": "claude-haiku-4-5", "executor": "llama3.2:3b",
+                        "text": "Category: bug", "in_tokens": 120, "out_tokens": 8,
+                        "judge_score": 0.97, "judge_reason": "equivalent"}],
+    }
+    r = client.post("/observe/client", json=obs).json()
+    assert r["candidates"] and r["candidates"][0]["retained"] > 0.9
+    assert r["candidates"][0]["saved_per_req"] > 0  # sonnet list > haiku list
+    q = client.get("/quality").json()["quality"]
+    assert any(s["candidate_model"] == "claude-haiku-4-5" for s in q)
+    ops = client.get("/opportunities").json()["opportunities"]
+    assert any(o["kind"] == "route" for o in ops)  # real measured route opportunity
+
+
 def test_reset(client):
     client.post("/simulate", json={"n": 10, "seed": 1})
     assert client.post("/reset").json()["ok"] is True

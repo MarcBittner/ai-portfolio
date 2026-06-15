@@ -138,6 +138,26 @@ def _llm_judge(judge: Model, prompt: str, baseline: str, candidate: str
         return None
 
 
+def score_from_texts(baseline: str, candidate: str, f: Features, *,
+                     judge_score: float | None = None,
+                     judge_reason: str = "") -> QualityScore | None:
+    """Combine a *pre-computed* judge score (e.g. from a browser→host Ollama call)
+    with server-side deterministic heuristics. Same formula as ``judge()``; used by
+    the browser→host ingest path so the heavy model calls run on the client while
+    the deterministic scoring stays on the server."""
+    if not (baseline and baseline.strip()) or not (candidate and candidate.strip()):
+        return None
+    comp = heuristics(baseline, candidate, f)
+    heur_mean = sum(comp.values()) / len(comp) if comp else 0.0
+    if judge_score is not None:
+        js = max(0.0, min(1.0, float(judge_score)))
+        retained = round(0.65 * js + 0.35 * heur_mean, 4)
+        return QualityScore(retained, "llm+heuristics (browser→host)", 0.9, comp,
+                            js, judge_reason or "browser→host judge")
+    return QualityScore(round(heur_mean, 4), "heuristics", 0.5, comp, None,
+                        "heuristic comparison only")
+
+
 def judge(baseline: str, candidate: str, f: Features, *,
           reg: Registry, prompt: str = "", judge_model: Model | None = None,
           use_llm: bool = True) -> QualityScore | None:

@@ -415,7 +415,11 @@
           <input id="simN" type="number" value="60" min="1" max="2000" />
         </div>
         <button class="btn primary" id="simbtn"><span class="lbl">Simulate traffic</span></button>
+        <button class="btn" id="measurebtn" title="Run baseline+candidate+judge on YOUR host Ollama (browser→host) for real measured quality"><span class="lbl">Measure on my Ollama</span></button>
         <button class="btn" id="resetbtn">Reset</button>
+      </div>
+      <div class="row" id="measurerow" style="margin-top:8px;display:none">
+        <span class="fhint" id="measurestat"></span>
       </div>
       <div class="row" style="margin-top:14px;gap:18px">
         <div class="pstat" style="min-width:240px"><span>strongest available
@@ -875,6 +879,60 @@ $("#simbtn").onclick=async()=>{
 };
 $("#resetbtn").onclick=async()=>{
   await fetch("reset",{method:"POST"}); toast("Cleared all logged traffic","info"); await loadAll();
+};
+
+/* ===================== browser→host measurement (real shadow-judging on YOUR Ollama) =====================
+   The heavy model calls — baseline, candidate, and the judge — run in the browser
+   against the host's Ollama, so even the keyless cloud demo measures real quality
+   on your local models. The server only does the deterministic scoring/pricing. */
+async function ollamaChat(base, model, messages, maxTokens, json){
+  const body={model, messages, stream:false, options:{temperature:0, num_predict:maxTokens||400}};
+  if(json) body.format="json";
+  const r=await fetch(base+"/api/chat",{method:"POST",headers:{"content-type":"application/json"},
+    body:JSON.stringify(body),signal:AbortSignal.timeout(120000)});
+  if(!r.ok) throw new Error("ollama "+r.status);
+  const d=await r.json();
+  return {text:(d.message&&d.message.content)||"", in_tokens:d.prompt_eval_count||0, out_tokens:d.eval_count||0};
+}
+$("#measurebtn").onclick=async()=>{
+  const base=(typeof probeOllama==="function")?await probeOllama():null;
+  if(!base){toast("Host Ollama not reachable from this browser — start it (and the :11435 CORS proxy)","bad");return;}
+  let tags=[];
+  try{const r=await fetch(base+"/api/tags",{signal:AbortSignal.timeout(2000)});tags=((await r.json()).models||[]).map(m=>m.name||m);}catch(e){}
+  if(!tags.length){toast("No models installed on host Ollama","bad");return;}
+  const execB=tags[0], execC=tags.find(n=>n!==execB)||execB;   // baseline + candidate executors
+  const priceB="claude-sonnet-4-6", priceC="claude-haiku-4-5"; // priced-as tiers (the Sonnet→Haiku scenario)
+  const jp=await j("judge-prompt");
+  const n=Math.max(1,Math.min(40,parseInt($("#simN").value,10)||12));
+  const reqs=(await j("traffic?n="+n+"&seed=1")).requests;
+  const row=$("#measurerow"), stat=$("#measurestat"); row.style.display="";
+  const lbl=$("#measurebtn").querySelector(".lbl"); lbl.textContent="Measuring…";
+  if(execC===execB) stat.textContent="only one model installed — candidate == baseline (retained ~100%); install a smaller model to show a real downgrade.";
+  let done=0, fail=0;
+  for(const req of reqs){
+    try{
+      const bl=await ollamaChat(base, execB, req.messages, req.max_tokens, req.wants_json);
+      const cd=await ollamaChat(base, execC, req.messages, req.max_tokens, req.wants_json);
+      const task=req.messages.filter(m=>m.role!=="system").map(m=>m.content).join(" ").slice(0,1000);
+      const juser=jp.user_template.replace("{task}",task).replace("{baseline}",bl.text).replace("{candidate}",cd.text);
+      let jscore=null, jreason="";
+      try{
+        const jr=await ollamaChat(base, execB, [{role:"system",content:jp.system},{role:"user",content:juser}], 200, true);
+        const mm=jr.text.match(/\{[\s\S]*\}/); const o=JSON.parse(mm?mm[0]:jr.text);
+        jscore=Math.max(0,Math.min(1,parseFloat(o.score))); jreason=String(o.reason||"").slice(0,200);
+      }catch(e){}
+      await j("observe/client",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({
+        messages:req.messages, max_tokens:req.max_tokens, temperature:req.temperature, wants_json:req.wants_json,
+        baseline:{model_id:priceB, executor:execB, text:bl.text, in_tokens:bl.in_tokens, out_tokens:bl.out_tokens},
+        candidates:[{model_id:priceC, executor:execC, text:cd.text, in_tokens:cd.in_tokens, out_tokens:cd.out_tokens, judge_score:jscore, judge_reason:jreason}]
+      })});
+    }catch(e){ fail++; }
+    done++;
+    stat.textContent=`measured ${done}/${reqs.length} on ${execB} → ${execC}, priced as Sonnet→Haiku`+(fail?` · ${fail} failed`:"");
+  }
+  lbl.textContent="Measure on my Ollama";
+  toast(`Measured ${done-fail}/${reqs.length} on your Ollama (${execB} → ${execC})`,"ok");
+  await loadAll();
 };
 $("#scenario").onchange=e=>{SCENARIO=e.target.value;loadReport();};
 $("#genrules").onclick=async()=>{

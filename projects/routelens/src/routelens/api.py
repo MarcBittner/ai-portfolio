@@ -9,20 +9,25 @@ console drives — mode, config, rules, opportunities, and the over-time report.
 from __future__ import annotations
 
 import os
+import time
 
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from . import classify as _classify
 from . import providers
+from .cache import prefix_signature, request_key
+from .cost import cost_usd
 from .models import (
     ChatCompletionRequest,
+    ClientObservation,
     ConfigUpdate,
     RuleIn,
     SimulateRequest,
 )
 from .proxy import Proxy
-from .quality import pick_judge
+from .quality import _JUDGE_SYSTEM, pick_judge, score_from_texts
 from .registry import DEFAULT as REGISTRY
 from .rules import RouteConfig, Rule, Ruleset, generate_rules
 from .store import Store
@@ -156,6 +161,67 @@ def simulate(req: SimulateRequest):
                      json_mode=bool(r.get("response_format")))
     return {"ran": len(reqs), "baseline": baseline, "mode": cfg.mode,
             "summary": store.summary()}
+
+
+@app.get("/traffic")
+def traffic(n: int = 12, seed: int = 1):
+    """Synthetic requests for the browser→host measurement flow to execute on the
+    host's Ollama (so the heavy model calls run client-side, not on this server)."""
+    from .traffic import generate
+    reqs = generate(n, seed, baseline_id="claude-sonnet-4-6")
+    return {"requests": [{"messages": r["messages"],
+                          "max_tokens": r.get("max_tokens", 400),
+                          "temperature": r.get("temperature", 0.0),
+                          "wants_json": bool(r.get("response_format"))}
+                         for r in reqs]}
+
+
+@app.get("/judge-prompt")
+def judge_prompt():
+    """The exact judge system prompt + user template, so a browser→host judge call
+    matches the server-side judge."""
+    return {"system": _JUDGE_SYSTEM,
+            "user_template": ("TASK:\n{task}\n\nBASELINE answer:\n{baseline}\n\n"
+                              "CANDIDATE answer:\n{candidate}")}
+
+
+@app.post("/observe/client")
+def observe_client(obs: ClientObservation):
+    """Ingest a browser→host-executed observation: log the baseline serve, then
+    score each candidate (browser-supplied judge score + server-side heuristics)
+    and record a real quality sample. No model is called here."""
+    msgs = [{"role": m.role, "content": m.content or ""} for m in obs.messages]
+    f = _classify.classify(msgs, max_tokens=obs.max_tokens, wants_json=obs.wants_json)
+    b = obs.baseline
+    base_cost = cost_usd(REGISTRY, b.model_id, b.in_tokens, b.out_tokens)
+    ph, pt = prefix_signature(msgs)
+    rkey = request_key(b.model_id, msgs, obs.max_tokens, obs.temperature)
+    store.log_event(
+        ts=time.time(), mode="observe", task_class=f.task_class,
+        requested_model=b.model_id, served_model=b.model_id, strategy="observe",
+        in_tokens=b.in_tokens, out_tokens=b.out_tokens, cached_in_tokens=0,
+        baseline_cost=base_cost, served_cost=base_cost, saved=0.0, latency_ms=0.0,
+        cache_hit=0, deterministic=1 if obs.temperature == 0 else 0,
+        request_key=rkey, prefix_hash=ph, prefix_tokens=pt)
+    results = []
+    for c in obs.candidates:
+        q = score_from_texts(b.text, c.text, f, judge_score=c.judge_score,
+                             judge_reason=c.judge_reason)
+        if q is None:
+            continue
+        cand_cost = cost_usd(REGISTRY, c.model_id, c.in_tokens, c.out_tokens)
+        store.log_quality(
+            ts=time.time(), task_class=f.task_class, baseline_model=b.model_id,
+            candidate_model=c.model_id, retained=q.retained, method=q.method,
+            confidence=q.confidence, judge_score=q.judge_score,
+            baseline_cost=base_cost, candidate_cost=cand_cost,
+            saved=round(base_cost - cand_cost, 6),
+            in_tokens=c.in_tokens, out_tokens=c.out_tokens)
+        results.append({"candidate": c.model_id, "executor": c.executor,
+                        "retained": q.retained, "method": q.method,
+                        "saved_per_req": round(base_cost - cand_cost, 6)})
+    return {"task_class": f.task_class, "baseline_executor": b.executor,
+            "candidates": results}
 
 
 @app.post("/reset")
