@@ -866,6 +866,18 @@ boot();
       if(open&&open.contains("open")) return; e.preventDefault(); btn.click(); }
   });
 })();
+
+/* ROUTING PILL: reflect browser\u2192host Ollama reachability */
+(function(){
+  function pill(){ return Array.prototype.slice.call(document.querySelectorAll(".pill"))
+    .filter(function(p){return /^\s*routing:/i.test(p.textContent);})[0]; }
+  async function probe(){ var C=["http://localhost:11434","http://localhost:11435"];
+    for(var i=0;i<C.length;i++){ try{ var r=await fetch(C[i]+"/api/tags",{signal:AbortSignal.timeout(1500)}); if(r.ok) return true; }catch(e){} } return false; }
+  async function sync(){ var p=pill(); if(!p) return;
+    if(await probe() && /offline|unavailable|deterministic/i.test(p.textContent)){
+      p.textContent="routing: ollama (browser\u2192host)"; p.title="Your host Ollama is reachable from this browser"; } }
+  setTimeout(sync,1700); setInterval(sync,30000);
+})();
 </script>
 </body>
 </html>
