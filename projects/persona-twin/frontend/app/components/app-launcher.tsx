@@ -31,6 +31,7 @@ const APPS: App[] = [
   { name: "quorum", tag: "Vendor-neutral multi-agent orchestrator — workflow DAG + parallel fan-…", url: "https://quorum.onrender.com" },
   { name: "burnrate", tag: "Instrumented Flask SRE service — Prometheus RED metrics, multi-window…", url: "https://burnrate-grza.onrender.com" },
   { name: "baseplate", tag: "Platform paved-road — reusable Terraform/EKS/RDS + ArgoCD + golden CI,…", url: "https://baseplate-mlrj.onrender.com" },
+  { name: "routelens", tag: "AI request proxy — cost/quality-aware routing + prompt/response caching; observe vs route, measured shadow-judging…", url: "https://routelens-0kxz.onrender.com" },
 ];
 
 // Mark the current app by comparing the live host — only meaningful on the

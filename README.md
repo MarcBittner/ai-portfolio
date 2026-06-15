@@ -30,10 +30,10 @@ sleep after ~15 min idle, so the **first request cold-starts in ~30–60s** (a h
 app like persona-twin toward the upper end, and a free model can add a few seconds);
 just reload if it stalls. Each **Live** link opens the app's UI — #2
 (tanglement-showcase) is a Next.js marketing teaser, #20 (trueline) is a full
-Next.js + Convex + Clerk app (sign in to try), and **#21–26 are net-new demos each
+Next.js + Convex + Clerk app (sign in to try), and **#21–27 are net-new demos each
 built on a specific target stack** — Go (relaytoken), Ruby on Rails (cycleledger),
-Flask (burnrate), and Python (postureline, quorum, baseplate). The rest are the
-offline-first FastAPI services.
+Flask (burnrate), and Python (postureline, quorum, baseplate, routelens). The rest are
+the offline-first FastAPI services.
 
 | # | Project | What it is | Stack | Live | Docs |
 |---|---|---|---|---|---|
@@ -63,6 +63,7 @@ offline-first FastAPI services.
 | 24 | **quorum** | Vendor-neutral multi-agent orchestrator — workflow DAG + parallel fan-out, with PII redaction + tamper-evident audit baked into the engine | FastAPI · multi-agent | [open ↗](https://quorum.onrender.com) | [README](projects/quorum/README.md) |
 | 25 | **burnrate** | Instrumented Flask SRE service — Prometheus RED metrics, multi-window SLO burn rate, TaskTiger tasks, GitOps smoke-gated rollback, LLM incident summary | Flask · Prometheus · ArgoCD | [open ↗](https://burnrate-grza.onrender.com) | [README](projects/burnrate/README.md) |
 | 26 | **baseplate** | Platform paved-road — reusable Terraform/EKS/RDS + ArgoCD + golden CI, a self-service LLM service-scaffolder, and data-quality-as-an-SLI ingest | FastAPI · Terraform · k8s | [open ↗](https://baseplate-mlrj.onrender.com) | [README](projects/baseplate/README.md) |
+| 27 | **routelens** | OpenAI-compatible cost/quality routing proxy — observe vs route modes; reroutes to cheaper/local models only when **measured** quality (real shadow-judging) clears a floor; + prompt-prefix & response caching; ranked savings analytics | FastAPI · SQLite · OpenAI-compatible | [open ↗](https://routelens-0kxz.onrender.com) | [README](projects/routelens/README.md) |
 
 > Verify a deployment's contract any time with the smoke suite:
 > `cd projects/<name> && ./run.sh smoke --url <live-url>` (see [CONV-5](docs/spec/spec.md)).
@@ -530,6 +531,24 @@ CI/CD, a self-service **LLM service-scaffolder**, and a price-transparency inges
 ```sh
 cd projects/baseplate
 ./run.sh setup && ./run.sh serve   # API + UI at http://localhost:8024
+```
+
+### [routelens](projects/routelens/) — v0.1.0
+
+An **OpenAI-compatible LLM proxy** that learns from real traffic where you overpay for
+model quality you don't need, then reroutes to cheaper/local models — **only when
+measured quality clears a floor** you set. It also finds and applies prompt-prefix and
+response caching.
+
+- **observe** mode shadow-judges cheaper candidates (real LLM-judge + heuristics) and
+  emits ranked savings opportunities; **route** mode reroutes transparently
+- **floor = hard gate, $/quality-point = tiebreak**; savings always shown next to a
+  *measured* quality-retention number (never a fabricated benchmark)
+- Three strategies: route · prompt-cache (Anthropic `cache_control`) · response-cache
+
+```sh
+cd projects/routelens
+./run.sh setup && ./run.sh demo    # then ./run.sh serve — proxy + UI at http://localhost:8030
 ```
 
 ## Roadmap
