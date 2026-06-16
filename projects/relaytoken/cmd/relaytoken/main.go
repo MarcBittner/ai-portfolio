@@ -13,12 +13,14 @@ package main
 
 import (
 	"context"
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"relaytoken/internal/adversary"
@@ -27,6 +29,12 @@ import (
 	"relaytoken/internal/threatmodel"
 	"relaytoken/internal/token"
 )
+
+// indexHTML is the web console, compiled into the binary so the distroless image
+// needs no filesystem assets. Served at "/".
+//
+//go:embed static/index.html
+var indexHTML []byte
 
 const (
 	defaultAPIKey = "relaytoken-demo-key"
@@ -65,6 +73,7 @@ func main() {
 
 	srv := &server{iss: iss}
 	mux := http.NewServeMux()
+	mux.HandleFunc("/", srv.index)
 	mux.HandleFunc("/healthz", srv.healthz)
 	mux.HandleFunc("/llm", srv.llmStatus)
 	mux.HandleFunc("/token/mint", srv.mint)
@@ -112,6 +121,16 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 	_ = enc.Encode(v)
+}
+
+// index serves the embedded web console at "/" (and 404s any unmatched path).
+func (s *server) index(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/" {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("content-type", "text/html; charset=utf-8")
+	_, _ = w.Write(indexHTML)
 }
 
 func (s *server) healthz(w http.ResponseWriter, _ *http.Request) {
@@ -189,14 +208,28 @@ func (s *server) grantLint(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "POST only"})
 		return
 	}
-	var p grant.Proposal
-	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
+	// Accept the proposal plus an optional browser→host-generated explanation: the
+	// console runs the LLM call on the user's host Ollama and submits the text here,
+	// so the live (keyless) cloud demo still narrates with a real model. The
+	// deterministic findings/risk always come from grant.Lint regardless.
+	var body struct {
+		grant.Proposal
+		ClientExplanation string `json:"client_explanation"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json: " + err.Error()})
+		return
+	}
+	if strings.TrimSpace(body.ClientExplanation) != "" {
+		lr := grant.Lint(body.Proposal)
+		lr.Explanation = strings.TrimSpace(body.ClientExplanation)
+		lr.Provider = "ollama (browser→host)"
+		writeJSON(w, http.StatusOK, lr)
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 90*time.Second)
 	defer cancel()
-	writeJSON(w, http.StatusOK, grant.Explain(ctx, p))
+	writeJSON(w, http.StatusOK, grant.Explain(ctx, body.Proposal))
 }
 
 // --------------------------------------------------------------------------- //

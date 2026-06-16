@@ -8,229 +8,234 @@
 
 **[▶ Live demo](https://relaytoken.onrender.com)**
 
-A Go HTTP service that **issues and verifies scoped real-time room access tokens**
-for WebRTC voice-AI infrastructure — and then **attacks its own token model** to
-prove it holds. Tokens are JWTs carrying granular publish/subscribe/admin
-capabilities, bound to a single room, with customizable, clamped TTLs, minted on
-the open-source **[`livekit/protocol`](https://github.com/livekit/protocol) `auth`**
-package — the de-facto standard WebRTC room-token library.
+**Scoped, least-privilege access tokens for real-time (WebRTC) rooms, built on the
+open-source `livekit/protocol` auth library — with an adversarial "breaker" suite
+that proves the token model holds, an LLM-backed grant-risk linter, and a
+documented WebRTC / voice-AI threat model.**
 
-It is a **builder + breaker** reference:
+relaytoken is two halves in one service:
 
-- **Builder.** `/token/mint` derives a least-privilege grant from a vetted role
-  template (`publisher` / `subscriber` / `admin`), scopes it to a room, and clamps
-  the TTL. `/token/verify` checks the signature and expiry *and* re-asserts the
-  room scope and the required capability — a cryptographically valid token that
-  does not cover the requested room or capability is still rejected.
-- **Breaker.** `/adversary` runs a deterministic suite of eight token abuses —
-  forged signature, `alg=none` downgrade, expired, not-yet-valid (nbf),
-  cross-room replay, capability escalation, least-privilege violation, malformed —
-  through the *public* verify path and asserts every one is blocked
-  (`block_rate == 1.0`).
-- **Advisory.** `/grant/lint` is an **LLM-backed grant risk explainer**: a
-  deterministic rule checker finds over-permissioning (a subscriber that can
-  publish, a missing room scope = valid in every room, an over-long TTL, a
-  data-channel prompt-injection surface into the AI agent), and the LLM narrates
-  it in plain English — with a deterministic offline fallback so it runs with zero
-  keys.
+- a **builder** — mint a JWT room token from a vetted role template, then verify it
+  against a required room + capability; and
+- a **breaker** — a deterministic attack harness that forges, downgrades, tampers,
+  replays, and expires tokens against the real verifier and asserts every attack is
+  rejected (headline metric: `block_rate`, which a correct model scores at `1.00`).
+
+It is built on the same library LiveKit itself uses for room tokens
+(`github.com/livekit/protocol/auth`), so the token shape and verification are the
+real thing, not a toy reimplementation.
 
 > All keys, rooms, identities, and tokens here are **synthetic and clearly
-> fictional**. No secrets; the service runs fully offline — the security core
-> (mint / verify / adversary) never makes a network call, and the LLM chain
-> degrades to a deterministic explainer.
+> fictional**. The security core (mint / verify / adversary) never makes a network
+> call; the LLM chain degrades to a deterministic explainer, so the service runs
+> fully offline with zero keys.
+
+---
+
+## Why this shape
+
+A real-time platform's authorization story *is* its access token: a short-lived
+JWT carrying a `VideoGrant` that says which **room** a participant may join and
+what they may do there (publish media, subscribe, send on the data channel,
+administer the room). Get that token model wrong — no room scope, a listener that
+can publish, a 24-hour TTL, a payload an attacker can edit — and the media plane
+is wide open. relaytoken demonstrates the token model *and* attacks it, so the
+security property is shown, not asserted.
+
+---
 
 ## Architecture
 
-A small, layered Go service. The security core is deterministic and self-
-contained; the LLM is an advisory layer with an always-terminal offline path.
-
-| Package | Responsibility |
-|---|---|
-| `internal/token` | role templates → `VideoGrant`; mint (`auth.NewAccessToken`) + verify (signature/expiry via the upstream verifier, then room + capability re-assertion); TTL clamping |
-| `internal/adversary` | the breaker suite: deterministic JWT surgery for eight attacks, all through the public verify path; reports `block_rate` |
-| `internal/grant` | deterministic over-permissioning rule checker + LLM narration (offline fallback) |
-| `internal/threatmodel` | static WebRTC / realtime-AI threat → mitigation → control table |
-| `internal/llm` | multi-provider router (paid → local → free → deterministic offline), net/http only |
-| `cmd/relaytoken` | net/http service, the `demo` CLI, and the container `healthcheck` |
-
-## Token model & grant table
-
-A token is an HS256 JWT whose claims carry a `VideoGrant`. Minting accepts only a
-**role template** plus a room and TTL — never a raw capability set from the caller
-— so a client cannot mint a grant the template does not permit.
-
-| Role | RoomJoin | CanPublish | CanSubscribe | CanPublishData | RoomAdmin |
-|---|---|---|---|---|---|
-| `subscriber` (listener) | ✓ | — | ✓ | — | — |
-| `publisher` | ✓ | ✓ | ✓ | ✓ | — |
-| `admin` | ✓ | ✓ | ✓ | ✓ | ✓ |
-
-Every token is bound to exactly one `room`. TTL is clamped to **`[1m, 12h]`**
-(default `1h`): a token with no TTL is a standing credential, and a long TTL widens
-the replay/leak window.
-
-## Mint → verify lifecycle
-
 ```
-POST /token/mint  {role:"publisher", room:"room-alpha", identity:"alice", ttl_seconds:3600}
-   │
-   ├─ grantForRole(publisher, room-alpha)   → VideoGrant{RoomJoin, Room, CanPublish, CanSubscribe, CanPublishData}
-   ├─ clampTTL(3600s)                        → 1h   (default 1h, min 1m, max 12h)
-   ├─ auth.NewAccessToken(key, secret).SetVideoGrant(grant).SetValidFor(ttl).ToJWT()
-   └─ → { token: "eyJ…", grant: {role, room, can_publish, …, expires_at} }
-
-POST /token/verify  {token:"eyJ…", room:"room-alpha", capability:"publish"}
-   │
-   ├─ auth.ParseAPIToken(token)              → structure
-   ├─ verifier.Verify(secret)                → HS256 signature + issuer + exp/nbf
-   ├─ re-assert room scope                   → token.Room == required room (and not empty)
-   ├─ re-assert capability                   → grant grants the required capability
-   └─ → { valid: true, why: "ok", grant: {…} }     // else { valid:false, why:"…" }
+cmd/relaytoken/main.go            HTTP server + embedded web console + offline demo CLI
+  └── internal/token              mint + verify (the trust-critical core)
+  └── internal/adversary          the breaker suite (deterministic JWT surgery)
+  └── internal/grant              deterministic grant-risk linter + LLM narration
+  └── internal/threatmodel        the static, reviewable threat model
+  └── internal/llm                multi-provider LLM router (Go port of the standard chain)
 ```
 
-The same publisher token replayed against `room-beta` returns
-`valid:false, why:"room mismatch: token scoped to \"room-alpha\", required \"room-beta\""`.
+A single static Go binary on a distroless image, with no datastore — every request
+is self-contained (a token is verified cryptographically, not looked up). The web
+console is compiled into the binary via `//go:embed` and served at `/`. `main.go`
+wires the HTTP mux, and the same binary run as `relaytoken demo` prints the whole
+flow offline for CI/terminals.
 
-## Adversary suite
+### The token model (`internal/token`)
 
-`GET /adversary` mints a legitimate token, then runs eight attacks through the
-public verify path. Each must be **rejected**; the headline number is `block_rate`.
+- **Roles are vetted least-privilege templates**, never hand-assembled capability
+  sets. `Mint` accepts a *role* (`subscriber` | `publisher` | `admin`) + a room +
+  identity; the `VideoGrant` is derived from the role:
+  - `subscriber` → join + subscribe only (a listener; no publish, no data).
+  - `publisher` → join + subscribe + publish + data.
+  - `admin` → the above + `RoomAdmin`.
+- **Every token is room-scoped.** `Mint` refuses an empty room — a scope-less token
+  ("valid in every room") is the single most dangerous over-grant.
+- **TTLs are clamped** to `[1m, 12h]` with a `1h` default; over-long lifetimes are
+  the most common real-world over-grant and the widest replay window.
+- The token is a **JWT (HS256)**; the signing secret never leaves the server and is
+  never embedded in a token.
 
-| # | Attack | What the adversary does | Expected |
+### Verification (`internal/token` — `Verify`)
+
+`Verify` is defense-in-depth and re-asserts everything at the point of use:
+
+1. **Signature + temporal claims** via the upstream `livekit/protocol` verifier —
+   HMAC under the server secret, `exp` (expiry) and `nbf` (not-before). `alg=none`
+   is never honored.
+2. **Room scope** — a cryptographically valid token is still rejected if its
+   `VideoGrant.Room` doesn't match the required room, or if it carries no room
+   scope at all.
+3. **Required capability** — the verifier requires the specific capability the
+   caller needs (`join` | `publish` | `subscribe` | `publishData` | `admin`); a
+   valid token that doesn't confer it is rejected.
+
+A valid signature is necessary but not sufficient: scope and capability are
+enforced server-side, so a leaked or replayed token only works for exactly what it
+was issued for.
+
+### The breaker suite (`internal/adversary`)
+
+`Run()` mints a legitimate publisher token, then attacks it through the **public**
+verify path only (so it proves the property an attacker actually faces). Eight
+cases, each asserted to be **rejected**:
+
+| # | Case | Attack | Why it's blocked |
 |---|---|---|---|
-| 1 | `forged_signature` | re-signs a valid token with an attacker HS256 secret | reject: HMAC fails under the server secret |
-| 2 | `alg_none_downgrade` | sets header `alg=none`, drops the signature | reject: verifier requires a real HS256 signature |
-| 3 | `expired` | signs a token with `exp` in the past | reject: token past expiry |
-| 4 | `not_yet_valid_nbf` | signs a token with `nbf` in the future | reject: token not yet valid |
-| 5 | `cross_room_replay` | replays a room-alpha token against room-beta | reject: room scope mismatch |
-| 6 | `capability_escalation` | flips `canPublish`/`roomAdmin` in the payload, keeps the sig | reject: payload tamper breaks the signature |
-| 7 | `least_privilege_publish` | uses a subscriber token to claim publish | reject: grant has no publish |
-| 8 | `malformed_token` | presents a truncated, non-JWT string | reject: does not parse |
+| 1 | `forged_signature` | re-sign with an attacker secret | HMAC fails under the server secret |
+| 2 | `alg_none_downgrade` | set header `alg=none`, drop the signature | verifier requires a real HS256 signature |
+| 3 | `expired` | a correctly signed token past its `exp` | expiry enforced |
+| 4 | `not_yet_valid_nbf` | a signed token with future `nbf` | not-before enforced |
+| 5 | `cross_room_replay` | a valid room-alpha token replayed at room-beta | room-scope mismatch |
+| 6 | `capability_escalation` | edit the payload to add `canPublish`/`roomAdmin`, keep the sig | payload tamper breaks the signature |
+| 7 | `least_privilege_publish` | a subscriber-only token claims `publish` | grant doesn't include publish |
+| 8 | `malformed_token` | a truncated, non-JWT string | doesn't parse |
 
+`block_rate = blocked / total` — a correct token model scores `1.00` (8/8). The
+attack constructions (`alg=none` rewrite, payload flip, re-sign, expired/nbf
+signing) are deterministic JWT surgery, so the suite is reproducible and CI-safe.
+
+### Grant-risk linter (`internal/grant`)
+
+Given a *proposed* grant (before it is signed), `Lint` runs deterministic
+least-privilege checks and emits findings + a `risk_score` (0–100):
+
+- **`no_room_scope`** (high) — valid in every room.
+- **`subscriber_can_publish`** (high) — a listener template granted publish.
+- **`subscriber_data_channel`** (medium) — a listener with data-channel publish is
+  a **prompt-injection surface into a voice-AI agent**.
+- **`unexpected_room_admin`** (high) — admin on a non-admin role.
+- **`no_ttl` / `over_long_ttl`** (medium) — standing-credential / wide-replay risks.
+
+`Lint` is the source of truth. `Explain` then asks the **LLM router** to narrate
+the findings in plain English (concise, no invented findings); with no provider
+configured it falls back to a deterministic explanation. The model never overrides
+the rule checker — only the prose comes from it.
+
+### Threat model (`internal/threatmodel`)
+
+Eight reviewable entries mapping a WebRTC / realtime-AI threat → vector →
+mitigation → the concrete control in this service: data-channel prompt injection
+(TM-1), egress/recording exposure (TM-2), SFU/signaling trust abuse (TM-3),
+cross-room replay (TM-4), capability escalation (TM-5), long-lived/stolen token
+replay (TM-6), join-flood DoS (TM-7), and token-mint abuse (TM-8).
+
+### LLM router (`internal/llm`)
+
+A Go port of the portfolio's standard chain — paid (Anthropic / OpenAI) → local
+(Ollama) → free (OpenRouter) → deterministic offline — used only to narrate grant
+findings. The app runs fully with zero keys (the offline fallback is always
+terminal).
+
+---
+
+## Web console
+
+Served at `/` (embedded in the binary). It drives every endpoint live: mint a
+scoped token and inspect the decoded grant, verify it (including a cross-room
+replay that denies), run the breaker suite and watch the `block_rate`, lint a
+proposed grant and read the LLM explanation, and browse the threat model. It
+carries the shared portfolio chrome — light/dark, glass surfaces, help, the
+project launcher (⌘K / G), and the browser→host Ollama model picker.
+
+---
+
+## API reference
+
+Base URL: `http://127.0.0.1:8080` locally; the Render deployment uses its assigned
+host. All bodies are JSON.
+
+### `POST /token/mint`
+```json
+{ "role": "publisher", "room": "room-alpha", "identity": "alice", "ttl_seconds": 3600 }
 ```
-block_rate = 1.00  (8/8 blocked)
+→ `{ "token": "<jwt>", "grant": { "role", "identity", "room", "room_join",
+"room_admin", "can_publish", "can_subscribe", "can_publish_data", "ttl",
+"expires_at" } }`
+
+### `POST /token/verify`
+```json
+{ "token": "<jwt>", "room": "room-alpha", "capability": "publish" }
 ```
+→ `200 { "valid": true, "why": "ok", "grant": {…} }` or `401 { "valid": false,
+"why": "room mismatch: token scoped to \"room-alpha\", required \"room-beta\"" }`
 
-The same suite is asserted in `internal/adversary/adversary_test.go`: every case
-must be blocked and `block_rate == 1.0`, so a regression that weakens the token
-model fails the test, not just the demo.
+### `GET /adversary`
+→ `{ "cases": [{ "name", "attack", "expected", "blocked", "detail" }], "total",
+"blocked", "block_rate" }`
 
-## Threat model
-
-`GET /threat-model` serves a WebRTC / realtime-AI threat → mitigation → control
-table.
-
-| ID | Threat | Control in this service |
-|---|---|---|
-| TM-1 | **Data-channel prompt injection** into the voice-AI agent | subscribers default `canPublishData=false`; the linter flags a listener with data-channel publish |
-| TM-2 | Egress / recording exposure | tokens carry only a `VideoGrant`, no storage credentials; upstream refuses sensitive credentials in client tokens |
-| TM-3 | SFU / signaling trust abuse | every token's HS256 signature verified server-side; forged / `alg=none` / tampered tokens all rejected |
-| TM-4 | Cross-room replay | every token room-scoped; verify rejects mismatch and refuses scope-less tokens |
-| TM-5 | Capability escalation | capabilities live in the signed grant; any payload edit breaks verification |
-| TM-6 | Long-lived / stolen token replay | TTL clamped to `[1m, 12h]`, default 1h; linter flags missing/over-long TTLs |
-| TM-7 | **Join-flood / connection DoS** | per-room, short-TTL, role-scoped tokens; rate limiting at the signaling tier |
-| TM-8 | **Token-mint abuse / rate-limiting** | mint accepts only a role template + room, never arbitrary capabilities |
-
-## Grant linter
-
-`POST /grant/lint` takes a proposed grant and returns what it allows, a list of
-over-permissioning findings against the least-privilege templates, a risk score,
-and a plain-English explanation. The **rule checker is the source of truth** and
-the offline fallback; the LLM only narrates it.
-
+### `POST /grant/lint`
+```json
+{ "role": "subscriber", "room": "", "can_publish": true, "can_subscribe": true,
+  "can_publish_data": true, "room_admin": false, "ttl_seconds": 86400 }
 ```
-POST /grant/lint
-  { "role":"subscriber", "room":"", "can_publish":true,
-    "can_subscribe":true, "can_publish_data":true, "ttl_seconds":86400 }
+→ `{ "allows": [...], "findings": [{ "severity", "code", "message" }],
+"risk_score": 0-100, "least_priv": false, "explanation": "...", "provider": "..." }`
 
-→ allows:  ["subscribe to media", "publish media (mic/camera)", "publish on the data channel"]
-  findings:
-    [high]   no room scope set: valid in EVERY room, not one. Bind it to a single room.
-    [high]   role is 'subscriber' but the grant allows publishing — drop canPublish.
-    [medium] a listener with data-channel publish can inject messages the AI agent
-             may treat as instructions (prompt injection). Restrict canPublishData.
-    [medium] TTL of 24h0m0s exceeds the 12h ceiling — shorten it.
-  risk_score: 100   least_priv: false   provider: offline
-```
+### `GET /threat-model`
+→ `{ "threat_model": [{ "id", "threat", "vector", "mitigation", "control" }] }`
 
-## Routing
+### `GET /healthz` · `GET /llm`
+`/healthz` → `{ status, service, token_core, roles }`. `/llm` → provider/router
+status. **Status codes:** `200` ok · `400` invalid body · `401` token invalid ·
+`405` wrong method.
 
-`internal/llm` is the portfolio-standard chain, identical in shape to the other
-demos: a provider is *available* only when its key is set (or, for Ollama, when a
-probe to `/api/tags` succeeds), so the chain self-selects from the environment and
-`Complete()` returns the first success, recording which providers it fell through.
-
-| mode | order |
-|---|---|
-| `auto` (default) | Anthropic → OpenAI → Ollama → OpenRouter → offline |
-| `paid` | Anthropic → OpenAI → offline |
-| `local` | Ollama → offline |
-| `free` | OpenRouter → offline |
-| `offline` | deterministic narrator only |
-
-`GET /llm` reports which providers are reachable and the active mode. The offline
-function is always terminal, so the grant explainer never fails for lack of a key —
-it degrades to a deterministic explanation, not to an error. The security core
-(mint / verify / adversary) does not use the LLM at all.
-
-## Code map
-
-```
-cmd/relaytoken/
-  main.go            net/http service + endpoints; `demo` CLI; `healthcheck` subcommand
-internal/
-  token/             role templates → VideoGrant; mint + verify; TTL clamp        (+ token_test.go)
-  adversary/         8-attack breaker suite via the public verify path; block_rate (+ adversary_test.go)
-  grant/             deterministic over-permissioning linter + LLM narration       (+ grant_test.go)
-  threatmodel/       static WebRTC / realtime-AI threat → mitigation → control table
-  llm/               multi-provider router (paid → local → free → offline), net/http (+ llm_test.go)
-docs/spec/           spec.md + development-plan.md
-```
-
-## Env
-
-Runs fully offline with no `.env` (the LLM chain falls back to a deterministic
-narrator; the token core needs no network). Set any of these to route the grant
-explanation to a real model; never commit real keys, and leave them unset on a
-public host. See `.env.example`.
-
-| var | purpose |
-|---|---|
-| `LLM_MODE` | `auto` (default) · `paid` · `local` · `free` · `offline` |
-| `ANTHROPIC_API_KEY` / `ANTHROPIC_MODEL` | paid path (tried first in `auto`) |
-| `OPENAI_API_KEY` / `OPENAI_MODEL` | paid path |
-| `OLLAMA_BASE_URL` / `OLLAMA_MODEL` | local models, autodetected via `/api/tags` |
-| `OPENROUTER_API_KEY` / `OPENROUTER_MODEL` | free-tier models |
-| `RELAYTOKEN_API_KEY` / `RELAYTOKEN_API_SECRET` | HS256 mint/verify signing key (demo default; set a real secret in prod) |
-| `PORT` | HTTP port (default 8080) |
+---
 
 ## Quickstart
 
-```sh
-cd projects/relaytoken
-./run.sh setup           # go mod download
-./run.sh demo            # offline: mint → verify → adversary 8/8 → grant lint → threat model
-./run.sh test            # go test ./...
-./run.sh lint            # go vet + gofmt check
-./run.sh run             # serve on http://127.0.0.1:8080
+```bash
+./run.sh demo      # offline: mint → verify → breaker suite → grant lint → threat model
+./run.sh serve     # HTTP server + console at http://127.0.0.1:8080
+./run.sh test      # go test ./...
+./run.sh check     # vet + test
 ```
 
-```sh
-# mint, then verify
-curl -s localhost:8080/token/mint -d '{"role":"publisher","room":"room-alpha","identity":"alice","ttl_seconds":3600}'
-curl -s localhost:8080/token/verify -d '{"token":"<jwt>","room":"room-alpha","capability":"publish"}'
-curl -s localhost:8080/adversary           # block_rate should read 1.0
-```
+`RELAYTOKEN_API_KEY` / `RELAYTOKEN_API_SECRET` override the demo signing keys; set
+a provider key (e.g. `ANTHROPIC_API_KEY`) or run host Ollama to get a live LLM
+grant explanation instead of the offline narration.
 
-## Deploy
+---
 
-Containerized (`Dockerfile`, multi-stage `golang:1.26` builder → `distroless/static`
-runtime, non-root, `PORT` env, `/healthz` via a `healthcheck` subcommand) and
-deployed on Render's free tier — the same static binary runs anywhere. **No
-provider keys are set on the public host**, so the live grant explainer runs the
-deterministic offline path; the security core is identical with or without keys.
-Free instances cold-start in ~30–50s.
+## Security model & honest limits
 
-Proprietary, offline-first, no secrets, synthetic data only. Built on the
-open-source `livekit/protocol` token library; **company-neutral** by design. Spec
-in `docs/spec/`.
+- **Trust-critical paths are deterministic.** Minting derives grants from vetted
+  role templates; verification enforces signature + expiry + room scope +
+  capability. The LLM only narrates the linter; it can never change a verdict.
+- **The breaker suite uses only the public verify path**, so `block_rate` reflects
+  the property an attacker actually faces, not an internal shortcut.
+- **Symmetric (HS256) signing**, matching the LiveKit default. Production at scale
+  would add key rotation / per-environment secrets and consider asymmetric signing
+  for multi-issuer setups.
+- **Stateless verification** means no revocation list — revocation is by short TTL
+  (and minting per session). A revocation / JTI denylist is a natural extension.
+- **Rate limiting on mint/join (TM-7, TM-8) is out of scope for the token service**
+  and belongs at the signaling / edge tier; the threat model says so explicitly.
+- Signing keys, identities, and rooms in the demo are synthetic.
+
+## Stack
+
+Go (stdlib `net/http`) · `github.com/livekit/protocol/auth` (JWT / HS256
+`VideoGrant`) · deterministic adversarial suite · multi-provider LLM router
+(Anthropic / OpenAI → Ollama → OpenRouter → offline) · browser→host Ollama ·
+embedded zero-build console · distroless Docker / Render.
