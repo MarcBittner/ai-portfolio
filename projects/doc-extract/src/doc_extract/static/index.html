@@ -265,13 +265,13 @@
 
   /* POLISH KIT: fancy-fx — animated text, sheen, accents (tasteful) */
   @supports ((-webkit-background-clip:text) or (background-clip:text)){
-    .brand{ background:linear-gradient(100deg,var(--ink) 0%,var(--ink) 34%,var(--accent) 50%,var(--ink) 66%,var(--ink) 100%);
-      background-size:240% auto; -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
-      animation:brandSheen 9s linear infinite; }
+    .brandword{ background:linear-gradient(90deg,var(--ink) 0%,var(--ink) 38%,var(--accent) 50%,var(--ink) 62%,var(--ink) 100%);
+      background-size:300% 100%; -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; color:transparent;
+      animation:brandSheen 4.5s ease-in-out infinite; }
     .brand .tag{ -webkit-text-fill-color:var(--ink-dim); }
     .brand .logo{ -webkit-text-fill-color:initial; }
   }
-  @keyframes brandSheen{ to{ background-position:240% center } }
+  @keyframes brandSheen{ 0%{ background-position:150% 0 } 100%{ background-position:-50% 0 } }
   .panel{ position:relative; }
   .panel::after{ content:""; position:absolute; inset:0; border-radius:inherit; pointer-events:none;
     background:linear-gradient(115deg,transparent 35%,rgba(255,255,255,.07) 50%,transparent 65%);
@@ -289,7 +289,7 @@
     transition:opacity .6s var(--ease),transform .6s var(--ease),filter .6s var(--ease); }
   .reveal.in{ opacity:1; transform:none; filter:none; }
   @media (prefers-reduced-motion:reduce){
-    .brand,header::after,.btn.primary{ animation:none } .panel::after{ display:none }
+    .brand,.brandword,header::after,.btn.primary{ animation:none } .panel::after{ display:none }
     .reveal{ opacity:1; transform:none; filter:none; transition:none } }
 
   /* SHOWCASE: richer effects */
@@ -879,5 +879,7 @@ boot();
   setTimeout(sync,1700); setInterval(sync,30000);
 })();
 </script>
+<script>/* POLISH KIT: wrap wordmark text in an inline span so the gradient sheen renders (background-clip:text is unreliable on the flex .brand) */
+(function(){try{document.querySelectorAll('.brand').forEach(function(b){Array.prototype.slice.call(b.childNodes).forEach(function(n){if(n.nodeType===3&&n.textContent.trim()){var s=document.createElement('span');s.className='brandword';s.textContent=n.textContent.trim();b.replaceChild(s,n);}});});}catch(e){}})();</script>
 </body>
 </html>
