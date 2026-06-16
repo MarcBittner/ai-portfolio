@@ -162,7 +162,11 @@ def _call(provider: str, system: str, user: str, *, json_mode: bool,
                          {"role": "user", "content": user}],
             "max_tokens": max_tokens,
         }
-        if json_mode:
+        # OpenAI reliably honors response_format; on OpenRouter the model is
+        # routed to an underlying provider that may 400 on it (free models
+        # especially), so we rely on the prompt-instructed JSON + lenient parsing
+        # there instead of forcing response_format.
+        if json_mode and provider == "openai":
             body["response_format"] = {"type": "json_object"}
         out = _post(f"{base}/chat/completions", body,
                     {"authorization": f"Bearer {key}"}, timeout=60)
