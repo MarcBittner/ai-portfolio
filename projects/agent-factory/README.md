@@ -23,6 +23,16 @@ LLM_MODE=offline              ./run.sh serve     # force the deterministic path
 ANTHROPIC_API_KEY=sk-ant-...  LLM_MODE=paid ./run.sh serve   # your own paid key
 ```
 
+## Contents
+
+- [The spec is the agent](#the-spec-is-the-agent)
+- [How a run works](#how-a-run-works)
+- [Templates](#templates)
+- [Tools](#tools)
+- [API](#api)
+- [Commands](#commands)
+- [Design notes](#design-notes)
+
 ## The spec is the agent
 
 Everything an agent is, is captured by one validated, serialisable `AgentSpec`:

@@ -20,6 +20,19 @@ caching. Both are zero-quality-impact by construction.
 
 ---
 
+## Contents
+
+- [The two modes](#the-two-modes)
+- [The cost/quality control](#the-costquality-control)
+- [How quality is measured — real shadow-judging](#how-quality-is-measured-real-shadow-judging)
+- [The three savings strategies](#the-three-savings-strategies)
+- [Quickstart](#quickstart)
+- [API reference](#api-reference)
+- [The honest dollar bridge](#the-honest-dollar-bridge)
+- [Honest limits](#honest-limits)
+- [Architecture](#architecture)
+- [Stack](#stack)
+
 ## The two modes
 
 | Mode | Behavior | Production impact |

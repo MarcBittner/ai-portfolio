@@ -16,6 +16,12 @@
 
 Tanglement.ai is a peer-to-peer network that optimizes LLM access through intelligent **client-side routing**, with *no centralized company infrastructure in the request path*. Apps embed the SDK; a local routing engine picks the best provider per request (cost / latency / reliability); calls go **directly** to the provider (OpenAI, Anthropic, Google) using the user's **own API keys** — Tanglement never touches or stores credentials — and nodes share routing intelligence over a gossip protocol. Result: no proxy bottleneck, no single point of failure, and operating cost of roughly **$0–65/month vs. $100k+/month** for a traditional API gateway.
 
+## Contents
+
+- [My role](#my-role)
+- [In this showcase](#in-this-showcase)
+- [Engineering highlights](#engineering-highlights)
+
 ## My role
 Founding engineer. I authored the architecture and the full multi-section technical specification, designed the routing / DHT / security model, built the Go + TypeScript implementation, and lead a team of 8 engineers. *(Design and early-implementation stage.)*
 

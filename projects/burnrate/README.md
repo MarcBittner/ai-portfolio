@@ -40,6 +40,22 @@ and the burn/recover demo are fully reproducible.
 > **GitOps (ArgoCD + GitHub-Actions)** deploy story — the framework + task-queue +
 > GitOps angle is the point.
 
+## Contents
+
+- [What it is](#what-it-is)
+- [Architecture](#architecture)
+- [SLOs & burn rate](#slos-burn-rate)
+- [Background tasks (TaskTiger/Redis)](#background-tasks-tasktigerredis)
+- [GitOps (ArgoCD + smoke-gated rollback)](#gitops-argocd-smoke-gated-rollback)
+- [Incident summary (LLM)](#incident-summary-llm)
+- [Routing](#routing)
+- [Evals](#evals)
+- [API](#api)
+- [Code map](#code-map)
+- [Quickstart](#quickstart)
+- [Env](#env)
+- [Deploy](#deploy)
+
 ## What it is
 
 A small, layered, single-instance reference service:

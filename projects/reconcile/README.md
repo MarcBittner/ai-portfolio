@@ -21,6 +21,14 @@ decisions that move money.
 > back to the deterministic parser whenever no model is available. All fixtures
 > are synthetic and clearly fictional — no real firms, projects, or PII.
 
+## Contents
+
+- [Architecture](#architecture)
+- [Design decisions](#design-decisions)
+- [Data model & invariants](#data-model-invariants)
+- [API](#api)
+- [Quickstart](#quickstart)
+
 ## Architecture
 
 Eight single-purpose modules under `src/reconcile/`, each doing one stage of the

@@ -32,6 +32,16 @@ real thing, not a toy reimplementation.
 
 ---
 
+## Contents
+
+- [Why this shape](#why-this-shape)
+- [Architecture](#architecture)
+- [Web console](#web-console)
+- [API reference](#api-reference)
+- [Quickstart](#quickstart)
+- [Security model & honest limits](#security-model-honest-limits)
+- [Stack](#stack)
+
 ## Why this shape
 
 A real-time platform's authorization story *is* its access token: a short-lived

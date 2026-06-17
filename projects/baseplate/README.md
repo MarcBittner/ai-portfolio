@@ -41,6 +41,19 @@ The two things this demo is built to prove:
 > hospitals, payers, codes, and rates are **synthetic and clearly fictional**;
 > no real data; **no HIPAA claim** is made.
 
+## Contents
+
+- [Architecture](#architecture)
+- [The paved road](#the-paved-road)
+- [Self-service scaffolder](#self-service-scaffolder)
+- [Observability & SLOs](#observability-slos)
+- [Routing](#routing)
+- [Evals](#evals)
+- [Code map](#code-map)
+- [Env](#env)
+- [Quickstart](#quickstart)
+- [Deploy](#deploy)
+
 ## Architecture
 
 The platform tooling is the focus; a tiny workload demonstrates the road carries

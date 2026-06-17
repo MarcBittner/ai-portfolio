@@ -30,6 +30,18 @@ Reliability is treated as an artifact, not an afterthought. Everything is offlin
 deterministic, and secret-free — traffic and faults are simulated, so the SLO math
 and the burn/recover demo are fully reproducible.
 
+## Contents
+
+- [Architecture](#architecture)
+- [Design decisions](#design-decisions)
+- [SLOs & invariants](#slos-invariants)
+- [Incident summary (LLM)](#incident-summary-llm)
+- [Routing](#routing)
+- [Evals](#evals)
+- [API](#api)
+- [Quickstart](#quickstart)
+- [Env](#env)
+
 ## Architecture
 
 The codebase is small and layered: a stdlib instrumentation core, a deterministic

@@ -28,6 +28,19 @@ vendor-neutral, governed by default, auditable.
 > the audit log stores **only redacted** text, and findings never echo a detected
 > secret.
 
+## Contents
+
+- [Architecture](#architecture)
+- [Routing](#routing)
+- [Evals](#evals)
+- [Design decisions](#design-decisions)
+- [Data model & invariants](#data-model-invariants)
+- [API](#api)
+- [Code map](#code-map)
+- [Env](#env)
+- [Quickstart](#quickstart)
+- [Deploy](#deploy)
+
 ## Architecture
 
 The gateway is a small set of single-responsibility modules. `gateway.complete`

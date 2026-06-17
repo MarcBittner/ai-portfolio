@@ -30,6 +30,14 @@ without governance risk.
 ./run.sh setup && ./run.sh serve     # API + UI at http://localhost:8006
 ```
 
+## Contents
+
+- [Architecture](#architecture)
+- [Design decisions](#design-decisions)
+- [Data model & invariants](#data-model-invariants)
+- [API](#api)
+- [Quickstart](#quickstart)
+
 ## Architecture
 
 The library is the core; the API is a thin stateless surface over it. The

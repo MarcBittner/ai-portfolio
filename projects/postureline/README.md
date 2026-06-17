@@ -37,6 +37,18 @@ data*, not a new product.
 > a real account. Runs fully offline (the LLM chain falls back to a deterministic
 > generator); no secrets.
 
+## Contents
+
+- [Architecture](#architecture)
+- [Surfaces](#surfaces)
+- [Policy-as-code](#policy-as-code)
+- [Compliance crosswalk](#compliance-crosswalk)
+- [Routing](#routing)
+- [Evals](#evals)
+- [Code map](#code-map)
+- [Env](#env)
+- [Deploy](#deploy)
+
 ## Architecture
 
 A shared core + a scanner registry. The scanner is the *only* surface-specific step;

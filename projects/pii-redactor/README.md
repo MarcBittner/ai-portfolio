@@ -25,6 +25,14 @@ locations, which regex can't reliably catch, are handled by an optional LLM
 entity pass that merges with the regex spans and degrades to regex-only when no
 provider is reachable.
 
+## Contents
+
+- [Architecture](#architecture)
+- [Design decisions](#design-decisions)
+- [Data model & invariants](#data-model-invariants)
+- [API](#api)
+- [Quickstart](#quickstart)
+
 ## Architecture
 
 | Module | Responsibility |

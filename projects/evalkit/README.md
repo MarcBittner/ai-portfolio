@@ -15,6 +15,14 @@ A single "accuracy %" hides what matters. evalkit keeps the signals separate so 
 *how* a system is right or wrong — and freeze a release on the specific metric you care about
 rather than an opaque blend.
 
+## Contents
+
+- [Architecture](#architecture)
+- [Design decisions](#design-decisions)
+- [Data model & invariants](#data-model-invariants)
+- [API](#api)
+- [Quickstart](#quickstart)
+
 ## Architecture
 
 The codebase is small and layered: a stdlib metrics core, pure evaluation/gate/compare

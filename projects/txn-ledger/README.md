@@ -34,6 +34,21 @@ matcher**, so it runs (and the eval reproduces) with zero keys and zero cost.
 > invented for this portfolio. No secrets; runs fully offline (the LLM chain falls
 > back to a deterministic matcher).
 
+## Contents
+
+- [Architecture](#architecture)
+- [The query plan as an artifact](#the-query-plan-as-an-artifact)
+- [Natural-language queries (NL→SQL)](#natural-language-queries-nlsql)
+- [Routing](#routing)
+- [Evals](#evals)
+- [Design decisions](#design-decisions)
+- [Schema & invariants](#schema-invariants)
+- [API](#api)
+- [Code map](#code-map)
+- [Env](#env)
+- [Quickstart](#quickstart)
+- [Deploy](#deploy)
+
 ## Architecture
 
 | Module | Responsibility |

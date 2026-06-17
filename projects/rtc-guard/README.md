@@ -34,6 +34,21 @@ One thing the deterministic core can't do, and where the LLM earns its keep:
 > never weakens a minted one. The live demo runs the deterministic path (no
 > provider keys on the public host).
 
+## Contents
+
+- [Architecture](#architecture)
+- [The adversarial suite](#the-adversarial-suite)
+- [Design decisions](#design-decisions)
+- [Threat model](#threat-model)
+- [LLM grant auditor](#llm-grant-auditor)
+- [Routing](#routing)
+- [Evals](#evals)
+- [API](#api)
+- [Code map](#code-map)
+- [Env](#env)
+- [Quickstart](#quickstart)
+- [Deploy](#deploy)
+
 ## Architecture
 
 | Module | Responsibility |

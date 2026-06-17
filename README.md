@@ -20,6 +20,14 @@ via Argo CD.
 
 ![ai-portfolio UIs](docs/screenshots/hero.png)
 
+## Contents
+
+- [Live demos](#live-demos)
+- [Projects](#projects)
+- [Roadmap](#roadmap)
+- [Repository conventions](#repository-conventions)
+- [License](#license)
+
 ## Live demos
 
 All twenty services run as **free live demos on Render**. The LLM-backed demos route

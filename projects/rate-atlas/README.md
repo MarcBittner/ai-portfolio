@@ -34,6 +34,20 @@ The thing hand-written adapters can't do, and where this demo earns its keep:
 > fully offline (the LLM chain falls back to a deterministic matcher). All hospitals,
 > payers, codes, and rates are synthetic and clearly fictional.
 
+## Contents
+
+- [Architecture](#architecture)
+- [Design decisions](#design-decisions)
+- [LLM-assisted column mapping](#llm-assisted-column-mapping)
+- [Routing](#routing)
+- [Evals](#evals)
+- [Data model & invariants](#data-model-invariants)
+- [API](#api)
+- [Code map](#code-map)
+- [Env](#env)
+- [Quickstart](#quickstart)
+- [Deploy](#deploy)
+
 ## Architecture
 
 | Module | Responsibility |

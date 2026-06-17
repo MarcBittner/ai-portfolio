@@ -38,6 +38,21 @@ its keep:
 > detector). The audit log records *who/what/why/decision*, **never a field
 > value**.
 
+## Contents
+
+- [Architecture](#architecture)
+- [LLM-assisted PHI detection (free text)](#llm-assisted-phi-detection-free-text)
+- [Re-identification risk (k-anonymity)](#re-identification-risk-k-anonymity)
+- [Routing](#routing)
+- [Evals](#evals)
+- [Design decisions](#design-decisions)
+- [Data model & invariants](#data-model-invariants)
+- [API](#api)
+- [Code map](#code-map)
+- [Env](#env)
+- [Quickstart](#quickstart)
+- [Deploy](#deploy)
+
 ## Architecture
 
 A small pipeline. `data.py` defines synthetic claims and the per-field

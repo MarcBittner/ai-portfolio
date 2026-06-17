@@ -27,6 +27,14 @@ aliases. Adding a document type is a dict entry, not a new extractor.
 > hosted demo is zero-cost and fully reviewable. Synthetic data only; no
 > secrets.
 
+## Contents
+
+- [Architecture](#architecture)
+- [Design decisions](#design-decisions)
+- [Data model & invariants](#data-model-invariants)
+- [API](#api)
+- [Quickstart](#quickstart)
+
 ## Architecture
 
 Six single-purpose modules under `src/doc_extract/`. The deterministic core

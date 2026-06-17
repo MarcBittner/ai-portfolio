@@ -11,6 +11,34 @@ A complete, read-it-once reference for how trueline works end to end. Pair with
 
 ---
 
+## Contents
+
+- [1. The thesis (why it's built this way)](#1-the-thesis-why-its-built-this-way)
+- [2. Stack & topology](#2-stack-topology)
+- [3. Data model ([`convex/schema.ts`](https://github.com/MarcBittner/ai-portfolio/blob/main/projects/trueline/convex/schema.ts))](#3-data-model-convexschemats)
+- [4. The request lifecycle (upload → recoverable $)](#4-the-request-lifecycle-upload-recoverable-)
+- [5. The deterministic core ([`convex/lib/reconcile.ts`](https://github.com/MarcBittner/ai-portfolio/blob/main/projects/trueline/convex/lib/reconcile.ts))](#5-the-deterministic-core-convexlibreconcilets)
+- [6. LLM routing ([`convex/lib/llm.ts`](https://github.com/MarcBittner/ai-portfolio/blob/main/projects/trueline/convex/lib/llm.ts))](#6-llm-routing-convexlibllmts)
+- [7. Multi-tenancy & auth](#7-multi-tenancy-auth)
+- [8. Realtime, idempotency, and the eval loop](#8-realtime-idempotency-and-the-eval-loop)
+- [9. App surface (`app/`)](#9-app-surface-app)
+- [10. Design decisions & tradeoffs](#10-design-decisions-tradeoffs)
+
+**Source map — jump to the code:**
+
+| Concept | Function(s) | Source |
+|---|---|---|
+| Data model (7 tables, `orgId`-scoped) | schema | [`convex/schema.ts`](https://github.com/MarcBittner/ai-portfolio/blob/main/projects/trueline/convex/schema.ts) |
+| Deterministic verification (math/match/flag/$) | `reconcileLine` | [`convex/lib/reconcile.ts`](https://github.com/MarcBittner/ai-portfolio/blob/main/projects/trueline/convex/lib/reconcile.ts) |
+| LLM routing chain (auto→local→paid→free→mock) | `extractLineItems` | [`convex/lib/llm.ts`](https://github.com/MarcBittner/ai-portfolio/blob/main/projects/trueline/convex/lib/llm.ts) |
+| Async extract job (action) | `run` | [`convex/extract.ts`](https://github.com/MarcBittner/ai-portfolio/blob/main/projects/trueline/convex/extract.ts) |
+| Mutations/queries + multi-tenancy + review | `createInvoiceFromText` · `submitExtraction` · `insertReconciledLines` · `correctLine` · `requireOrg` | [`convex/invoices.ts`](https://github.com/MarcBittner/ai-portfolio/blob/main/projects/trueline/convex/invoices.ts) |
+| Auth wiring (Clerk JWT → Convex) | `Providers` | [`app/providers.tsx`](https://github.com/MarcBittner/ai-portfolio/blob/main/projects/trueline/app/providers.tsx) · [`convex/auth.config.ts`](https://github.com/MarcBittner/ai-portfolio/blob/main/projects/trueline/convex/auth.config.ts) |
+| Edge auth gate (`/app`) | `clerkMiddleware` | [`middleware.ts`](https://github.com/MarcBittner/ai-portfolio/blob/main/projects/trueline/middleware.ts) |
+| Browser→host Ollama (live demo) | — | [`app/lib/ollama.ts`](https://github.com/MarcBittner/ai-portfolio/blob/main/projects/trueline/app/lib/ollama.ts) |
+| Eval (accuracy + flag precision/recall) | — | [`convex/evals.ts`](https://github.com/MarcBittner/ai-portfolio/blob/main/projects/trueline/convex/evals.ts) |
+| App pages | — | [`app/`](https://github.com/MarcBittner/ai-portfolio/blob/main/projects/trueline/app) |
+
 ## 1. The thesis (why it's built this way)
 
 The product is **trust with money**. So the design rule is a hard split:
@@ -19,7 +47,7 @@ The product is **trust with money**. So the design rule is a hard split:
 |---|---|
 | read values that appear in the document into a strict JSON shape, with a per-line `confidence` and a verbatim `sourceQuote` | compute an extension, decide a flag, estimate recoverable $, or touch a total |
 
-Everything that touches money is **pure, deterministic TypeScript** (`convex/lib/reconcile.ts`) — recompute the math, match to baselines, compute variance, flag, estimate recovery. A model hallucinating a number can only ever mis-*read* a line (caught by the math recompute + the `sourceQuote` + a low-confidence flag); it can't mis-*decide* one. This is the whole credibility argument for putting an LLM near accounts payable.
+Everything that touches money is **pure, deterministic TypeScript** ([`convex/lib/reconcile.ts`](https://github.com/MarcBittner/ai-portfolio/blob/main/projects/trueline/convex/lib/reconcile.ts)) — recompute the math, match to baselines, compute variance, flag, estimate recovery. A model hallucinating a number can only ever mis-*read* a line (caught by the math recompute + the `sourceQuote` + a low-confidence flag); it can't mis-*decide* one. This is the whole credibility argument for putting an LLM near accounts payable.
 
 ---
 
@@ -69,7 +97,7 @@ The schema *is* the thesis: the `invoiceLines` columns are physically partitione
 
 ## 4. The request lifecycle (upload → recoverable $)
 
-A new invoice (`convex/invoices.ts` + `convex/extract.ts`):
+A new invoice ([`convex/invoices.ts`](https://github.com/MarcBittner/ai-portfolio/blob/main/projects/trueline/convex/invoices.ts) + [`convex/extract.ts`](https://github.com/MarcBittner/ai-portfolio/blob/main/projects/trueline/convex/extract.ts)):
 
 1. **`createInvoiceFromText`** (mutation) inserts the invoice as `status:"extracting"`, logs the upload. Then one of two extraction paths:
    - **Server path** (default): schedules the `extract.run` **action** via `ctx.scheduler.runAfter(0, …)` — a managed async job (an action is the only place external I/O is allowed).
@@ -110,14 +138,14 @@ Pure functions, no Convex imports → trivially unit-testable. Per line:
 
 - The **system prompt** constrains the model to read-only structured output; `coerceLines` + `parseJsonLoose` defensively normalize numbers (strip `$`/`,`), clamp `confidence` to [0,1], tolerate fenced JSON, and drop empty rows. **No `response_format` is forced** (free OpenRouter models reject it) — the prompt + lenient parse do the job.
 - Keys live **server-side in the Convex deployment** (`ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY`); the public demo defaults to OpenRouter free (`google/gemma-4-31b-it:free`).
-- **Browser→host Ollama** (`app/lib/ollama.ts` + `submitExtraction`) lets the *live cloud* demo run a real model on the reviewer's own machine — the cloud action can't reach `localhost`, but the browser can; the server still does all the deterministic reconcile.
+- **Browser→host Ollama** ([`app/lib/ollama.ts`](https://github.com/MarcBittner/ai-portfolio/blob/main/projects/trueline/app/lib/ollama.ts) + `submitExtraction`) lets the *live cloud* demo run a real model on the reviewer's own machine — the cloud action can't reach `localhost`, but the browser can; the server still does all the deterministic reconcile.
 
 ---
 
 ## 7. Multi-tenancy & auth
 
-- **Clerk** runs at the edge (`middleware.ts`): `/app(.*)` is gated (`auth.protect()`), everything else is public so reviewers can read the product before signing in.
-- `ClerkProvider → ConvexProviderWithClerk` (`app/providers.tsx`) mints the Clerk **"convex" JWT** and attaches it to every Convex request; Convex validates it against `CLERK_JWT_ISSUER_DOMAIN` (`convex/auth.config.ts`).
+- **Clerk** runs at the edge ([`middleware.ts`](https://github.com/MarcBittner/ai-portfolio/blob/main/projects/trueline/middleware.ts)): `/app(.*)` is gated (`auth.protect()`), everything else is public so reviewers can read the product before signing in.
+- `ClerkProvider → ConvexProviderWithClerk` ([`app/providers.tsx`](https://github.com/MarcBittner/ai-portfolio/blob/main/projects/trueline/app/providers.tsx)) mints the Clerk **"convex" JWT** and attaches it to every Convex request; Convex validates it against `CLERK_JWT_ISSUER_DOMAIN` ([`convex/auth.config.ts`](https://github.com/MarcBittner/ai-portfolio/blob/main/projects/trueline/convex/auth.config.ts)).
 - Inside every function, `requireOrg`/`optionalOrg` read `ctx.auth.getUserIdentity()` → `org_id` claim (or a `user:<subject>` fallback so a solo reviewer still gets an isolated, seeded space). **Every query/mutation filters by `orgId` through an index** — tenant isolation is enforced in code on every row, not assumed.
 - `optionalOrg` never throws: read queries return an empty state during the brief window where Convex auth lags a render behind Clerk, instead of crashing the client.
 
@@ -127,7 +155,7 @@ Pure functions, no Convex imports → trivially unit-testable. Per line:
 
 - **Realtime**: Convex `useQuery` subscriptions push updates to every client when any underlying row changes — the review list, an invoice's lines, and the dashboard stats all update live as extraction completes or a teammate reviews.
 - **Idempotency**: the extract action is keyed on the invoice id and `insertReconciledLines` clears-then-inserts, so a retried/duplicated run is safe.
-- **Eval** (`convex/evals.ts`, Evals tab): runs the pipeline over a labeled set and reports **extraction accuracy** (fields read correctly) and **flag precision/recall** — quality is *measured*, not asserted, and a reviewer's `correctLine` edits are labels that feed it.
+- **Eval** ([`convex/evals.ts`](https://github.com/MarcBittner/ai-portfolio/blob/main/projects/trueline/convex/evals.ts), Evals tab): runs the pipeline over a labeled set and reports **extraction accuracy** (fields read correctly) and **flag precision/recall** — quality is *measured*, not asserted, and a reviewer's `correctLine` edits are labels that feed it.
 
 ---
 

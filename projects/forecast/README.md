@@ -19,6 +19,14 @@ and fully explainable. This is the portfolio's non-LLM-core project; an optional
 natural-language summary of the result is the only place a model is touched, and
 it degrades to a deterministic template offline.
 
+## Contents
+
+- [Architecture](#architecture)
+- [Design decisions](#design-decisions)
+- [Data model & invariants](#data-model-invariants)
+- [API](#api)
+- [Quickstart](#quickstart)
+
 ## Architecture
 
 Single-purpose modules under `src/forecast/`. The forecasting core

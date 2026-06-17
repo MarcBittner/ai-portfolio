@@ -36,6 +36,23 @@ production-shaped for regulated clients:
 > offline (every agent has a deterministic fallback). The audit is **value-light**:
 > a redacted prompt/output summary + telemetry, never the raw document.
 
+## Contents
+
+- [What it does](#what-it-does)
+- [Architecture](#architecture)
+- [Multi-agent workflow](#multi-agent-workflow)
+- [Run lifecycle](#run-lifecycle)
+- [Governance](#governance)
+- [Replicable workflows](#replicable-workflows)
+- [Routing](#routing)
+- [Evals](#evals)
+- [Design decisions](#design-decisions)
+- [API](#api)
+- [Code map](#code-map)
+- [Env](#env)
+- [Quickstart](#quickstart)
+- [Deploy](#deploy)
+
 ## What it does
 
 The headline workflow, **contract-review**, ingests a contract and:

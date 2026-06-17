@@ -30,6 +30,14 @@ both a `[TYPE]`-masked text and a set of pixel rectangles.
 ./run.sh setup && ./run.sh serve     # API + UI at http://localhost:8008
 ```
 
+## Contents
+
+- [Architecture](#architecture)
+- [Design decisions](#design-decisions)
+- [Data model & invariants](#data-model-invariants)
+- [API](#api)
+- [Quickstart](#quickstart)
+
 ## Architecture
 
 The unit of work is the `OcrToken` — a word plus its bounding box, which is

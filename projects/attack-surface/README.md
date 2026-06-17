@@ -34,6 +34,21 @@ What raw findings still can't do, and where this demo earns its keep:
   that flip fail → pass — the "if we do X, our grade goes D → B" view that turns
   exposure into a prioritized plan.
 
+## Contents
+
+- [Architecture](#architecture)
+- [Findings → controls](#findings-controls)
+- [Executive narrative & remediation](#executive-narrative-remediation)
+- [Routing](#routing)
+- [Evals](#evals)
+- [Design decisions](#design-decisions)
+- [Invariants](#invariants)
+- [API](#api)
+- [Code map](#code-map)
+- [Env](#env)
+- [Quickstart](#quickstart)
+- [Deploy](#deploy)
+
 ## Architecture
 
 Small, single-purpose modules; the data flows one direction through them.

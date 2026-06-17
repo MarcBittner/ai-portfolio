@@ -20,6 +20,14 @@ arbitrary code or touch the network.
 > parse. The agent loop, tools, and `{n}` step-chaining are shared by both
 > planners. All knowledge-base content is synthetic.
 
+## Contents
+
+- [Architecture](#architecture)
+- [Design decisions](#design-decisions)
+- [Data model & invariants](#data-model-invariants)
+- [API](#api)
+- [Quickstart](#quickstart)
+
 ## Architecture
 
 Seven small modules under `src/agent_sandbox/`. The deterministic core

@@ -31,6 +31,14 @@ value.
 ./run.sh setup && ./run.sh serve     # API + UI at http://localhost:8005
 ```
 
+## Contents
+
+- [Architecture](#architecture)
+- [Design decisions](#design-decisions)
+- [Data model & invariants](#data-model-invariants)
+- [API](#api)
+- [Quickstart](#quickstart)
+
 ## Architecture
 
 The deterministic core is two small modules: `rules.py` declares the rule set,

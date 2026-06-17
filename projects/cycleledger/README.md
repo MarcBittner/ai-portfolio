@@ -26,6 +26,15 @@ deterministic; the LLM is an assistant, never the trusted path.
 ./run.sh setup && ./run.sh demo    # offline: seed → rollups → plan → NL→SQL → guard reject
 ```
 
+## Contents
+
+- [Architecture](#architecture)
+- [Routing](#routing)
+- [Code map](#code-map)
+- [Env](#env)
+- [Deploy](#deploy)
+- [Develop](#develop)
+
 ## Architecture
 
 ```

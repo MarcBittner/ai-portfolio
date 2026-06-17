@@ -31,6 +31,15 @@ collapse fidelity into one number.
 ./run.sh setup && ./run.sh demo    # fully offline — no API keys, no database
 ```
 
+## Contents
+
+- [Architecture](#architecture)
+- [Design decisions](#design-decisions)
+- [Data model & invariants](#data-model-invariants)
+- [API](#api)
+- [Quickstart](#quickstart)
+- [The personas](#the-personas)
+
 ## Architecture
 
 Every external dependency sits behind a port (protocol/ABC) with a
