@@ -212,5 +212,5 @@ host**, so the live scaffolder runs the deterministic offline parser; the LLM
 chain activates wherever keys/Ollama are present. Free instances cold-start in
 ~30–50s.
 
-Proprietary, offline-first, no secrets, synthetic data only, no HIPAA claim —
+Proprietary, offline-first, no secrets, synthetic sample data (runs on your real data too), no HIPAA claim —
 conforms to the portfolio conventions. Spec in `docs/spec/`.

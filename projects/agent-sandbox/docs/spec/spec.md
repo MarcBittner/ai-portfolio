@@ -40,7 +40,7 @@ same interface), and every tool is sandboxed, pure, and network-free.
 ### FR-6: Conventions
 - Python 3.11+, type hints, `ruff` clean, lean pinned deps.
 - `./run.sh setup && ./run.sh check` green on a fresh clone, no `.env`.
-- Synthetic data only; no secrets; tools are offline and side-effect-free.
+- Synthetic sample data (runs on your real data too); no secrets; tools are offline and side-effect-free.
 
 ## Non-Goals
 - A bundled LLM — the LLM planner routes to an external provider

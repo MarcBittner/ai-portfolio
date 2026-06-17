@@ -44,7 +44,7 @@ reproducible and safe in a pipeline.
 ### FR-7: Conventions
 - Python 3.11+, type hints, `ruff` clean, lean pinned deps.
 - `./run.sh setup && ./run.sh check` green on a fresh clone, no `.env`.
-- Synthetic data only; no secrets.
+- Synthetic sample data (runs on your real data too); no secrets.
 
 ## Non-Goals
 - A bundled model — the optional LLM fill routes to an external provider

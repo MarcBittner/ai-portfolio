@@ -204,5 +204,5 @@ Config (all optional; nothing required to run offline): `OLLAMA_BASE_URL`,
 
 ---
 
-Synthetic data only; no secrets. Proprietary — all rights reserved. CONV-1…5.
+Synthetic sample data (runs on your real data too); no secrets. Proprietary — all rights reserved. CONV-1…5.
 Part of the [ai-portfolio](https://github.com/MarcBittner/ai-portfolio).

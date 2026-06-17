@@ -40,7 +40,7 @@ produces reproducible rows as JSON or CSV. No model and no network.
 ### FR-7: Conventions
 - Python 3.11+, type hints, `ruff` clean, lean pinned deps.
 - `./run.sh setup && ./run.sh check` green on a fresh clone, no `.env`.
-- Synthetic data only; no secrets.
+- Synthetic sample data (runs on your real data too); no secrets.
 
 ## Non-Goals
 - Realistic statistical distributions / inter-column correlations — columns are

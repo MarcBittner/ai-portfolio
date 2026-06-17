@@ -42,7 +42,7 @@ so results are reproducible and the tool is safe in CI.
 ### FR-7: Conventions
 - Python 3.11+, type hints, `ruff` clean, lean pinned deps.
 - `./run.sh setup && ./run.sh check` green on a fresh clone, no `.env`.
-- Synthetic data only; no secrets.
+- Synthetic sample data (runs on your real data too); no secrets.
 
 ## Non-Goals
 - A bundled LLM — the `llm_judge` metric routes to an external provider

@@ -22,7 +22,7 @@ load test. Offline and deterministic; SQLite stands in for Postgres.
 - **FR-6 API + UI.** FastAPI (`/summary`, `/schema`, `/plan`, `/aggregate`,
   `/cycles`, `/committees`, `/loadtest`) + a dashboard showing the plan diff,
   the rollup, and the surge result.
-- **FR-7 Offline + safe.** No network, no secrets; synthetic data only.
+- **FR-7 Offline + safe.** No network, no secrets; synthetic sample data — designed to run against your real data.
 
 ## Architecture
 
@@ -35,6 +35,6 @@ loadtest.py (surge: N queries → qps + latency percentiles)
 
 ## Conventions
 
-Proprietary, offline-first, no secrets, synthetic data only — conforms to the
+Proprietary, offline-first, no secrets, synthetic sample data (built to run against your real data) — conforms to the
 portfolio's CONV-1…5. SQLite here; the schema/indexing/partitioning/plan reasoning
 ports to Postgres unchanged.

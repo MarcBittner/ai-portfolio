@@ -27,7 +27,7 @@ deterministic, no real PHI.
 - **FR-7 API + UI.** FastAPI (`/records`, `/access`, `/scores`, `/roles`,
   `/audit[/verify]`) + a console showing the de-identified surface, the access
   decision, the score, and the audit chain.
-- **FR-8 Offline + safe.** No model, no network, no secrets; synthetic data only.
+- **FR-8 Offline + safe.** No model, no network, no secrets; synthetic sample data — the app runs on your real data too.
 
 ## Architecture
 
@@ -42,5 +42,5 @@ store.py: ingest → de-identify → access_field(role, rec, field, purpose, rei
 
 ## Conventions
 
-Proprietary, offline-first, no secrets, synthetic data only — conforms to the
+Proprietary, offline-first, no secrets, synthetic sample data (runs on your real data too) — conforms to the
 portfolio's CONV-1…5.

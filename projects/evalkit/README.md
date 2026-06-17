@@ -171,5 +171,5 @@ thresholds, and run to see aggregate bars, a pass/fail badge, and a per-item sco
 deterministic token-F1 grade otherwise. Cloud providers are enabled by setting
 `OPENAI_API_KEY` / `OPENROUTER_API_KEY` (with optional `*_MODEL` and `LLM_TIMEOUT`).
 
-Proprietary, offline-first, no secrets, synthetic data only — conforms to the portfolio
+Proprietary, offline-first, no secrets, synthetic sample data (runs on your real data too) — conforms to the portfolio
 conventions (CONV-1…5).

@@ -50,7 +50,7 @@ Python, deterministic, offline.
 - Python 3.11+, type hints, `ruff` clean, lean pinned deps (no numpy — the math
   is hand-rolled).
 - `./run.sh setup && ./run.sh check` green on a fresh clone, no `.env`.
-- Synthetic data only; no secrets.
+- Synthetic sample data (runs on your real data too); no secrets.
 
 ## Non-Goals
 - ARIMA/Prophet/ML-model forecasters — out of scope to stay dependency-light;

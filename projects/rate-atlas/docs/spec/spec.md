@@ -22,7 +22,7 @@ detection. Offline and deterministic; SQLite stands in for Postgres.
 - **FR-6 Discovery.** List sources (with detected shape), procedures, and search.
 - **FR-7 API + UI.** FastAPI (`/sources`, `/procedures`, `/compare/{code}`,
   `/outliers`, `/search`) + a comparison UI with a spread visualization.
-- **FR-8 Offline + safe.** No network, no secrets; synthetic data only.
+- **FR-8 Offline + safe.** No network, no secrets; synthetic sample data — the app runs on your real data too.
 
 ## Architecture
 
@@ -35,5 +35,5 @@ store.py (SQLite: load + index; compare/procedures/sources/search)
 
 ## Conventions
 
-Proprietary, offline-first, no secrets, synthetic data only — conforms to the
+Proprietary, offline-first, no secrets, synthetic sample data (runs on your real data too) — conforms to the
 portfolio's CONV-1…5. SQLite here; the schema/queries port to Postgres unchanged.

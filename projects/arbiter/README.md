@@ -176,4 +176,4 @@ client across Anthropic / OpenAI / OpenRouter / Ollama · real LLM-judge plus
 deterministic heuristics · browser→host Ollama · zero-build console · Docker /
 Render · offline-capable, synthetic data, secret-scan-clean.
 
-*All traffic and content in the demo are synthetic and fictional.*
+*The bundled demo traffic is synthetic; arbiter proxies and analyzes your real traffic.*

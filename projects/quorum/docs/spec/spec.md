@@ -30,7 +30,7 @@ with a deterministic offline fallback. Offline, deterministic, no real data.
 - **FR-9 API + UI.** FastAPI (`/health`, `/workflows`, `/review`, `/run`,
   `/trace/{run_id}`, `/evals`, `/llm`) + a console showing the agent pipeline,
   per-step trace with routing tier/latency/cost, the risk report, and the audit.
-- **FR-10 Offline + safe.** No network, no secrets, synthetic data only; every
+- **FR-10 Offline + safe.** No network, no secrets, synthetic sample data (runs on your real data too); every
   agent has a deterministic fallback so the whole system runs with zero keys.
 
 ## Architecture
@@ -49,5 +49,5 @@ WorkflowSpec (data: stages of agents)
 
 ## Conventions
 
-Proprietary, offline-first, no secrets, synthetic data only — conforms to the
+Proprietary, offline-first, no secrets, synthetic sample data (runs on your real data too) — conforms to the
 portfolio's CONV-1…5.

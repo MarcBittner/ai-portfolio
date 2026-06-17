@@ -22,7 +22,7 @@ both a `[TYPE]`-masked text and a set of pixel rectangles.
 > over **bundled sample documents** whose tokens are synthesized from a fixed
 > monospace layout — the whole detect→redact-by-box path is real and
 > reproducible with no model and no binary. A real OCR backend (**Tesseract**)
-> is opt-in via an extra. All sample data is synthetic and clearly fictional,
+> is opt-in via an extra. The bundled sample data is synthetic; the app also runs on your own real data,
 > and **detected PII is never echoed** — findings carry category and length
 > only, never the value.
 
@@ -204,6 +204,6 @@ binary; otherwise the service is samples-only and fully offline.
 Spec-driven: requirements in [docs/spec/spec.md](docs/spec/spec.md), task plan
 in [docs/spec/development-plan.md](docs/spec/development-plan.md).
 
-Proprietary, offline-first, no secrets, synthetic data only — conforms to the
+Proprietary, offline-first, no secrets, synthetic sample data (runs on your real data too) — conforms to the
 portfolio conventions (CONV-1…5: zero-cost reviewability, no secrets, synthetic
 data, engineering hygiene, local + remote smoke suite).

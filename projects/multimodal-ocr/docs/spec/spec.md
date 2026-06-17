@@ -42,7 +42,7 @@ pluggable, opt-in backend.
 - Python 3.11+, type hints, `ruff` clean, lean pinned deps (real-OCR deps are
   an optional extra).
 - `./run.sh setup && ./run.sh check` green on a fresh clone, no `.env`.
-- Synthetic data only; no secrets; detected PII is never echoed.
+- Synthetic sample data (runs on your real data too); no secrets; detected PII is never echoed.
 
 ## Non-Goals
 - Bundled pixel OCR — that needs a model/binary and is opt-in (`ocr` extra +

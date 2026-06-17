@@ -322,5 +322,5 @@ activates wherever keys/Ollama are present. Free instances cold-start in ~30–5
 
 ---
 
-Proprietary, offline-first, no secrets, synthetic data only — conforms to the
+Proprietary, offline-first, no secrets, synthetic sample data (built to run against your real data) — conforms to the
 portfolio conventions (CONV-1…5).

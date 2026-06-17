@@ -310,5 +310,5 @@ free-tier demo doesn't run — **clearly illustrative, not live**:
   data-quality pass rate) with multi-window **burn-rate** alerts; **`docs/deployment.md`**
   — the full build/deploy story.
 
-Proprietary, offline-first, no secrets, synthetic data only — conforms to the portfolio
+Proprietary, offline-first, no secrets, synthetic sample data (runs on your real data too) — conforms to the portfolio
 conventions (CONV-1…5). Spec in `docs/spec/`.

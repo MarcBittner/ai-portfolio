@@ -206,7 +206,7 @@ throwaway test stubs — they are the documented offline mode.
   request
 - **FR-9.3** Redaction events logged with counts by type, never with the
   redacted values
-- **FR-9.4** `docs/data-governance.md` — posture: synthetic data only,
+- **FR-9.4** `docs/data-governance.md` — posture: synthetic sample data (runs on your real data too),
   what the redaction layer does and does not catch, and where an NER-based
   layer would slot in for production use
 

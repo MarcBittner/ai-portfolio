@@ -39,5 +39,5 @@ scanner.py (enumerate → fingerprint → map → posture)
 
 ## Conventions
 
-Proprietary, offline-first, no secrets, synthetic data only — conforms to the
+Proprietary, offline-first, no secrets, synthetic sample data (runs on your real data too) — conforms to the
 portfolio's CONV-1…5. Only scan domains you own/are authorized to assess.

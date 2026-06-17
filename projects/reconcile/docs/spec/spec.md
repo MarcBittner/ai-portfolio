@@ -59,6 +59,6 @@ and labeled ground truth for the eval. No real firms, projects, or PII.
 
 ## Conventions
 
-Proprietary, offline-first, no secrets, synthetic data only — conforms to the
+Proprietary, offline-first, no secrets, synthetic sample data (runs on your real data too) — conforms to the
 portfolio's CONV-1…5 (zero-cost reviewability, no secrets, synthetic data,
 engineering hygiene, local+remote smoke suite).

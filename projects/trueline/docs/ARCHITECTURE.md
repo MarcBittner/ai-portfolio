@@ -146,4 +146,4 @@ Pure functions, no Convex imports → trivially unit-testable. Per line:
 - **Clerk over hand-rolled auth** — production sessions/MFA + an **organization** model + billing, drop-in; the org id rides in the JWT and scopes every row, so there's no bespoke RBAC.
 - **LLM reads, code decides** — the only safe contract for money; also makes the system explainable (`reasons[]`) and testable (pure `reconcile.ts`).
 - **Deterministic terminal fallback** — the app runs end-to-end with zero keys/zero cost, which is why the public demo works for any reviewer.
-- **Honest limits** — synthetic data only; pipe-delimited text ingest (PDF/OCR is the stated next step); fuzzy description matching is token-overlap (embeddings are the upgrade); single Convex deployment (Convex handles scaling). These are called out, not hidden.
+- **Honest limits** — synthetic sample data (runs on your real data too); pipe-delimited text ingest (PDF/OCR is the stated next step); fuzzy description matching is token-overlap (embeddings are the upgrade); single Convex deployment (Convex handles scaling). These are called out, not hidden.

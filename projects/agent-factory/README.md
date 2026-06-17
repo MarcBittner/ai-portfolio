@@ -71,7 +71,7 @@ task ─▶ input guardrail ─▶ plan (LLM or rule) ─▶ act (tools, chained
 
 `calculator` · `convert` (length/mass/temp) · `date_diff` · `text_stats` ·
 `regex_extract` · `json_get` · `kb_search` · `doc_fetch`. All deterministic and
-offline; synthetic data only.
+offline; synthetic sample data — the app runs on your real data too.
 
 ## API
 

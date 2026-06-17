@@ -14,7 +14,7 @@ order + catalog rates → flag recoverable overcharges → human review → eval
 reads the document into structured JSON; all arithmetic and every flag is deterministic
 TypeScript.
 
-**Live:** https://trueline-moys.onrender.com · synthetic data only.
+**Live:** https://trueline-moys.onrender.com · synthetic sample data — the app runs on your real data too.
 
 ![trueline](docs/screenshot.png)
 

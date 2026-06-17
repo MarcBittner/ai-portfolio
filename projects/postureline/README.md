@@ -325,5 +325,5 @@ Render's free tier — the same image runs anywhere. **No provider keys are set 
 public host**, so the live demo runs the deterministic offline path; the LLM chain
 activates wherever keys/Ollama are present. Free instances cold-start in ~30–50s.
 
-Proprietary, offline-first, no secrets, synthetic data only — conforms to the
+Proprietary, offline-first, no secrets, synthetic sample data (built to run against your real data) — conforms to the
 portfolio conventions (CONV-1…5). Spec in `docs/spec/`.

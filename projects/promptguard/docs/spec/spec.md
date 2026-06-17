@@ -40,7 +40,7 @@ pipeline — and it never re-emits a detected secret.
 ### FR-6: Conventions
 - Python 3.11+, type hints, `ruff` clean, lean pinned deps.
 - `./run.sh setup && ./run.sh check` green on a fresh clone, no `.env`.
-- Synthetic data only; no secrets in the repo (test fixtures are split so no
+- Synthetic sample data (runs on your real data too); no secrets in the repo (test fixtures are split so no
   secret-shaped token sits in source).
 
 ## Non-Goals
