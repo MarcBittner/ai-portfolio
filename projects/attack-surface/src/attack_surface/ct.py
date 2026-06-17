@@ -1,9 +1,9 @@
 """Certificate-Transparency subdomain enumeration.
 
-Fixture mode returns the synthetic CT entries (offline, deterministic). Live mode
-queries the public crt.sh CT-log mirror — this is **passive** recon (reading
-published certificates), not active scanning, so it's safe to run against a real
-domain. The full fingerprint/findings path only runs on the owned fixture.
+Fixture mode returns synthetic CT entries (offline, deterministic). Live mode does
+passive recon against a REAL domain by reading PUBLIC Certificate Transparency
+data — never probing a host. Primary source is the certspotter API (reliable from
+cloud IPs, clean JSON); crt.sh is the fallback (it tends to rate-limit cloud IPs).
 """
 
 import json
@@ -12,46 +12,60 @@ import urllib.request
 
 from attack_surface.data import CT_ENTRIES, DOMAIN
 
+CERTSPOTTER = ("https://api.certspotter.com/v1/issuances?domain={domain}"
+               "&include_subdomains=true&expand=dns_names&expand=issuer&expand=not_after")
 CRT_SH = "https://crt.sh/?q=%25.{domain}&output=json"
+MAX_SUBDOMAINS = 500
+_UA = {"User-Agent": "attack-surface/0.1 (passive CT recon)"}
 
 
 def enumerate_fixture() -> list[dict]:
     return [dict(e) for e in CT_ENTRIES]
 
 
-MAX_SUBDOMAINS = 500  # cap the payload; crt.sh can return thousands of rows
+def _get(url: str, timeout: float):
+    req = urllib.request.Request(url, headers=_UA)
+    with urllib.request.urlopen(req, timeout=timeout) as r:  # noqa: S310 - fixed hosts
+        return json.loads(r.read().decode())
 
 
-def enumerate_live(domain: str, timeout: float = 25.0, retries: int = 2) -> list[dict]:
-    """Query crt.sh for certs covering ``domain``; return distinct subdomains.
-    Passive (reads public CT logs); never probes the hosts themselves. crt.sh is
-    often slow/rate-limited, so we use a generous timeout and retry before giving
-    up — and surface a clear error entry rather than failing the scan."""
-    req = urllib.request.Request(CRT_SH.format(domain=domain),
-                                 headers={"User-Agent": "attack-surface/0.1"})
-    rows = None
-    last = ""
-    for _ in range(retries + 1):
-        try:
-            with urllib.request.urlopen(req, timeout=timeout) as r:  # noqa: S310 - fixed host
-                rows = json.loads(r.read().decode())
-            break
-        except (urllib.error.URLError, OSError, ValueError, TimeoutError) as exc:
-            last = type(exc).__name__
-    if rows is None:
-        return [{"error": f"crt.sh unreachable after {retries + 1} tries: {last}"}]
+def enumerate_live(domain: str, timeout: float = 20.0) -> list[dict]:
+    """Passive recon: read PUBLIC CT data for ``domain`` (certspotter, then crt.sh).
+    Never probes a host. Returns ``{name, issuer, not_after}`` per distinct
+    subdomain, or a single ``{"error": ...}`` entry if no CT source is reachable."""
     seen: dict[str, dict] = {}
-    for row in rows:
-        for name in str(row.get("name_value", "")).splitlines():
-            name = name.strip().lstrip("*.").lower()
-            if name and name.endswith(domain) and name not in seen:
-                seen[name] = {"name": name, "issuer": row.get("issuer_name", "?"),
-                              "not_after": row.get("not_after", "?")}
-            if len(seen) >= MAX_SUBDOMAINS:
-                break
-        if len(seen) >= MAX_SUBDOMAINS:
-            break
-    return list(seen.values())
+
+    def add(name, issuer, not_after):
+        name = (name or "").strip().lstrip("*.").lower()
+        if (name and name.endswith(domain) and name not in seen
+                and len(seen) < MAX_SUBDOMAINS):
+            seen[name] = {"name": name, "issuer": issuer or "?",
+                          "not_after": not_after or "?"}
+
+    # 1) certspotter — reliable from cloud IPs, clean JSON
+    try:
+        rows = _get(CERTSPOTTER.format(domain=domain), timeout)
+        for iss in rows if isinstance(rows, list) else []:
+            issuer = iss.get("issuer")
+            issuer = issuer.get("name") if isinstance(issuer, dict) else issuer
+            for n in iss.get("dns_names", []):
+                add(n, issuer, iss.get("not_after"))
+        if seen:
+            return list(seen.values())
+    except (urllib.error.URLError, OSError, ValueError, TimeoutError):
+        pass
+
+    # 2) crt.sh fallback (often rate-limits cloud IPs → may HTTPError)
+    try:
+        rows = _get(CRT_SH.format(domain=domain), timeout)
+        for row in rows if isinstance(rows, list) else []:
+            for n in str(row.get("name_value", "")).splitlines():
+                add(n, row.get("issuer_name"), row.get("not_after"))
+        if seen:
+            return list(seen.values())
+        return [{"error": "no subdomains found in public CT for this domain"}]
+    except (urllib.error.URLError, OSError, ValueError, TimeoutError) as exc:
+        return [{"error": f"CT sources unreachable: {type(exc).__name__}"}]
 
 
 def subdomains(entries: list[dict]) -> list[str]:
