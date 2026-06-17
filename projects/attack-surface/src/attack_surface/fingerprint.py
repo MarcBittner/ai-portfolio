@@ -5,12 +5,71 @@ severity, a remediation, and the SOC 2 / ISO controls it affects — so the repo
 is governed evidence, not a raw scanner dump.
 """
 
+import re
+
 NONPROD = {"staging", "dev", "test", "qa", "uat"}
+
+# Labels that, when they appear in a CT-published hostname, suggest internal /
+# sensitive infrastructure that probably should not be discoverable in public CT.
+SENSITIVE_LABELS = {
+    "admin", "vpn", "internal", "intranet", "corp", "git", "gitlab", "jenkins",
+    "jira", "confluence", "grafana", "kibana", "db", "sql", "mysql", "postgres",
+    "mongo", "redis", "ldap", "vault", "ftp", "ssh", "rdp", "smtp", "mail",
+    "phpmyadmin", "backup", "ci", "nexus", "registry", "k8s", "kube",
+}
+NONPROD_LABELS = {
+    "dev", "develop", "staging", "stage", "test", "qa", "uat", "sandbox",
+    "demo", "preprod", "beta", "nonprod",
+}
 
 
 def _f(rule_id, severity, title, asset, detail, controls, remediation) -> dict:
     return {"rule_id": rule_id, "severity": severity, "title": title, "asset": asset,
             "detail": detail, "controls": controls, "remediation": remediation}
+
+
+def derive_passive(entries: list[dict], domain: str) -> list[dict]:
+    """Findings derivable from PUBLIC CT data alone — no active probing of any
+    host. Two honest signals: hostnames in public CT that look internal/non-prod
+    (CT leaks names), and the size of the externally-discoverable surface. Each is
+    pre-mapped to controls, identical in shape to the fixture findings."""
+    out: list[dict] = []
+    names = sorted({e["name"] for e in entries if e.get("name")})
+    for name in names:
+        sub = name[: -(len(domain) + 1)] if name.endswith("." + domain) else name
+        if not sub:
+            continue  # the apex itself, not a subdomain
+        toks = set(re.split(r"[.\-_]", sub.lower()))
+        sensitive = sorted(toks & SENSITIVE_LABELS)
+        nonprod = sorted(toks & NONPROD_LABELS)
+        if sensitive:
+            out.append(_f(
+                "CT_SENSITIVE_HOST", "high", "Sensitive-service hostname in public CT",
+                name,
+                f"Hostname implies internal/sensitive infra ({', '.join(sensitive)}) "
+                "yet is published in Certificate Transparency for anyone to enumerate.",
+                ["SOC2:CC6.1", "SOC2:CC6.6", "ISO:A.5.15"],
+                "Confirm it is not internet-reachable; gate behind VPN/SSO; prefer a "
+                "private CA or wildcard so internal names aren't leaked in public CT."))
+        elif nonprod:
+            out.append(_f(
+                "CT_NONPROD_HOST", "medium", "Non-prod hostname in public CT", name,
+                f"A non-production host ({', '.join(nonprod)}) is published in "
+                "public CT logs and is part of the discoverable external surface.",
+                ["SOC2:CC6.6", "SOC2:CC7.1"],
+                "Keep non-prod off the public edge; use an internal CA if it needs "
+                "a cert."))
+    n = len(names)
+    if n >= 40:
+        out.append(_f(
+            "CT_SURFACE_SPRAWL", "medium" if n >= 120 else "low",
+            "Large external attack surface", domain,
+            f"{n} distinct subdomains for {domain} are discoverable in public CT — "
+            "each a host to inventory and defend.",
+            ["SOC2:CC7.1", "ISO:A.5.7"],
+            "Keep an authoritative external asset inventory; retire unused hosts; "
+            "monitor CT continuously for new issuance."))
+    return out
 
 
 def derive(svc: dict, domain: str) -> list[dict]:

@@ -84,13 +84,29 @@ def remediation_diff() -> dict:
 
 
 def scan_live(domain: str) -> dict:
+    """Real domain, fully passive: enumerate via public CT, then derive the
+    findings that PUBLIC data alone supports (sensitive/non-prod hostnames leaked
+    in CT, external-surface sprawl), map them to controls, and score posture — so a
+    real domain produces a real, control-mapped exposure report without ever
+    probing a host."""
     entries = ct.enumerate_live(domain)
+    err = next((e["error"] for e in entries if "error" in e), None)
+    findings = [] if err else fingerprint.derive_passive(entries, domain)
+    findings.sort(key=lambda f: (SEVERITY_ORDER.get(f["severity"], 9), f["asset"]))
+    control_rows = controls.evaluate(findings)
+    sev_counts = {s: sum(1 for f in findings if f["severity"] == s)
+                  for s in SEVERITY_WEIGHT}
     return {
         "domain": domain, "mode": "live",
-        "note": "passive CT-log recon only — no active scanning of third-party hosts; "
-                "the control-mapped findings report runs on the owned fixture domain.",
+        "note": ("passive recon only — findings are derived from PUBLIC Certificate "
+                 "Transparency data (leaked hostnames + external-surface size), never "
+                 "from probing a host. " + (f"crt.sh error: {err}" if err else
+                 f"{len(ct.subdomains(entries))} subdomains discovered in public CT.")),
         "assets": {"subdomains": ct.subdomains(entries), "ct_entries": entries},
-        "findings": [], "controls": [],
+        "findings": findings,
+        "severity_counts": sev_counts,
+        "controls": control_rows,
+        "posture": _posture(findings, control_rows),
     }
 
 

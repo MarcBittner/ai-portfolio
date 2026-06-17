@@ -29,11 +29,18 @@ def test_governed_evidence_invariant():
 
 
 def test_live_mode_is_passive(monkeypatch):
+    # live mode now produces a control-mapped report, but ONLY from public CT data
+    # (leaked hostnames + surface size) — never from actively probing a host.
     monkeypatch.setattr(ct, "enumerate_live",
-                        lambda d, timeout=15.0: [{"name": f"a.{d}", "issuer": "x",
-                                                  "not_after": "2027"}])
+                        lambda d, timeout=25.0, retries=2: [
+                            {"name": f"admin.{d}", "issuer": "x", "not_after": "?"},
+                            {"name": f"www.{d}", "issuer": "x", "not_after": "?"}])
     r = scan("example.com", mode="live")
     assert r["mode"] == "live"
-    assert r["findings"] == [] and r["controls"] == []
     assert "passive" in r["note"].lower()
-    assert r["assets"]["subdomains"] == ["a.example.com"]
+    # every live finding is a passive CT-derived rule, never an active-probe rule
+    assert r["findings"] and all(f["rule_id"].startswith("CT_") for f in r["findings"])
+    assert any(f["rule_id"] == "CT_SENSITIVE_HOST" for f in r["findings"])
+    # and it is a real control-mapped report (catalog evaluated, a control fails)
+    assert r["controls"] and any(c["status"] == "fail" for c in r["controls"])
+    assert "admin.example.com" in r["assets"]["subdomains"]
