@@ -1,6 +1,6 @@
 """Cost computation from registry list prices.
 
-Every dollar figure in routelens traces back to this one function and the
+Every dollar figure in arbiter traces back to this one function and the
 registry's published prices — there is no fudge factor. Provider-side
 prompt-cache reads are billed at ``CACHE_READ_FACTOR`` of the input price
 (Anthropic charges ~0.1x for cached input), which is what makes the

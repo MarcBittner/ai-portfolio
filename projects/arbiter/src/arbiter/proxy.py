@@ -30,7 +30,7 @@ def _offline_stub(messages: list[dict], max_tokens: int) -> tuple[str, int, int]
     a real model output) — the analytics simply skip it."""
     user = " ".join(m.get("content") or "" for m in messages
                     if m.get("role") != "system")
-    text = ("[offline] routelens has no model provider reachable; this is a "
+    text = ("[offline] arbiter has no model provider reachable; this is a "
             "deterministic stub. Connect Ollama or set a provider key to serve "
             "real completions and measure routing quality. Echo: "
             + user[:200])
@@ -212,7 +212,7 @@ class Proxy:
                          "message": {"role": "assistant", "content": text}}],
             "usage": {"prompt_tokens": in_t, "completion_tokens": out_t,
                       "total_tokens": in_t + out_t},
-            "routelens": {
+            "arbiter": {
                 "mode": self.cfg.mode,
                 "requested_model": requested,
                 "baseline_model": baseline,

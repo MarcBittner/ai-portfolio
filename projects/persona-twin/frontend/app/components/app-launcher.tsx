@@ -3,8 +3,11 @@ import { cn } from "~/lib/utils";
 
 type App = { name: string; tag: string; url: string };
 
-// Portfolio catalog — kept in sync with the shared launcher across the demos.
-const APPS: App[] = [
+// Single source of truth is catalog.json (repo root), served via jsDelivr and
+// fetched at runtime; this inlined list is only an offline fallback.
+const CATALOG_URL =
+  "https://cdn.jsdelivr.net/gh/MarcBittner/ai-portfolio@main/catalog.json";
+const FALLBACK: App[] = [
   { name: "persona-twin", tag: "RAG digital-twins: chunking/embedding/rerank, eval, streaming chat, ob…", url: "https://persona-twin-usu4.onrender.com" },
   { name: "tanglement-showcase", tag: "P2P multi-provider LLM routing network (proprietary showcase)", url: "https://tanglement-teaser.onrender.com" },
   { name: "pii-redactor", tag: "PII detect/redact — regex+checksum core + LLM NER", url: "https://pii-redactor-lk6x.onrender.com" },
@@ -31,7 +34,7 @@ const APPS: App[] = [
   { name: "quorum", tag: "Vendor-neutral multi-agent orchestrator — workflow DAG + parallel fan-…", url: "https://quorum-9x75.onrender.com" },
   { name: "burnrate", tag: "Instrumented Flask SRE service — Prometheus RED metrics, multi-window…", url: "https://burnrate-grza.onrender.com" },
   { name: "baseplate", tag: "Platform paved-road — reusable Terraform/EKS/RDS + ArgoCD + golden CI,…", url: "https://baseplate-mlrj.onrender.com" },
-  { name: "routelens", tag: "AI request proxy — cost/quality-aware routing + prompt/response caching; observe vs route, measured shadow-judging…", url: "https://routelens-0kxz.onrender.com" },
+  { name: "arbiter", tag: "AI request gateway — sits in front of your apps' real LLM traffic; routes/caches for cost savings gated by measured quality", url: "https://routelens-0kxz.onrender.com" },
 ];
 
 // Mark the current app by comparing the live host — only meaningful on the
@@ -49,7 +52,23 @@ function isCurrent(url: string): boolean {
 
 export function AppLauncher({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [filter, setFilter] = useState("");
+  const [apps, setApps] = useState<App[]>(FALLBACK);
   const searchRef = useRef<HTMLInputElement>(null);
+
+  // Single source of truth: pull the live catalog at runtime; keep FALLBACK if
+  // it's unreachable. Adding/renaming a demo never touches this file.
+  useEffect(() => {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 2500);
+    fetch(CATALOG_URL, { signal: ctrl.signal })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (Array.isArray(j) && j.length) setApps(j as App[]);
+      })
+      .catch(() => {})
+      .finally(() => clearTimeout(t));
+    return () => clearTimeout(t);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -63,9 +82,9 @@ export function AppLauncher({ open, onClose }: { open: boolean; onClose: () => v
 
   const shown = useMemo(() => {
     const q = filter.trim().toLowerCase();
-    if (!q) return APPS;
-    return APPS.filter((a) => (a.name + " " + a.tag).toLowerCase().includes(q));
-  }, [filter]);
+    if (!q) return apps;
+    return apps.filter((a) => (a.name + " " + a.tag).toLowerCase().includes(q));
+  }, [filter, apps]);
 
   return (
     <div
@@ -91,7 +110,7 @@ export function AppLauncher({ open, onClose }: { open: boolean; onClose: () => v
       >
         <header className="flex items-center gap-3 border-b border-border px-5 py-4">
           <b className="text-sm font-semibold">Portfolio demos</b>
-          <span className="text-xs text-muted-foreground">{APPS.length} apps</span>
+          <span className="text-xs text-muted-foreground">{apps.length} apps</span>
           <input
             ref={searchRef}
             value={filter}

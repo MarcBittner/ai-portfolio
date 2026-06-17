@@ -1,4 +1,4 @@
-"""Quality measurement — the guardrail that stops routelens from "saving" money
+"""Quality measurement — the guardrail that stops arbiter from "saving" money
 by quietly degrading your app.
 
 Quality is **measured, never assumed**: we score a candidate model's output

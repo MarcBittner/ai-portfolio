@@ -4,12 +4,12 @@ without a network or a live model."""
 
 import pytest
 
-import routelens.providers as providers
-from routelens.providers import Completion
-from routelens.proxy import Proxy
-from routelens.registry import Registry
-from routelens.rules import RouteConfig, Ruleset, generate_rules
-from routelens.store import Store
+import arbiter.providers as providers
+from arbiter.providers import Completion
+from arbiter.proxy import Proxy
+from arbiter.registry import Registry
+from arbiter.rules import RouteConfig, Ruleset, generate_rules
+from arbiter.store import Store
 
 
 @pytest.fixture
@@ -45,9 +45,9 @@ def _msg(text):
 def test_observe_serves_baseline_and_measures_quality(simulated):
     proxy, store, cfg = _proxy("observe")
     out = proxy.handle("claude-opus-4-8", _msg("classify this ticket as bug"))
-    assert out["routelens"]["served_model"] == "claude-opus-4-8"  # baseline served
-    assert out["routelens"]["strategy"] == "observe"
-    assert out["routelens"]["shadow"]  # candidates were judged
+    assert out["arbiter"]["served_model"] == "claude-opus-4-8"  # baseline served
+    assert out["arbiter"]["strategy"] == "observe"
+    assert out["arbiter"]["shadow"]  # candidates were judged
     stats = store.quality_stats()
     assert stats and all(s["retained"] >= 0.9 for s in stats)
 
@@ -62,7 +62,7 @@ def test_route_picks_cheaper_and_saves(simulated):
     cfg.mode = "route"
     cfg.response_cache = False  # isolate the routing decision from cache hits
     out = proxy.handle("claude-opus-4-8", _msg("classify a freshly arrived ticket"))
-    rl = out["routelens"]
+    rl = out["arbiter"]
     assert rl["strategy"] == "route"
     assert rl["served_model"] != "claude-opus-4-8"
     assert rl["saved"] > 0
@@ -73,8 +73,8 @@ def test_response_cache_hit(simulated):
     proxy, store, cfg = _proxy("observe")
     proxy.handle("claude-opus-4-8", _msg("a stable deterministic prompt"))
     out2 = proxy.handle("claude-opus-4-8", _msg("a stable deterministic prompt"))
-    assert out2["routelens"]["strategy"] == "response-cache"
-    assert out2["routelens"]["cache_hit"] is True
+    assert out2["arbiter"]["strategy"] == "response-cache"
+    assert out2["arbiter"]["cache_hit"] is True
     assert proxy.response_cache.stats()["hits"] >= 1
 
 
@@ -83,6 +83,6 @@ def test_offline_when_no_provider(monkeypatch):
     proxy, store, cfg = _proxy("observe")
     out = proxy.handle("claude-opus-4-8", _msg("hello"))
     # no real model -> nothing spent or saved, quality not measured
-    assert out["routelens"]["served_model"] == "offline"
-    assert out["routelens"]["saved"] == 0.0
+    assert out["arbiter"]["served_model"] == "offline"
+    assert out["arbiter"]["saved"] == 0.0
     assert store.quality_stats() == []

@@ -6,7 +6,7 @@ below the floor is never selected), the quality heuristics' ordering, and the
 end-to-end savings reproducibility. None of them call a model, so they run the
 same everywhere.
 
-Run: ``./run.sh eval``  (or ``python -m routelens.evaluate``)
+Run: ``./run.sh eval``  (or ``python -m arbiter.evaluate``)
 """
 
 from __future__ import annotations
@@ -130,7 +130,7 @@ def main(argv: list[str] | None = None) -> int:
     evals = [eval_classifier(), eval_cost(), eval_routing_safety(),
              eval_quality_heuristics(), eval_savings_reproducible()]
     passed = sum(e["pass"] for e in evals)
-    lines = ["# routelens — eval report", "",
+    lines = ["# arbiter — eval report", "",
              f"**{passed}/{len(evals)} eval suites passed.**", "",
              "These evals are deterministic and model-free; they gate the logic "
              "that must be correct regardless of any live provider.", "",

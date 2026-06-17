@@ -1,7 +1,7 @@
 """Offline-capable end-to-end demo: generate traffic → observe + shadow-judge →
 generate rules → route → report realized + projected savings.
 
-Run: ``./run.sh demo``  (or ``python -m routelens.demo``)
+Run: ``./run.sh demo``  (or ``python -m arbiter.demo``)
 
 With a reachable model (host Ollama or a provider key) you get the *full* story:
 real shadow-judged quality, generated rules, and realized routing savings. With
@@ -45,7 +45,7 @@ def main(argv: list[str] | None = None) -> int:
     baseline = judge.id if have_model else "claude-sonnet-4-6"
 
     print("=" * 64)
-    print("routelens — cost/quality routing proxy: end-to-end demo")
+    print("arbiter — cost/quality routing proxy: end-to-end demo")
     print("=" * 64)
     print(f"providers reachable: {providers.status()['providers']}")
     print(f"baseline model for synthetic traffic: {baseline}")

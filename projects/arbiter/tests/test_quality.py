@@ -1,6 +1,6 @@
-from routelens.classify import Features
-from routelens.quality import heuristics, judge
-from routelens.registry import DEFAULT as REG
+from arbiter.classify import Features
+from arbiter.quality import heuristics, judge
+from arbiter.registry import DEFAULT as REG
 
 
 def _f(task="chat", **kw):
@@ -31,7 +31,7 @@ def test_judge_returns_none_without_real_pair():
 
 
 def test_heuristics_only_when_no_judge(monkeypatch):
-    import routelens.quality as q
+    import arbiter.quality as q
     monkeypatch.setattr(q, "pick_judge", lambda reg: None)
     score = judge("Paris.", "Paris.", _f(), reg=REG)
     assert score is not None

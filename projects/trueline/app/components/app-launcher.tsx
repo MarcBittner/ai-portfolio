@@ -4,11 +4,15 @@ import { useEffect, useRef, useState } from "react";
 
 import { cn } from "./ui";
 
-// Portfolio demo catalog (live *.onrender.com links). Inlined so the launcher
-// is self-contained and works in every deployment.
+// Portfolio demo catalog. Single source of truth is catalog.json at the repo
+// root, served via jsDelivr and fetched at runtime; this inlined list is only an
+// offline fallback so the launcher still works if the fetch fails.
 type App = { name: string; tag: string; url: string };
 
-const APPS: App[] = [
+const CATALOG_URL =
+  "https://cdn.jsdelivr.net/gh/MarcBittner/ai-portfolio@main/catalog.json";
+
+const FALLBACK: App[] = [
   { name: "persona-twin", tag: "RAG digital-twins: chunking/embedding/rerank, eval, streaming chat, ob…", url: "https://persona-twin-usu4.onrender.com" },
   { name: "tanglement-showcase", tag: "P2P multi-provider LLM routing network (proprietary showcase)", url: "https://tanglement-teaser.onrender.com" },
   { name: "pii-redactor", tag: "PII detect/redact — regex+checksum core + LLM NER", url: "https://pii-redactor-lk6x.onrender.com" },
@@ -35,7 +39,7 @@ const APPS: App[] = [
   { name: "quorum", tag: "Vendor-neutral multi-agent orchestrator — workflow DAG + parallel fan-…", url: "https://quorum-9x75.onrender.com" },
   { name: "burnrate", tag: "Instrumented Flask SRE service — Prometheus RED metrics, multi-window…", url: "https://burnrate-grza.onrender.com" },
   { name: "baseplate", tag: "Platform paved-road — reusable Terraform/EKS/RDS + ArgoCD + golden CI,…", url: "https://baseplate-mlrj.onrender.com" },
-  { name: "routelens", tag: "AI request proxy — cost/quality-aware routing + prompt/response caching; observe vs route, measured shadow-judging…", url: "https://routelens-0kxz.onrender.com" },
+  { name: "arbiter", tag: "AI request gateway — sits in front of your apps' real LLM traffic; routes/caches for cost savings gated by measured quality", url: "https://routelens-0kxz.onrender.com" },
 ];
 
 function hostOf(url: string): string | null {
@@ -50,6 +54,7 @@ export function AppLauncher() {
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState("");
   const [currentHost, setCurrentHost] = useState<string | null>(null);
+  const [apps, setApps] = useState<App[]>(FALLBACK);
   const searchRef = useRef<HTMLInputElement>(null);
 
   // Resolve the current host only on the client; "here" is meaningful only on
@@ -57,6 +62,21 @@ export function AppLauncher() {
   useEffect(() => {
     const h = window.location.hostname;
     setCurrentHost(h.includes("onrender") ? h : null);
+  }, []);
+
+  // Single source of truth: pull the live catalog at runtime; keep the inlined
+  // FALLBACK if it's unreachable. Adding/renaming a demo never touches this file.
+  useEffect(() => {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 2500);
+    fetch(CATALOG_URL, { signal: ctrl.signal })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (Array.isArray(j) && j.length) setApps(j as App[]);
+      })
+      .catch(() => {})
+      .finally(() => clearTimeout(t));
+    return () => clearTimeout(t);
   }, []);
 
   // Esc closes; focus the filter when the modal opens.
@@ -99,7 +119,7 @@ export function AppLauncher() {
   }
 
   const q = filter.trim().toLowerCase();
-  const shown = APPS.filter(
+  const shown = apps.filter(
     (a) => !q || (a.name + " " + a.tag).toLowerCase().includes(q),
   );
 
@@ -147,7 +167,7 @@ export function AppLauncher() {
             <div className="flex items-center gap-3 border-b border-[--color-line] px-4 py-3">
               <b className="text-sm">Portfolio demos</b>
               <span className="text-xs text-[--color-muted]">
-                {APPS.length} apps
+                {apps.length} apps
               </span>
               <input
                 ref={searchRef}

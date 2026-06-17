@@ -1,4 +1,4 @@
-from routelens.classify import classify
+from arbiter.classify import classify
 
 
 def test_extraction_via_json():

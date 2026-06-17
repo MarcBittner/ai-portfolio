@@ -9,7 +9,7 @@ It deliberately bakes in the patterns the analytics should *find*:
   strategy has something real to detect).
 
 All content is synthetic and fictional. The ``model`` stamped on each request is
-the *baseline* the customer "intended"; routelens decides whether a cheaper model
+the *baseline* the customer "intended"; arbiter decides whether a cheaper model
 can serve it.
 """
 

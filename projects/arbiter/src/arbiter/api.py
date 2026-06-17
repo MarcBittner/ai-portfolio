@@ -34,7 +34,7 @@ from .store import Store
 
 _STATIC = os.path.join(os.path.dirname(__file__), "static")
 
-app = FastAPI(title="routelens", version="0.1.0")
+app = FastAPI(title="arbiter", version="0.1.0")
 
 store = Store()
 cfg = RouteConfig()
@@ -48,7 +48,7 @@ if _saved_rules:
     ruleset.replace([Rule(**r) for r in _saved_rules])
 
 proxy = Proxy(REGISTRY, cfg, ruleset, store,
-              default_model=os.environ.get("ROUTELENS_DEFAULT_MODEL", "local"))
+              default_model=os.environ.get("ARBITER_DEFAULT_MODEL", "local"))
 
 
 def _persist_cfg() -> None:
@@ -75,12 +75,12 @@ def health():
 def chat_completions(req: ChatCompletionRequest):
     resp = proxy.handle(req.model, req.as_messages(), max_tokens=req.max_tokens,
                         temperature=req.temperature, json_mode=req.wants_json())
-    rl = resp["routelens"]
+    rl = resp["arbiter"]
     headers = {
-        "x-routelens-strategy": str(rl["strategy"]),
-        "x-routelens-served-model": str(rl["served_model"]),
-        "x-routelens-baseline-model": str(rl["baseline_model"]),
-        "x-routelens-saved-usd": str(rl["saved"]),
+        "x-arbiter-strategy": str(rl["strategy"]),
+        "x-arbiter-served-model": str(rl["served_model"]),
+        "x-arbiter-baseline-model": str(rl["baseline_model"]),
+        "x-arbiter-saved-usd": str(rl["saved"]),
     }
     return JSONResponse(resp, headers=headers)
 

@@ -1,10 +1,10 @@
-# routelens
+# arbiter
 
 **An OpenAI-compatible proxy that learns, from your real traffic, where you're
 overpaying for model quality you don't need — then reroutes those requests to
 cheaper or local models *only when measured quality stays above a floor you set*.**
 
-routelens never "wins" by quietly degrading your app: every dollar of savings is
+arbiter never "wins" by quietly degrading your app: every dollar of savings is
 reported next to a **measured** quality-retention number, and that retention is
 obtained by *actually running* candidate models and judging their output against
 the baseline — not estimated, not faked. When no model is reachable it says
@@ -16,7 +16,7 @@ caching** detects long reused prefixes and bills them at ~10% via provider-side
 caching. Both are zero-quality-impact by construction.
 
 > Sibling of `llm-gateway`, which puts *governance* on the request path;
-> routelens puts *economics + quality* on it.
+> arbiter puts *economics + quality* on it.
 
 ---
 
@@ -99,21 +99,21 @@ Request, in OpenAI shape, with extra fields allowed:
   "max_tokens": 400, "temperature": 0.0,
   "response_format": {"type":"json_object"} }
 ```
-Response: a standard `chat.completion` object plus a `routelens` block and
-`x-routelens-*` headers:
+Response: a standard `chat.completion` object plus a `arbiter` block and
+`x-arbiter-*` headers:
 ```json
 { "object":"chat.completion","model":"claude-haiku-4-5",
   "choices":[{"index":0,"message":{"role":"assistant","content":"..."},
               "finish_reason":"stop"}],
   "usage":{"prompt_tokens":120,"completion_tokens":30,"total_tokens":150},
-  "routelens":{ "mode":"route","requested_model":"claude-opus-4-8",
+  "arbiter":{ "mode":"route","requested_model":"claude-opus-4-8",
     "baseline_model":"claude-opus-4-8","served_model":"claude-haiku-4-5",
     "strategy":"route","task_class":"classification","matched_rule":"auto-...",
     "baseline_cost":0.0021,"served_cost":0.00015,"saved":0.00195,
     "cache_hit":false,"real_model":true,"shadow":[] } }
 ```
-Headers: `x-routelens-strategy`, `x-routelens-served-model`,
-`x-routelens-baseline-model`, `x-routelens-saved-usd`.
+Headers: `x-arbiter-strategy`, `x-arbiter-served-model`,
+`x-arbiter-baseline-model`, `x-arbiter-saved-usd`.
 
 | Method · Path | Purpose |
 |---|---|

@@ -11,10 +11,10 @@ import urllib.request
 
 import pytest
 
-LIVE = os.environ.get("ROUTELENS_LIVE") == "1"
-BASE = os.environ.get("ROUTELENS_BASE_URL", "http://127.0.0.1:8030").rstrip("/")
+LIVE = os.environ.get("ARBITER_LIVE") == "1"
+BASE = os.environ.get("ARBITER_BASE_URL", "http://127.0.0.1:8030").rstrip("/")
 
-pytestmark = pytest.mark.skipif(not LIVE, reason="set ROUTELENS_LIVE=1 to run")
+pytestmark = pytest.mark.skipif(not LIVE, reason="set ARBITER_LIVE=1 to run")
 
 
 def _get(path):
@@ -37,7 +37,7 @@ def test_health():
 def test_console_served():
     with urllib.request.urlopen(f"{BASE}/", timeout=30) as r:
         assert r.status == 200
-        assert b"routelens" in r.read().lower()
+        assert b"arbiter" in r.read().lower()
 
 
 def test_models_listed():
@@ -49,7 +49,7 @@ def test_openai_completion_shape():
         "model": "claude-opus-4-8",
         "messages": [{"role": "user", "content": "ping"}]})
     assert body["object"] == "chat.completion"
-    assert "routelens" in body
+    assert "arbiter" in body
 
 
 def test_simulate_and_report():

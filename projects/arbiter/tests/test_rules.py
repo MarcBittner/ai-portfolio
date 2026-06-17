@@ -1,6 +1,6 @@
-from routelens.classify import classify
-from routelens.registry import DEFAULT as REG
-from routelens.rules import RouteConfig, Rule, Ruleset, generate_rules
+from arbiter.classify import classify
+from arbiter.registry import DEFAULT as REG
+from arbiter.rules import RouteConfig, Rule, Ruleset, generate_rules
 
 
 def _stat(task, cand, retained, saved, n=10):

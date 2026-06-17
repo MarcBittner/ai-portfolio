@@ -49,7 +49,7 @@ CREATE INDEX IF NOT EXISTS idx_q_task ON quality_samples(task_class);
 
 class Store:
     def __init__(self, path: str | None = None):
-        self.path = path or os.environ.get("ROUTELENS_DB", "routelens.db")
+        self.path = path or os.environ.get("ARBITER_DB", "arbiter.db")
         self._lock = threading.Lock()
         self._db = sqlite3.connect(self.path, check_same_thread=False)
         self._db.row_factory = sqlite3.Row

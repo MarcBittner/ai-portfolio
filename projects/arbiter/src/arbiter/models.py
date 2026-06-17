@@ -1,5 +1,5 @@
 """Pydantic request/response shapes. The completion endpoint is OpenAI-compatible
-so routelens is a drop-in: a client only changes its ``base_url``."""
+so arbiter is a drop-in: a client only changes its ``base_url``."""
 
 from __future__ import annotations
 

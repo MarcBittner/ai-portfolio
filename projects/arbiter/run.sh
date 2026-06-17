@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# run.sh — dev/ops entrypoint for routelens (replaces make).
+# run.sh — dev/ops entrypoint for arbiter (replaces make).
 # Production-grade: strict mode, dependency + version checks, --flag options.
 set -euo pipefail
 
 # ---- project config ----
-PROJECT="routelens"
-PKG="routelens"
-APP="routelens.api:app"
+PROJECT="arbiter"
+PKG="arbiter"
+APP="arbiter.api:app"
 MIN_PY_MAJOR=3
 MIN_PY_MINOR=11
 DEFAULT_PORT=8030
@@ -132,8 +132,8 @@ cmd_smoke() {
 cmd_serve() { ensure_installed; tool uvicorn "$APP" --host "$HOST" --port "$PORT" --reload; }
 cmd_test()  { ensure_installed; py -m pytest -q "$@"; }
 cmd_lint()  { ensure_installed; tool ruff check src tests; }
-cmd_demo()  { ensure_installed; py -m routelens.demo "$@"; }
-cmd_eval()  { ensure_installed; py -m routelens.evaluate "$@"; }
+cmd_demo()  { ensure_installed; py -m arbiter.demo "$@"; }
+cmd_eval()  { ensure_installed; py -m arbiter.evaluate "$@"; }
 
 CMD=""
 while (( $# )); do

@@ -1,11 +1,11 @@
-from routelens.cache import (
+from arbiter.cache import (
     ResponseCache,
     prefix_signature,
     request_key,
     should_cache_prefix,
 )
-from routelens.cost import cost_usd
-from routelens.registry import DEFAULT as REG
+from arbiter.cost import cost_usd
+from arbiter.registry import DEFAULT as REG
 
 
 def test_cost_basic():

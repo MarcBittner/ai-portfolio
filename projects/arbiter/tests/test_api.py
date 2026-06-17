@@ -7,8 +7,8 @@ from fastapi.testclient import TestClient
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
-    monkeypatch.setenv("ROUTELENS_DB", str(tmp_path / "t.db"))
-    import routelens.api as api
+    monkeypatch.setenv("ARBITER_DB", str(tmp_path / "t.db"))
+    import arbiter.api as api
     importlib.reload(api)
     return TestClient(api.app)
 
@@ -28,8 +28,8 @@ def test_openai_compatible_completion(client):
     body = r.json()
     assert body["object"] == "chat.completion"
     assert body["choices"][0]["message"]["role"] == "assistant"
-    assert "routelens" in body
-    assert "x-routelens-strategy" in r.headers
+    assert "arbiter" in body
+    assert "x-arbiter-strategy" in r.headers
 
 
 def test_config_roundtrip(client):
@@ -94,7 +94,7 @@ def test_reset(client):
 
 def test_static_index_served(client):
     static = os.path.join(
-        os.path.dirname(importlib.import_module("routelens.api").__file__),
+        os.path.dirname(importlib.import_module("arbiter.api").__file__),
         "static", "index.html")
     if not os.path.exists(static):
         pytest.skip("console not built yet")
