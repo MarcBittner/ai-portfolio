@@ -132,6 +132,6 @@
   {
     "name": "arbiter",
     "tag": "AI request gateway \u2014 sits in front of your apps' real LLM traffic, analyzes it, and routes/caches for cost savings gated by measured quality",
-    "url": "https://routelens-0kxz.onrender.com"
+    "url": "https://arbiter-splt.onrender.com"
   }
 ]
