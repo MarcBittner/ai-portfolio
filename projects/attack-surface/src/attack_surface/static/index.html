@@ -519,9 +519,9 @@
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const j=async(u,o)=>(await fetch(u,o)).json();
 const esc=s=>String(s).replace(/</g,"&lt;");
-const CFG_KEY="attacksurface.cfg";
+const CFG_KEY="attacksurface.cfg2";  // bumped so the new stripe.com default wins over any stale saved cfg
 // cfg.mode = scan target (fixture|live); cfg.routeMode = LLM routing tier for the narrative.
-let cfg={mode:"fixture",domain:"example-corp.test",routeMode:"auto",model:""};
+let cfg={mode:"live",domain:"stripe.com",routeMode:"auto",model:""};
 let llmProviders={};  // last GET /llm providers map
 
 function toast(msg,type="info"){
@@ -542,7 +542,7 @@ $("#gear").onclick=openDrawer;$("#closedrawer").onclick=closeDrawer;
 $("#savecfg").onclick=()=>{cfg={mode:$("#cfgMode").value,domain:$("#cfgDomain").value.trim()||"example-corp.test",
     routeMode:currentMode(),model:$("#cfgModel").value.trim()};
   localStorage.setItem(CFG_KEY,JSON.stringify(cfg));closeDrawer();toast("Settings saved","ok");run()};
-$("#resetcfg").onclick=()=>{cfg={mode:"fixture",domain:"example-corp.test",routeMode:"auto",model:""};localStorage.removeItem(CFG_KEY);applyCfgToForm();syncMainControls();toast("Reset to defaults","info")};
+$("#resetcfg").onclick=()=>{cfg={mode:"live",domain:"stripe.com",routeMode:"auto",model:""};localStorage.removeItem(CFG_KEY);applyCfgToForm();syncMainControls();toast("Reset to defaults","info")};
 
 // ---- main-panel scan controls: domain + mode are first-class, not buried in Settings ----
 function persistCfg(){try{localStorage.setItem(CFG_KEY,JSON.stringify(cfg))}catch{}}
@@ -791,23 +791,30 @@ async function loadLlm(){
   try{const s=await j("llm");llmProviders=s.providers||{};renderRouting();}catch{}
 }
 
+// Always lands on a populated report. Live mode tries passive CT recon; on any
+// failure (or empty CT) it falls back to the offline control-mapped report — the
+// console never shows a bare "Scan failed".
 async function run(){
-  if(cfg.mode==="live" && (!cfg.domain || cfg.domain==="example-corp.test")){
-    toast("Enter a real domain (e.g. stripe.com) for live mode","bad");$("#mainDomain")?.focus();return;
-  }
   const btn=$("#scan");btn.classList.add("loading");
+  const fixtureFallback=async(note)=>{try{const f=await j("scan");renderReport(f);if(note)toast(note,"info");}catch{toast("Service still waking up — try again in a moment","info");}};
   try{
-    if(cfg.mode==="live"){
-      const r=await j("scan",{method:"POST",headers:{"content-type":"application/json"},
-        body:JSON.stringify({mode:"live",domain:cfg.domain})});
-      renderLive(r);
-      toast(`Live recon · ${(r.assets&&r.assets.subdomains||[]).length} subdomains`,"ok");
+    if(cfg.mode==="live" && cfg.domain && cfg.domain!=="example-corp.test"){
+      try{
+        const r=await j("scan",{method:"POST",headers:{"content-type":"application/json"},
+          body:JSON.stringify({mode:"live",domain:cfg.domain})});
+        const ns=((r.assets&&r.assets.subdomains)||[]).length, nf=(r.findings||[]).length;
+        if(ns||nf){renderLive(r);toast(`Live recon · ${ns} subdomains · ${nf} findings`,"ok");}
+        else await fixtureFallback("No public CT data for that domain — showing the offline control-mapped report");
+      }catch(err){
+        await fixtureFallback("Live recon unavailable — showing the offline control-mapped report");
+      }
     }else{
-      const r=await j("scan");
-      renderReport(r);
+      const r=await j("scan");renderReport(r);
       toast(`Scan complete · grade ${r.posture.grade}`,"ok");
     }
-  }catch(e){toast("Scan failed","bad")}
+  }catch(e){
+    await fixtureFallback("Showing the offline control-mapped report");
+  }
   btn.classList.remove("loading");
 }
 $("#scan").onclick=run;
@@ -827,8 +834,10 @@ async function boot(){
   $$(".reveal").forEach((el,i)=>setTimeout(()=>el.classList.add("in"),90*i));
   loadLlm();
   refreshClientOllama();   // browser-side Ollama check (browser→host)
-  // first load: always show the populated fixture report
+  // first load: always show a populated report immediately (offline, never fails),
+  // then — if defaulted to a live domain (stripe.com) — upgrade to the live recon.
   try{const r=await j("scan");renderReport(r);}catch{}
+  if(cfg.mode==="live" && cfg.domain && cfg.domain!=="example-corp.test"){run();}
 }
 boot();
 
