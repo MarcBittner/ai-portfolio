@@ -67,7 +67,7 @@ export default function Landing() {
           </Link>
         </SignedIn>
         <p className="mt-2 text-xs text-[--color-muted]">
-          A demo organization is seeded with sample invoices the moment you sign in. Synthetic data only.
+          A demo organization is seeded with synthetic sample invoices the moment you sign in — or upload your own contract and invoices to run it on real data.
         </p>
       </div>
 
@@ -105,8 +105,9 @@ export default function Landing() {
       </section>
 
       <footer className="mt-12 border-t border-[--color-line] pt-6 text-xs text-[--color-muted]">
-        Synthetic, fictional data only. A portfolio project demonstrating the
-        Next.js · Convex · Clerk · LLM stack and an extract → verify → reconcile → review → eval loop.
+        Sample data is synthetic and fictional; upload your own contract and invoices to run it on
+        real data. A portfolio project demonstrating the Next.js · Convex · Clerk · LLM stack and an
+        extract → verify → reconcile → review → eval loop.
       </footer>
     </main>
   );
