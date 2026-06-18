@@ -19,7 +19,14 @@ def _grade(score: int) -> str:
 
 
 def _posture(findings: list[dict], control_rows: list[dict]) -> dict:
-    penalty = sum(SEVERITY_WEIGHT.get(f["severity"], 0) for f in findings)
+    # Critical/high findings drive the grade linearly; low/medium *observations*
+    # have their total contribution CAPPED so sheer volume can't floor the score.
+    # A raw `100 - Σpenalty` unfairly gave any large domain an F purely because it
+    # has more hosts (more low-severity CT observations) — size, not security.
+    n = {s: sum(1 for f in findings if f["severity"] == s)
+         for s in SEVERITY_WEIGHT}
+    penalty = (n["critical"] * 10 + n["high"] * 6
+               + min(n["medium"] * 3, 24) + min(n["low"] * 1, 12))
     score = max(0, 100 - penalty)
     failing = sum(1 for c in control_rows if c["status"] == "fail")
     return {"score": score, "grade": _grade(score),

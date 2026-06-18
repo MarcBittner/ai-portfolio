@@ -44,7 +44,7 @@ def derive_passive(entries: list[dict], domain: str) -> list[dict]:
         nonprod = sorted(toks & NONPROD_LABELS)
         if sensitive:
             out.append(_f(
-                "CT_SENSITIVE_HOST", "high", "Sensitive-service hostname in public CT",
+                "CT_SENSITIVE_HOST", "low", "Sensitive-service hostname in public CT",
                 name,
                 f"Hostname implies internal/sensitive infra ({', '.join(sensitive)}) "
                 "yet is published in Certificate Transparency for anyone to enumerate.",
@@ -53,7 +53,7 @@ def derive_passive(entries: list[dict], domain: str) -> list[dict]:
                 "private CA or wildcard so internal names aren't leaked in public CT."))
         elif nonprod:
             out.append(_f(
-                "CT_NONPROD_HOST", "medium", "Non-prod hostname in public CT", name,
+                "CT_NONPROD_HOST", "low", "Non-prod hostname in public CT", name,
                 f"A non-production host ({', '.join(nonprod)}) is published in "
                 "public CT logs and is part of the discoverable external surface.",
                 ["SOC2:CC6.6", "SOC2:CC7.1"],

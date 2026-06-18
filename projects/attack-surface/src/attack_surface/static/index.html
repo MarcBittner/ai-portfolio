@@ -643,19 +643,20 @@ function renderDiff(){
 function renderLive(r){
   const subs=(r.assets&&r.assets.subdomains)||[];
   const findings=r.findings||[];
-  const sens=findings.filter(f=>f.severity==="high").length;      // sensitive-label hosts
-  const nonprod=findings.filter(f=>f.severity==="medium").length; // nonprod-label hosts
-  // hero = the surface, NOT a grade
-  $("#gradecard").className="gradecard";
-  $("#grade").textContent=subs.length; $("#grade").className="g";
-  $("#gradelbl").textContent="hosts in CT";
-  $("#score").textContent=findings.length;
-  $("#scoreunit").textContent=" observations";
-  $("#ctrlfail").innerHTML=`<b>${sens}</b> sensitive-label · <b>${nonprod}</b> nonprod hosts`;
-  $("#domain").innerHTML=`scope <code>${esc(r.domain)}</code> · live, passive Certificate Transparency only`;
-  $("#poscaption").textContent="passive attack-surface map — no grade (CT enumeration is not a vulnerability assessment)";
-  $("#posturepill").textContent=`live · ${subs.length} subdomains`;
-  $("#posturepill").className="pill";
+  const sens=findings.filter(f=>f.rule_id==="CT_SENSITIVE_HOST").length;   // sensitive-label hosts
+  const nonprod=findings.filter(f=>f.rule_id==="CT_NONPROD_HOST").length;  // nonprod-label hosts
+  // hero = bounded external-hygiene grade (volume can't floor it) + honest framing
+  const p=r.posture||{grade:"?",score:0};
+  $("#gradecard").className="gradecard g"+p.grade;
+  $("#grade").textContent=p.grade; $("#grade").className="g g"+p.grade;
+  $("#gradelbl").textContent="ext. hygiene";
+  $("#score").textContent=p.score;
+  $("#scoreunit").textContent="/100";
+  $("#ctrlfail").innerHTML=`<b>${subs.length}</b> hosts · <b>${sens}</b> sensitive-label · <b>${nonprod}</b> nonprod`;
+  $("#domain").innerHTML=`scope <code>${esc(r.domain)}</code> · live, passive Certificate Transparency`;
+  $("#poscaption").textContent="passive external-hygiene grade — CT enumeration only, not a full vulnerability assessment";
+  $("#posturepill").textContent=`live · grade ${p.grade} · ${subs.length} subdomains`;
+  $("#posturepill").className="pill "+gradeClass(p.grade);
   // neutral surface-stat cards (not severity-colored alarm)
   $("#sevTitle").textContent="Surface summary";
   $("#sev").innerHTML=[
@@ -667,7 +668,7 @@ function renderLive(r){
   $("#findingsPanel").style.display="";
   $("#findingsTitle").innerHTML='Passively-observable exposure <span class="muted" style="margin-left:auto;text-transform:none;letter-spacing:0">CT only · not a vulnerability assessment</span>';
   $("#findings").innerHTML=`<thead><tr><th>type</th><th>observation</th><th>asset</th></tr></thead><tbody>`+
-    (findings.length?findings.map(f=>{const tag=f.severity==="high"?"sensitive":f.severity==="medium"?"nonprod":"info";
+    (findings.length?findings.map(f=>{const tag=f.rule_id==="CT_SENSITIVE_HOST"?"sensitive":f.rule_id==="CT_NONPROD_HOST"?"nonprod":"surface";
       return `<tr><td><span class="badge b-${f.severity}">${tag}</span></td>
       <td><b>${esc(f.title)}</b><div class="muted">${esc(f.detail)}</div></td>
       <td><span class="mono">${esc(f.asset)}</span></td></tr>`;}).join("")
