@@ -375,13 +375,12 @@
           <div class="meta" id="ctrlfail">—</div>
           <div class="meta" id="domain"></div>
           <div class="row" style="margin-top:14px;gap:8px;flex-wrap:wrap;align-items:center">
-            <select id="mainMode" title="Scan mode"
-              style="padding:9px 11px;border-radius:9px;background:var(--card,#0e141b);color:inherit;border:1px solid var(--line,#2a3340);font:inherit">
-              <option value="fixture">fixture — full control-mapped report</option>
-              <option value="live">live — passive CT recon of a real domain</option>
+            <select id="mainMode" title="Scan mode" style="width:auto;padding:9px 11px">
+              <option value="live">live — passive CT recon</option>
+              <option value="fixture">fixture — full report</option>
             </select>
             <input id="mainDomain" placeholder="example.com  (live mode)" autocomplete="off" spellcheck="false"
-              style="flex:1;min-width:200px;padding:9px 11px;border-radius:9px;background:var(--card,#0e141b);color:inherit;border:1px solid var(--line,#2a3340);font:inherit" />
+              style="flex:1;min-width:180px;width:auto;padding:9px 11px" />
             <button class="btn primary" id="scan"><span class="spin"></span><span class="lbl">Run scan</span></button>
             <span class="muted" id="subs"></span>
           </div>
