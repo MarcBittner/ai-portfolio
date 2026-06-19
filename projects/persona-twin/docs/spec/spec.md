@@ -371,7 +371,7 @@ throwaway test stubs — they are the documented offline mode.
 - **FR-10.2** `./run.sh demo` works on a fresh clone with no `.env` — this is a
   hard acceptance criterion
 - **FR-10.3** README: what it is, architecture diagram, 60-second
-  quickstart, per-component docs links, honest limitations section
+  quickstart, per-component docs links, limitations section
 - **FR-10.4** Pinned, lean dependencies (`pyproject.toml`); Python 3.11+
 
 ### FR-11: Frontend (optional)

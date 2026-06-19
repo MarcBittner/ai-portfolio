@@ -379,7 +379,7 @@ single worker. The live demo runs on Render; the EKS path is the GitOps artifact
 `deploy/` (ArgoCD Application, k8s manifests + HPA, Prometheus burn-rate rules, the
 smoke-gated GitHub Actions pipeline with rollback).
 
-**Honest single-instance caveats.** This is a single-worker reference, not a fleet
+**Single-instance caveats.** This is a single-worker reference, not a fleet
 service. The `prometheus_client` registry is per-process, so `/metrics`, `/slo`, and
 the dashboard are one consistent source only at one replica (`--workers 1`); a real
 deployment scrapes each pod and aggregates the SLIs in Prometheus over a sliding

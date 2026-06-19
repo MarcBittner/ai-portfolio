@@ -23,6 +23,7 @@ A complete, read-it-once reference for how trueline works end to end. Pair with
 - [8. Realtime, idempotency, and the eval loop](#8-realtime-idempotency-and-the-eval-loop)
 - [9. App surface (`app/`)](#9-app-surface-app)
 - [10. Design decisions & tradeoffs](#10-design-decisions-tradeoffs)
+- [11. Future development](#11-future-development)
 
 **Source map — jump to the code:**
 
@@ -174,4 +175,25 @@ Pure functions, no Convex imports → trivially unit-testable. Per line:
 - **Clerk over hand-rolled auth** — production sessions/MFA + an **organization** model + billing, drop-in; the org id rides in the JWT and scopes every row, so there's no bespoke RBAC.
 - **LLM reads, code decides** — the only safe contract for money; also makes the system explainable (`reasons[]`) and testable (pure `reconcile.ts`).
 - **Deterministic terminal fallback** — the app runs end-to-end with zero keys/zero cost, which is why the public demo works for any reviewer.
-- **Honest limits** — synthetic sample data (runs on your real data too); pipe-delimited text ingest (PDF/OCR is the stated next step); fuzzy description matching is token-overlap (embeddings are the upgrade); single Convex deployment (Convex handles scaling). These are called out, not hidden.
+- **Limitations** — synthetic sample data (runs on your real data too); pipe-delimited text ingest (PDF/OCR is the stated next step); fuzzy description matching is token-overlap (embeddings are the upgrade); single Convex deployment (Convex handles scaling). These are called out, not hidden.
+
+---
+
+## 11. Future development
+
+Concrete next increments, in rough priority order:
+
+- **Document ingest (PDF / image + OCR).** Accept real invoices and contracts as
+  PDFs or scans, OCR them to text, and feed that into the existing extraction step —
+  replacing the pipe-delimited text format used today.
+- **Semantic line matching (embeddings).** Replace the token-overlap description
+  matcher in `reconcile.ts` with embedding-based similarity, so paraphrased or
+  abbreviated line descriptions (e.g. "1/2in steel bracket" vs "half-inch steel
+  mounting bracket") match reliably; keep the deterministic matcher as a fallback.
+- **Richer reconciliation.** Tax, freight, and discount lines; unit-of-measure
+  conversion; partial-quantity and split-shipment matching across multiple POs; and
+  currency normalization for multi-currency vendors.
+- **Workflow & integrations.** Dispute export (CSV/PDF), webhook/AP-system
+  integration to push approved corrections downstream, and reviewer approval routing.
+- **Model & eval.** Expand the labeled eval set, add a confusion-matrix view to the
+  eval page, and support per-tenant threshold tuning with the eval as the gate.

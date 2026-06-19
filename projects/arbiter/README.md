@@ -29,7 +29,7 @@ caching. Both are zero-quality-impact by construction.
 - [Quickstart](#quickstart)
 - [API reference](#api-reference)
 - [The honest dollar bridge](#the-honest-dollar-bridge)
-- [Honest limits](#honest-limits)
+- [Limitations](#limitations)
 - [Architecture](#architecture)
 - [Stack](#stack)
 
@@ -158,7 +158,7 @@ re-prices those measured routing decisions at a chosen list-price scenario —
 dollar impact at prices you actually pay. It is clearly labeled as a projection on
 a *measured* decision, never a fabricated benchmark.
 
-## Honest limits
+## Limitations
 
 - Quality estimation is **statistical, not a guarantee**; the floor and the
   keep-measuring-while-routing sample bound the downside. Canary and auto-rollback

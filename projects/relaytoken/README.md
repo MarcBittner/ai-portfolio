@@ -39,7 +39,7 @@ real thing, not a toy reimplementation.
 - [Web console](#web-console)
 - [API reference](#api-reference)
 - [Quickstart](#quickstart)
-- [Security model & honest limits](#security-model-honest-limits)
+- [Security model & limitations](#security-model-limitations)
 - [Stack](#stack)
 
 ## Why this shape
@@ -227,7 +227,7 @@ grant explanation instead of the offline narration.
 
 ---
 
-## Security model & honest limits
+## Security model & limitations
 
 - **Trust-critical paths are deterministic.** Minting derives grants from vetted
   role templates; verification enforces signature + expiry + room scope +
