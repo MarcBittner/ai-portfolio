@@ -4,7 +4,7 @@
 //
 // CLERK_JWT_ISSUER_DOMAIN is your Clerk Frontend API URL, e.g.
 //   https://your-slug.clerk.accounts.dev
-export default {
+const authConfig = {
   providers: [
     {
       domain: process.env.CLERK_JWT_ISSUER_DOMAIN,
@@ -12,3 +12,5 @@ export default {
     },
   ],
 };
+
+export default authConfig;

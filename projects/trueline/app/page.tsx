@@ -12,7 +12,7 @@ const PIPELINE = [
 ];
 
 const STACK = [
-  ["Next.js 16 + React 19", "App Router, server components for the shell, client components for live data. On Vercel."],
+  ["Next.js 16 + React 19", "App Router, server components for the shell, client components for live data. Deployed on Render."],
   ["Convex", "The backend: reactive queries, transactional mutations, and an action for the external LLM call. No separate API server or SQL DB."],
   ["Clerk", "Auth + multi-tenant organizations + billing. The org id rides in the JWT and scopes every Convex row."],
   ["LLM (Anthropic / free)", "Server-side only. Structured outputs; calculator-verified. Free OpenRouter models by default, Anthropic when a key is set."],
@@ -44,7 +44,7 @@ export default function Landing() {
       </header>
 
       <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-        Catch what's padding the invoice — before you pay it.
+        Catch what&apos;s padding the invoice — before you pay it.
       </h1>
       <p className="mt-4 text-[--color-muted]">
         trueline reads a vendor invoice, <strong className="text-[--color-ink]">verifies the math

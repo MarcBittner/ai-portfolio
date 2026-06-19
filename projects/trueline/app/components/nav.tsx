@@ -12,6 +12,7 @@ function ThemeToggle() {
   const [light, setLight] = useState<boolean | null>(null);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- read client-only DOM class after mount; avoids a hydration mismatch
     setLight(document.documentElement.classList.contains("light"));
   }, []);
 

@@ -2,14 +2,16 @@
   "name": "trueline",
   "version": "0.1.0",
   "private": true,
-  "description": "Invoice line-item verification — extract, verify in code, reconcile vs PO + catalog, flag recoverable $, human review. Next.js + Convex + Clerk + LLM.",
+  "description": "Invoice line-item verification \u2014 extract, verify in code, reconcile vs PO + catalog, flag recoverable $, human review. Next.js + Convex + Clerk + LLM.",
   "scripts": {
     "dev": "next dev",
     "dev:convex": "convex dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "check:docs": "node scripts/check-doc-links.mjs",
+    "verify": "npm run lint && npm run typecheck && npm run check:docs"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.12.0",

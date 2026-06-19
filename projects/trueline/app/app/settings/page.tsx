@@ -34,10 +34,12 @@ export default function Configuration() {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect -- seed the form fields when the routing-config query resolves */
     if (cfg) {
       setMode(cfg.mode);
       setModel(cfg.model ?? "");
     }
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [cfg]);
 
   if (!isAuthenticated || cfg === undefined) {

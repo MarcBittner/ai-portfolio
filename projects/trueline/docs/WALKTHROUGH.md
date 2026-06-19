@@ -406,7 +406,7 @@ connection. The test: *"once, or every render?"* Once → module scope.
 
 ## Concept — Server Components vs Client Components
 
-The biggest App Router idea: **where does this component's code run?**
+The App Router's central distinction is **where a component's code executes** — on the server, in the browser, or both.
 
 Every component is a **Server Component by default**; it becomes a **Client
 Component** only if its file starts with `"use client"`.

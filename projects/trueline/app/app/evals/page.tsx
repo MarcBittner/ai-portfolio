@@ -27,7 +27,7 @@ export default function Evals() {
       <h1 className="text-lg font-semibold">Evaluation — proving the engine before it ships</h1>
       <p className="mb-5 mt-1 text-sm text-[--color-muted]">
         Accuracy is <i>measured</i>, not asserted. This scores the flag engine on a labeled set of
-        invoices — the gate you'd run in CI before shipping a threshold, prompt, or model change. A{" "}
+        invoices — the gate you&apos;d run in CI before shipping a threshold, prompt, or model change. A{" "}
         <b className="text-[--color-bad]">false negative</b> lets padding through (lost money); a{" "}
         <b className="text-[--color-warn]">false positive</b> makes estimators stop trusting it.
       </p>

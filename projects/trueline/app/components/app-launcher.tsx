@@ -61,6 +61,7 @@ export function AppLauncher() {
   // the live onrender deployments.
   useEffect(() => {
     const h = window.location.hostname;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resolve the host on the client only, after mount
     setCurrentHost(h.includes("onrender") ? h : null);
   }, []);
 

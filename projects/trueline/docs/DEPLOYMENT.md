@@ -112,8 +112,8 @@ Because the **Convex action runs in the cloud, it cannot reach a reviewer's
 
 ## 5. CI, build notes, ops
 
-- **Build:** `npm run build` (Next 16 production build). `next.config.ts` sets `eslint.ignoreDuringBuilds` so a style nit can't block a deploy; lint runs separately. **Typecheck:** `npx tsc --noEmit` (clean).
-- **Lint:** Next 16 removed `next lint`; run ESLint directly (`npx eslint .`) — the `package.json` `lint` script predates that change.
+- **Build:** `npm run build` (Next 16 production build). `next.config.ts` sets `eslint.ignoreDuringBuilds` so a style nit can't block a deploy; lint runs separately. **Typecheck:** `npm run typecheck` (= `tsc --noEmit`). **Verify both at once:** `npm run verify`.
+- **Lint:** `npm run lint` (= `eslint .`) against the ESLint 9 flat config in `eslint.config.mjs`, which loads `eslint-config-next`'s `core-web-vitals` + `typescript` rules. (Next 16 removed `next lint`, so ESLint runs directly.)
 - **Cold start:** Render free tier sleeps after ~15 min idle; first hit cold-starts ~30–60s. Open the URL a minute before demoing.
 - **Cost:** all free tiers — Render free web service, Convex free plan, Clerk free plan, OpenRouter free model. $0 to run.
 - **Push behaviour:** the repo's services auto-deploy on push to `main` (and a local ArgoCD cluster reconciles) — batch commits to avoid rebuild storms.
