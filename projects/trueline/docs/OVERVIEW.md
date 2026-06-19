@@ -123,7 +123,9 @@ can never double-insert.
    reviewer approves, rejects, or corrects a line; `correctLine` re-runs the same
    `reconcileLine` on the corrected numbers and records the edit as a labeled signal.
 7. **Evaluate.** `runEval` ([`convex/evals.ts`](../convex/evals.ts)) scores the flag
-   engine's precision and recall against a labeled set — the gate to run before
+   engine's precision and recall against a fixed, hand-labeled benchmark of 18 invoices
+   ([`convex/lib/benchmark.ts`](../convex/lib/benchmark.ts)) — engine-level and independent
+   of anything the tenant uploads. It auto-runs on app load and is the gate to run before
    changing a threshold, prompt, or model.
 
 ### A concrete example

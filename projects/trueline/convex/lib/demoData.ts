@@ -63,11 +63,3 @@ export const DEMO_INVOICES = [
     ].join("\n"),
   },
 ];
-
-// A tiny labeled eval set: the "truth" for whether each invoice should surface
-// any red flag. Used by evals.ts to score flag precision/recall.
-export const DEMO_EVAL_LABELS: Record<string, boolean> = {
-  "INV-1009": false, // no padding — should stay green
-  "INV-1010": true, // padded — should flag
-  "INV-1011": true, // math error + over-charge — should flag
-};

@@ -64,7 +64,7 @@ Source: [`convex/invoices.ts`](../convex/invoices.ts),
 | `api.invoices.setInvoiceStatus` | `{ invoiceId, status }` | Sets the invoice status. `status`: `"approved"` \| `"rejected"` \| `"needs_review"`. |
 | `api.invoices.resetDemo` | — | Clears all of the tenant's invoices, lines, POs, catalog, and eval runs. Returns `{ cleared }`. |
 | `api.routing.set` | `{ mode, model? }` | Saves the tenant's extraction routing. `mode`: `"auto"` \| `"local"` \| `"free"` \| `"paid"` \| `"offline"`. Returns `{ ok }`. |
-| `api.evals.runEval` | — | Scores the flag engine (precision / recall / math-consistency) on the labeled set and stores an `evalRuns` row. Returns the run. |
+| `api.evals.runEval` | — | Scores the flag engine (precision / recall / math-consistency) against the fixed, hand-labeled benchmark of 18 invoices via `scoreBenchmark()` — independent of tenant data. Stores an `evalRuns` row (deduped; no new row when identical to the latest) and returns the latest/inserted row. Auto-runs on app load. |
 
 ## Actions (external I/O)
 

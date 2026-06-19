@@ -167,6 +167,17 @@ export default function Dashboard() {
     }
   }, [isAuthenticated, baseline, invoices, seedAll]);
 
+  // Run the engine regression (a fixed labeled benchmark, independent of your
+  // invoices) asynchronously on app load, so the Evals page is already populated
+  // and nobody waits on it. Fire-and-forget; never blocks render.
+  const ranEval = useRef(false);
+  useEffect(() => {
+    if (!ranEval.current && isAuthenticated) {
+      ranEval.current = true;
+      void runEval().catch(() => {});
+    }
+  }, [isAuthenticated, runEval]);
+
   if (!isAuthenticated || baseline === undefined || invoices === undefined) {
     return (
       <main className="mx-auto max-w-5xl px-6 py-8">
@@ -349,18 +360,12 @@ export default function Dashboard() {
             </p>
           </section>
 
-          <section className="mb-4 grid gap-3 sm:grid-cols-4">
+          {/* These three reflect YOUR invoices. Engine accuracy (precision/recall)
+              lives on the Evals page — it's a fixed benchmark, not a per-invoice stat. */}
+          <section className="mb-4 grid gap-3 sm:grid-cols-3">
             <Stat label="Invoices" value={String(stats?.invoices ?? nInv)} />
             <Stat label="Recoverable" value={usd(stats?.recoverableUsd)} accent />
             <Stat label="Needs review" value={String(stats?.needsReview ?? 0)} />
-            <Stat
-              label="Flag P / R"
-              value={
-                stats?.latestEval
-                  ? `${stats.latestEval.flagPrecision.toFixed(2)} / ${stats.latestEval.flagRecall.toFixed(2)}`
-                  : "run eval"
-              }
-            />
           </section>
 
           <div className="grid gap-6 md:grid-cols-[1fr_300px]">

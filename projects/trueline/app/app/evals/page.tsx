@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Nav } from "@/app/components/nav";
@@ -10,6 +10,17 @@ export default function Evals() {
   const runs = useQuery(api.evals.listEvals);
   const runEval = useMutation(api.evals.runEval);
   const [busy, setBusy] = useState(false);
+
+  // The benchmark also auto-runs on the dashboard at app load; run it here too in
+  // case this is the first page the user lands on. Idempotent + deduped server-side,
+  // so a fresh run only appends a row when the engine's numbers actually changed.
+  const ranEval = useRef(false);
+  useEffect(() => {
+    if (!ranEval.current && isAuthenticated) {
+      ranEval.current = true;
+      void runEval().catch(() => {});
+    }
+  }, [isAuthenticated, runEval]);
 
   if (!isAuthenticated || runs === undefined) {
     return (
@@ -26,8 +37,10 @@ export default function Evals() {
       <Nav />
       <h1 className="text-lg font-semibold">Evaluation — proving the engine before it ships</h1>
       <p className="mb-5 mt-1 text-sm text-[--color-muted]">
-        Accuracy is <i>measured</i>, not asserted. This scores the flag engine on a labeled set of
-        invoices — the gate you&apos;d run in CI before shipping a threshold, prompt, or model change. A{" "}
+        Accuracy is <i>measured</i>, not asserted. This scores the flag engine against a{" "}
+        <b>fixed, hand-labeled benchmark of 18 invoices</b> — built into the code, <i>independent of
+        anything you upload</i>. It runs automatically when the app loads and re-runs on demand; it&apos;s
+        the gate you&apos;d run in CI before shipping a threshold, prompt, or model change. A{" "}
         <b className="text-[--color-bad]">false negative</b> lets padding through (lost money); a{" "}
         <b className="text-[--color-warn]">false positive</b> makes estimators stop trusting it.
       </p>
@@ -47,7 +60,7 @@ export default function Evals() {
             disabled={busy}
             className="rounded-md bg-[--color-accent] px-4 py-2 text-sm font-medium text-[--color-accent-ink] disabled:opacity-50"
           >
-            {busy ? "scoring…" : "Run evaluation"}
+            {busy ? "scoring…" : "Re-run evaluation"}
           </button>
         </div>
         {latest ? (
@@ -58,7 +71,7 @@ export default function Evals() {
           </div>
         ) : (
           <p className="mt-4 text-sm text-[--color-muted]">
-            No runs yet — upload the sample invoices on the dashboard, then run the evaluation.
+            Scoring the benchmark… (runs automatically on load).
           </p>
         )}
       </section>

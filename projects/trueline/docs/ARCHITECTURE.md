@@ -90,7 +90,7 @@ Seven tables, **every document scoped by `orgId`** (the Clerk organization), eac
   - *human-in-the-loop*: `decision (pending|approved|edited|rejected), reviewer`
 - **`logs`** — structured event log (Diagnostics tab).
 - **`settings`** — per-tenant LLM routing (`mode`, optional `model`).
-- **`evalRuns`** — extraction accuracy + flag precision/recall over a labeled set.
+- **`evalRuns`** — math-consistency + flag precision/recall over the fixed 18-invoice benchmark (engine-level, independent of uploads).
 
 The schema *is* the thesis: the `invoiceLines` columns are physically partitioned into "model read it" vs "code decided it."
 
@@ -156,7 +156,7 @@ Pure functions, no Convex imports → trivially unit-testable. Per line:
 
 - **Realtime**: Convex `useQuery` subscriptions push updates to every client when any underlying row changes — the review list, an invoice's lines, and the dashboard stats all update live as extraction completes or a teammate reviews.
 - **Idempotency**: the extract action is keyed on the invoice id and `insertReconciledLines` clears-then-inserts, so a retried/duplicated run is safe.
-- **Eval** ([`convex/evals.ts`](https://github.com/MarcBittner/ai-portfolio/blob/main/projects/trueline/convex/evals.ts), Evals tab): runs the pipeline over a labeled set and reports **extraction accuracy** (fields read correctly) and **flag precision/recall** — quality is *measured*, not asserted, and a reviewer's `correctLine` edits are labels that feed it.
+- **Eval** ([`convex/evals.ts`](https://github.com/MarcBittner/ai-portfolio/blob/main/projects/trueline/convex/evals.ts) → [`convex/lib/benchmark.ts`](https://github.com/MarcBittner/ai-portfolio/blob/main/projects/trueline/convex/lib/benchmark.ts), Evals tab): `scoreBenchmark()` runs the real `reconcileLine` engine over a **fixed, hand-labeled benchmark of 18 invoices** (against a fixed PO + catalog, purely in memory — no DB reads) and reports **math-consistency** (share of lines whose printed total checks out) and **flag precision/recall** — engine-level regression metrics, *independent of any invoice the tenant uploads*, not per-upload stats. Quality is *measured*, not asserted. The eval auto-runs on app load and the insert is deduped (no new row when the engine's numbers are unchanged). It's the gate to run in CI before shipping a threshold, prompt, or model change.
 
 ---
 

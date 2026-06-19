@@ -1,11 +1,10 @@
 import { mutation, query } from "./_generated/server";
-import { DEMO_EVAL_LABELS } from "./lib/demoData";
+import { scoreBenchmark } from "./lib/benchmark";
 
-// Score the reconcile engine on the labeled demo set: for each invoice we know
-// whether it *should* surface a red flag (truth), and check what the engine did
-// (predicted = any red line). This is the gate you'd run in CI before shipping a
-// threshold / prompt / model change. Extraction "math-consistency" is the share
-// of lines whose printed extension matches qty×price (caught in code).
+// Engine regression: score the flag engine on a FIXED, hand-labeled benchmark
+// (convex/lib/benchmark.ts) — flag precision/recall and math-consistency. This is
+// independent of the tenant's uploaded invoices; it measures the engine itself, the
+// gate you'd run in CI before changing a threshold, prompt, or model.
 
 async function requireOrg(ctx: { auth: { getUserIdentity: () => Promise<unknown> } }) {
   const id = (await ctx.auth.getUserIdentity()) as
@@ -22,46 +21,33 @@ export const runEval = mutation({
   args: {},
   handler: async (ctx) => {
     const { orgId, who } = await requireOrg(ctx);
-    const invoices = await ctx.db
-      .query("invoices")
+    const m = scoreBenchmark(); // pure; no invoice reads
+
+    // The benchmark is deterministic and this is auto-run on every app load, so
+    // skip appending an identical run — keep the history meaningful.
+    const latest = await ctx.db
+      .query("evalRuns")
       .withIndex("by_org", (q) => q.eq("orgId", orgId))
-      .collect();
-
-    let tp = 0;
-    let fp = 0;
-    let fn = 0;
-    let n = 0;
-    let mathConsistent = 0;
-    let totalLines = 0;
-
-    for (const inv of invoices) {
-      const truth = DEMO_EVAL_LABELS[inv.invoiceNumber];
-      const lines = await ctx.db
-        .query("invoiceLines")
-        .withIndex("by_invoice", (q) => q.eq("invoiceId", inv._id))
-        .collect();
-      totalLines += lines.length;
-      mathConsistent += lines.filter((l) => l.mathOk).length;
-      if (truth === undefined) continue; // only labeled invoices count
-      n++;
-      const predicted = lines.some((l) => l.flag === "red");
-      if (predicted && truth) tp++;
-      else if (predicted && !truth) fp++;
-      else if (!predicted && truth) fn++;
+      .order("desc")
+      .first();
+    if (
+      latest &&
+      latest.n === m.n &&
+      latest.extractionAccuracy === m.extractionAccuracy &&
+      latest.flagPrecision === m.flagPrecision &&
+      latest.flagRecall === m.flagRecall
+    ) {
+      return latest;
     }
-
-    const precision = tp + fp === 0 ? 1 : tp / (tp + fp);
-    const recall = tp + fn === 0 ? 1 : tp / (tp + fn);
-    const extractionAccuracy = totalLines === 0 ? 1 : mathConsistent / totalLines;
 
     const id = await ctx.db.insert("evalRuns", {
       orgId,
       provider: "engine",
       model: "reconcile-v1",
-      n,
-      extractionAccuracy: Math.round(extractionAccuracy * 1000) / 1000,
-      flagPrecision: Math.round(precision * 1000) / 1000,
-      flagRecall: Math.round(recall * 1000) / 1000,
+      n: m.n,
+      extractionAccuracy: m.extractionAccuracy,
+      flagPrecision: m.flagPrecision,
+      flagRecall: m.flagRecall,
       createdBy: who,
     });
     return await ctx.db.get(id);

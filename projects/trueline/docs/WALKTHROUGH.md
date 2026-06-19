@@ -1362,41 +1362,93 @@ export const _forExtract = internalQuery({ args:{orgId}, … }); // read by the 
 
 ## 27. Evals (the CI gate, `evals.ts`)
 
-**Files:** [`convex/evals.ts`](../convex/evals.ts) · [`app/app/evals/page.tsx`](../app/app/evals/page.tsx) · labels in [`convex/lib/demoData.ts`](../convex/lib/demoData.ts)
+**Files:** [`convex/evals.ts`](../convex/evals.ts) · the benchmark itself in [`convex/lib/benchmark.ts`](../convex/lib/benchmark.ts) · [`app/app/evals/page.tsx`](../app/app/evals/page.tsx)
+
+The eval measures the *engine*, and it does so against a fixed, hand-labeled benchmark
+that is completely independent of whatever the tenant happens to have uploaded. The
+benchmark lives in `convex/lib/benchmark.ts`; `runEval` in `convex/evals.ts` just calls it.
 
 ```ts
+// convex/lib/benchmark.ts — a FIXED set of 18 invoices, BM-01..BM-18, each carrying a
+// human label ("should this invoice raise a RED flag?"), scored against a fixed PO + catalog.
+export const BENCHMARK_INVOICES: BenchmarkInvoice[] = [
+  { invoiceNumber: "BM-01", label: false, lines: [L("A1", 100, 4.0, 400), L("A3", 10, 30.0, 300)] }, // clean
+  { invoiceNumber: "BM-04", label: true,  lines: [L("A1", 100, 4.6, 460)] },                          // >10% overcharge
+  { invoiceNumber: "BM-08", label: true,  lines: [L("A1", 100, 4.0, 450)] },                          // math error
+  // …18 in all: clean/at-PO-rate, >10% overcharge, 3–10% (yellow only), math errors,
+  //   unmatched lines, undercharge, low-confidence, threshold boundaries, and mixed.
+];
+
+export function scoreBenchmark(): BenchmarkScore {
+  let tp = 0, fp = 0, fn = 0, mathConsistent = 0, totalLines = 0;
+  for (const inv of BENCHMARK_INVOICES) {
+    const reconciled = inv.lines.map((l) => reconcileLine(l, PO, CATALOG)); // the REAL engine, in memory
+    totalLines += reconciled.length;
+    mathConsistent += reconciled.filter((r) => r.mathOk).length;
+    const predicted = reconciled.some((r) => r.flag === "red");
+    if (predicted && inv.label) tp++;
+    else if (predicted && !inv.label) fp++;
+    else if (!predicted && inv.label) fn++;
+  }
+  return {
+    n: BENCHMARK_INVOICES.length,                                         // 18
+    extractionAccuracy: totalLines === 0 ? 1 : mathConsistent / totalLines,
+    flagPrecision: tp + fp === 0 ? 1 : tp / (tp + fp),
+    flagRecall:    tp + fn === 0 ? 1 : tp / (tp + fn),
+  };
+}
+```
+
+```ts
+// convex/evals.ts — runEval is now a thin wrapper: score, dedupe, insert.
 export const runEval = mutation({
   handler: async (ctx) => {
-    const { orgId } = await requireOrg(ctx);
-    const invoices = await ctx.db.query("invoices").withIndex("by_org", q => q.eq("orgId", orgId)).collect();
-    let tp=0, fp=0, fn=0, n=0, mathConsistent=0, totalLines=0;
-    for (const inv of invoices) {
-      const truth = DEMO_EVAL_LABELS[inv.invoiceNumber];     // labeled "should it flag red?"
-      const lines = await ctx.db.query("invoiceLines").withIndex("by_invoice", q => q.eq("invoiceId", inv._id)).collect();
-      totalLines += lines.length; mathConsistent += lines.filter(l => l.mathOk).length;
-      if (truth === undefined) continue;
-      n++; const predicted = lines.some(l => l.flag === "red");
-      if (predicted && truth) tp++; else if (predicted && !truth) fp++; else if (!predicted && truth) fn++;
+    const { orgId, who } = await requireOrg(ctx);
+    const m = scoreBenchmark();                       // pure — no invoice/DB reads
+    const latest = await ctx.db.query("evalRuns").withIndex("by_org", q => q.eq("orgId", orgId)).order("desc").first();
+    if (latest && latest.n === m.n && latest.extractionAccuracy === m.extractionAccuracy
+        && latest.flagPrecision === m.flagPrecision && latest.flagRecall === m.flagRecall) {
+      return latest;                                  // deterministic + auto-run on load → don't re-append an identical row
     }
-    const precision = tp+fp===0 ? 1 : tp/(tp+fp);
-    const recall    = tp+fn===0 ? 1 : tp/(tp+fn);
-    const extractionAccuracy = totalLines===0 ? 1 : mathConsistent/totalLines;
-    return await ctx.db.insert("evalRuns", { orgId, provider:"engine", model:"reconcile-v1", n, extractionAccuracy, flagPrecision:precision, flagRecall:recall });
+    const id = await ctx.db.insert("evalRuns", { orgId, provider:"engine", model:"reconcile-v1",
+      n: m.n, extractionAccuracy: m.extractionAccuracy, flagPrecision: m.flagPrecision, flagRecall: m.flagRecall, createdBy: who });
+    return await ctx.db.get(id);
   },
 });
 ```
 
-1. **Scores the flag *engine*, not the model.** Truth = "this invoice should surface a
-   red flag" (from `DEMO_EVAL_LABELS`); prediction = "any red line." Accumulates
-   TP/FP/FN → precision & recall.
-2. **`extractionAccuracy`** = math-consistency (share of lines whose printed total
-   matches qty×price) — a check the deterministic code performs.
-3. **The Evals page** frames *why* it matters: a false negative lets padding through
+1. **A fixed benchmark, not the tenant's uploads.** The old design iterated whatever
+   invoices the tenant had uploaded and looked each up in a tiny labeled map — which
+   conflated "how good the engine is" with "what you happened to upload." The benchmark
+   is now `BENCHMARK_INVOICES`: 18 hand-labeled fixtures spanning every behavior the flag
+   engine must classify (clean/at-PO-rate, >10% overcharge, 3–10% overcharge-only,
+   math errors, unmatched lines, undercharge, low-confidence, threshold boundaries, mixed).
+2. **`scoreBenchmark()` is pure.** It runs the *real* `reconcileLine` engine over every
+   fixture line against a fixed PO + catalog, entirely in memory — no `ctx`, no DB reads —
+   so it's the same logic the product runs, exercised in isolation. Truth = the human
+   label "this invoice should surface a red flag"; prediction = "any red line."
+   Accumulates TP/FP/FN → **flag precision/recall** (engine-level regression metrics, not
+   per-upload stats).
+3. **`extractionAccuracy`** = math-consistency (share of benchmark lines whose printed
+   total matches qty×price) — a check the deterministic code performs.
+4. **`runEval` is a thin wrapper.** It scores the benchmark, then dedupes: because the
+   benchmark is deterministic and the eval auto-runs on every app load, it skips inserting
+   an `evalRuns` row when the latest row has identical `n`/`extractionAccuracy`/
+   `flagPrecision`/`flagRecall`, keeping the history meaningful. Otherwise it inserts and
+   returns the new row.
+5. **Auto-run on load.** A fire-and-forget effect on both the dashboard
+   (`app/app/page.tsx`) and the Evals page (`app/app/evals/page.tsx`) triggers `runEval`
+   when the app loads, so the Evals page is already populated and nobody waits; a
+   "Re-run evaluation" button re-runs on demand.
+6. **The Evals page** frames *why* it matters: a false negative lets padding through
    (lost money); a false positive makes estimators distrust the tool. This is the gate
-   you'd run in CI before shipping a threshold/prompt/model change.
+   you'd run in CI before shipping a threshold/prompt/model change. The current pinned
+   numbers (asserted by a vitest test): `n=18`, precision `1.00`, recall `1.00`,
+   math-consistency `0.871`.
 
-> **Summary:** accuracy is *measured*, not asserted. The decision logic's
-> quality is provable independently of whatever LLM did the reading.
+> **Summary:** accuracy is *measured*, not asserted, against a fixed benchmark of 18
+> hand-labeled invoices — so the engine's quality is provable independently of whatever
+> the tenant uploaded and of whatever LLM did the reading.
 
 ---
 
@@ -1470,5 +1522,5 @@ Upload  → read file in browser → createInvoiceFromText (atomic, status "extr
         → BOTH funnel to insertReconciledLines → reconcileLine (the money decision, in code)
         → write rows (idempotent) → Convex PUSHES updates → every open screen re-renders
 Review  → reviewLine / correctLine (re-reconciles) → live update
-Prove   → runEval scores flag precision/recall on labeled data
+Prove   → runEval scores flag precision/recall on a fixed 18-invoice benchmark (auto-run on load)
 ```

@@ -415,8 +415,10 @@ catalog, evals, logs). **Errors** `Error("Not authenticated")`.
 | --------- | ---- | --- | ----------- |
 | _(none)_ | | | |
 
-**Returns** `EvalRun` — scores the labeled set (flag precision/recall), inserts the run,
-and returns it. **Errors** `Error("Not authenticated")`.
+**Returns** `EvalRun` — scores the engine against the fixed 18-invoice benchmark
+(`scoreBenchmark()`, independent of tenant data), inserts the run (deduped — no new row
+when the latest is identical), and returns the latest/inserted row. Auto-runs on app load.
+**Errors** `Error("Not authenticated")`.
 
 ---
 
@@ -544,11 +546,17 @@ recoverableUsd = max(0, unitPrice − min(poUnitPrice, catalogPrice)) × quantit
 
 ## Evals (`convex/evals.ts`)
 
-`runEval()` scores the engine on a labeled set (`lib/demoData.ts:DEMO_EVAL_LABELS`):
-per labeled invoice, predicted = any red line, truth = should-flag → **flag
-precision/recall**; plus **math-consistency** = share of lines with `mathOk`. Persisted to
-`evalRuns`; shown at `/app/evals`. This is the CI gate before shipping a threshold/prompt/
-model change.
+`runEval()` calls `scoreBenchmark()` ([`convex/lib/benchmark.ts`](convex/lib/benchmark.ts)),
+which runs the real `reconcileLine` engine over a **fixed, hand-labeled benchmark of 18
+invoices** (`BENCHMARK_INVOICES`, BM-01..BM-18) against a fixed PO + catalog — entirely in
+memory, with no DB reads and independent of whatever the tenant uploaded. Per benchmark
+invoice, predicted = any red line, truth = the hand label → **flag precision/recall**; plus
+**math-consistency** (`extractionAccuracy`) = share of benchmark lines whose printed total
+checks out. The result is persisted to `evalRuns` (deduped — an identical latest run is not
+re-appended) and shown at `/app/evals`. The eval auto-runs on app load, so the page is
+already populated; it re-runs on demand. This is the CI gate before shipping a threshold,
+prompt, or model change. Pinned numbers (asserted by a vitest test): `n=18`, precision
+`1.00`, recall `1.00`, math-consistency `0.871`.
 
 ## Auth & multi-tenancy
 
