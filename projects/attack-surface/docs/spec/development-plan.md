@@ -28,8 +28,8 @@
 
 Grade **B+**. Prioritized fixes; full detail + `file:line` in the review.
 
-- [ ] **HIGH — land the live-findings UI.** Backend `scanner.scan_live` now returns control-mapped findings/controls/posture, but the console `renderLive()` (`src/attack_surface/static/index.html` ~610–629) renders only subdomains and hard-codes "no findings"; the Settings note, Help text, README, and `spec.md` also still say live mode has no findings. Render the live findings + control crosswalk + posture, and fix the stale copy. (The live-domain example demo is invisible in the browser until this lands.)
-- [ ] **MED — look-alike domain match.** `ct.py` `endswith(domain)` accepts e.g. `evilexample.com` for `example.com`; use `endswith("." + domain)` (and an exact-apex case), matching `fingerprint.derive_passive`.
+- [ ] **HIGH — land the live-findings UI.** Backend `scanner.scan_live` now returns control-mapped findings/controls/posture, but the console `renderLive()` (`src/attack_surface/static/index.html` ~610–629) renders only subdomains and hard-codes "no findings"; the Settings note, Help text, README, and `spec.md` also still say live mode has no findings. Render the live findings + control crosswalk + posture, and fix the stale copy. (The live-domain demo is invisible in the browser until this lands.)
+- [ ] **MED — look-alike domain match.** `ct.py` `endswith(domain)` accepts e.g. `evil-corp.example` for `corp.example`; use `endswith("." + domain)` (and an exact-apex case), matching `fingerprint.derive_passive`.
 - [ ] **MED — validate the live `domain` input** (`models.py` → CT URL interpolation): restrict to a hostname pattern before building the certspotter/crt.sh URL.
 - [ ] **LOW — misleading error label** in `scanner.py` ("crt.sh error:") now that certspotter is the primary source; make the message source-agnostic.
 - [ ] **LOW — stale test mock**: the `enumerate_live` mock signature in `tests/` references a removed `retries` param; align with the current signature.
