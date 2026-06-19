@@ -6,7 +6,7 @@ import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Nav } from "@/app/components/nav";
 import { Button, buttonCls, FlagBadge, StatusBadge, usd } from "@/app/components/ui";
-import { extractWithOllama, probeOllama } from "@/app/lib/ollama";
+import { extractWithOllama, pickOllamaModel, probeOllama } from "@/app/lib/ollama";
 
 // ---- the downloadable sample files (match the reconcile engine's expectations) ----
 const CONTRACT = {
@@ -234,10 +234,16 @@ export default function Dashboard() {
       return;
     }
     // Host-local Ollama, via the browser (the cloud action can't reach localhost).
+    // Prefer it whenever a model is reachable — it has NO quota. We only fall through
+    // to the server (paid → free → offline) when no local model is usable, and we say
+    // exactly why. Deterministic offline is therefore a true last resort.
+    let fellBack = "";
     try {
-      const base = await probeOllama();
-      if (base) {
-        const model = routingCfg?.model || routingCfg?.defaultLocalModel || "llama3.1:8b";
+      const { url: base, models } = await probeOllama();
+      if (!base) {
+        fellBack = "no local Ollama reachable from the browser";
+      } else {
+        const model = pickOllamaModel(routingCfg?.model || routingCfg?.defaultLocalModel, models);
         setMsg(`Extracting on your machine via Ollama (${model})…`);
         const t0 = performance.now();
         const lines = await extractWithOllama(text, model, base);
@@ -249,15 +255,16 @@ export default function Dashboard() {
             latencyMs: Math.round(performance.now() - t0),
             lines,
           });
-          setMsg(`✓ Extracted on your machine via Ollama (${model}).`);
+          setMsg(`✓ Extracted on your machine via Ollama (${model}) — no quota used.`);
           return;
         }
+        fellBack = `local Ollama (${model}) returned no lines`;
       }
-    } catch {
-      /* unreachable / CORS / parse failure → fall through to the server */
+    } catch (e) {
+      fellBack = `local Ollama call failed (${(e as Error).message})`;
     }
     await scheduleExtract({ invoiceId });
-    setMsg("✓ Uploaded — no local Ollama reachable; using server (paid → free → offline).");
+    setMsg(`⚠ ${fellBack} — using the server (paid → free → offline).`);
   }
 
   // Load the demo: seed the baseline (PO + catalog) server-side, then run each demo

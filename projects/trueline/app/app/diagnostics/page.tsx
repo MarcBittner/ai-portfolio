@@ -5,7 +5,7 @@ import { useAction, useConvexAuth, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Nav } from "@/app/components/nav";
 import { Button, usd } from "@/app/components/ui";
-import { probeOllama, extractWithOllama } from "@/app/lib/ollama";
+import { probeOllama, pickOllamaModel, extractWithOllama } from "@/app/lib/ollama";
 
 const BENCH_SAMPLE = [
   "Apex Industrial Supply — Invoice INV-BENCH (PO PO-4471)",
@@ -74,12 +74,14 @@ export default function Diagnostics() {
                 // browser, via the same browser→host bridge the upload flow uses.
                 const localRow = rows.find((r) => r.mode === "local");
                 if (localRow) {
-                  const base = await probeOllama();
+                  const { url: base, models } = await probeOllama();
                   if (!base) {
                     localRow.error = "no host Ollama reachable from the browser";
                   } else {
-                    const model =
-                      routingCfg?.model || routingCfg?.defaultLocalModel || "llama3.1:8b";
+                    const model = pickOllamaModel(
+                      routingCfg?.model || routingCfg?.defaultLocalModel,
+                      models,
+                    );
                     const t0 = performance.now();
                     try {
                       const lines = await extractWithOllama(BENCH_SAMPLE, model, base);

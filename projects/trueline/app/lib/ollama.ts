@@ -28,26 +28,46 @@ export interface OllamaLine {
   sourceQuote: string;
 }
 
-let probe: { url: string | null; at: number } | null = null;
+let probe: { url: string | null; models: string[]; at: number } | null = null;
 
-// Returns the reachable Ollama base URL (direct, else the CORS proxy), or null.
-export async function probeOllama(): Promise<string | null> {
+// Probe Ollama: returns the reachable base URL (direct, else the CORS proxy) AND the
+// list of models it actually has pulled, so callers can use a model that exists
+// instead of guessing a name that 404s and forces a fallback.
+export async function probeOllama(): Promise<{ url: string | null; models: string[] }> {
   const now = Date.now();
-  if (probe && now - probe.at < 30_000) return probe.url;
+  if (probe && now - probe.at < 30_000) return { url: probe.url, models: probe.models };
   let url: string | null = null;
+  let models: string[] = [];
   for (const base of CANDIDATES) {
     try {
       const r = await fetch(`${base}/api/tags`, { signal: AbortSignal.timeout(1500) });
       if (r.ok) {
         url = base;
+        const data = (await r.json()) as { models?: { name?: string; model?: string }[] };
+        models = (data?.models ?? [])
+          .map((m) => m.name ?? m.model ?? "")
+          .filter((n): n is string => n.length > 0);
         break;
       }
     } catch {
       /* try the next candidate */
     }
   }
-  probe = { url, at: now };
-  return url;
+  probe = { url, models, at: now };
+  return { url, models };
+}
+
+// Choose the model to call: the user's configured model if Ollama actually has it
+// (exact, or by family prefix like "llama3.1"), else whatever's installed, else the
+// configured/default name as a last resort. Prevents a silent fallback when the
+// configured/default model isn't pulled locally.
+export function pickOllamaModel(configured: string | undefined, available: string[]): string {
+  if (configured) {
+    const fam = configured.split(":")[0];
+    const hit = available.find((m) => m === configured || m.split(":")[0] === fam);
+    if (hit) return hit;
+  }
+  return available[0] ?? configured ?? "llama3.1:8b";
 }
 
 function num(x: unknown): number {
