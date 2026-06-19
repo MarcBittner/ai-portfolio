@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -155,6 +155,17 @@ export default function Dashboard() {
   const submitExtraction = useMutation(api.invoices.submitExtraction);
   const scheduleExtract = useMutation(api.invoices.scheduleExtract);
   const [msg, setMsg] = useState<string | null>(null);
+  const seededOnce = useRef(false);
+
+  // Auto-seed the demo set on first load of an empty tenant, so a fresh sign-in
+  // lands on a populated dashboard. seedIfEmpty is idempotent; the ref limits it to
+  // one call per mount (a manual Reset won't re-seed within the same session).
+  useEffect(() => {
+    if (!seededOnce.current && isAuthenticated && baseline && !baseline.hasPo && invoices && invoices.length === 0) {
+      seededOnce.current = true;
+      seedAll();
+    }
+  }, [isAuthenticated, baseline, invoices, seedAll]);
 
   if (!isAuthenticated || baseline === undefined || invoices === undefined) {
     return (

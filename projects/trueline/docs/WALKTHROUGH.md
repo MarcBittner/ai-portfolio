@@ -709,8 +709,9 @@ export const listInvoices = query({
 
 **Files:** [`convex/invoices.ts`](../convex/invoices.ts) (`seedIfEmpty`) · [`convex/lib/demoData.ts`](../convex/lib/demoData.ts)
 
-First sign-in has no data. The dashboard offers "skip the walkthrough and load
-everything," which calls:
+First sign-in has no data, so the dashboard auto-seeds the demo set on first load
+(a one-shot mount effect in `app/app/page.tsx`) and also exposes a manual "skip the
+walkthrough and load everything" link. Both call:
 
 ```ts
 export const seedIfEmpty = mutation({
