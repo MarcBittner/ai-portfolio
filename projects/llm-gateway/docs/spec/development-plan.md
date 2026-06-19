@@ -28,3 +28,15 @@
 - [ ] Entropy-based secret detection + allow/deny lists
 - [ ] Real-provider eval (answer quality) alongside the governance eval
 - [ ] Deploy live on Render (free) + add to the portfolio "Live demos" table
+
+---
+
+## Code review backlog (from `/docs/code-review/llm-gateway.md`, 2026-06-18) — NOT YET DONE
+
+Grade **B+**. Prioritized fixes; full detail + `file:line` in the review.
+
+- [ ] **HIGH — audit truncation gap.** The "tamper-evident" hash chain detects edits and reordering but **not tail truncation** (dropping trailing entries still verifies `ok:true`). Add a signed head/length commitment (or a verified expected-count / running HMAC over the length).
+- [ ] **HIGH — firewall bypass + misleading eval.** The regex firewall is defeated by trivial obfuscation (leetspeak / zero-width / rewording), yet the eval reports **100% detection** because the labeled set matches the regexes. Report honest recall on an adversarial set and/or strengthen detection; stop advertising 100%.
+- [ ] **MED — `/v1/extract` ungoverned `instruction`.** The extract path's `instruction`/system text reaches the provider unscanned and unredacted — governance only covers the user `prompt`. Run it through the same firewall+redaction.
+- [ ] **MED — unauth tamper endpoint.** `/v1/audit/_demo_tamper` can corrupt the shared audit log on a public deploy; gate it (or remove from prod).
+- [ ] **LOW — `IP_ADDRESS` regex false positives** on version strings (e.g. `1.2.3.4`-shaped semver).
