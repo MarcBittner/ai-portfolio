@@ -9,3 +9,4 @@ build/
 # without a Convex deploy step in CI.
 *.tsbuildinfo
 next-env.d.ts
+.convex-tmp/
