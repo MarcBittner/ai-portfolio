@@ -13,6 +13,7 @@ const files = [
   "docs/ARCHITECTURE.md",
   "docs/API.md",
   "docs/WALKTHROUGH.md",
+  "docs/FUNCTIONS.md",
   "docs/DEPLOYMENT.md",
   "docs/spec/spec.md",
   "docs/spec/development-plan.md",
