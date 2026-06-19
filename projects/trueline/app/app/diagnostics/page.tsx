@@ -5,6 +5,7 @@ import { useAction, useConvexAuth, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Nav } from "@/app/components/nav";
 import { usd } from "@/app/components/ui";
+import { probeOllama, extractWithOllama } from "@/app/lib/ollama";
 
 const BENCH_SAMPLE = [
   "Apex Industrial Supply — Invoice INV-BENCH (PO PO-4471)",
@@ -28,6 +29,7 @@ export default function Diagnostics() {
   const invoices = useQuery(api.invoices.listInvoices);
   const logs = useQuery(api.invoices.recentLogs);
   const benchmark = useAction(api.diagnostics.benchmark);
+  const routingCfg = useQuery(api.routing.get);
   const [bench, setBench] = useState<BenchRow[] | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -56,14 +58,40 @@ export default function Diagnostics() {
             <div className="text-sm font-semibold">Model benchmark</div>
             <div className="text-xs text-[--color-muted]">
               Run one invoice through every routing mode and compare provider, latency, and lines
-              recovered.
+              recovered. Local mode is exercised in your browser (the server can&apos;t reach a model on
+              your machine), so it needs host Ollama running.
             </div>
           </div>
           <button
             onClick={async () => {
               setBusy(true);
               try {
-                setBench(await benchmark({ invoiceText: BENCH_SAMPLE }));
+                const rows = await benchmark({ invoiceText: BENCH_SAMPLE });
+                // The server action can't reach an Ollama on your machine, so its
+                // `local` row falls back to mock. Exercise local mode here in the
+                // browser, via the same browser→host bridge the upload flow uses.
+                const localRow = rows.find((r) => r.mode === "local");
+                if (localRow) {
+                  const base = await probeOllama();
+                  if (!base) {
+                    localRow.error = "no host Ollama reachable from the browser";
+                  } else {
+                    const model =
+                      routingCfg?.model || routingCfg?.defaultLocalModel || "llama3.1:8b";
+                    const t0 = performance.now();
+                    try {
+                      const lines = await extractWithOllama(BENCH_SAMPLE, model, base);
+                      localRow.provider = "ollama (browser→host)";
+                      localRow.model = model;
+                      localRow.latencyMs = Math.round(performance.now() - t0);
+                      localRow.lines = lines.length;
+                      localRow.error = lines.length ? null : "no lines returned";
+                    } catch {
+                      localRow.error = "ollama call failed (browser→host)";
+                    }
+                  }
+                }
+                setBench(rows);
               } finally {
                 setBusy(false);
               }
