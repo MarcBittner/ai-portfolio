@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Nav } from "@/app/components/nav";
+import { Button } from "@/app/components/ui";
 
 type Mode = "auto" | "local" | "free" | "paid" | "offline";
 
@@ -83,7 +84,7 @@ export default function Configuration() {
             <button
               key={m.id}
               onClick={() => setMode(m.id)}
-              className="rounded-lg border p-3 text-left transition-colors"
+              className="cursor-pointer rounded-lg border p-3 text-left transition-all duration-150 hover:brightness-110 active:scale-[0.98]"
               style={{
                 borderColor: mode === m.id ? "var(--color-accent)" : "var(--color-line)",
                 background:
@@ -110,12 +111,9 @@ export default function Configuration() {
         </div>
 
         <div className="mt-4 flex items-center gap-3">
-          <button
-            onClick={onSave}
-            className="rounded-md bg-[--color-accent] px-4 py-2 text-sm font-medium text-[--color-accent-ink]"
-          >
+          <Button variant="primary" onClick={onSave}>
             Save routing
-          </button>
+          </Button>
           {saved && <span className="text-sm text-[--color-ok]">✓ saved</span>}
         </div>
       </section>

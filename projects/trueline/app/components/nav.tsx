@@ -33,7 +33,7 @@ function ThemeToggle() {
       onClick={toggle}
       aria-label="Toggle light / dark theme"
       title="Toggle light / dark theme"
-      className="rounded-md px-2 py-1 text-sm text-[--color-muted] hover:text-[--color-ink]"
+      className="cursor-pointer rounded-md px-2 py-1 text-sm text-[--color-muted] transition-all duration-150 hover:bg-[--color-accent]/10 hover:text-[--color-ink] active:scale-90"
     >
       {light ? "☾" : "☀"}
     </button>

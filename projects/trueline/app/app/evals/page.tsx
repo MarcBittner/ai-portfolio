@@ -45,30 +45,33 @@ export default function Evals() {
         the invoices you&apos;ve actually processed.
       </p>
 
+      {/* action bar — its own row, kept separate from the metrics themselves */}
+      <section className="glass mb-4 flex flex-wrap items-center justify-between gap-3 p-3">
+        <span className="text-xs text-[--color-muted]">
+          The regression runs automatically on load. Re-run it after an engine change.
+        </span>
+        <Button
+          variant="secondary"
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            try {
+              await runEval();
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          {busy ? "scoring…" : "Re-run evaluation"}
+        </Button>
+      </section>
+
       {/* ---- engine regression: the fixed benchmark, independent of uploads ---- */}
       <section className="glass p-5">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <div className="text-sm font-semibold">Engine regression — the CI gate</div>
-            <div className="text-xs text-[--color-muted]">
-              Scored on a fixed, hand-labeled benchmark of 18 invoices. These move only when the
-              <i> engine</i> changes — never when you upload.
-            </div>
-          </div>
-          <Button
-            variant="secondary"
-            disabled={busy}
-            onClick={async () => {
-              setBusy(true);
-              try {
-                await runEval();
-              } finally {
-                setBusy(false);
-              }
-            }}
-          >
-            {busy ? "scoring…" : "Re-run evaluation"}
-          </Button>
+        <div className="text-sm font-semibold">Engine regression — the CI gate</div>
+        <div className="text-xs text-[--color-muted]">
+          Scored on a fixed, hand-labeled benchmark of 18 invoices. These move only when the
+          <i> engine</i> changes — never when you upload.
         </div>
         {latest ? (
           <div className="mt-4 grid grid-cols-2 gap-3">

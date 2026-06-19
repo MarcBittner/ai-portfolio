@@ -84,19 +84,23 @@ function UploadButton({
   disabled?: boolean;
   title?: string;
 }) {
-  // A file picker is a <label>, not a <button>, so it can't use disabled — render a
-  // styled, inert span instead. It still gets the shared button look.
-  if (disabled) {
-    return (
-      <span className={buttonCls(variant, "cursor-not-allowed opacity-50")} title={title} aria-disabled>
-        {label}
-      </span>
-    );
-  }
+  // A real <button> that opens a hidden file input — so it behaves like every other
+  // button (focusable, same hover/press feedback, real disabled state) instead of a
+  // <label>, which is what made these read and act inconsistently.
+  const inputRef = useRef<HTMLInputElement>(null);
   return (
-    <label className={buttonCls(variant)} title={title}>
-      {label}
+    <>
+      <Button
+        type="button"
+        variant={variant}
+        disabled={disabled}
+        title={title}
+        onClick={() => inputRef.current?.click()}
+      >
+        {label}
+      </Button>
       <input
+        ref={inputRef}
         type="file"
         multiple={multiple}
         accept=".txt,.csv,text/plain"
@@ -107,7 +111,7 @@ function UploadButton({
           e.target.value = "";
         }}
       />
-    </label>
+    </>
   );
 }
 
@@ -277,8 +281,8 @@ export default function Dashboard() {
           title={hasPo ? "Upload one or more invoice files" : "Load the contract first"}
         />
         <Button
-          variant="ghost"
-          className="ml-auto px-3 py-1.5 text-xs"
+          variant="secondary"
+          className="ml-auto"
           onClick={async () => {
             await reset();
             setMsg("Reset — the demo is cleared. Upload a contract, or reload the sample set below.");
@@ -325,12 +329,11 @@ export default function Dashboard() {
               baseline every invoice line is checked against.
             </p>
           </section>
-          <p className="text-center text-xs text-[--color-muted]">
-            or{" "}
-            <button onClick={() => seedAll()} className="text-[--color-accent] underline hover:no-underline">
-              skip the walkthrough and load everything
-            </button>
-          </p>
+          <div className="flex justify-center">
+            <Button variant="secondary" onClick={() => seedAll()}>
+              Skip the walkthrough — load everything
+            </Button>
+          </div>
         </div>
       )}
 
@@ -350,17 +353,17 @@ export default function Dashboard() {
               reads it with an LLM, recomputes the math, and checks every line against the contract and
               market rates. Start with the padded one.
             </p>
-            <div className="mt-3 text-xs text-[--color-muted]">
-              need the files?{" "}
-              {INVOICES.map((inv, i) => (
-                <button
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-[--color-muted]">
+              <span>need the files?</span>
+              {INVOICES.map((inv) => (
+                <Button
                   key={inv.num}
+                  variant="secondary"
+                  className="px-2.5 py-1 text-xs"
                   onClick={() => download(`invoice-${inv.num}.txt`, inv.text)}
-                  className="text-[--color-accent] underline hover:no-underline"
                 >
-                  {inv.num}
-                  {i < INVOICES.length - 1 ? ", " : ""}
-                </button>
+                  ⬇ {inv.num}
+                </Button>
               ))}
             </div>
           </section>
@@ -424,18 +427,20 @@ export default function Dashboard() {
                 <h2 className="mb-1 text-sm font-semibold">Add another invoice</h2>
                 <p className="text-xs text-[--color-muted]">
                   Use <b className="text-[--color-ink]">⬆ Upload invoice(s)</b> in the action bar above.
-                  Need a sample?{" "}
-                  {INVOICES.map((inv, i) => (
-                    <button
-                      key={inv.num}
-                      onClick={() => download(`invoice-${inv.num}.txt`, inv.text)}
-                      className="text-[--color-accent] underline hover:no-underline"
-                    >
-                      {inv.num}
-                      {i < INVOICES.length - 1 ? " · " : ""}
-                    </button>
-                  ))}
                 </p>
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[--color-muted]">
+                  <span>need a sample?</span>
+                  {INVOICES.map((inv) => (
+                    <Button
+                      key={inv.num}
+                      variant="secondary"
+                      className="px-2.5 py-1 text-xs"
+                      onClick={() => download(`invoice-${inv.num}.txt`, inv.text)}
+                    >
+                      ⬇ {inv.num}
+                    </Button>
+                  ))}
+                </div>
               </section>
               <section className="glass p-4">
                 <h2 className="mb-1 text-sm font-semibold">Engine regression</h2>
@@ -447,7 +452,7 @@ export default function Dashboard() {
                   <Button variant="secondary" className="flex-1 px-3 py-1.5" onClick={() => runEval()}>
                     Re-run
                   </Button>
-                  <Link href="/app/evals" className={buttonCls("ghost", "flex-1 px-3 py-1.5")}>
+                  <Link href="/app/evals" className={buttonCls("secondary", "flex-1 px-3 py-1.5")}>
                     View Evals
                   </Link>
                 </div>

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useAction, useConvexAuth, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Nav } from "@/app/components/nav";
-import { usd } from "@/app/components/ui";
+import { Button, usd } from "@/app/components/ui";
 import { probeOllama, extractWithOllama } from "@/app/lib/ollama";
 
 const BENCH_SAMPLE = [
@@ -62,7 +62,9 @@ export default function Diagnostics() {
               your machine), so it needs host Ollama running.
             </div>
           </div>
-          <button
+          <Button
+            variant="primary"
+            disabled={busy}
             onClick={async () => {
               setBusy(true);
               try {
@@ -96,11 +98,9 @@ export default function Diagnostics() {
                 setBusy(false);
               }
             }}
-            disabled={busy}
-            className="cursor-pointer rounded-md bg-[--color-accent] px-4 py-2 text-sm font-medium text-[--color-accent-ink] transition-all duration-150 hover:brightness-110 hover:shadow-md active:scale-[0.97] active:brightness-95 disabled:pointer-events-none disabled:opacity-50"
           >
             {busy ? "benchmarking…" : "Run benchmark"}
-          </button>
+          </Button>
         </div>
         {bench && (
           <table className="mt-4 w-full text-sm">
