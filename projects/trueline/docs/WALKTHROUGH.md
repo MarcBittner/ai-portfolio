@@ -1,24 +1,23 @@
 # trueline — Complete Code Walkthrough
 
-A slow, point-by-point tour of how the entire app works, written to be read top to
-bottom. Each **Point** covers one file or concept: a code snippet, numbered
-observations, and a one-line mental model. Concept boxes (📚) define the framework
-ideas as they come up (server vs client, hydration, JWT, scopes, Convex function
-types).
+A file-by-file walkthrough of the trueline application, ordered by execution flow.
+Each numbered Point covers one file or concept with a code excerpt, numbered notes,
+and a summary line. Concept boxes (📚) define framework concepts where they first
+apply: server vs. client components, hydration, JWT verification, variable scope,
+and the Convex function types.
 
-This pairs with [`ARCHITECTURE.md`](./ARCHITECTURE.md) (the system view) and
-[`DEPLOYMENT.md`](./DEPLOYMENT.md) (how it's hosted). This doc is the *line-level*
-view: what executes, in what order, when a person uses the app.
+Companion documents: [`ARCHITECTURE.md`](./ARCHITECTURE.md) (system design) and
+[`DEPLOYMENT.md`](./DEPLOYMENT.md) (hosting and environment). This document covers
+runtime behavior — what executes, and in what order, during normal use.
 
-> **The one idea everything serves:** the LLM only *reads* the invoice into
-> structured data. **Deterministic code makes every decision that touches money.**
-> Watch how the architecture physically enforces that split.
+**Design principle.** The language model only reads the invoice into structured
+data; deterministic code performs every calculation and flag decision. The sections
+below identify where the codebase enforces that boundary.
 
-> **All paths in this doc are relative to the project root**
-> [`projects/trueline/`](../). This file lives at `projects/trueline/docs/`, so a
-> link like [`../convex/reconcile.ts`] points up one level into the source. Every
-> Point names its file(s) with a clickable link, and the table below maps every
-> source file to the Points that cover it.
+**Paths.** All paths are relative to the project root `projects/trueline/`. This
+file is in `projects/trueline/docs/`, so `../convex/reconcile.ts` refers to the
+source tree one level up. Each Point links its source file(s); the source map below
+lists every file and the Points it covers.
 
 ---
 
