@@ -27,7 +27,7 @@ export interface ReconciledFields {
   mathOk: boolean;
   poUnitPrice?: number;
   catalogPrice?: number;
-  matchedBy: "sku" | "description" | "none";
+  matchedBy: "sku" | "description" | "manual" | "none";
   varianceVsPoPct?: number;
   varianceVsMarketPct?: number;
   flag: "green" | "yellow" | "red";
@@ -67,6 +67,11 @@ export function reconcileLine(
   line: ExtractedLine,
   po: BaselineLine[],
   catalog: CatalogItem[],
+  // `acceptedUnitPrice` is a reviewer override: when a line can't be matched to the
+  // PO or catalog (an unlisted fee, say), an estimator can adjudicate it by entering
+  // the rate they accept. That human decision establishes a baseline, so the line is
+  // verified — not left permanently "unverifiable". Ignored for matched lines.
+  opts?: { acceptedUnitPrice?: number },
 ): ReconciledFields {
   const reasons: string[] = [];
 
@@ -115,6 +120,15 @@ export function reconcileLine(
   const poUnitPrice = poLine?.unitPrice;
   const catalogPrice = cat?.marketPrice;
 
+  // Reviewer override: an unmatched line the estimator has adjudicated by entering an
+  // agreed rate. Promote it to a manual match so it's verified rather than flagged
+  // unverifiable. (Only applies when there's no PO/catalog match to compare against.)
+  const manualBaseline =
+    matchedBy === "none" && opts?.acceptedUnitPrice != null && opts.acceptedUnitPrice > 0
+      ? opts.acceptedUnitPrice
+      : undefined;
+  if (manualBaseline !== undefined) matchedBy = "manual";
+
   // 3) variance vs each baseline. Keep the UNROUNDED variance for threshold
   // comparisons (so 3.0001% correctly clears the 3% line); round only for the
   // stored/displayed fields.
@@ -137,6 +151,8 @@ export function reconcileLine(
   if (matchedBy === "none") {
     escalate("yellow");
     reasons.push("no PO or catalog match — cannot verify the rate");
+  } else if (matchedBy === "manual") {
+    reasons.push(`unlisted line — rate accepted by reviewer at $${manualBaseline}`);
   }
   if (line.confidence < LOW_CONFIDENCE) {
     escalate("yellow");
@@ -160,7 +176,8 @@ export function reconcileLine(
       ? round2((line.unitPrice - benchmark) * line.quantity)
       : 0;
 
-  if (flag === "green") reasons.push("within tolerance of PO and market");
+  if (flag === "green" && matchedBy !== "manual")
+    reasons.push("within tolerance of PO and market");
 
   return {
     computedExtension,

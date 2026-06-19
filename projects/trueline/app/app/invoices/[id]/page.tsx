@@ -57,14 +57,18 @@ export default function InvoiceReview() {
     poUnitPrice?: number | null;
     catalogPrice?: number | null;
   }) {
-    // suggest (and pre-fill) the agreed PO price, else the market rate
+    const hasBaseline = l.poUnitPrice != null || l.catalogPrice != null;
+    // matched line: pre-fill the agreed PO price (else market). unlisted line: there's
+    // no baseline, so pre-fill the invoiced rate — entering it accepts the line.
     const suggested = l.poUnitPrice ?? l.catalogPrice ?? l.unitPrice;
     const v = window.prompt(
       `Correct the unit price for "${l.description}".\n` +
         `Invoiced ${usd(l.unitPrice)}` +
         (l.poUnitPrice != null ? `  ·  agreed PO ${usd(l.poUnitPrice)}` : "") +
         (l.catalogPrice != null ? `  ·  market ${usd(l.catalogPrice)}` : "") +
-        `\n\nWe pre-filled the agreed PO price — press OK to apply it, or edit it:`,
+        (hasBaseline
+          ? `\n\nWe pre-filled the agreed PO price — press OK to apply it, or edit it:`
+          : `\n\nThis line isn't on the PO or catalog. Enter the rate you're accepting it at — the line will be marked reviewed (green):`),
       String(suggested),
     );
     if (v === null) return;

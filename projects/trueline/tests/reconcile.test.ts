@@ -216,6 +216,40 @@ describe("parsePipeInvoice", () => {
   });
 });
 
+describe("reviewer correction of an unlisted line", () => {
+  // An unmatched line (no PO/catalog) is yellow: "cannot verify the rate".
+  const unlisted = line({ description: "expedite handling fee", quantity: 1, unitPrice: 250, extension: 250 });
+
+  it("stays yellow and unverifiable with no baseline and no override", () => {
+    const r = reconcileLine(unlisted, [po({ sku: "A1", description: "steel bracket" })], []);
+    expect(r.matchedBy).toBe("none");
+    expect(r.flag).toBe("yellow");
+  });
+
+  it("becomes a green manual match once the reviewer accepts a rate", () => {
+    // correctLine passes acceptedUnitPrice = the entered unit price.
+    const r = reconcileLine(
+      unlisted,
+      [po({ sku: "A1", description: "steel bracket" })],
+      [],
+      { acceptedUnitPrice: 250 },
+    );
+    expect(r.matchedBy).toBe("manual");
+    expect(r.flag).toBe("green");
+    expect(r.recoverableUsd).toBe(0);
+    expect(r.reasons.some((x) => x.includes("accepted by reviewer"))).toBe(true);
+  });
+
+  it("does NOT override a line that genuinely matches the PO (still flags overcharge)", () => {
+    const matched = line({ sku: "A1", description: "steel bracket", quantity: 10, unitPrice: 120, extension: 1200 });
+    const r = reconcileLine(matched, [po({ sku: "A1", description: "steel bracket", unitPrice: 100 })], [], {
+      acceptedUnitPrice: 120,
+    });
+    expect(r.matchedBy).toBe("sku");
+    expect(r.flag).toBe("red"); // +20% over PO — the override is ignored for matched lines
+  });
+});
+
 describe("parsePoText", () => {
   it("drops the header and short rows, sanitizes $ and commas", () => {
     const raw = [

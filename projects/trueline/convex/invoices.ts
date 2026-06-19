@@ -475,6 +475,10 @@ export const correctLine = mutation({
       },
       pos.flatMap((p) => p.lines),
       catalog,
+      // A correction is a human decision: if the line is unlisted (no PO/catalog
+      // match), the entered rate becomes the accepted baseline so it verifies green
+      // instead of staying perpetually yellow. Ignored when the line does match.
+      { acceptedUnitPrice: unitPrice },
     );
     await ctx.db.patch(lineId, {
       unitPrice,
