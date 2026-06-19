@@ -1,7 +1,7 @@
 # trueline — Complete Code Walkthrough
 
 A file-by-file walkthrough of the trueline application, ordered by execution flow.
-Each numbered Point covers one file or concept with a code excerpt, numbered notes,
+Each numbered section covers one file or concept with a code excerpt, numbered notes,
 and a summary line. Concept boxes define framework concepts where they first
 apply: server vs. client components, hydration, JWT verification, variable scope,
 and the Convex function types.
@@ -16,8 +16,8 @@ below identify where the codebase enforces that boundary.
 
 **Paths.** All paths are relative to the project root `projects/trueline/`. This
 file is in `projects/trueline/docs/`, so `../convex/reconcile.ts` refers to the
-source tree one level up. Each Point links its source file(s); the source map below
-lists every file and the Points it covers.
+source tree one level up. Each section links its source file(s); the source map below
+lists every file and the sections it covers.
 
 ---
 
@@ -48,44 +48,44 @@ locally and posts the structured lines via `submitExtraction` ([§16](#16-branch
 
 **Frontend — [`app/`](../app)** (Next.js App Router; runs in the browser unless noted)
 
-| File | What it is | Points |
+| File | What it is | Sections |
 |---|---|---|
-| [`middleware.ts`](../middleware.ts) | the auth gate (runs before every route) | P2 |
-| [`app/layout.tsx`](../app/layout.tsx) | root shell + theme bootstrap (server) | P3 |
-| [`app/providers.tsx`](../app/providers.tsx) | Clerk + Convex client — the client boundary | P4 |
-| [`app/page.tsx`](../app/page.tsx) | marketing landing (server component) | P5, P6 |
-| [`app/app/page.tsx`](../app/app/page.tsx) | workspace dashboard + upload flow | P8, P12–P16, P22 |
-| [`app/app/invoices/[id]/page.tsx`](../app/app/invoices/%5Bid%5D/page.tsx) | per-invoice review table | P23 |
-| [`app/app/settings/page.tsx`](../app/app/settings/page.tsx) | routing-config UI | P25 |
-| [`app/app/diagnostics/page.tsx`](../app/app/diagnostics/page.tsx) | traces, event log, benchmark | P26 |
-| [`app/app/evals/page.tsx`](../app/app/evals/page.tsx) | eval UI | P27 |
-| [`app/lib/ollama.ts`](../app/lib/ollama.ts) | browser-side Ollama client | P16 |
-| [`app/components/ui.tsx`](../app/components/ui.tsx) | `usd`, `FlagBadge`, `StatusBadge` | P28 |
-| [`app/components/nav.tsx`](../app/components/nav.tsx) | app nav + theme toggle | P28 |
+| [`middleware.ts`](../middleware.ts) | the auth gate (runs before every route) | §2 |
+| [`app/layout.tsx`](../app/layout.tsx) | root shell + theme bootstrap (server) | §3 |
+| [`app/providers.tsx`](../app/providers.tsx) | Clerk + Convex client — the client boundary | §4 |
+| [`app/page.tsx`](../app/page.tsx) | marketing landing (server component) | §5, §6 |
+| [`app/app/page.tsx`](../app/app/page.tsx) | workspace dashboard + upload flow | §8, §12–§16, §22 |
+| [`app/app/invoices/[id]/page.tsx`](../app/app/invoices/%5Bid%5D/page.tsx) | per-invoice review table | §23 |
+| [`app/app/settings/page.tsx`](../app/app/settings/page.tsx) | routing-config UI | §25 |
+| [`app/app/diagnostics/page.tsx`](../app/app/diagnostics/page.tsx) | traces, event log, benchmark | §26 |
+| [`app/app/evals/page.tsx`](../app/app/evals/page.tsx) | eval UI | §27 |
+| [`app/lib/ollama.ts`](../app/lib/ollama.ts) | browser-side Ollama client | §16 |
+| [`app/components/ui.tsx`](../app/components/ui.tsx) | `usd`, `FlagBadge`, `StatusBadge` | §28 |
+| [`app/components/nav.tsx`](../app/components/nav.tsx) | app nav + theme toggle | §28 |
 
 **Backend — [`convex/`](../convex)** (DB + functions; runs in Convex Cloud)
 
-| File | What it is | Points |
+| File | What it is | Sections |
 |---|---|---|
-| [`convex/schema.ts`](../convex/schema.ts) | tables + indexes (the data model) | P11 |
-| [`convex/auth.config.ts`](../convex/auth.config.ts) | which JWT issuer Convex trusts | P7 |
-| [`convex/invoices.ts`](../convex/invoices.ts) | queries + mutations (the workhorse) | P9, P10, P15, P20, P24 |
-| [`convex/extract.ts`](../convex/extract.ts) | the extract **action** (external LLM I/O) | P17 |
-| [`convex/routing.ts`](../convex/routing.ts) | per-tenant routing config | P25 |
-| [`convex/evals.ts`](../convex/evals.ts) | flag precision/recall scoring | P27 |
-| [`convex/diagnostics.ts`](../convex/diagnostics.ts) | the benchmark action | P26 |
-| [`convex/lib/llm.ts`](../convex/lib/llm.ts) | provider routing + extraction | P18, P19 |
-| [`convex/lib/reconcile.ts`](../convex/lib/reconcile.ts) | the decision engine (pure, money) | P21 |
-| [`convex/lib/parse.ts`](../convex/lib/parse.ts) | pipe parser + shared types | P19 |
-| [`convex/lib/demoData.ts`](../convex/lib/demoData.ts) | seed PO/catalog/invoices + eval labels | P10 |
+| [`convex/schema.ts`](../convex/schema.ts) | tables + indexes (the data model) | §11 |
+| [`convex/auth.config.ts`](../convex/auth.config.ts) | which JWT issuer Convex trusts | §7 |
+| [`convex/invoices.ts`](../convex/invoices.ts) | queries + mutations (the workhorse) | §9, §10, §15, §20, §24 |
+| [`convex/extract.ts`](../convex/extract.ts) | the extract **action** (external LLM I/O) | §17 |
+| [`convex/routing.ts`](../convex/routing.ts) | per-tenant routing config | §25 |
+| [`convex/evals.ts`](../convex/evals.ts) | flag precision/recall scoring | §27 |
+| [`convex/diagnostics.ts`](../convex/diagnostics.ts) | the benchmark action | §26 |
+| [`convex/lib/llm.ts`](../convex/lib/llm.ts) | provider routing + extraction | §18, §19 |
+| [`convex/lib/reconcile.ts`](../convex/lib/reconcile.ts) | the decision engine (pure, money) | §21 |
+| [`convex/lib/parse.ts`](../convex/lib/parse.ts) | pipe parser + shared types | §19 |
+| [`convex/lib/demoData.ts`](../convex/lib/demoData.ts) | seed PO/catalog/invoices + eval labels | §10 |
 
 **Config & docs**
 
-| File | What it is | Points |
+| File | What it is | Sections |
 |---|---|---|
-| [`next.config.ts`](../next.config.ts) | Next build config | P29 |
+| [`next.config.ts`](../next.config.ts) | Next build config | §29 |
 | [`docs/ARCHITECTURE.md`](./ARCHITECTURE.md) | the system view | — |
-| [`docs/DEPLOYMENT.md`](./DEPLOYMENT.md) | how it's hosted (the three planes) | P29 |
+| [`docs/DEPLOYMENT.md`](./DEPLOYMENT.md) | how it's hosted (the three planes) | §29 |
 
 ---
 
@@ -608,7 +608,7 @@ export default function Dashboard() {
    distinct from Clerk's own "signed in." There's a brief window where Clerk says
    "signed in" but Convex hasn't verified the JWT over the socket, so this can be
    `false` for a render or two.
-2. **Each `useQuery(api.xxx)` opens a live subscription** over the Point-4 socket:
+2. **Each `useQuery(api.xxx)` opens a live subscription** over the §4 socket:
    Convex runs the query, returns the result, and **re-sends automatically whenever
    the underlying data changes**. You never call "refresh."
 3. **`useMutation(api.xxx)` returns a *function*** — armed but idle until you invoke
@@ -785,8 +785,7 @@ invoiceLines: defineTable({
    can see exactly which fields a model touched and which are deterministic.
 2. **`sourceQuote`** grounds every extracted number to a verbatim snippet, so any
    field traces back to the document.
-3. **Every table carries `orgId` and a `by_org*` index** — the substrate for Point
-   9's tenant isolation.
+3. **Every table carries `orgId` and a `by_org*` index** — the substrate for §9's tenant isolation.
 4. Other tables: **`invoices`** (the header + rollups: `recoverableUsd`,
    `extractionProvider`, `latencyMs`, `costUsd`, `status`), **`logs`** (Diagnostics
    event log), **`settings`** (per-tenant routing mode/model), **`evalRuns`** (scored
