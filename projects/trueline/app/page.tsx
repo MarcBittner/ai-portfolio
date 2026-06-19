@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/nextjs";
+import { buttonCls } from "@/app/components/ui";
 
 const PIPELINE = [
   ["Upload", "Invoice text → Convex storage + a record (mutation)."],
@@ -29,13 +30,11 @@ export default function Landing() {
         <div className="flex items-center gap-3 text-sm">
           <SignedOut>
             <SignInButton mode="modal">
-              <button className="rounded-lg bg-[--color-accent] px-4 py-2 font-medium text-[--color-accent-ink]">
-                Sign in
-              </button>
+              <button className={buttonCls("primary")}>Sign in</button>
             </SignInButton>
           </SignedOut>
           <SignedIn>
-            <Link href="/app" className="rounded-lg bg-[--color-accent] px-4 py-2 font-medium text-[--color-accent-ink]">
+            <Link href="/app" className={buttonCls("primary")}>
               Open workspace
             </Link>
             <UserButton afterSignOutUrl="/" />
@@ -56,13 +55,13 @@ export default function Landing() {
       <div className="mt-6">
         <SignedOut>
           <SignInButton mode="modal">
-            <button className="rounded-lg bg-[--color-accent] px-5 py-2.5 font-medium text-[--color-accent-ink]">
+            <button className={buttonCls("primary", "px-5 py-2.5")}>
               Sign in to open the workspace →
             </button>
           </SignInButton>
         </SignedOut>
         <SignedIn>
-          <Link href="/app" className="rounded-lg bg-[--color-accent] px-5 py-2.5 font-medium text-[--color-accent-ink]">
+          <Link href="/app" className={buttonCls("primary", "px-5 py-2.5")}>
             Open the workspace →
           </Link>
         </SignedIn>

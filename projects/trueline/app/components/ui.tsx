@@ -12,24 +12,28 @@ export function cn(...inputs: ClassValue[]) {
 // the cases that can't be a <button> (e.g. the file-input <label>).
 type ButtonVariant = "primary" | "secondary" | "ghost" | "ok" | "danger";
 
+// Every button shares ONE shape: a visible outline (border), a surface fill at rest,
+// a lift + shadow on hover, and a press (scale down) on click. Variants differ only
+// by border/text color and the hover-fill tint — so the styling is consistent and
+// every button reads as a button, outline included.
 const BTN_BASE =
   "inline-flex items-center justify-center gap-2 rounded-md border px-4 py-2 text-sm font-medium " +
-  "cursor-pointer select-none transition-all duration-150 " +
-  "hover:-translate-y-px active:translate-y-0 active:scale-95 " +
+  "cursor-pointer select-none bg-[--color-surface] transition-all duration-150 " +
+  "hover:-translate-y-px hover:shadow-sm active:translate-y-0 active:scale-95 " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[--color-accent]/50 " +
   "disabled:pointer-events-none disabled:opacity-50 disabled:hover:translate-y-0";
 
 const BTN_VARIANT: Record<ButtonVariant, string> = {
   primary:
-    "border-transparent bg-[--color-accent] text-[--color-accent-ink] shadow-sm hover:brightness-110 hover:shadow-md active:brightness-95",
+    "border-[--color-accent] text-[--color-accent] hover:bg-[--color-accent]/15 active:bg-[--color-accent]/25",
   secondary:
-    "border-[--color-line] bg-[--color-surface] text-[--color-ink] hover:border-[--color-accent] hover:bg-[--color-accent]/15 hover:shadow-sm active:bg-[--color-accent]/25",
+    "border-[--color-line] text-[--color-ink] hover:border-[--color-accent] hover:bg-[--color-accent]/10 active:bg-[--color-accent]/20",
   ghost:
-    "border-transparent text-[--color-muted] hover:border-[--color-line] hover:bg-[--color-accent]/10 hover:text-[--color-ink] active:bg-[--color-accent]/20",
+    "border-[--color-line] text-[--color-muted] hover:border-[--color-accent] hover:text-[--color-ink] hover:bg-[--color-accent]/10 active:bg-[--color-accent]/20",
   ok:
-    "border-transparent bg-[--color-ok] text-[--color-accent-ink] shadow-sm hover:brightness-110 hover:shadow-md active:brightness-95",
+    "border-[--color-ok] text-[--color-ok] hover:bg-[--color-ok]/15 active:bg-[--color-ok]/25",
   danger:
-    "border-[--color-bad]/60 text-[--color-bad] hover:border-[--color-bad] hover:bg-[--color-bad]/15 hover:shadow-sm active:bg-[--color-bad]/25",
+    "border-[--color-bad] text-[--color-bad] hover:bg-[--color-bad]/15 active:bg-[--color-bad]/25",
 };
 
 export function buttonCls(variant: ButtonVariant = "secondary", extra?: string) {
