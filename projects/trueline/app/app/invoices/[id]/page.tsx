@@ -97,13 +97,13 @@ export default function InvoiceReview() {
           </div>
           <button
             onClick={() => setStatus({ invoiceId, status: "approved" })}
-            className="rounded-md bg-[--color-ok]/20 px-3 py-1.5 text-sm font-medium text-[--color-ok]"
+            className="cursor-pointer rounded-md bg-[--color-ok]/20 px-3 py-1.5 text-sm font-medium text-[--color-ok] transition-all duration-150 hover:bg-[--color-ok]/30 active:scale-[0.97]"
           >
             Approve invoice
           </button>
           <button
             onClick={() => setStatus({ invoiceId, status: "rejected" })}
-            className="rounded-md bg-[--color-bad]/20 px-3 py-1.5 text-sm font-medium text-[--color-bad]"
+            className="cursor-pointer rounded-md bg-[--color-bad]/20 px-3 py-1.5 text-sm font-medium text-[--color-bad] transition-all duration-150 hover:bg-[--color-bad]/30 active:scale-[0.97]"
           >
             Reject
           </button>
@@ -273,7 +273,7 @@ export default function InvoiceReview() {
 // Decision buttons: a static base class (Tailwind needs static strings) plus an
 // inline style so the *active* decision is filled in its tone via CSS vars.
 const DEC_BTN =
-  "rounded-md border px-2.5 py-1 text-left text-xs transition-colors hover:opacity-90";
+  "rounded-md border px-2.5 py-1 text-left text-xs cursor-pointer transition-all duration-150 hover:opacity-90 hover:brightness-110 active:scale-[0.97]";
 
 function decStyle(active: boolean, v: string) {
   return active

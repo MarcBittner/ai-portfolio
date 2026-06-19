@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Nav } from "@/app/components/nav";
-import { FlagBadge, StatusBadge, usd } from "@/app/components/ui";
+import { Button, buttonCls, FlagBadge, StatusBadge, usd } from "@/app/components/ui";
 import { extractWithOllama, probeOllama } from "@/app/lib/ollama";
 
 // ---- the downloadable sample files (match the reconcile engine's expectations) ----
@@ -72,22 +72,29 @@ function download(name: string, text: string) {
 function UploadButton({
   label,
   onText,
-  primary,
+  variant = "secondary",
   multiple,
+  disabled,
+  title,
 }: {
   label: string;
   onText: (text: string, filename: string) => void;
-  primary?: boolean;
+  variant?: "primary" | "secondary" | "ghost";
   multiple?: boolean;
+  disabled?: boolean;
+  title?: string;
 }) {
+  // A file picker is a <label>, not a <button>, so it can't use disabled — render a
+  // styled, inert span instead. It still gets the shared button look.
+  if (disabled) {
+    return (
+      <span className={buttonCls(variant, "cursor-not-allowed opacity-50")} title={title} aria-disabled>
+        {label}
+      </span>
+    );
+  }
   return (
-    <label
-      className={`inline-block cursor-pointer rounded-md px-4 py-2 text-sm font-medium ${
-        primary
-          ? "bg-[--color-accent] text-[--color-accent-ink]"
-          : "border border-[--color-line] hover:border-[--color-accent]"
-      }`}
-    >
+    <label className={buttonCls(variant)} title={title}>
       {label}
       <input
         type="file"
@@ -146,6 +153,7 @@ export default function Dashboard() {
   const baseline = useQuery(api.invoices.baseline);
   const invoices = useQuery(api.invoices.listInvoices);
   const stats = useQuery(api.invoices.stats);
+  const demoState = useQuery(api.invoices.demoState);
   const setBaseline = useMutation(api.invoices.setBaselineFromText);
   const createInvoice = useMutation(api.invoices.createInvoiceFromText);
   const reset = useMutation(api.invoices.resetDemo);
@@ -157,15 +165,16 @@ export default function Dashboard() {
   const [msg, setMsg] = useState<string | null>(null);
   const seededOnce = useRef(false);
 
-  // Auto-seed the demo set on first load of an empty tenant, so a fresh sign-in
-  // lands on a populated dashboard. seedIfEmpty is idempotent; the ref limits it to
-  // one call per mount (a manual Reset won't re-seed within the same session).
+  // Auto-seed the demo set the first time a tenant ever loads the dashboard, so a
+  // fresh sign-in lands on a populated walkthrough. Gated on a persistent server
+  // flag (demoState.initialized) — NOT on "are there 0 invoices?" — so an explicit
+  // Reset stays reset even after navigating away and coming back.
   useEffect(() => {
-    if (!seededOnce.current && isAuthenticated && baseline && !baseline.hasPo && invoices && invoices.length === 0) {
+    if (!seededOnce.current && isAuthenticated && demoState && !demoState.initialized) {
       seededOnce.current = true;
       seedAll();
     }
-  }, [isAuthenticated, baseline, invoices, seedAll]);
+  }, [isAuthenticated, demoState, seedAll]);
 
   // Run the engine regression (a fixed labeled benchmark, independent of your
   // invoices) asynchronously on app load, so the Evals page is already populated
@@ -247,21 +256,39 @@ export default function Dashboard() {
   return (
     <main className="mx-auto max-w-5xl px-6 py-8">
       <Nav />
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <h1 className="text-lg font-semibold">Invoice verification — guided demo</h1>
-        <button
+      <h1 className="mb-4 text-lg font-semibold">Invoice verification — guided demo</h1>
+
+      <Stepper step={step} />
+
+      {/* Consistent action bar — the upload controls live here in every step, so they
+          never jump around as the walkthrough advances. Reset lives here too. */}
+      <section className="glass mb-4 flex flex-wrap items-center gap-2 p-3">
+        <UploadButton
+          label={hasPo ? "⬆ Replace contract" : "⬆ Upload contract file"}
+          onText={uploadContract}
+          variant={hasPo ? "secondary" : "primary"}
+        />
+        <UploadButton
+          label="⬆ Upload invoice(s)"
+          onText={uploadInvoice}
+          multiple
+          variant={hasPo && nInv === 0 ? "primary" : "secondary"}
+          disabled={!hasPo}
+          title={hasPo ? "Upload one or more invoice files" : "Load the contract first"}
+        />
+        <Button
+          variant="ghost"
+          className="ml-auto px-3 py-1.5 text-xs"
           onClick={async () => {
             await reset();
-            setMsg("Reset — start from step 1.");
+            setMsg("Reset — the demo is cleared. Upload a contract, or reload the sample set below.");
           }}
-          className="rounded-md border border-[--color-line] px-3 py-1.5 text-xs text-[--color-muted] hover:border-[--color-accent]"
           title="Clear everything and start the walkthrough over"
         >
           ↻ Reset demo
-        </button>
-      </div>
+        </Button>
+      </section>
 
-      <Stepper step={step} />
       {msg && (
         <div className="glass mb-4 p-3 text-sm text-[--color-ink]">{msg}</div>
       )}
@@ -276,36 +303,31 @@ export default function Dashboard() {
               and a few <b className="text-[--color-ink]">invoices</b> from a vendor billed against it.
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
-              <button
-                onClick={() => download(CONTRACT.name, CONTRACT.text)}
-                className="rounded-md bg-[--color-accent] px-4 py-2 text-sm font-medium text-[--color-accent-ink]"
-              >
+              <Button variant="primary" onClick={() => download(CONTRACT.name, CONTRACT.text)}>
                 ⬇ Download contract (PO)
-              </button>
+              </Button>
               {INVOICES.map((inv) => (
-                <button
+                <Button
                   key={inv.num}
+                  variant="secondary"
                   onClick={() => download(`invoice-${inv.num}.txt`, inv.text)}
-                  className="rounded-md border border-[--color-line] px-4 py-2 text-sm hover:border-[--color-accent]"
                 >
                   ⬇ {inv.label}
-                </button>
+                </Button>
               ))}
             </div>
           </section>
           <section className="glass p-5">
             <h2 className="font-semibold">Step 2 — Upload the contract</h2>
             <p className="mt-1 text-sm text-[--color-muted]">
-              Upload <b className="text-[--color-ink]">contract-PO-4471.txt</b>. It becomes the baseline
-              every invoice line is checked against.
+              Use <b className="text-[--color-ink]">⬆ Upload contract file</b> in the action bar above
+              and pick <b className="text-[--color-ink]">contract-PO-4471.txt</b>. It becomes the
+              baseline every invoice line is checked against.
             </p>
-            <div className="mt-3">
-              <UploadButton label="⬆ Upload contract file" onText={uploadContract} primary />
-            </div>
           </section>
           <p className="text-center text-xs text-[--color-muted]">
             or{" "}
-            <button onClick={() => seedAll()} className="text-[--color-accent] underline">
+            <button onClick={() => seedAll()} className="text-[--color-accent] underline hover:no-underline">
               skip the walkthrough and load everything
             </button>
           </p>
@@ -323,26 +345,23 @@ export default function Dashboard() {
           <section className="glass p-5">
             <h2 className="font-semibold">Step 3 — Upload an invoice</h2>
             <p className="mt-1 text-sm text-[--color-muted]">
-              Upload one of the <b className="text-[--color-ink]">invoice-INV-….txt</b> files. trueline
-              will read it with an LLM, recompute the math, and check every line against the contract
-              and market rates. Start with the padded one.
+              Use <b className="text-[--color-ink]">⬆ Upload invoice(s)</b> in the action bar above and
+              pick one of the <b className="text-[--color-ink]">invoice-INV-….txt</b> files. trueline
+              reads it with an LLM, recomputes the math, and checks every line against the contract and
+              market rates. Start with the padded one.
             </p>
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <UploadButton label="⬆ Upload invoice file(s)" onText={uploadInvoice} primary multiple />
-              <span className="text-xs text-[--color-muted]">
-                (need the files?{" "}
-                {INVOICES.map((inv, i) => (
-                  <button
-                    key={inv.num}
-                    onClick={() => download(`invoice-${inv.num}.txt`, inv.text)}
-                    className="text-[--color-accent] underline"
-                  >
-                    {inv.num}
-                    {i < INVOICES.length - 1 ? ", " : ""}
-                  </button>
-                ))}
-                )
-              </span>
+            <div className="mt-3 text-xs text-[--color-muted]">
+              need the files?{" "}
+              {INVOICES.map((inv, i) => (
+                <button
+                  key={inv.num}
+                  onClick={() => download(`invoice-${inv.num}.txt`, inv.text)}
+                  className="text-[--color-accent] underline hover:no-underline"
+                >
+                  {inv.num}
+                  {i < INVOICES.length - 1 ? ", " : ""}
+                </button>
+              ))}
             </div>
           </section>
         </div>
@@ -402,32 +421,36 @@ export default function Dashboard() {
 
             <aside className="space-y-4">
               <section className="glass p-4">
-                <h2 className="mb-2 text-sm font-semibold">Add another invoice</h2>
-                <UploadButton label="⬆ Upload invoice(s)" onText={uploadInvoice} multiple />
-                <div className="mt-2 text-xs text-[--color-muted]">
+                <h2 className="mb-1 text-sm font-semibold">Add another invoice</h2>
+                <p className="text-xs text-[--color-muted]">
+                  Use <b className="text-[--color-ink]">⬆ Upload invoice(s)</b> in the action bar above.
+                  Need a sample?{" "}
                   {INVOICES.map((inv, i) => (
                     <button
                       key={inv.num}
                       onClick={() => download(`invoice-${inv.num}.txt`, inv.text)}
-                      className="text-[--color-accent] underline"
+                      className="text-[--color-accent] underline hover:no-underline"
                     >
                       {inv.num}
                       {i < INVOICES.length - 1 ? " · " : ""}
                     </button>
                   ))}
-                </div>
+                </p>
               </section>
               <section className="glass p-4">
-                <h2 className="mb-2 text-sm font-semibold">Evaluation</h2>
-                <p className="mb-2 text-xs text-[--color-muted]">
-                  Score the flag engine (precision/recall) on the labeled set.
+                <h2 className="mb-1 text-sm font-semibold">Engine regression</h2>
+                <p className="mb-3 text-xs text-[--color-muted]">
+                  Flag precision/recall are scored on a fixed labeled benchmark — independent of these
+                  invoices. It runs automatically; full results live on the Evals page.
                 </p>
-                <button
-                  onClick={() => runEval()}
-                  className="w-full rounded-md border border-[--color-line] px-3 py-1.5 text-sm"
-                >
-                  Run eval
-                </button>
+                <div className="flex gap-2">
+                  <Button variant="secondary" className="flex-1 px-3 py-1.5" onClick={() => runEval()}>
+                    Re-run
+                  </Button>
+                  <Link href="/app/evals" className={buttonCls("ghost", "flex-1 px-3 py-1.5")}>
+                    View Evals
+                  </Link>
+                </div>
               </section>
             </aside>
           </div>

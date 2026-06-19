@@ -97,7 +97,7 @@ export default function Diagnostics() {
               }
             }}
             disabled={busy}
-            className="rounded-md bg-[--color-accent] px-4 py-2 text-sm font-medium text-[--color-accent-ink] disabled:opacity-50"
+            className="cursor-pointer rounded-md bg-[--color-accent] px-4 py-2 text-sm font-medium text-[--color-accent-ink] transition-all duration-150 hover:brightness-110 hover:shadow-md active:scale-[0.97] active:brightness-95 disabled:pointer-events-none disabled:opacity-50"
           >
             {busy ? "benchmarking…" : "Run benchmark"}
           </button>

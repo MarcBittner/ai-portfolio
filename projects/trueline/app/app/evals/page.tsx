@@ -4,10 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Nav } from "@/app/components/nav";
+import { Button } from "@/app/components/ui";
 
 export default function Evals() {
   const { isAuthenticated } = useConvexAuth();
   const runs = useQuery(api.evals.listEvals);
+  const stats = useQuery(api.invoices.stats);
   const runEval = useMutation(api.evals.runEval);
   const [busy, setBusy] = useState(false);
 
@@ -37,18 +39,25 @@ export default function Evals() {
       <Nav />
       <h1 className="text-lg font-semibold">Evaluation — proving the engine before it ships</h1>
       <p className="mb-5 mt-1 text-sm text-[--color-muted]">
-        Accuracy is <i>measured</i>, not asserted. This scores the flag engine against a{" "}
-        <b>fixed, hand-labeled benchmark of 18 invoices</b> — built into the code, <i>independent of
-        anything you upload</i>. It runs automatically when the app loads and re-runs on demand; it&apos;s
-        the gate you&apos;d run in CI before shipping a threshold, prompt, or model change. A{" "}
-        <b className="text-[--color-bad]">false negative</b> lets padding through (lost money); a{" "}
-        <b className="text-[--color-warn]">false positive</b> makes estimators stop trusting it.
+        Two different things are measured here, and they don&apos;t mix. <b>Engine regression</b> is the
+        CI gate — it scores the flag engine against a fixed, hand-labeled benchmark built into the
+        code, so it&apos;s <i>independent of anything you upload</i>. <b>Your data</b> is a live readout of
+        the invoices you&apos;ve actually processed.
       </p>
 
+      {/* ---- engine regression: the fixed benchmark, independent of uploads ---- */}
       <section className="glass p-5">
-        <div className="flex items-center justify-between">
-          <div className="text-sm font-semibold">Latest run</div>
-          <button
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <div className="text-sm font-semibold">Engine regression — the CI gate</div>
+            <div className="text-xs text-[--color-muted]">
+              Scored on a fixed, hand-labeled benchmark of 18 invoices. These move only when the
+              <i> engine</i> changes — never when you upload.
+            </div>
+          </div>
+          <Button
+            variant="secondary"
+            disabled={busy}
             onClick={async () => {
               setBusy(true);
               try {
@@ -57,28 +66,51 @@ export default function Evals() {
                 setBusy(false);
               }
             }}
-            disabled={busy}
-            className="rounded-md bg-[--color-accent] px-4 py-2 text-sm font-medium text-[--color-accent-ink] disabled:opacity-50"
           >
             {busy ? "scoring…" : "Re-run evaluation"}
-          </button>
+          </Button>
         </div>
         {latest ? (
-          <div className="mt-4 grid grid-cols-3 gap-3">
-            <Metric label="Flag precision" v={latest.flagPrecision} hint="of flagged, how many were real" />
-            <Metric label="Flag recall" v={latest.flagRecall} hint="of real issues, how many caught" />
-            <Metric label="Math-consistency" v={latest.extractionAccuracy} hint="lines whose totals check out" />
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <Metric label="Flag precision" v={latest.flagPrecision} hint="of flagged, how many were real overcharges" />
+            <Metric label="Flag recall" v={latest.flagRecall} hint="of real overcharges, how many it caught" />
           </div>
         ) : (
           <p className="mt-4 text-sm text-[--color-muted]">
             Scoring the benchmark… (runs automatically on load).
           </p>
         )}
+        <p className="mt-3 text-xs text-[--color-muted]">
+          A <b className="text-[--color-bad]">false negative</b> lets padding through (lost money); a{" "}
+          <b className="text-[--color-warn]">false positive</b> makes estimators stop trusting it. This
+          is the gate you&apos;d run before shipping a threshold, prompt, or model change.
+        </p>
+      </section>
+
+      {/* ---- your data: a live property of what you've processed ---- */}
+      <section className="glass mt-4 p-5">
+        <div className="text-sm font-semibold">Your processed invoices</div>
+        <div className="text-xs text-[--color-muted]">
+          A live readout of the invoices you&apos;ve uploaded — this changes as you process more.
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <Metric
+            label="Math-consistency"
+            v={stats?.mathConsistency ?? null}
+            hint="of your lines, the share whose printed total checks out"
+          />
+          <div className="rounded-lg border border-[--color-line] p-3">
+            <div className="text-xs text-[--color-muted]">Lines processed</div>
+            <div className="text-2xl font-bold">{stats?.linesProcessed ?? 0}</div>
+            <div className="mt-1 text-xs text-[--color-muted]">across your uploaded invoices</div>
+          </div>
+        </div>
       </section>
 
       {runs.length > 0 && (
         <section className="glass mt-4 overflow-x-auto p-1">
-          <table className="w-full text-sm">
+          <div className="px-4 pt-3 text-sm font-semibold">Regression history</div>
+          <table className="mt-2 w-full text-sm">
             <thead className="text-left text-xs uppercase text-[--color-muted]">
               <tr className="border-b border-[--color-line]">
                 <th className="p-3">When</th>
@@ -86,7 +118,6 @@ export default function Evals() {
                 <th className="p-3">N</th>
                 <th className="p-3">Precision</th>
                 <th className="p-3">Recall</th>
-                <th className="p-3">Math-consistency</th>
               </tr>
             </thead>
             <tbody>
@@ -97,7 +128,6 @@ export default function Evals() {
                   <td className="p-3">{r.n}</td>
                   <td className="p-3">{r.flagPrecision.toFixed(2)}</td>
                   <td className="p-3">{r.flagRecall.toFixed(2)}</td>
-                  <td className="p-3">{r.extractionAccuracy.toFixed(2)}</td>
                 </tr>
               ))}
             </tbody>
@@ -108,7 +138,16 @@ export default function Evals() {
   );
 }
 
-function Metric({ label, v, hint }: { label: string; v: number; hint: string }) {
+function Metric({ label, v, hint }: { label: string; v: number | null; hint: string }) {
+  if (v === null) {
+    return (
+      <div className="rounded-lg border border-[--color-line] p-3">
+        <div className="text-xs text-[--color-muted]">{label}</div>
+        <div className="text-2xl font-bold text-[--color-muted]">—</div>
+        <div className="mt-1 text-xs text-[--color-muted]">{hint}</div>
+      </div>
+    );
+  }
   const color =
     v >= 0.9
       ? "var(--color-ok)"

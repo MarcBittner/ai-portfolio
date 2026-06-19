@@ -40,6 +40,21 @@ async function optionalOrg(ctx: { auth: MutationCtx["auth"] }): Promise<string |
   return claims.org_id ?? `user:${id.subject}`;
 }
 
+// Mark a tenant as "initialized" so the dashboard's first-load auto-seed never
+// fires again — whether the tenant got there by being seeded or by an explicit
+// Reset. Idempotent.
+async function markInitialized(ctx: MutationCtx, orgId: string) {
+  const st = await ctx.db
+    .query("tenantState")
+    .withIndex("by_org", (q) => q.eq("orgId", orgId))
+    .first();
+  if (st) {
+    if (!st.demoInitialized) await ctx.db.patch(st._id, { demoInitialized: true });
+  } else {
+    await ctx.db.insert("tenantState", { orgId, demoInitialized: true });
+  }
+}
+
 // Reconcile a set of extracted lines against the org's PO + catalog and write
 // them, returning the invoice rollups. Shared by the seed and the extract action.
 async function insertReconciledLines(
@@ -145,11 +160,26 @@ export const stats = query({
   handler: async (ctx) => {
     const orgId = await optionalOrg(ctx);
     if (!orgId)
-      return { invoices: 0, recoverableUsd: 0, needsReview: 0, latestEval: null };
+      return {
+        invoices: 0,
+        recoverableUsd: 0,
+        needsReview: 0,
+        linesProcessed: 0,
+        mathConsistency: null,
+        latestEval: null,
+      };
     const invoices = await ctx.db
       .query("invoices")
       .withIndex("by_org", (q) => q.eq("orgId", orgId))
       .collect();
+    // Live math-consistency over the lines THIS tenant has uploaded and processed
+    // (distinct from the fixed benchmark on the Evals page). Share of lines whose
+    // printed total matches qty × unit price.
+    const lines = await ctx.db
+      .query("invoiceLines")
+      .withIndex("by_org_decision", (q) => q.eq("orgId", orgId))
+      .collect();
+    const mathOk = lines.filter((l) => l.mathOk).length;
     const evals = await ctx.db
       .query("evalRuns")
       .withIndex("by_org", (q) => q.eq("orgId", orgId))
@@ -161,8 +191,26 @@ export const stats = query({
         invoices.reduce((s, i) => s + (i.recoverableUsd ?? 0), 0) * 100,
       ) / 100,
       needsReview: invoices.filter((i) => i.status === "needs_review").length,
+      linesProcessed: lines.length,
+      mathConsistency: lines.length === 0 ? null : Math.round((mathOk / lines.length) * 1000) / 1000,
       latestEval: evals[0] ?? null,
     };
+  },
+});
+
+// Whether this tenant has been initialized (auto-seeded or explicitly reset). The
+// dashboard uses this — not "are there 0 invoices?" — to decide whether to auto-seed,
+// so a Reset stays reset even after navigating away and back.
+export const demoState = query({
+  args: {},
+  handler: async (ctx) => {
+    const orgId = await optionalOrg(ctx);
+    if (!orgId) return { initialized: true }; // not authed yet → never auto-seed
+    const st = await ctx.db
+      .query("tenantState")
+      .withIndex("by_org", (q) => q.eq("orgId", orgId))
+      .first();
+    return { initialized: !!st?.demoInitialized };
   },
 });
 
@@ -176,7 +224,10 @@ export const seedIfEmpty = mutation({
       .query("invoices")
       .withIndex("by_org", (q) => q.eq("orgId", orgId))
       .first();
-    if (existing) return { seeded: false };
+    if (existing) {
+      await markInitialized(ctx, orgId);
+      return { seeded: false };
+    }
 
     await ctx.db.insert("purchaseOrders", {
       orgId,
@@ -204,6 +255,7 @@ export const seedIfEmpty = mutation({
       });
       await ctx.db.patch(invoiceId, rollup);
     }
+    await markInitialized(ctx, orgId);
     return { seeded: true };
   },
 });
@@ -374,6 +426,9 @@ export const resetDemo = mutation({
         .collect();
       for (const r of rows) await ctx.db.delete(r._id);
     }
+    // Stay reset: mark the tenant initialized so the dashboard's first-load
+    // auto-seed won't repopulate it when the user navigates away and back.
+    await markInitialized(ctx, orgId);
     return { cleared: true };
   },
 });

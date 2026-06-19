@@ -123,6 +123,14 @@ export default defineSchema({
     model: v.optional(v.string()), // override the model for the chosen mode
   }).index("by_org", ["orgId"]),
 
+  // Per-tenant lifecycle flags. `demoInitialized` is set once the tenant has been
+  // auto-seeded OR explicitly reset by the user, so the dashboard's first-load
+  // auto-seed fires exactly once per tenant and a Reset stays reset across navigation.
+  tenantState: defineTable({
+    orgId: v.string(),
+    demoInitialized: v.boolean(),
+  }).index("by_org", ["orgId"]),
+
   // Eval runs: extraction accuracy + flag precision/recall over a labeled set.
   evalRuns: defineTable({
     orgId: v.string(),

@@ -12,6 +12,7 @@ import type * as diagnostics from "../diagnostics.js";
 import type * as evals from "../evals.js";
 import type * as extract from "../extract.js";
 import type * as invoices from "../invoices.js";
+import type * as lib_benchmark from "../lib/benchmark.js";
 import type * as lib_demoData from "../lib/demoData.js";
 import type * as lib_llm from "../lib/llm.js";
 import type * as lib_parse from "../lib/parse.js";
@@ -29,6 +30,7 @@ declare const fullApi: ApiFromModules<{
   evals: typeof evals;
   extract: typeof extract;
   invoices: typeof invoices;
+  "lib/benchmark": typeof lib_benchmark;
   "lib/demoData": typeof lib_demoData;
   "lib/llm": typeof lib_llm;
   "lib/parse": typeof lib_parse;
