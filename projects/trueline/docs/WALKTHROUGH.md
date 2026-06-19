@@ -21,6 +21,29 @@ lists every file and the Points it covers.
 
 ---
 
+## Summary
+
+The LLM reads, deterministic code decides, the database is multi-tenant and
+reactive, and every layer degrades gracefully to a working, testable, zero-cost
+fallback.
+
+## FAQ
+
+**How is the LLM prevented from inventing numbers?** It only extracts;
+[`reconcile.ts`](../convex/lib/reconcile.ts) recomputes every total in code, so the
+model's output is only ever *input* to deterministic checks (Point 21).
+
+**Actions aren't transactional — how is data not corrupted when one re-runs?** The
+write is keyed on the invoice `_id`, and `insertReconciledLines` clears existing
+lines before re-inserting, with all writes batched into one `writeResults` mutation
+(Points 17, 20).
+
+**How does a cloud-hosted app use a model running on a local machine?** Browser→host
+Ollama: the cloud backend can't reach `localhost`, but the browser can — it extracts
+locally and posts the structured lines via `submitExtraction` (Point 16).
+
+---
+
 ## Source map
 
 **Frontend — [`app/`](../app)** (Next.js App Router; runs in the browser unless noted)
@@ -1449,7 +1472,3 @@ Upload  → read file in browser → createInvoiceFromText (atomic, status "extr
 Review  → reviewLine / correctLine (re-reconciles) → live update
 Prove   → runEval scores flag precision/recall on labeled data
 ```
-
-**The one sentence:** the LLM reads, deterministic code decides, the database is
-multi-tenant and reactive, and every layer degrades gracefully to a working,
-testable, zero-cost fallback.
