@@ -1,9 +1,9 @@
 # trueline — real-world sample data (extraction stress test)
 
-These are **realistic, varied-format** invoices + purchase orders for testing how
-extraction fares on data that *isn't* the clean pipe format the demo ships with. They're
-synthetic (no real proprietary data is downloadable), but each is shaped like a real
-invoice in a different format, and each plants known issues so you can score the result.
+Invoices + purchase orders for testing how extraction fares on data that *isn't* the clean
+pipe format the demo ships with. Scenarios 01–05 are realistic, varied-format synthetic
+samples; **scenario 06 is built from real public data** (a published government bid
+tabulation — see its `SOURCE.md`). Each plants known issues so you can score the result.
 
 **Why this exists.** The deterministic fallback ("mock", `parsePipeInvoice` in
 `convex/lib/parse.ts`) only understands pipe-delimited text. Real invoices come as CSV,
@@ -36,6 +36,7 @@ open development-plan items on **measuring extraction accuracy (mock vs each LLM
 | 03 | `03-bluepeak-saas-printed` | printed invoice (space-aligned table, **no SKU column**, addresses, subtotal/tax/total) | column inference + fuzzy match by description | ❌ extracts nothing |
 | 04 | `04-nordwind-imports-markdown` | markdown table (EUR, discount line) | leading/trailing pipes + a `\|---\|` separator row | ⚠️ **silently mis-parses** — column shift from the leading pipe, plus the separator row as a junk line |
 | 05 | `05-delgado-construction-prose` | prose / letterhead (`500x … @ $3.85 … $1,925.00`, **no SKUs**) | hardest — free-form, fuzzy match, freight + tax | ❌ extracts nothing |
+| 06 | `06-idea-schools-real-office-supplies` | **real public data** — printed invoice (space-aligned, real SKUs/descriptions/prices from a govt bid tabulation) | real descriptions + SKUs + OCR noise (`QuoƟng`) at scale | ❌ extracts nothing |
 
 Scenario 04 is the important one: the mock doesn't just fail loudly, it produces **wrong
 lines that look plausible** — exactly the case where a measured mock-vs-LLM accuracy check
@@ -55,6 +56,10 @@ matters.
 - **05 Delgado (prose, no SKUs):** `1/2in drywall` 13.60 vs 12.40 → **+9.7% yellow**;
   `16d framing nails` 20 × 64.00 = 1280 but printed 1290.00 → **red (math error)**;
   `Delivery surcharge` and `Sales tax` → **yellow (unmatched)**. Description-only matching.
+- **06 IDEA (real data, printed):** `Logitech M720` 39.50 vs 33.89 → **+16.5% red**;
+  `Logitech K120` 50 × 10.65 = 532.50 but printed 560.00 → **red (math error)**;
+  `Correction tape` 4.99 vs 4.78 → **+4.4% yellow**; `Restocking fee` → **yellow (unmatched)**.
+  Real SKUs/descriptions from the source bid tabulation (see `06-…/SOURCE.md`).
 
 ## What to record
 

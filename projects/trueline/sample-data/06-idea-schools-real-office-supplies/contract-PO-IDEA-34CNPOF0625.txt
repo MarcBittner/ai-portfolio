@@ -1,0 +1,14 @@
+PURCHASE ORDER PO-IDEA-34CNPOF0625 — IDEA Public Schools (Office Supplies, CNP 0625)
+SKU | Description | Qty | Unit | Unit Price
+QRTS534 | Markerboard aluminum trim whiteboard 3x4 ft | 10 | ea | 76.99
+OFD699459 | Correction tape white pack of 10 | 20 | pack | 4.78
+BICGSM609AST | Ballpoint pen medium 1.0mm assorted colors set of 60 | 50 | set | 5.66
+OFD574929 | Dividers insertable 1-sided 5-tab assorted colors | 100 | set | 0.56
+OFD444611 | Masking tape 1in x 60yd | 100 | ea | 5.08
+OFD565308 | Push pin 3/8in assorted colors box of 100 | 40 | pack | 0.43
+LOG920002478 | Wired keyboard Logitech K120 | 50 | ea | 10.65
+LOG910004790 | Wireless mouse Logitech M720 | 50 | ea | 33.89
+LOG910001439 | Corded mouse Logitech B100 | 50 | ea | 6.95
+DELLKM555 | Silent keyboard and mouse Dell KM555 | 50 | ea | 73.32
+LOG920008219 | Wireless keyboard and mouse combo Logitech MK850 | 50 | ea | 79.53
+TRPN201010BL | Cat6 RJ45 ethernet cable 10ft | 50 | ea | 6.34

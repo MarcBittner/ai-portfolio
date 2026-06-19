@@ -1,0 +1,22 @@
+OFFICE SUPPLY CO.                                   INVOICE
+                                                    Invoice #: INV-IDEA-88231
+Bill To: IDEA Public Schools                        PO #: PO-IDEA-34CNPOF0625
+Procurement / CNP                                   Date: 2026-05-20  Terms: Net 30
+
+  Item Code      Description                                      Qty  Unit Price     Amount
+  ------------------------------------------------------------------------------------------
+  QRTS534        Markerboard aluminum trim whiteboard 3x4 ft       10      76.99      769.90
+  OFD699459      Correction tape white pack of 10                  20       4.99       99.80
+  BICGSM609AST   Ballpoint pen medium 1.0mm assorted, set of 60    50       5.66      283.00
+  OFD574929      Dividers insertable 1-sided 5-tab assorted       100       0.56       56.00
+  OFD444611      Masking tape 1in x 60yd                          100       5.08      508.00
+  OFD565308      Push pin 3/8in assorted colors box of 100         40       0.43       17.20
+  LOG920002478   Wired keyboard Logitech K120                      50      10.65      560.00
+  LOG910004790   Wireless mouse Logitech M720                      50      39.50    1,975.00
+  LOG910001439   Corded mouse Logitech B100                        50       6.95      347.50
+  DELLKM555      Silent keyboard and mouse Dell KM555              50      73.32    3,666.00
+  LOG920008219   Wireless keyboard and mouse combo Logitech MK850  50      79.53    3,976.50
+  TRPN201010BL   Cat6 RJ45 ethernet cable 10ft                     50       6.34      317.00
+  RESTOCK        Restocking fee (prior return)                      1     125.00      125.00
+  ------------------------------------------------------------------------------------------
+                                                            Total        12,700.80
