@@ -8,7 +8,9 @@ and the Convex function types.
 
 Companion documents: [`ARCHITECTURE.md`](./ARCHITECTURE.md) (system design) and
 [`DEPLOYMENT.md`](./DEPLOYMENT.md) (hosting and environment), and [`API.md`](./API.md) (the function API). This document covers
-runtime behavior — what executes, and in what order, during normal use.
+runtime behavior — what executes, and in what order, during normal use. For the same
+material organized by **what the product does** (each capability → its code → the
+section here), see [`FUNCTIONS.md`](./FUNCTIONS.md).
 
 **Design principle.** The language model only reads the invoice into structured
 data; deterministic code performs every calculation and flag decision. The sections
