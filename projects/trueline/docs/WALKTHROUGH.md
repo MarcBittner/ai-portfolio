@@ -1450,17 +1450,6 @@ Review  → reviewLine / correctLine (re-reconciles) → live update
 Prove   → runEval scores flag precision/recall on labeled data
 ```
 
-**Three common questions about the design, and where the answer lives:**
-1. *"How do you stop the LLM from inventing numbers?"* → `reconcile.ts:74`
-   recomputes math in code; the model's output is only ever *input* to deterministic
-   checks (Point 21).
-2. *"Actions aren't transactional — how don't you corrupt data on a re-run?"* →
-   `_id`-keyed, clear-then-reinsert in `insertReconciledLines`, all writes batched
-   into one `writeResults` mutation (Points 17, 20).
-3. *"How does a cloud app use a model on my laptop?"* → browser→host Ollama: the
-   cloud can't reach `localhost`, but the browser can; it posts structured lines via
-   `submitExtraction` (Point 16).
-
 **The one sentence:** the LLM reads, deterministic code decides, the database is
 multi-tenant and reactive, and every layer degrades gracefully to a working,
 testable, zero-cost fallback.
