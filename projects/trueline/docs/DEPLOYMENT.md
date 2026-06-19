@@ -8,7 +8,7 @@ lives in**, and how to stand the whole thing up from scratch. Pair with
 
 ## Contents
 
-- [1. Topology — three managed planes](#1-topology-three-managed-planes)
+- [1. Topology — three managed planes](#1-topology--three-managed-planes)
 - [2. Environment variable matrix (which var, which plane)](#2-environment-variable-matrix-which-var-which-plane)
 - [3. Stand it up from scratch](#3-stand-it-up-from-scratch)
 - [4. The browser→host Ollama path (live-demo "real model, free")](#4-the-browserhost-ollama-path-live-demo-real-model-free)

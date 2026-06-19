@@ -23,7 +23,7 @@ TypeScript.
 ## Contents
 
 - [Stack](#stack)
-- [Managed services — what each does, and why](#managed-services-what-each-does-and-why)
+- [Managed services — what each does, and why](#managed-services--what-each-does-and-why)
 - [Request lifecycle](#request-lifecycle)
 - [Persistence layer (`convex/schema.ts`)](#persistence-layer-convexschemats)
 - [API reference (Convex functions)](#api-reference-convex-functions)
@@ -31,7 +31,7 @@ TypeScript.
 - [Routing config (`convex/routing.ts`, UI `app/app/settings`)](#routing-config-convexroutingts-ui-appappsettings)
 - [Reconcile algorithm (`convex/lib/reconcile.ts`, pure)](#reconcile-algorithm-convexlibreconcilets-pure)
 - [Evals (`convex/evals.ts`)](#evals-convexevalsts)
-- [Auth & multi-tenancy](#auth-multi-tenancy)
+- [Auth & multi-tenancy](#auth--multi-tenancy)
 - [Code map](#code-map)
 - [Env (`.env.example`)](#env-envexample)
 - [Local dev](#local-dev)

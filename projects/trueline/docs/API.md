@@ -28,6 +28,16 @@ Source: [`convex/invoices.ts`](../convex/invoices.ts),
 
 ---
 
+## Contents
+
+- [Queries (reactive reads)](#queries-reactive-reads)
+- [Mutations (transactional writes)](#mutations-transactional-writes)
+- [Actions (external I/O)](#actions-external-io)
+- [Internal functions](#internal-functions)
+- [Local-model path](#local-model-path)
+
+---
+
 ## Queries (reactive reads)
 
 | Function | Arguments | Returns |

@@ -14,15 +14,15 @@ A complete, read-it-once reference for how trueline works end to end. Pair with
 ## Contents
 
 - [1. The thesis (why it's built this way)](#1-the-thesis-why-its-built-this-way)
-- [2. Stack & topology](#2-stack-topology)
+- [2. Stack & topology](#2-stack--topology)
 - [3. Data model ([`convex/schema.ts`](https://github.com/MarcBittner/ai-portfolio/blob/main/projects/trueline/convex/schema.ts))](#3-data-model-convexschemats)
-- [4. The request lifecycle (upload → recoverable $)](#4-the-request-lifecycle-upload-recoverable-)
+- [4. The request lifecycle (upload → recoverable $)](#4-the-request-lifecycle-upload--recoverable-)
 - [5. The deterministic core ([`convex/lib/reconcile.ts`](https://github.com/MarcBittner/ai-portfolio/blob/main/projects/trueline/convex/lib/reconcile.ts))](#5-the-deterministic-core-convexlibreconcilets)
 - [6. LLM routing ([`convex/lib/llm.ts`](https://github.com/MarcBittner/ai-portfolio/blob/main/projects/trueline/convex/lib/llm.ts))](#6-llm-routing-convexlibllmts)
-- [7. Multi-tenancy & auth](#7-multi-tenancy-auth)
+- [7. Multi-tenancy & auth](#7-multi-tenancy--auth)
 - [8. Realtime, idempotency, and the eval loop](#8-realtime-idempotency-and-the-eval-loop)
 - [9. App surface (`app/`)](#9-app-surface-app)
-- [10. Design decisions & tradeoffs](#10-design-decisions-tradeoffs)
+- [10. Design decisions & tradeoffs](#10-design-decisions--tradeoffs)
 - [11. Future development](#11-future-development)
 
 **Source map — jump to the code:**

@@ -5,6 +5,21 @@ shaped — grounded in the code, but above the line-level depth of
 [`WALKTHROUGH.md`](./WALKTHROUGH.md). For system design see
 [`ARCHITECTURE.md`](./ARCHITECTURE.md); for hosting see [`DEPLOYMENT.md`](./DEPLOYMENT.md); for the function API see [`API.md`](./API.md).
 
+---
+
+## Contents
+
+- [The problem](#the-problem)
+- [The core principle](#the-core-principle)
+- [The three planes](#the-three-planes)
+- [Convex function types (how the split is enforced at runtime)](#convex-function-types-how-the-split-is-enforced-at-runtime)
+- [How it works, end to end](#how-it-works-end-to-end)
+- [The data model](#the-data-model)
+- [Design decisions worth noting](#design-decisions-worth-noting)
+- [Key properties](#key-properties)
+- [Code map](#code-map)
+- [Stack](#stack)
+
 ## The problem
 
 Vendors are paid against a contract — a purchase order that fixes the agreed unit
