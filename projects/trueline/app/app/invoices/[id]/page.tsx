@@ -6,7 +6,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { Nav } from "@/app/components/nav";
-import { FlagBadge, StatusBadge, usd } from "@/app/components/ui";
+import { Button, FlagBadge, StatusBadge, usd } from "@/app/components/ui";
 
 export default function InvoiceReview() {
   const params = useParams();
@@ -95,18 +95,12 @@ export default function InvoiceReview() {
             <div className="text-xs text-[--color-muted]">recoverable</div>
             <div className="font-semibold text-[--color-bad]">{usd(recoverable)}</div>
           </div>
-          <button
-            onClick={() => setStatus({ invoiceId, status: "approved" })}
-            className="cursor-pointer rounded-md bg-[--color-ok]/20 px-3 py-1.5 text-sm font-medium text-[--color-ok] transition-all duration-150 hover:bg-[--color-ok]/30 active:scale-[0.97]"
-          >
+          <Button variant="ok" onClick={() => setStatus({ invoiceId, status: "approved" })}>
             Approve invoice
-          </button>
-          <button
-            onClick={() => setStatus({ invoiceId, status: "rejected" })}
-            className="cursor-pointer rounded-md bg-[--color-bad]/20 px-3 py-1.5 text-sm font-medium text-[--color-bad] transition-all duration-150 hover:bg-[--color-bad]/30 active:scale-[0.97]"
-          >
+          </Button>
+          <Button variant="danger" onClick={() => setStatus({ invoiceId, status: "rejected" })}>
             Reject
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -273,7 +267,7 @@ export default function InvoiceReview() {
 // Decision buttons: a static base class (Tailwind needs static strings) plus an
 // inline style so the *active* decision is filled in its tone via CSS vars.
 const DEC_BTN =
-  "rounded-md border px-2.5 py-1 text-left text-xs cursor-pointer transition-all duration-150 hover:opacity-90 hover:brightness-110 active:scale-[0.97]";
+  "rounded-md border px-2.5 py-1 text-left text-xs cursor-pointer transition-all duration-150 hover:-translate-y-px hover:brightness-110 hover:shadow-sm active:translate-y-0 active:scale-95";
 
 function decStyle(active: boolean, v: string) {
   return active
