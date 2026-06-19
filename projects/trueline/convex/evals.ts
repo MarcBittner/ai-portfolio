@@ -1,3 +1,4 @@
+import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { scoreBenchmark } from "./lib/benchmark";
 
@@ -18,26 +19,30 @@ async function requireOrg(ctx: { auth: { getUserIdentity: () => Promise<unknown>
 }
 
 export const runEval = mutation({
-  args: {},
-  handler: async (ctx) => {
+  // force: a manual re-run always records a row (so the user can build a history);
+  // auto-runs on app load omit it and dedupe, so navigation doesn't spam identical rows.
+  args: { force: v.optional(v.boolean()) },
+  handler: async (ctx, { force }) => {
     const { orgId, who } = await requireOrg(ctx);
     const m = scoreBenchmark(); // pure; no invoice reads
 
-    // The benchmark is deterministic and this is auto-run on every app load, so
-    // skip appending an identical run — keep the history meaningful.
-    const latest = await ctx.db
-      .query("evalRuns")
-      .withIndex("by_org", (q) => q.eq("orgId", orgId))
-      .order("desc")
-      .first();
-    if (
-      latest &&
-      latest.n === m.n &&
-      latest.extractionAccuracy === m.extractionAccuracy &&
-      latest.flagPrecision === m.flagPrecision &&
-      latest.flagRecall === m.flagRecall
-    ) {
-      return latest;
+    // The benchmark is deterministic, so an auto-run on every app load would append
+    // identical rows. Skip an identical run UNLESS the user explicitly re-ran it.
+    if (!force) {
+      const latest = await ctx.db
+        .query("evalRuns")
+        .withIndex("by_org", (q) => q.eq("orgId", orgId))
+        .order("desc")
+        .first();
+      if (
+        latest &&
+        latest.n === m.n &&
+        latest.extractionAccuracy === m.extractionAccuracy &&
+        latest.flagPrecision === m.flagPrecision &&
+        latest.flagRecall === m.flagRecall
+      ) {
+        return latest;
+      }
     }
 
     const id = await ctx.db.insert("evalRuns", {

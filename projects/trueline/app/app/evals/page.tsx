@@ -20,7 +20,7 @@ export default function Evals() {
   useEffect(() => {
     if (!ranEval.current && isAuthenticated) {
       ranEval.current = true;
-      void runEval().catch(() => {});
+      void runEval({}).catch(() => {});
     }
   }, [isAuthenticated, runEval]);
 
@@ -56,7 +56,7 @@ export default function Evals() {
           onClick={async () => {
             setBusy(true);
             try {
-              await runEval();
+              await runEval({ force: true });
             } finally {
               setBusy(false);
             }

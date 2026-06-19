@@ -190,7 +190,7 @@ export default function Dashboard() {
   useEffect(() => {
     if (!ranEval.current && isAuthenticated) {
       ranEval.current = true;
-      void runEval().catch(() => {});
+      void runEval({}).catch(() => {});
     }
   }, [isAuthenticated, runEval]);
 
@@ -477,7 +477,7 @@ export default function Dashboard() {
                   invoices. It runs automatically; full results live on the Evals page.
                 </p>
                 <div className="flex gap-2">
-                  <Button variant="secondary" className="flex-1 px-3 py-1.5" onClick={() => runEval()}>
+                  <Button variant="secondary" className="flex-1 px-3 py-1.5" onClick={() => runEval({ force: true })}>
                     Re-run
                   </Button>
                   <Link href="/app/evals" className={buttonCls("secondary", "flex-1 px-3 py-1.5")}>
