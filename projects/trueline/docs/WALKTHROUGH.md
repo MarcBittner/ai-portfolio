@@ -2,12 +2,12 @@
 
 A file-by-file walkthrough of the trueline application, ordered by execution flow.
 Each numbered Point covers one file or concept with a code excerpt, numbered notes,
-and a summary line. Concept boxes (📚) define framework concepts where they first
+and a summary line. Concept boxes define framework concepts where they first
 apply: server vs. client components, hydration, JWT verification, variable scope,
 and the Convex function types.
 
 Companion documents: [`ARCHITECTURE.md`](./ARCHITECTURE.md) (system design) and
-[`DEPLOYMENT.md`](./DEPLOYMENT.md) (hosting and environment). This document covers
+[`DEPLOYMENT.md`](./DEPLOYMENT.md) (hosting and environment), and [`API.md`](./API.md) (the function API). This document covers
 runtime behavior — what executes, and in what order, during normal use.
 
 **Design principle.** The language model only reads the invoice into structured
@@ -31,16 +31,16 @@ fallback.
 
 **How is the LLM prevented from inventing numbers?** It only extracts;
 [`reconcile.ts`](../convex/lib/reconcile.ts) recomputes every total in code, so the
-model's output is only ever *input* to deterministic checks (Point 21).
+model's output is only ever *input* to deterministic checks ([§21](#21-the-trust-critical-core-reconcileline)).
 
 **Actions aren't transactional — how is data not corrupted when one re-runs?** The
 write is keyed on the invoice `_id`, and `insertReconciledLines` clears existing
 lines before re-inserting, with all writes batched into one `writeResults` mutation
-(Points 17, 20).
+([§17](#17-branch-b-the-server-action-extractrun), [§20](#20-reconcile--write-writeresults--insertreconciledlines)).
 
 **How does a cloud-hosted app use a model running on a local machine?** Browser→host
 Ollama: the cloud backend can't reach `localhost`, but the browser can — it extracts
-locally and posts the structured lines via `submitExtraction` (Point 16).
+locally and posts the structured lines via `submitExtraction` ([§16](#16-branch-a-browserhost-ollama)).
 
 ---
 
@@ -92,59 +92,59 @@ locally and posts the structured lines via `submitExtraction` (Point 16).
 ## Contents
 
 **Part 1 — The framework skeleton (how Next.js boots a request)**
-- [Point 1 — How files become URLs (the App Router)](#point-1--how-files-become-urls-the-app-router)
-- [Point 2 — `middleware.ts` runs before every request](#point-2--middlewarets-runs-before-every-request)
-- [Point 3 — `app/layout.tsx`, the shell that wraps every page](#point-3--applayouttsx-the-shell-that-wraps-every-page)
-- [📚 Concept — Hydration, and the hydration mismatch](#-concept--hydration-and-the-hydration-mismatch)
-- [Point 4 — `app/providers.tsx`, the client boundary + live connections](#point-4--appproviderstsx-the-client-boundary--live-connections)
-- [📚 Concept — Module scope vs component scope](#-concept--module-scope-vs-component-scope)
-- [📚 Concept — Server Components vs Client Components](#-concept--server-components-vs-client-components)
-- [Point 5 — `app/page.tsx`, the landing page (a Server Component)](#point-5--apppagetsx-the-landing-page-a-server-component)
+- [1. How files become URLs (the App Router)](#1-how-files-become-urls-the-app-router)
+- [2. `middleware.ts` runs before every request](#2-middlewarets-runs-before-every-request)
+- [3. `app/layout.tsx`, the shell that wraps every page](#3-applayouttsx-the-shell-that-wraps-every-page)
+- [Concept — Hydration, and the hydration mismatch](#concept--hydration-and-the-hydration-mismatch)
+- [4. `app/providers.tsx`, the client boundary + live connections](#4-appproviderstsx-the-client-boundary--live-connections)
+- [Concept — Module scope vs component scope](#concept--module-scope-vs-component-scope)
+- [Concept — Server Components vs Client Components](#concept--server-components-vs-client-components)
+- [5. `app/page.tsx`, the landing page (a Server Component)](#5-apppagetsx-the-landing-page-a-server-component)
 
 **Part 2 — Identity (signing in)**
-- [Point 6 — Clicking "Sign in": the Clerk flow](#point-6--clicking-sign-in-the-clerk-flow)
-- [📚 Concept — How a JWT works](#-concept--how-a-jwt-works)
-- [Point 7 — `auth.config.ts`: how Convex decides to trust the JWT](#point-7--authconfigts-how-convex-decides-to-trust-the-jwt)
+- [6. Clicking "Sign in": the Clerk flow](#6-clicking-sign-in-the-clerk-flow)
+- [Concept — How a JWT works](#concept--how-a-jwt-works)
+- [7. `auth.config.ts`: how Convex decides to trust the JWT](#7-authconfigts-how-convex-decides-to-trust-the-jwt)
 
 **Part 3 — Landing in the workspace + the data model**
-- [Point 8 — `/app` mounts and fires live queries](#point-8--app-mounts-and-fires-live-queries)
-- [📚 Concept — Convex query / mutation / action](#-concept--convex-query--mutation--action)
-- [Point 9 — The backend reads: `optionalOrg`, `requireOrg`, multi-tenancy](#point-9--the-backend-reads-optionalorg-requireorg-multi-tenancy)
-- [Point 10 — Seeding an empty account (`seedIfEmpty`)](#point-10--seeding-an-empty-account-seedifempty)
-- [Point 11 — The data model (`schema.ts`) — the read/decide split, in tables](#point-11--the-data-model-schemats--the-readdecide-split-in-tables)
+- [8. `/app` mounts and fires live queries](#8-app-mounts-and-fires-live-queries)
+- [Concept — Convex query / mutation / action](#concept--convex-query--mutation--action)
+- [9. The backend reads: `optionalOrg`, `requireOrg`, multi-tenancy](#9-the-backend-reads-optionalorg-requireorg-multi-tenancy)
+- [10. Seeding an empty account (`seedIfEmpty`)](#10-seeding-an-empty-account-seedifempty)
+- [11. The data model (`schema.ts`) — the read/decide split, in tables](#11-the-data-model-schemats--the-readdecide-split-in-tables)
 
 **Part 4 — The core codepath: upload → verdict**
-- [Point 12 — The guided stepper UI](#point-12--the-guided-stepper-ui)
-- [Point 13 — Uploading a file (the browser side)](#point-13--uploading-a-file-the-browser-side)
-- [Point 14 — `uploadInvoice` decides which route extraction takes](#point-14--uploadinvoice-decides-which-route-extraction-takes)
-- [Point 15 — `createInvoiceFromText` mutation (one transaction)](#point-15--createinvoicefromtext-mutation-one-transaction)
-- [Point 16 — Branch A: browser→host Ollama](#point-16--branch-a-browserhost-ollama)
-- [Point 17 — Branch B: the server action (`extract.run`)](#point-17--branch-b-the-server-action-extractrun)
-- [Point 18 — Provider routing (`llm.ts` → `extractLineItems`)](#point-18--provider-routing-llmts--extractlineitems)
-- [Point 19 — Parsing messy model output (`parse.ts`, coerce, loose JSON)](#point-19--parsing-messy-model-output-parsets-coerce-loose-json)
-- [Point 20 — Reconcile + write (`writeResults` → `insertReconciledLines`)](#point-20--reconcile--write-writeresults--insertreconciledlines)
-- [Point 21 — The trust-critical core (`reconcileLine`)](#point-21--the-trust-critical-core-reconcileline)
-- [Point 22 — The verdict pushes back to the UI (reactivity)](#point-22--the-verdict-pushes-back-to-the-ui-reactivity)
+- [12. The guided stepper UI](#12-the-guided-stepper-ui)
+- [13. Uploading a file (the browser side)](#13-uploading-a-file-the-browser-side)
+- [14. `uploadInvoice` decides which route extraction takes](#14-uploadinvoice-decides-which-route-extraction-takes)
+- [15. `createInvoiceFromText` mutation (one transaction)](#15-createinvoicefromtext-mutation-one-transaction)
+- [16. Branch A: browser→host Ollama](#16-branch-a-browserhost-ollama)
+- [17. Branch B: the server action (`extract.run`)](#17-branch-b-the-server-action-extractrun)
+- [18. Provider routing (`llm.ts` → `extractLineItems`)](#18-provider-routing-llmts--extractlineitems)
+- [19. Parsing messy model output (`parse.ts`, coerce, loose JSON)](#19-parsing-messy-model-output-parsets-coerce-loose-json)
+- [20. Reconcile + write (`writeResults` → `insertReconciledLines`)](#20-reconcile--write-writeresults--insertreconciledlines)
+- [21. The trust-critical core (`reconcileLine`)](#21-the-trust-critical-core-reconcileline)
+- [22. The verdict pushes back to the UI (reactivity)](#22-the-verdict-pushes-back-to-the-ui-reactivity)
 
 **Part 5 — Human review, configuration, evaluation**
-- [Point 23 — The invoice detail / review page](#point-23--the-invoice-detail--review-page)
-- [Point 24 — `reviewLine` and `correctLine` (an edit re-reconciles)](#point-24--reviewline-and-correctline-an-edit-re-reconciles)
-- [Point 25 — Routing config (Settings page + `routing.ts`)](#point-25--routing-config-settings-page--routingts)
-- [Point 26 — Diagnostics (traces, event log, model benchmark)](#point-26--diagnostics-traces-event-log-model-benchmark)
-- [Point 27 — Evals (the CI gate, `evals.ts`)](#point-27--evals-the-ci-gate-evalsts)
+- [23. The invoice detail / review page](#23-the-invoice-detail--review-page)
+- [24. `reviewLine` and `correctLine` (an edit re-reconciles)](#24-reviewline-and-correctline-an-edit-re-reconciles)
+- [25. Routing config (Settings page + `routing.ts`)](#25-routing-config-settings-page--routingts)
+- [26. Diagnostics (traces, event log, model benchmark)](#26-diagnostics-traces-event-log-model-benchmark)
+- [27. Evals (the CI gate, `evals.ts`)](#27-evals-the-ci-gate-evalsts)
 
 **Part 6 — The shared pieces + the big picture**
-- [Point 28 — Shared UI (`ui.tsx`, `nav.tsx`)](#point-28--shared-ui-uitsx-navtsx)
-- [Point 29 — Build & deploy: the three planes](#point-29--build--deploy-the-three-planes)
-- [Point 30 — The whole machine, end to end](#point-30--the-whole-machine-end-to-end)
+- [28. Shared UI (`ui.tsx`, `nav.tsx`)](#28-shared-ui-uitsx-navtsx)
+- [29. Build & deploy: the three planes](#29-build--deploy-the-three-planes)
+- [30. The whole machine, end to end](#30-the-whole-machine-end-to-end)
 
 ---
 
 # Part 1 — The framework skeleton
 
-## Point 1 — How files become URLs (the App Router)
+## 1. How files become URLs (the App Router)
 
-📄 **Files:** the [`app/`](../app) directory tree · [`middleware.ts`](../middleware.ts) · [`app/providers.tsx`](../app/providers.tsx)
+**Files:** the [`app/`](../app) directory tree · [`middleware.ts`](../middleware.ts) · [`app/providers.tsx`](../app/providers.tsx)
 
 trueline uses the Next.js **App Router** (the `app/` directory). The precise rule:
 the URL path is the **chain of folder names** from `app/` down, and the leaf folder
@@ -187,32 +187,32 @@ Next (file-based):  app/invoices/[id]/page.tsx           ← the directory tree 
    | File in a folder | Meaning |
    |---|---|
    | `page.tsx` | the page rendered at this path |
-   | `layout.tsx` | a shell wrapping this folder + everything under it (Point 3) |
+   | `layout.tsx` | a shell wrapping this folder + everything under it ([§3](#3-applayouttsx-the-shell-that-wraps-every-page)) |
    | `loading.tsx` | shown while the page loads |
    | `error.tsx` | shown if the page throws |
    | `route.ts` | an API endpoint instead of a page |
 
 2. **`[id]` (brackets) = a *dynamic* segment** — the folder matches any value and
-   captures it as a param (`useParams().id`, Point 23). One file
+   captures it as a param (`useParams().id`, [§23](#23-the-invoice-detail--review-page)). One file
    (`invoices/[id]/page.tsx`) serves `/app/invoices/abc`, `/app/invoices/xyz`, etc.
 3. **`(group)` (parens) = organizational, not part of the URL** — a folder named
    `(marketing)` groups files without adding a path segment. (trueline doesn't use
-   these, but you'll see them in larger apps.)
+   these, but they appear in larger apps.)
 4. **`app/layout.tsx`** is the root shell — same convention, the `layout.tsx`
-   reserved name (Point 3). It renders once and persists across navigation.
+   reserved name ([§3](#3-applayouttsx-the-shell-that-wraps-every-page)). It renders once and persists across navigation.
 5. Two non-page files matter too: **`middleware.ts`** (repo root) runs before any
-   route (Point 2), and **`app/providers.tsx`** sets up Clerk + Convex (Point 4).
+   route ([§2](#2-middlewarets-runs-before-every-request)), and **`app/providers.tsx`** sets up Clerk + Convex ([§4](#4-appproviderstsx-the-client-boundary--live-connections)).
 
-> 🧠 **Mental model:** the directory tree *is* the route configuration — folders are
+> **Summary:** the directory tree *is* the route configuration — folders are
 > URL segments, `page.tsx` makes a segment renderable, brackets make it dynamic, and
 > Next compiles all of that into the router at build time so you never write route
 > declarations yourself.
 
 ---
 
-## Point 2 — `middleware.ts` runs before every request
+## 2. `middleware.ts` runs before every request
 
-📄 **File:** [`middleware.ts`](../middleware.ts)
+**File:** [`middleware.ts`](../middleware.ts)
 
 The **first code that executes** for any request — before any page renders. Next
 runs it at the edge on every request matching its `config.matcher`.
@@ -241,15 +241,15 @@ export const config = {
    internals (`_next`) and static files (`.*\\..*`), so it only fires on real
    navigations and API routes.
 
-> 🧠 **Mental model:** middleware = the bouncer at the door. Public pages pass;
+> **Summary:** middleware = the bouncer at the door. Public pages pass;
 > anything under `/app` must show a valid session or get bounced. Runs *before*
 > React renders anything.
 
 ---
 
-## Point 3 — `app/layout.tsx`, the shell that wraps every page
+## 3. `app/layout.tsx`, the shell that wraps every page
 
-📄 **File:** [`app/layout.tsx`](../app/layout.tsx)
+**File:** [`app/layout.tsx`](../app/layout.tsx)
 
 Every page renders *inside* the root layout.
 
@@ -289,13 +289,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
    DOM differ on that one attribute. This tells React "that mismatch is intentional."
 5. **`export const metadata`** is how the App Router sets `<title>`/`<meta>`.
 
-> 🧠 **Mental model:** the layout is the picture frame; pages are pictures swapped
+> **Summary:** the layout is the picture frame; pages are pictures swapped
 > into it. It renders on the server, owns the document, and persists across
 > navigation.
 
 ---
 
-## 📚 Concept — Hydration, and the hydration mismatch
+## Concept — Hydration, and the hydration mismatch
 
 **Hydration** is the step where, after the browser downloads the React JS bundle,
 React runs your components *again in the browser* and attaches itself to the
@@ -317,15 +317,15 @@ no `localStorage`), then `THEME_BOOTSTRAP` *mutates* it to `<html class="light">
 before React hydrates → React sees a difference → we silence that one element with
 `suppressHydrationWarning`. It's a deliberate, scoped suppression, not a blanket one.
 
-> 🧠 **One-liner:** hydration = the browser bringing the server's static HTML to
+> **In brief:** hydration = the browser bringing the server's static HTML to
 > life; a hydration error = the live version didn't match the static one, usually
 > because something changed before React got there.
 
 ---
 
-## Point 4 — `app/providers.tsx`, the client boundary + live connections
+## 4. `app/providers.tsx`, the client boundary + live connections
 
-📄 **File:** [`app/providers.tsx`](../app/providers.tsx)
+**File:** [`app/providers.tsx`](../app/providers.tsx)
 
 Where the app stops being server-only HTML and gains its live brain.
 
@@ -367,13 +367,13 @@ export function Providers({ children }: { children: React.ReactNode }) {
    `{children}` (your pages) render inside both, so any page's `useQuery` is
    automatically authenticated.
 
-> 🧠 **Mental model:** Providers is where the app plugs in — one persistent socket to
+> **Summary:** Providers is where the app plugs in — one persistent socket to
 > the DB (Convex), one identity provider (Clerk), wired so every data call carries
 > your identity automatically.
 
 ---
 
-## 📚 Concept — Module scope vs component scope
+## Concept — Module scope vs component scope
 
 **Scope** = where code lives, which decides *when* it runs.
 
@@ -398,13 +398,13 @@ client (new WebSocket) on every render — a reconnect storm that drops every li
 subscription. Putting it at module scope makes it a **singleton**: one stable
 connection. The test: *"once, or every render?"* Once → module scope.
 
-> 🧠 **One-liner:** module scope = the file's setup that runs once; component scope =
+> **In brief:** module scope = the file's setup that runs once; component scope =
 > the function's work that runs every render. Long-lived things (a DB connection)
 > belong at module scope.
 
 ---
 
-## 📚 Concept — Server Components vs Client Components
+## Concept — Server Components vs Client Components
 
 The biggest App Router idea: **where does this component's code run?**
 
@@ -434,15 +434,15 @@ app/layout.tsx          ← Server Component (no JS shipped)
        └─ your pages        ← Client Components (hooks, live data, clicks)
 ```
 
-> 🧠 **One-liner:** Server Component = compute once on the server, send dead HTML,
+> **In brief:** Server Component = compute once on the server, send dead HTML,
 > ship no JS. Client Component = send HTML *and* JS, then bring it to life in the
 > browser. Default to server; opt into client only where you need interactivity.
 
 ---
 
-## Point 5 — `app/page.tsx`, the landing page (a Server Component)
+## 5. `app/page.tsx`, the landing page (a Server Component)
 
-📄 **File:** [`app/page.tsx`](../app/page.tsx)
+**File:** [`app/page.tsx`](../app/page.tsx)
 
 The page at `/`. No `"use client"` → all of this runs on the server and ships as HTML.
 
@@ -477,7 +477,7 @@ const STACK = [
 4. The footer + sign-in note carry the honest **"Synthetic, fictional data only"**
    disclaimer.
 
-> 🧠 **Mental model:** the landing is a static brochure rendered entirely on the
+> **Summary:** the landing is a static brochure rendered entirely on the
 > server — describing the pipeline and stack, with exactly one interactive control
 > (sign in / open workspace), chosen by the session the middleware already resolved.
 
@@ -485,9 +485,9 @@ const STACK = [
 
 # Part 2 — Identity
 
-## Point 6 — Clicking "Sign in": the Clerk flow
+## 6. Clicking "Sign in": the Clerk flow
 
-📄 **File:** [`app/page.tsx`](../app/page.tsx) (the `SignInButton`); the sign-in UI itself is Clerk-hosted
+**File:** [`app/page.tsx`](../app/page.tsx) (the `SignInButton`); the sign-in UI itself is Clerk-hosted
 
 ```tsx
 <SignInButton mode="modal">
@@ -507,17 +507,17 @@ const STACK = [
      `/app`);
    - a **Convex JWT** → a separate token Clerk mints on demand from the "convex"
      template, which *Convex* verifies. (`ConvexProviderWithClerk` was wired in
-     Point 4 precisely to fetch and attach it.)
+     [§4](#4-appproviderstsx-the-client-boundary--live-connections) precisely to fetch and attach it.)
 5. **Click "Open workspace"** → `<Link href="/app">` → the protected matcher applies,
    sees the valid session, lets you through.
 
-> 🧠 **Mental model:** signing in mints your identity in two forms — a cookie for
+> **Summary:** signing in mints your identity in two forms — a cookie for
 > Next/middleware (gets you past the door) and a JWT for Convex (authenticates and
 > tenant-scopes your data requests).
 
 ---
 
-## 📚 Concept — How a JWT works
+## Concept — How a JWT works
 
 **JWT (JSON Web Token)** is a small, self-contained string proving "this request is
 from an authenticated user with these properties," verifiable **without calling back
@@ -547,14 +547,14 @@ In trueline: sign in → Clerk mints+signs a JWT (with `sub`, `org_id`, `iss`, `
 hands the verified claims to the function, which reads `org_id` to scope the query.
 `exp` keeps tokens short-lived; Clerk silently mints fresh ones.
 
-> 🧠 **One-liner:** a JWT is a signed, self-verifying ID card; Clerk issues+signs it,
+> **In brief:** a JWT is a signed, self-verifying ID card; Clerk issues+signs it,
 > Convex checks the signature and reads `org_id` from it — no per-request callback.
 
 ---
 
-## Point 7 — `auth.config.ts`: how Convex decides to trust the JWT
+## 7. `auth.config.ts`: how Convex decides to trust the JWT
 
-📄 **File:** [`convex/auth.config.ts`](../convex/auth.config.ts)
+**File:** [`convex/auth.config.ts`](../convex/auth.config.ts)
 
 ```ts
 export default {
@@ -575,16 +575,16 @@ export default {
 3. `CLERK_JWT_ISSUER_DOMAIN` lives on the **Convex** deployment (server-side), set via
    `npx convex env set` — see `DEPLOYMENT.md`.
 
-> 🧠 **Mental model:** `auth.config.ts` is the one-line bridge that tells Convex
+> **Summary:** `auth.config.ts` is the one-line bridge that tells Convex
 > whose signatures to trust. Without it, every authenticated call would be rejected.
 
 ---
 
 # Part 3 — Landing in the workspace + the data model
 
-## Point 8 — `/app` mounts and fires live queries
+## 8. `/app` mounts and fires live queries
 
-📄 **File:** [`app/app/page.tsx`](../app/app/page.tsx) (top of `Dashboard`)
+**File:** [`app/app/page.tsx`](../app/app/page.tsx) (top of `Dashboard`)
 
 `app/app/page.tsx` (a Client Component). After hydration, the top of `Dashboard`:
 
@@ -620,13 +620,13 @@ export default function Dashboard() {
    Convex auths *and* the first queries resolve, show "connecting…" instead of a
    half-built UI — this hides the JWT-propagation gap from #1.
 
-> 🧠 **Mental model:** mounting the dashboard opens several live subscriptions at
+> **Summary:** mounting the dashboard opens several live subscriptions at
 > once. `useQuery` = "read and keep me updated forever"; `useMutation` = "give me a
 > function to change data later."
 
 ---
 
-## 📚 Concept — Convex query / mutation / action
+## Concept — Convex query / mutation / action
 
 Three backend function types, each with a strict contract. This split *is* the
 architecture.
@@ -647,15 +647,15 @@ architecture.
   auto-retried, has no `ctx.db`. Reads/writes by calling queries/mutations.
   (`extract.run`, `diagnostics.benchmark`.)
 
-> 🧠 **The architectural rule:** the external, fallible, non-transactional step (the
+> **The architectural rule:** the external, fallible, non-transactional step (the
 > LLM read) is quarantined in an **action**; every decision touching money is a pure
 > function called inside a transactional **mutation**.
 
 ---
 
-## Point 9 — The backend reads: `optionalOrg`, `requireOrg`, multi-tenancy
+## 9. The backend reads: `optionalOrg`, `requireOrg`, multi-tenancy
 
-📄 **File:** [`convex/invoices.ts`](../convex/invoices.ts)
+**File:** [`convex/invoices.ts`](../convex/invoices.ts)
 
 How a query authenticates and isolates tenants (`convex/invoices.ts`):
 
@@ -699,15 +699,15 @@ export const listInvoices = query({
    the tenant index — so one tenant **physically cannot** read another's rows. The
    isolation is enforced at the index, not in ad-hoc app logic.
 
-> 🧠 **Mental model:** every read scopes to your `orgId` via an index; reads fail
+> **Summary:** every read scopes to your `orgId` via an index; reads fail
 > soft (empty), writes fail loud (throw). Multi-tenancy is a `withIndex` invariant,
 > not a convention.
 
 ---
 
-## Point 10 — Seeding an empty account (`seedIfEmpty`)
+## 10. Seeding an empty account (`seedIfEmpty`)
 
-📄 **Files:** [`convex/invoices.ts`](../convex/invoices.ts) (`seedIfEmpty`) · [`convex/lib/demoData.ts`](../convex/lib/demoData.ts)
+**Files:** [`convex/invoices.ts`](../convex/invoices.ts) (`seedIfEmpty`) · [`convex/lib/demoData.ts`](../convex/lib/demoData.ts)
 
 First sign-in has no data. The dashboard offers "skip the walkthrough and load
 everything," which calls:
@@ -738,20 +738,20 @@ export const seedIfEmpty = mutation({
 2. Inserts the demo **PO** (`DEMO_PO_LINES`), the **catalog** (`DEMO_CATALOG`), and
    three **invoices** from `convex/lib/demoData.ts` — one clean (`INV-1009`), one
    padded (`INV-1010`), one with errors (`INV-1011`).
-3. **Reconciles each invoice at seed time** via `insertReconciledLines` (Point 20),
+3. **Reconciles each invoice at seed time** via `insertReconciledLines` ([§20](#20-reconcile--write-writeresults--insertreconciledlines)),
    so flags + recoverable totals exist the instant the dashboard loads.
 4. All of this is **one transaction** (it's a mutation) — the seeded world is
    all-or-nothing.
 
-> 🧠 **Mental model:** seeding builds a believable demo tenant atomically, reusing
+> **Summary:** seeding builds a believable demo tenant atomically, reusing
 > the exact same reconcile path a real upload uses — so the seeded data and live
 > uploads are computed identically.
 
 ---
 
-## Point 11 — The data model (`schema.ts`) — the read/decide split, in tables
+## 11. The data model (`schema.ts`) — the read/decide split, in tables
 
-📄 **File:** [`convex/schema.ts`](../convex/schema.ts)
+**File:** [`convex/schema.ts`](../convex/schema.ts)
 
 `convex/schema.ts` defines the tables. Two hold the **baselines** an invoice is judged
 against; the interesting one is `invoiceLines`.
@@ -792,16 +792,16 @@ invoiceLines: defineTable({
    event log), **`settings`** (per-tenant routing mode/model), **`evalRuns`** (scored
    precision/recall history).
 
-> 🧠 **Mental model:** the table layout *is* the trust boundary — model-read fields
+> **Summary:** the table layout *is* the trust boundary — model-read fields
 > and code-decided fields are separated on disk, not just in prose.
 
 ---
 
 # Part 4 — The core codepath: upload → verdict
 
-## Point 12 — The guided stepper UI
+## 12. The guided stepper UI
 
-📄 **File:** [`app/app/page.tsx`](../app/app/page.tsx) (`Stepper`)
+**File:** [`app/app/page.tsx`](../app/app/page.tsx) (`Stepper`)
 
 The dashboard is a 4-step wizard (`app/app/page.tsx`):
 
@@ -818,17 +818,17 @@ const step  = !hasPo ? (nInv === 0 ? 1 : 4) : nInv === 0 ? 3 : 4;
 2. The `<Stepper>` component (`:107`) renders the four pills (Download → Upload
    contract → Upload invoice → Review) with done/now/todo styling.
 3. Step 1 also offers **"skip the walkthrough and load everything"** → `seedIfEmpty`
-   (Point 10). Step 2 uploads a contract → `setBaselineFromText` (parses pipe text
+   ([§10](#10-seeding-an-empty-account-seedifempty)). Step 2 uploads a contract → `setBaselineFromText` (parses pipe text
    into PO lines, makes it the baseline, seeds the catalog if absent).
 
-> 🧠 **Mental model:** the wizard step is a pure function of the data — there's no
+> **Summary:** the wizard step is a pure function of the data — there's no
 > separate "where am I" state to get out of sync.
 
 ---
 
-## Point 13 — Uploading a file (the browser side)
+## 13. Uploading a file (the browser side)
 
-📄 **File:** [`app/app/page.tsx`](../app/app/page.tsx) (`UploadButton`)
+**File:** [`app/app/page.tsx`](../app/app/page.tsx) (`UploadButton`)
 
 ```tsx
 function UploadButton({ label, onText, primary, multiple }) {
@@ -853,15 +853,15 @@ function UploadButton({ label, onText, primary, multiple }) {
 3. **`e.target.value = ""`** resets the input so picking the *same* file again still
    fires `onChange`.
 
-> 🧠 **Mental model:** the file never goes to a server as a file — its text is read
+> **Summary:** the file never goes to a server as a file — its text is read
 > in the browser and handed to a handler. (For this demo the "documents" are pipe-
 > delimited text; a production version would add PDF/image OCR upstream.)
 
 ---
 
-## Point 14 — `uploadInvoice` decides which route extraction takes
+## 14. `uploadInvoice` decides which route extraction takes
 
-📄 **File:** [`app/app/page.tsx`](../app/app/page.tsx) (`uploadInvoice`)
+**File:** [`app/app/page.tsx`](../app/app/page.tsx) (`uploadInvoice`)
 
 ```tsx
 async function uploadInvoice(text: string, filename: string) {
@@ -886,15 +886,15 @@ async function uploadInvoice(text: string, filename: string) {
    the fork: if true, the browser will try local Ollama first; if false, the server
    action handles everything.
 
-> 🧠 **Mental model:** the client decides *who reads the document* — your own machine
+> **Summary:** the client decides *who reads the document* — your own machine
 > (private, free) or the cloud — based on the routing mode, and signals that to the
 > backend with `deferServer`.
 
 ---
 
-## Point 15 — `createInvoiceFromText` mutation (one transaction)
+## 15. `createInvoiceFromText` mutation (one transaction)
 
-📄 **File:** [`convex/invoices.ts`](../convex/invoices.ts) (`createInvoiceFromText`)
+**File:** [`convex/invoices.ts`](../convex/invoices.ts) (`createInvoiceFromText`)
 
 ```ts
 export const createInvoiceFromText = mutation({
@@ -926,17 +926,17 @@ export const createInvoiceFromText = mutation({
    push** the new "extracting" row to every client of this tenant. The UI updates
    with zero polling.
 
-> 🧠 **Mental model:** the upload first records an "extracting" invoice atomically,
+> **Summary:** the upload first records an "extracting" invoice atomically,
 > then either hands off to the browser (defer) or schedules the cloud action — and
 > the live queries reflect it immediately.
 
 ---
 
-## Point 16 — Branch A: browser→host Ollama
+## 16. Branch A: browser→host Ollama
 
-📄 **Files:** [`app/app/page.tsx`](../app/app/page.tsx) (`uploadInvoice`) · [`app/lib/ollama.ts`](../app/lib/ollama.ts)
+**Files:** [`app/app/page.tsx`](../app/app/page.tsx) (`uploadInvoice`) · [`app/lib/ollama.ts`](../app/lib/ollama.ts)
 
-The slickest trick in the app. Continuing `uploadInvoice` (`tryLocal` was true):
+The most distinctive mechanism in the app. Continuing `uploadInvoice` (`tryLocal` was true):
 
 ```tsx
 try {
@@ -962,19 +962,19 @@ await scheduleExtract({ invoiceId });            // fallback: hand to the server
 3. **`extractWithOllama`** POSTs to `/api/chat` with `format: "json"` and the
    read-only system prompt; `parseLines` strips ``` fences and coerces fields.
 4. **`submitExtraction`** (a mutation) reconciles + writes the browser-extracted lines
-   (Point 20). On any failure (unreachable / CORS / no lines), it falls through to
+   ([§20](#20-reconcile--write-writeresults--insertreconciledlines)). On any failure (unreachable / CORS / no lines), it falls through to
    **`scheduleExtract`**, which schedules the server action — so extraction always
    happens somewhere.
 
-> 🧠 **Mental model:** "the cloud can't reach your laptop, but your browser can" — so
+> **Summary:** "the cloud can't reach your laptop, but your browser can" — so
 > a cloud-hosted demo runs a real model *for free* on the reviewer's machine, and the
 > server still does all the deterministic reconcile.
 
 ---
 
-## Point 17 — Branch B: the server action (`extract.run`)
+## 17. Branch B: the server action (`extract.run`)
 
-📄 **File:** [`convex/extract.ts`](../convex/extract.ts)
+**File:** [`convex/extract.ts`](../convex/extract.ts)
 
 When extraction runs server-side, the scheduler invokes `extract.run` — an
 `internalAction`.
@@ -1009,19 +1009,19 @@ export const run = internalAction({
    fallible external step separate from the atomic write.
 4. **Idempotency despite no retries:** the work is keyed on the invoice `_id`, and
    `writeResults` → `insertReconciledLines` **clears any existing lines before
-   re-inserting** (Point 20). So a manual re-run can't double-insert.
+   re-inserting** ([§20](#20-reconcile--write-writeresults--insertreconciledlines)). So a manual re-run can't double-insert.
 5. **On any throw → `markError`** flips the invoice to `needs_review` with an error
    string + an error log row.
 
-> 🧠 **Mental model:** the action is a careful airlock — do the risky network call
+> **Summary:** the action is a careful airlock — do the risky network call
 > outside any transaction, then commit the result in a single idempotent mutation,
 > and record failures instead of crashing.
 
 ---
 
-## Point 18 — Provider routing (`llm.ts` → `extractLineItems`)
+## 18. Provider routing (`llm.ts` → `extractLineItems`)
 
-📄 **File:** [`convex/lib/llm.ts`](../convex/lib/llm.ts) (`extractLineItems`)
+**File:** [`convex/lib/llm.ts`](../convex/lib/llm.ts) (`extractLineItems`)
 
 ```ts
 export async function extractLineItems(rawText, routing = {}) {
@@ -1057,15 +1057,15 @@ export async function extractLineItems(rawText, routing = {}) {
    — so the pipeline **always** completes, even with zero keys and zero network. This
    is why every demo "works on real data" without an API key.
 
-> 🧠 **Mental model:** routing is a try-list, not a switch — each mode is a sequence
+> **Summary:** routing is a try-list, not a switch — each mode is a sequence
 > of attempts with a deterministic safety net at the end. Quality degrades
 > gracefully; the pipeline never fails to produce lines.
 
 ---
 
-## Point 19 — Parsing messy model output (`parse.ts`, coerce, loose JSON)
+## 19. Parsing messy model output (`parse.ts`, coerce, loose JSON)
 
-📄 **Files:** [`convex/lib/llm.ts`](../convex/lib/llm.ts) · [`convex/lib/parse.ts`](../convex/lib/parse.ts)
+**Files:** [`convex/lib/llm.ts`](../convex/lib/llm.ts) · [`convex/lib/parse.ts`](../convex/lib/parse.ts)
 
 Models return imperfect JSON. Two layers defang it (`convex/lib/llm.ts` +
 `convex/lib/parse.ts`):
@@ -1091,17 +1091,17 @@ function coerceLines(raw) {                      // force every field into the r
    camelCase aliases, confidence clamped to `[0,1]`, blank-description lines dropped.
 3. **`parsePipeInvoice` / `parsePoText`** (`parse.ts`) are the deterministic parsers
    for the pipe format (`SKU | Desc | Qty | Unit | Price | Extension`). The same
-   `parsePipeInvoice` is reused as the zero-key fallback in Point 18 *and* by the seed
-   in Point 10 — one parser, three callers.
+   `parsePipeInvoice` is reused as the zero-key fallback in [§18](#18-provider-routing-llmts--extractlineitems) *and* by the seed
+   in [§10](#10-seeding-an-empty-account-seedifempty) — one parser, three callers.
 
-> 🧠 **Mental model:** never trust the model's formatting — slice to the JSON, coerce
+> **Summary:** never trust the model's formatting — slice to the JSON, coerce
 > every field, and keep a deterministic parser that handles the exact same shape.
 
 ---
 
-## Point 20 — Reconcile + write (`writeResults` → `insertReconciledLines`)
+## 20. Reconcile + write (`writeResults` → `insertReconciledLines`)
 
-📄 **File:** [`convex/invoices.ts`](../convex/invoices.ts) (`insertReconciledLines`, `writeResults`, `submitExtraction`)
+**File:** [`convex/invoices.ts`](../convex/invoices.ts) (`insertReconciledLines`, `writeResults`, `submitExtraction`)
 
 Both the server path (`writeResults`) and the browser path (`submitExtraction`)
 funnel into one shared function:
@@ -1133,21 +1133,21 @@ async function insertReconciledLines(ctx, { orgId, invoiceId, extracted }) {
 
 1. **Loads the tenant's PO lines + catalog** (the baselines) via the `by_org` index.
 2. **Clears existing lines first** — this is the idempotency that makes the
-   non-retried action safe (Point 17).
+   non-retried action safe ([§17](#17-branch-b-the-server-action-extractrun)).
 3. **Calls `reconcileLine` per extracted line** and inserts a row that *spreads both
    zones*: the LLM-read fields and `...r` (the computed/decided fields) + `decision:
    "pending"`.
 4. **Returns a rollup** (`recoverableUsd`, `claimedTotal`); the caller patches it onto
    the invoice along with `status: "needs_review"` + provider/model/latency/cost.
 
-> 🧠 **Mental model:** one shared write path for *every* source of lines (seed, server
+> **Summary:** one shared write path for *every* source of lines (seed, server
 > action, browser Ollama) — so all of them reconcile identically and idempotently.
 
 ---
 
-## Point 21 — The trust-critical core (`reconcileLine`)
+## 21. The trust-critical core (`reconcileLine`)
 
-📄 **File:** [`convex/lib/reconcile.ts`](../convex/lib/reconcile.ts)
+**File:** [`convex/lib/reconcile.ts`](../convex/lib/reconcile.ts)
 
 `convex/lib/reconcile.ts` — pure functions, no Convex imports, trivially unit-testable.
 This is where money decisions happen.
@@ -1199,27 +1199,27 @@ export function reconcileLine(line, po, catalog) {
 Concrete (`INV-1010`, CBL-12G billed @ $0.95 vs PO $0.78): +21.8% → **red**,
 recoverable `(0.95 − 0.78) × 1000 = $170`.
 
-> 🧠 **Mental model:** this pure function is the product. The model's output is only
+> **Summary:** this pure function is the product. The model's output is only
 > *input* to deterministic checks; the flag and the dollar figure come from code you
 > can read, test, and defend.
 
 ---
 
-## Point 22 — The verdict pushes back to the UI (reactivity)
+## 22. The verdict pushes back to the UI (reactivity)
 
-📄 **Files:** Convex runtime reactivity · queries in [`convex/invoices.ts`](../convex/invoices.ts) · client hooks in [`app/app/page.tsx`](../app/app/page.tsx) & [`app/app/invoices/[id]/page.tsx`](../app/app/invoices/%5Bid%5D/page.tsx)
+**Files:** Convex runtime reactivity · queries in [`convex/invoices.ts`](../convex/invoices.ts) · client hooks in [`app/app/page.tsx`](../app/app/page.tsx) & [`app/app/invoices/[id]/page.tsx`](../app/app/invoices/%5Bid%5D/page.tsx)
 
 No "refresh" anywhere. When `writeResults` / `submitExtraction` commits:
 
 1. Convex sees the `invoices` + `invoiceLines` rows changed.
 2. It **re-runs every subscribed query** that touches those rows
    (`listInvoices`, `getInvoice`, `stats`) and **pushes the new results** down the
-   WebSocket from Point 4.
+   WebSocket from [§4](#4-appproviderstsx-the-client-boundary--live-connections).
 3. The React hooks holding those subscriptions re-render: the dashboard list flips
    from "extracting…" to the verdict + recoverable figure; the detail page's table
    fills with color-coded lines. The eval/diagnostics pages update too if open.
 
-> 🧠 **Mental model:** the UI is a *live projection* of the database. Write on the
+> **Summary:** the UI is a *live projection* of the database. Write on the
 > backend → every screen showing that data updates itself. Reactivity replaces
 > polling, refetching, and cache invalidation.
 
@@ -1227,9 +1227,9 @@ No "refresh" anywhere. When `writeResults` / `submitExtraction` commits:
 
 # Part 5 — Human review, configuration, evaluation
 
-## Point 23 — The invoice detail / review page
+## 23. The invoice detail / review page
 
-📄 **File:** [`app/app/invoices/[id]/page.tsx`](../app/app/invoices/%5Bid%5D/page.tsx)
+**File:** [`app/app/invoices/[id]/page.tsx`](../app/app/invoices/%5Bid%5D/page.tsx)
 
 `app/app/invoices/[id]/page.tsx`:
 
@@ -1246,7 +1246,7 @@ if (data === null)      return <p>Not found.</p>;  // wrong tenant or missing
 const { invoice, lines } = data;
 ```
 
-1. **`useParams()`** reads the dynamic `[id]` from the URL (Point 1) — that's how the
+1. **`useParams()`** reads the dynamic `[id]` from the URL ([§1](#1-how-files-become-urls-the-app-router)) — that's how the
    page knows which invoice to load.
 2. **`getInvoice` is tenant-checked server-side** — it returns `null` if the invoice's
    `orgId` ≠ yours, so the page renders "Not found" rather than leaking another
@@ -1259,15 +1259,15 @@ const { invoice, lines } = data;
 5. **`providerLabel()`** turns the stored provider/model into friendly text
    ("extracted by free model (gemma-…)", "extracted in offline mode…").
 
-> 🧠 **Mental model:** the detail page is a live, color-coded audit of one invoice —
+> **Summary:** the detail page is a live, color-coded audit of one invoice —
 > every number shown with both what the vendor claimed and what code computed, plus
 > the reasons behind each flag.
 
 ---
 
-## Point 24 — `reviewLine` and `correctLine` (an edit re-reconciles)
+## 24. `reviewLine` and `correctLine` (an edit re-reconciles)
 
-📄 **File:** [`convex/invoices.ts`](../convex/invoices.ts) (`reviewLine`, `correctLine`, `setInvoiceStatus`)
+**File:** [`convex/invoices.ts`](../convex/invoices.ts) (`reviewLine`, `correctLine`, `setInvoiceStatus`)
 
 ```ts
 export const reviewLine = mutation({                 // approve / reject one line
@@ -1303,14 +1303,14 @@ export const correctLine = mutation({                // estimator edits the pric
 3. The detail page's `correct()` handler pre-fills the prompt with the agreed PO price
    (else market), so the common "set it to what we agreed" action is one click.
 
-> 🧠 **Mental model:** human edits flow back through the exact same deterministic
+> **Summary:** human edits flow back through the exact same deterministic
 > engine — the UI never hand-computes a corrected total; it asks `reconcileLine`.
 
 ---
 
-## Point 25 — Routing config (Settings page + `routing.ts`)
+## 25. Routing config (Settings page + `routing.ts`)
 
-📄 **Files:** [`app/app/settings/page.tsx`](../app/app/settings/page.tsx) · [`convex/routing.ts`](../convex/routing.ts)
+**Files:** [`app/app/settings/page.tsx`](../app/app/settings/page.tsx) · [`convex/routing.ts`](../convex/routing.ts)
 
 The Configuration page (`app/app/settings/page.tsx`) lets a tenant choose how
 extraction is routed; `convex/routing.ts` persists it.
@@ -1319,12 +1319,12 @@ extraction is routed; `convex/routing.ts` persists it.
 // routing.ts
 export const get = query({ … });          // current mode/model + key status + resolved activeMode
 export const set = mutation({ args: { mode, model? }, … });   // upsert into the `settings` table
-export const _forExtract = internalQuery({ args:{orgId}, … }); // read by the action (Point 17)
+export const _forExtract = internalQuery({ args:{orgId}, … }); // read by the action ([§17](#17-branch-b-the-server-action-extractrun))
 ```
 
 1. **Five modes** (`auto | local | free | paid | offline`), each a provider chain the
    Settings UI spells out explicitly ("Ollama → Anthropic → OpenRouter → Offline" for
-   auto, etc.) — mirroring the `order` logic in Point 18.
+   auto, etc.) — mirroring the `order` logic in [§18](#18-provider-routing-llmts--extractlineitems).
 2. **`get` also returns live key status** (`keyStatus()`) and the resolved
    `activeMode`, so the page can show which providers are actually available (a key
    set on Convex) vs configured.
@@ -1333,14 +1333,14 @@ export const _forExtract = internalQuery({ args:{orgId}, … }); // read by the 
 4. **Provider keys are never in the browser** — the page only selects *which*
    server-side provider a run uses; the note on the page says so.
 
-> 🧠 **Mental model:** routing is per-tenant config in a row, read at extract time —
-> the same try-list from Point 18, made selectable and observable.
+> **Summary:** routing is per-tenant config in a row, read at extract time —
+> the same try-list from [§18](#18-provider-routing-llmts--extractlineitems), made selectable and observable.
 
 ---
 
-## Point 26 — Diagnostics (traces, event log, model benchmark)
+## 26. Diagnostics (traces, event log, model benchmark)
 
-📄 **Files:** [`app/app/diagnostics/page.tsx`](../app/app/diagnostics/page.tsx) · [`convex/diagnostics.ts`](../convex/diagnostics.ts)
+**Files:** [`app/app/diagnostics/page.tsx`](../app/app/diagnostics/page.tsx) · [`convex/diagnostics.ts`](../convex/diagnostics.ts)
 
 `app/app/diagnostics/page.tsx` + `convex/diagnostics.ts` — the technical view.
 
@@ -1355,14 +1355,14 @@ export const _forExtract = internalQuery({ args:{orgId}, … }); // read by the 
    each — a live comparison. It's an action because it makes external calls; results
    are returned directly to the page via `useAction` (not stored), plus a summary log.
 
-> 🧠 **Mental model:** Diagnostics is the "show me the machine" tab — the same data
+> **Summary:** Diagnostics is the "show me the machine" tab — the same data
 > the product uses, surfaced as traces, logs, and a head-to-head model benchmark.
 
 ---
 
-## Point 27 — Evals (the CI gate, `evals.ts`)
+## 27. Evals (the CI gate, `evals.ts`)
 
-📄 **Files:** [`convex/evals.ts`](../convex/evals.ts) · [`app/app/evals/page.tsx`](../app/app/evals/page.tsx) · labels in [`convex/lib/demoData.ts`](../convex/lib/demoData.ts)
+**Files:** [`convex/evals.ts`](../convex/evals.ts) · [`app/app/evals/page.tsx`](../app/app/evals/page.tsx) · labels in [`convex/lib/demoData.ts`](../convex/lib/demoData.ts)
 
 ```ts
 export const runEval = mutation({
@@ -1395,16 +1395,16 @@ export const runEval = mutation({
    (lost money); a false positive makes estimators distrust the tool. This is the gate
    you'd run in CI before shipping a threshold/prompt/model change.
 
-> 🧠 **Mental model:** accuracy is *measured*, not asserted. The decision logic's
+> **Summary:** accuracy is *measured*, not asserted. The decision logic's
 > quality is provable independently of whatever LLM did the reading.
 
 ---
 
 # Part 6 — The shared pieces + the big picture
 
-## Point 28 — Shared UI (`ui.tsx`, `nav.tsx`)
+## 28. Shared UI (`ui.tsx`, `nav.tsx`)
 
-📄 **Files:** [`app/components/ui.tsx`](../app/components/ui.tsx) · [`app/components/nav.tsx`](../app/components/nav.tsx)
+**Files:** [`app/components/ui.tsx`](../app/components/ui.tsx) · [`app/components/nav.tsx`](../app/components/nav.tsx)
 
 1. **`app/components/ui.tsx`** — tiny shared helpers: `usd()` (currency formatting,
    `—` for null), `FlagBadge` / `StatusBadge` (the colored pills), and `cn()`
@@ -1418,14 +1418,14 @@ export const runEval = mutation({
    `localStorage["theme"]` and toggles the `light` class, starting as `null` until
    mounted so SSR markup matches (avoiding the hydration mismatch on the icon).
 
-> 🧠 **Mental model:** the shared components keep every page visually consistent and
+> **Summary:** the shared components keep every page visually consistent and
 > carry the cross-tenant (org switcher) and cross-project (launcher) chrome.
 
 ---
 
-## Point 29 — Build & deploy: the three planes
+## 29. Build & deploy: the three planes
 
-📄 **Files:** [`next.config.ts`](../next.config.ts) · full detail in [`docs/DEPLOYMENT.md`](./DEPLOYMENT.md)
+**Files:** [`next.config.ts`](../next.config.ts) · full detail in [`docs/DEPLOYMENT.md`](./DEPLOYMENT.md)
 
 (Full detail in `DEPLOYMENT.md`; the essentials.)
 
@@ -1445,17 +1445,17 @@ Browser ──Clerk JS──► Next.js on RENDER ──NEXT_PUBLIC_CONVEX_URL +
    into the browser bundle; at runtime, the Node server serves SSR/RSC. The most
    common deploy mistake is putting an LLM key on Render — it does nothing there.
 5. With **no** LLM key anywhere, extraction still works via the deterministic
-   fallback (Point 18) — $0, fully offline.
+   fallback ([§18](#18-provider-routing-llmts--extractlineitems)) — $0, fully offline.
 
-> 🧠 **Mental model:** three managed planes, joined by a public URL and a signed JWT;
+> **Summary:** three managed planes, joined by a public URL and a signed JWT;
 > secrets live where the code that needs them runs (LLM keys on Convex, never the
 > browser or Render).
 
 ---
 
-## Point 30 — The whole machine, end to end
+## 30. The whole machine, end to end
 
-📄 **Files:** the whole tree — see the [Source map](#source-map) for every file + link
+**Files:** the whole tree — see the [Source map](#source-map) for every file + link
 
 The complete path, in one breath:
 

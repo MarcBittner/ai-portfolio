@@ -83,7 +83,7 @@ npx convex env set OPENROUTER_MODEL google/gemma-4-31b-it:free
 # optional paid path:
 # npx convex env set ANTHROPIC_API_KEY sk-ant-...
 ```
-`convex deploy` pushes the schema + functions and prints the `NEXT_PUBLIC_CONVEX_URL` you'll give Render.
+`convex deploy` pushes the schema + functions and prints the `NEXT_PUBLIC_CONVEX_URL` to provide to Render.
 
 ### Step 3 — Render (web plane)
 Create a **Web Service** from the repo (root dir `projects/trueline`), runtime **Node**:

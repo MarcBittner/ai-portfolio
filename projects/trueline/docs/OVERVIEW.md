@@ -3,7 +3,7 @@
 A technical overview of what trueline is, the problem it solves, and how it is
 shaped — grounded in the code, but above the line-level depth of
 [`WALKTHROUGH.md`](./WALKTHROUGH.md). For system design see
-[`ARCHITECTURE.md`](./ARCHITECTURE.md); for hosting see [`DEPLOYMENT.md`](./DEPLOYMENT.md).
+[`ARCHITECTURE.md`](./ARCHITECTURE.md); for hosting see [`DEPLOYMENT.md`](./DEPLOYMENT.md); for the function API see [`API.md`](./API.md).
 
 ## The problem
 
