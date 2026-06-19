@@ -1,7 +1,8 @@
 # Deploy the persona-twin demo for free (public URL)
 
 The `persona-twin` app runs **fully offline** by default — deterministic mock LLM + in-memory
-vector store, corpus self-ingested on startup, synthetic data only. So free hosting needs **no API
+vector store, a synthetic seed corpus self-ingested on startup (you can also ingest your own real
+documents). So free hosting needs **no API
 keys and costs nothing**. The Dockerfile serves the API + built UI on `$PORT`.
 
 ## Option A — Render (one click, recommended for a shareable link)

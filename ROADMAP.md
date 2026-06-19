@@ -61,5 +61,6 @@ Projects 3–10; the roadmaps below are what's next._
 ## Principles (unchanged)
 
 Self-contained projects, deterministic/offline-first cores, LLM features routed
-Ollama-first with a deterministic fallback, synthetic data only, no secrets,
+Ollama-first with a deterministic fallback, synthetic sample data (demos also run
+on real data), no secrets,
 `run.sh` + ruff + tests green on a fresh clone.

@@ -18,8 +18,9 @@ decisions that move money.
 > Offline by default (deterministic table parser + mock LLM, no keys, no cost).
 > With a provider configured (`ANTHROPIC_API_KEY`, Ollama, OpenAI/OpenRouter),
 > the extraction step uses **schema-constrained structured outputs**; it falls
-> back to the deterministic parser whenever no model is available. All fixtures
-> are synthetic and clearly fictional — no real firms, projects, or PII.
+> back to the deterministic parser whenever no model is available. Sample fixtures
+> are synthetic and clearly fictional, and it also runs on your own real
+> documents — no real firms, projects, or PII in the demo.
 
 ## Contents
 

@@ -24,8 +24,8 @@ A schema is data, not code — an ordered list of typed fields with label
 aliases. Adding a document type is a dict entry, not a new extractor.
 
 > Offline by default (regex core + mock provider, no keys, no cost), so the
-> hosted demo is zero-cost and fully reviewable. Synthetic data only; no
-> secrets.
+> hosted demo is zero-cost and fully reviewable. Sample data is synthetic and
+> fictional; the extractor also runs on your own real documents. No secrets.
 
 ## Contents
 

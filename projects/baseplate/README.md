@@ -37,9 +37,9 @@ The two things this demo is built to prove:
 > demo runs the FastAPI console on Render's free tier; the same container would
 > run on the EKS cluster sketched here). The LLM scaffolder routes
 > **Anthropic/OpenAI → local Ollama → free (OpenRouter) → a deterministic
-> offline parser**, so it runs (and the eval reproduces) with zero keys. All
-> hospitals, payers, codes, and rates are **synthetic and clearly fictional**;
-> no real data; **no HIPAA claim** is made.
+> offline parser**, so it runs (and the eval reproduces) with zero keys. The
+> sample hospitals, payers, codes, and rates are **synthetic and clearly
+> fictional**, and it also runs on your own real data; **no HIPAA claim** is made.
 
 ## Contents
 

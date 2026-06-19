@@ -22,10 +22,10 @@ collapse fidelity into one number.
 > Offline by default — a deterministic hash embedder, an in-memory vector
 > store, and a mock LLM activate automatically, so reviewers need no keys and
 > incur no cost. Real backends (Ollama / OpenAI / Anthropic / Mongo Atlas /
-> Redis) switch on purely via environment variables. All persona and document
-> data is **synthetic and clearly fictional**; PII is redacted at ingest before
-> any text is embedded or stored, and redaction reports carry counts, never
-> values.
+> Redis) switch on purely via environment variables. Sample persona and document
+> data is **synthetic and clearly fictional**, and you can also ingest your own
+> real documents; PII is redacted at ingest before any text is embedded or
+> stored, and redaction reports carry counts, never values.
 
 ```sh
 ./run.sh setup && ./run.sh demo    # fully offline — no API keys, no database

@@ -23,10 +23,10 @@ vendor-neutral, governed by default, auditable.
 
 > Offline by default — deterministic firewall + redaction and a mock provider,
 > so reviewers need no keys and incur no cost. Real providers switch on via env.
-> All eval/sample data is **synthetic and clearly fictional** (client names,
-> accounts, and secrets are invented; **no real client data** ever touches it);
-> the audit log stores **only redacted** text, and findings never echo a detected
-> secret.
+> The eval/sample data is **synthetic and clearly fictional** (client names,
+> accounts, and secrets are invented), and the gateway also runs on your own real
+> traffic; in the demo, **no real client data** ever touches it. The audit log
+> stores **only redacted** text, and findings never echo a detected secret.
 
 ## Contents
 

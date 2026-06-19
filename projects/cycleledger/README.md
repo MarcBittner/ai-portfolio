@@ -19,8 +19,8 @@ deterministic; the LLM is an assistant, never the trusted path.
 > Offline by default — with zero LLM keys the copilot uses a deterministic
 > canned-question → safe-SELECT mapper, so reviewers need no keys and incur no
 > cost. Real providers (Anthropic / OpenAI / Ollama / OpenRouter) switch on via
-> environment variables. All donor, committee, and contribution data is
-> **synthetic and clearly fictional** — no real PII.
+> environment variables. Sample donor, committee, and contribution data is
+> **synthetic and clearly fictional**, and it also runs on your own real data — no real PII.
 
 ```sh
 ./run.sh setup && ./run.sh demo    # offline: seed → rollups → plan → NL→SQL → guard reject

@@ -31,10 +31,10 @@ a board, and diffs before/after remediation. The point of the merge: the
 compliance/posture engine is surface-agnostic, so a second exposure surface is *new
 data*, not a new product.
 
-> All data is **synthetic and clearly fictional**. The warehouse holds invented
-> healthcare claims (no real PHI); the estate uses **reserved documentation IP
-> ranges** (RFC 5737) and the reserved `.test` TLD. Nothing touches a real network or
-> a real account. Runs fully offline (the LLM chain falls back to a deterministic
+> The sample data is **synthetic and clearly fictional**, and it also runs on
+> your own real data. The warehouse holds invented healthcare claims (no real
+> PHI); the estate uses **reserved documentation IP ranges** (RFC 5737) and the
+> reserved `.test` TLD. Nothing touches a real network or a real account. Runs fully offline (the LLM chain falls back to a deterministic
 > generator); no secrets.
 
 ## Contents

@@ -241,8 +241,9 @@ export function Help({
           </section>
 
           <p className="border-t border-border pt-4 text-xs text-muted-foreground">
-            All personas and documents are synthetic and fictional. PII is redacted at
-            ingest; redaction reports carry counts, never values.
+            Sample personas and documents are synthetic and fictional; you can also ingest
+            your own real documents. PII is redacted at ingest; redaction reports carry
+            counts, never values.
           </p>
         </div>
       </aside>

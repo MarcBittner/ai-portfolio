@@ -32,10 +32,10 @@ its keep:
   by *linkage* on quasi-identifiers — and that coarser generalization is the lever
   that fixes it.
 
-> All claims are **synthetic and clearly fictional** — members, providers, names,
-> codes, and amounts are invented for this portfolio; **no real PHI** ever touches
-> it. No secrets; runs fully offline (the LLM chain falls back to a deterministic
-> detector). The audit log records *who/what/why/decision*, **never a field
+> The sample claims are **synthetic and clearly fictional** — members, providers,
+> names, codes, and amounts are invented for this portfolio — and it also runs on
+> your own real records; in the demo, **no real PHI** ever touches it. No secrets;
+> runs fully offline (the LLM chain falls back to a deterministic detector). The audit log records *who/what/why/decision*, **never a field
 > value**.
 
 ## Contents

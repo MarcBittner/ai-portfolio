@@ -31,8 +31,9 @@ The thing hand-written adapters can't do, and where this demo earns its keep:
 
 > Offline and deterministic core. SQLite (stdlib) stands in for Postgres — same schema,
 > same index, same queries; swap the connection string in production. No secrets; runs
-> fully offline (the LLM chain falls back to a deterministic matcher). All hospitals,
-> payers, codes, and rates are synthetic and clearly fictional.
+> fully offline (the LLM chain falls back to a deterministic matcher). The sample hospitals,
+> payers, codes, and rates are synthetic and clearly fictional; rate-atlas also
+> runs on your own real data.
 
 ## Contents
 

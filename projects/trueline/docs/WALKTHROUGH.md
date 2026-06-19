@@ -474,8 +474,8 @@ const STACK = [
    middleware already resolved the session.
 3. **`<Link href="/app">`** is client-side navigation — no full reload; Next fetches
    just the new route and keeps the layout (and its socket) alive.
-4. The footer + sign-in note carry the honest **"Synthetic, fictional data only"**
-   disclaimer.
+4. The footer + sign-in note carry the honest disclaimer that the **sample data is
+   synthetic and fictional, and you can also run it on your own real contract and invoices**.
 
 > **Summary:** the landing is a static brochure rendered entirely on the
 > server — describing the pipeline and stack, with exactly one interactive control

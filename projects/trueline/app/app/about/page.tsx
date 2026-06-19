@@ -62,7 +62,7 @@ export default function About() {
       <p className="mb-5 mt-1 text-sm text-[--color-muted]">
         Invoice line-item verification: extract → verify the math in code → reconcile against the
         purchase order &amp; market rates → flag recoverable overcharges → human review → eval.
-        Synthetic, fictional data only.
+        Sample data is synthetic and fictional; you can also run it on your own real contract and invoices.
       </p>
 
       <section className="space-y-4">

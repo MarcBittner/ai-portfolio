@@ -96,8 +96,8 @@ data with citations.
 - **Layered evaluation** — retrieval hit-rate, grounding/faithfulness,
   and answer quality measured separately, with a write-up on why a single
   "fidelity %" hides what matters
-- **Data governance** — deterministic PII redaction at ingest; synthetic,
-  clearly-fictional data only
+- **Data governance** — deterministic PII redaction at ingest; sample data
+  is synthetic and clearly fictional, and it also runs on your own real data
 
 ```sh
 cd projects/persona-twin
@@ -570,7 +570,7 @@ project's v0.2.0 milestone (per-project detail in `docs/spec/development-plan.md
   (`docs/spec/`), a production-grade `run.sh`, tests, and docs
 - No secrets in the repo — environment variables via gitignored `.env`,
   placeholder `.env.example` committed per project
-- All sample data is synthetic and fictional
+- All sample data is synthetic and fictional; the demos also run on your own real data
 
 ## License
 

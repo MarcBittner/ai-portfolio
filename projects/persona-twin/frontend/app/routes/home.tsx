@@ -123,8 +123,8 @@ export default function Home({ loaderData }: Route.ComponentProps) {
       {response && <AnswerPanel response={response} />}
 
       <footer className="pt-4 text-xs text-muted-foreground">
-        All personas are synthetic and fictional. Offline mode answers
-        extractively via the deterministic mock provider.
+        Sample personas are synthetic and fictional; you can also ingest your own
+        real documents. Offline mode answers extractively via the deterministic mock provider.
       </footer>
     </main>
   );

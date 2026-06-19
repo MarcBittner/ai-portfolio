@@ -30,9 +30,10 @@ query; trust-critical execution stays deterministic and guarded. The LLM routes
 **Anthropic/OpenAI → local Ollama → free (OpenRouter) → a deterministic question
 matcher**, so it runs (and the eval reproduces) with zero keys and zero cost.
 
-> Donors, committees, and amounts are **synthetic and clearly fictional** —
-> invented for this portfolio. No secrets; runs fully offline (the LLM chain falls
-> back to a deterministic matcher).
+> The sample donors, committees, and amounts are **synthetic and clearly
+> fictional** — invented for this portfolio — and it also runs on your own real
+> data. No secrets; runs fully offline (the LLM chain falls back to a
+> deterministic matcher).
 
 ## Contents
 

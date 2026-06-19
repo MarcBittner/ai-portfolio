@@ -31,9 +31,10 @@ production-shaped for regulated clients:
   The headline workflow is **contract review**; a second workflow (**policy-qa**)
   ships on the identical engine to prove it.
 
-> All contracts and policy text are **synthetic and clearly fictional** — parties,
-> terms, and amounts are invented for this portfolio. No secrets; runs fully
-> offline (every agent has a deterministic fallback). The audit is **value-light**:
+> The sample contracts and policy text are **synthetic and clearly fictional** —
+> parties, terms, and amounts are invented for this portfolio — and it also runs
+> on your own real documents. No secrets; runs fully offline (every agent has a
+> deterministic fallback). The audit is **value-light**:
 > a redacted prompt/output summary + telemetry, never the raw document.
 
 ## Contents
