@@ -83,7 +83,10 @@ export function reconcileLine(
   let poLine: BaselineLine | undefined;
   if (line.sku) poLine = po.find((p) => p.sku && p.sku === line.sku);
   if (poLine) matchedBy = "sku";
-  else {
+  // Fuzzy description fallback ONLY when the line carries no SKU. If a SKU is
+  // present but not found in this baseline, we must NOT borrow a different
+  // SKU's price (that would fabricate/mask recoverable $) — treat as no match.
+  else if (!line.sku) {
     let best = 0;
     for (const p of po) {
       const o = overlap(line.description, p.description);
@@ -97,7 +100,8 @@ export function reconcileLine(
 
   let cat: CatalogItem | undefined;
   if (line.sku) cat = catalog.find((c) => c.sku === line.sku);
-  if (!cat) {
+  // Same guard: only fuzzy-match the catalog when the line has no SKU.
+  if (!cat && !line.sku) {
     let best = 0;
     for (const c of catalog) {
       const o = overlap(line.description, c.description);
@@ -111,11 +115,16 @@ export function reconcileLine(
   const poUnitPrice = poLine?.unitPrice;
   const catalogPrice = cat?.marketPrice;
 
-  // 3) variance vs each baseline
-  const variance = (base?: number) =>
-    base && base > 0 ? round2(((line.unitPrice - base) / base) * 100) : undefined;
-  const varianceVsPoPct = variance(poUnitPrice);
-  const varianceVsMarketPct = variance(catalogPrice);
+  // 3) variance vs each baseline. Keep the UNROUNDED variance for threshold
+  // comparisons (so 3.0001% correctly clears the 3% line); round only for the
+  // stored/displayed fields.
+  const rawVariance = (base?: number) =>
+    base && base > 0 ? ((line.unitPrice - base) / base) * 100 : undefined;
+  const rawVsPoPct = rawVariance(poUnitPrice);
+  const rawVsMarketPct = rawVariance(catalogPrice);
+  const varianceVsPoPct = rawVsPoPct === undefined ? undefined : round2(rawVsPoPct);
+  const varianceVsMarketPct =
+    rawVsMarketPct === undefined ? undefined : round2(rawVsMarketPct);
 
   // 4) flag + recoverable $
   let flag: ReconciledFields["flag"] = "green";
@@ -133,7 +142,7 @@ export function reconcileLine(
     escalate("yellow");
     reasons.push(`low extraction confidence (${line.confidence.toFixed(2)})`);
   }
-  const worst = Math.max(varianceVsPoPct ?? -Infinity, varianceVsMarketPct ?? -Infinity);
+  const worst = Math.max(rawVsPoPct ?? -Infinity, rawVsMarketPct ?? -Infinity);
   if (worst !== -Infinity) {
     if (worst > RED_PCT * 100) {
       escalate("red");
