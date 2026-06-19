@@ -161,7 +161,7 @@ export default function Dashboard() {
   const setBaseline = useMutation(api.invoices.setBaselineFromText);
   const createInvoice = useMutation(api.invoices.createInvoiceFromText);
   const reset = useMutation(api.invoices.resetDemo);
-  const seedAll = useMutation(api.invoices.seedIfEmpty);
+  const seedDemoBaseline = useMutation(api.invoices.seedDemoBaseline);
   const runEval = useMutation(api.evals.runEval);
   const routingCfg = useQuery(api.routing.get);
   const submitExtraction = useMutation(api.invoices.submitExtraction);
@@ -172,13 +172,16 @@ export default function Dashboard() {
   // Auto-seed the demo set the first time a tenant ever loads the dashboard, so a
   // fresh sign-in lands on a populated walkthrough. Gated on a persistent server
   // flag (demoState.initialized) — NOT on "are there 0 invoices?" — so an explicit
-  // Reset stays reset even after navigating away and coming back.
+  // Reset stays reset even after navigating away and coming back. The demo invoices
+  // are run through the real LLM pipeline (see loadDemo), not pre-baked.
   useEffect(() => {
     if (!seededOnce.current && isAuthenticated && demoState && !demoState.initialized) {
       seededOnce.current = true;
-      seedAll();
+      void loadDemo();
     }
-  }, [isAuthenticated, demoState, seedAll]);
+    // loadDemo is stable for our purposes and the ref guards a single run.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, demoState]);
 
   // Run the engine regression (a fixed labeled benchmark, independent of your
   // invoices) asynchronously on app load, so the Evals page is already populated
@@ -257,6 +260,24 @@ export default function Dashboard() {
     setMsg("✓ Uploaded — no local Ollama reachable; using server (paid → free → offline).");
   }
 
+  // Load the demo: seed the baseline (PO + catalog) server-side, then run each demo
+  // invoice through the SAME extraction pipeline an upload uses — so the demo set is
+  // genuinely LLM-extracted (local model via the browser, else server fallback),
+  // not pre-reconciled. Used by the first-load auto-seed and the "load everything" button.
+  async function loadDemo() {
+    setMsg("Loading the demo set through the model…");
+    let invoices: { invoiceNumber: string; rawText: string }[] = [];
+    try {
+      ({ invoices } = await seedDemoBaseline());
+    } catch (e) {
+      setMsg("Couldn't seed the demo: " + (e as Error).message);
+      return;
+    }
+    for (const inv of invoices) {
+      await uploadInvoice(inv.rawText, `invoice-${inv.invoiceNumber}.txt`);
+    }
+  }
+
   return (
     <main className="mx-auto max-w-5xl px-6 py-8">
       <Nav />
@@ -330,7 +351,7 @@ export default function Dashboard() {
             </p>
           </section>
           <div className="flex justify-center">
-            <Button variant="secondary" onClick={() => seedAll()}>
+            <Button variant="secondary" onClick={() => loadDemo()}>
               Skip the walkthrough — load everything
             </Button>
           </div>

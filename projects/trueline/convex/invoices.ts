@@ -260,6 +260,43 @@ export const seedIfEmpty = mutation({
   },
 });
 
+// Seed ONLY the baseline (PO + catalog) and mark the tenant initialized, then hand
+// the demo invoice texts back to the client. The client runs each through the real
+// extraction pipeline (browser→host LLM, else server paid→free→offline) — so the
+// demo invoices are genuinely LLM-extracted, not pre-reconciled. Idempotent: skips
+// the baseline if a PO already exists and only returns invoices not already present.
+export const seedDemoBaseline = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const { orgId } = await requireOrg(ctx);
+    const existingPo = await ctx.db
+      .query("purchaseOrders")
+      .withIndex("by_org", (q) => q.eq("orgId", orgId))
+      .first();
+    if (!existingPo) {
+      await ctx.db.insert("purchaseOrders", {
+        orgId,
+        poNumber: DEMO_PO_NUMBER,
+        vendor: DEMO_VENDOR,
+        lines: DEMO_PO_LINES,
+      });
+      for (const c of DEMO_CATALOG) await ctx.db.insert("catalog", { orgId, ...c });
+    }
+    await markInitialized(ctx, orgId);
+    const existing = await ctx.db
+      .query("invoices")
+      .withIndex("by_org", (q) => q.eq("orgId", orgId))
+      .collect();
+    const have = new Set(existing.map((i) => i.invoiceNumber));
+    return {
+      invoices: DEMO_INVOICES.filter((d) => !have.has(d.invoiceNumber)).map((d) => ({
+        invoiceNumber: d.invoiceNumber,
+        rawText: d.rawText,
+      })),
+    };
+  },
+});
+
 export const createInvoiceFromText = mutation({
   // deferServer: the client will try host-local Ollama in the browser first and
   // submit the result via submitExtraction; only schedule the server action if
