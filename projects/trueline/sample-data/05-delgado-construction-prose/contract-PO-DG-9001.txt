@@ -1,0 +1,7 @@
+PURCHASE ORDER PO-DG-9001 — Delgado Construction Materials
+SKU | Description | Qty | Unit | Unit Price
+LUM-2X4 | 2x4x8 framing lumber | 500 | ea | 3.85
+DRY-12 | 1/2in drywall 4x8 | 300 | sheet | 12.40
+SCRW-3 | 3in deck screws (5lb) | 40 | box | 28.00
+INSUL-R | R-13 insulation roll | 80 | roll | 42.00
+NAIL-16 | 16d framing nails (50lb) | 20 | box | 64.00

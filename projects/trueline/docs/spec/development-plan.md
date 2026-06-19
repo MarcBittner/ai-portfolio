@@ -80,6 +80,18 @@ LLM-extracted demo; Reset is durable. `npm run verify` is green.
 Grouped by theme, roughly in priority order. Complements [`ARCHITECTURE` §11](../ARCHITECTURE.md).
 
 ### Extraction rigor (trust the read more)
+- [ ] **Measure mock-vs-LLM extraction accuracy.** We don't yet know if LLM extraction
+      beats the deterministic parser, or where. Score both — field-level (qty / unitPrice
+      / extension / description / SKU) against a labeled, **multi-format** corpus
+      (`sample-data/`: pipe, CSV, printed table, markdown, prose) — and report accuracy
+      per format. The pipe mock extracts nothing on CSV/printed/prose and *silently
+      mis-parses* markdown, so the LLM's value is format-dependent; quantify it.
+- [ ] **Justify the LLM on cost & performance.** Record per-invoice latency and (cloud)
+      cost alongside the accuracy lift, and choose the routing default from the data — the
+      LLM should only be the default on formats the parser can't read; for clean pipe/CSV
+      the deterministic path may be the right (free, instant) choice.
+- [ ] **LLM contract (PO) parsing.** `parsePoText` is deterministic/pipe-only, so non-pipe
+      contracts won't load; route contracts through the same extraction path as invoices.
 - [ ] **Schema-validated extraction with retry.** Validate the model's JSON against a
       strict schema (Convex validator / zod) and re-prompt on malformed output instead
       of best-effort parsing.

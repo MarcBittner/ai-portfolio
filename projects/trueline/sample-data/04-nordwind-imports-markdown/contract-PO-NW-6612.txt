@@ -1,0 +1,6 @@
+PURCHASE ORDER PO-NW-6612 — Nordwind Imports
+SKU | Description | Qty | Unit | Unit Price
+TILE-CER | ceramic floor tile (sqm) | 500 | sqm | 18.00
+GROUT-25 | epoxy grout 25kg | 40 | bag | 32.00
+TRIM-OAK | oak trim 2.4m | 120 | ea | 11.50
+ADH-20 | tile adhesive 20kg | 60 | bag | 21.00

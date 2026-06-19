@@ -1,0 +1,8 @@
+Acme Print & Signage — Invoice INV-AC-5510 (PO PO-AC-2207)
+SKU | Description | Qty | Unit | Unit Price | Extension
+PPR-100 | 100lb gloss text paper (500 sheets) | 40 | ream | 62.00 | 2480.00
+INK-CMYK | CMYK ink set 1L | 12 | set | 167.00 | 2004.00
+LAM-30 | 30in laminate roll | 8 | roll | 88.00 | 704.00
+PLT-AL | aluminum sign blank 24x36 | 60 | ea | 19.50 | 1170.00
+LBR-DSGN | design labor | 30 | hr | 95.00 | 2850.00
+TAX | sales tax 8.25% | 1 | ea | 750.00 | 750.00

@@ -1,0 +1,7 @@
+PURCHASE ORDER PO-HM-7781 — Harbor Marine Supply
+SKU | Description | Qty | Unit | Unit Price
+ROPE-12 | 1/2in nylon dock line 25ft | 100 | ea | 14.25
+FEND-8 | 8in boat fender | 80 | ea | 23.00
+ANCH-15 | 15lb galvanized anchor | 20 | ea | 47.50
+BILGE-P | 1100gph bilge pump | 15 | ea | 39.00
+SS-BOLT | stainless bolt kit | 200 | kit | 6.40

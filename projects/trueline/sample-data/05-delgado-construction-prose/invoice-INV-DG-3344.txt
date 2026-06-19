@@ -1,0 +1,15 @@
+DELGADO CONSTRUCTION MATERIALS
+Invoice INV-DG-3344  |  against PO PO-DG-9001  |  Net 15
+
+Thank you for your order. Charges are itemized below. No SKUs are printed on
+this invoice — please match line items by description.
+
+  500x  2x4x8 framing lumber           @ $3.85 .............. $1,925.00
+  300x  1/2in drywall 4x8              @ $13.60 ............. $4,080.00
+   40x  3in deck screws (5lb)          @ $28.00 ............. $1,120.00
+   80x  R-13 insulation roll           @ $42.00 ............. $3,360.00
+   20x  16d framing nails (50lb)       @ $64.00 ............. $1,290.00
+        Delivery surcharge ............................. $   240.00
+        Sales tax (7%) ................................. $   841.00
+        ------------------------------------------------ ----------
+        Total due .................................... $12,856.00

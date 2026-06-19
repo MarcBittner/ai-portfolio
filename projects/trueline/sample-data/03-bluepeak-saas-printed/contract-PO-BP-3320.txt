@@ -1,0 +1,6 @@
+PURCHASE ORDER PO-BP-3320 — BluePeak Cloud
+SKU | Description | Qty | Unit | Unit Price
+SEAT-STD | Standard seat (monthly) | 200 | seat | 22.00
+SEAT-ADM | Admin seat (monthly) | 10 | seat | 60.00
+STOR-100 | 100GB storage block | 50 | block | 9.00
+SUP-BIZ | Business support (monthly) | 1 | mo | 1200.00
