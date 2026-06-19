@@ -14,7 +14,8 @@ const files = [
   "docs/API.md",
   "docs/WALKTHROUGH.md",
   "docs/DEPLOYMENT.md",
-  "docs/development-plan.md",
+  "docs/spec/spec.md",
+  "docs/spec/development-plan.md",
 ];
 
 const slug = (s) =>
