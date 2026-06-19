@@ -224,33 +224,42 @@ export default function InvoiceReview() {
                   )}
                 </td>
                 <td className="p-3">
-                  {l.decision !== "pending" ? (
-                    <span className="text-xs text-[--color-muted]">{l.decision}</span>
-                  ) : (
-                    <div className="flex flex-col gap-1">
-                      <button
-                        onClick={() => reviewLine({ lineId: l._id, decision: "approved" })}
-                        className="rounded bg-[--color-ok]/15 px-2 py-0.5 text-xs text-[--color-ok]"
-                      >
-                        approve
-                      </button>
-                      <button
-                        onClick={() => correct(l)}
-                        className="rounded bg-[color-mix(in_oklch,_var(--color-ink)_6%,_transparent)] px-2 py-0.5 text-xs"
-                        title="set the unit price to the agreed PO price"
-                      >
-                        {l.poUnitPrice != null || l.catalogPrice != null
+                  {/* Always-visible decisions: the active one is filled/checked, so a line
+                      can be re-decided or re-corrected any number of times. */}
+                  <div className="flex flex-col gap-1">
+                    <button
+                      type="button"
+                      aria-pressed={l.decision === "approved"}
+                      onClick={() => reviewLine({ lineId: l._id, decision: "approved" })}
+                      className={DEC_BTN}
+                      style={decStyle(l.decision === "approved", "--color-ok")}
+                    >
+                      {l.decision === "approved" ? "✓ approved" : "approve"}
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={l.decision === "edited"}
+                      onClick={() => correct(l)}
+                      title="set or adjust the unit price (you can re-correct anytime)"
+                      className={DEC_BTN}
+                      style={decStyle(l.decision === "edited", "--color-accent")}
+                    >
+                      {l.decision === "edited"
+                        ? `✓ edited · ${usd(l.unitPrice)}`
+                        : l.poUnitPrice != null || l.catalogPrice != null
                           ? `correct → ${usd(l.poUnitPrice ?? l.catalogPrice)}`
                           : "correct"}
-                      </button>
-                      <button
-                        onClick={() => reviewLine({ lineId: l._id, decision: "rejected" })}
-                        className="rounded bg-[--color-bad]/15 px-2 py-0.5 text-xs text-[--color-bad]"
-                      >
-                        reject
-                      </button>
-                    </div>
-                  )}
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={l.decision === "rejected"}
+                      onClick={() => reviewLine({ lineId: l._id, decision: "rejected" })}
+                      className={DEC_BTN}
+                      style={decStyle(l.decision === "rejected", "--color-bad")}
+                    >
+                      {l.decision === "rejected" ? "✓ rejected" : "reject"}
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -259,6 +268,22 @@ export default function InvoiceReview() {
       </div>
     </main>
   );
+}
+
+// Decision buttons: a static base class (Tailwind needs static strings) plus an
+// inline style so the *active* decision is filled in its tone via CSS vars.
+const DEC_BTN =
+  "rounded-md border px-2.5 py-1 text-left text-xs transition-colors hover:opacity-90";
+
+function decStyle(active: boolean, v: string) {
+  return active
+    ? {
+        background: `color-mix(in oklch, var(${v}) 22%, transparent)`,
+        color: `var(${v})`,
+        borderColor: `var(${v})`,
+        fontWeight: 600,
+      }
+    : { background: "transparent", color: "var(--color-muted)", borderColor: "var(--color-line)" };
 }
 
 function providerLabel(provider?: string, model?: string): string {
