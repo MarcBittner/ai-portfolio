@@ -16,7 +16,7 @@ LATENCY_SLO = 0.95
 def compute(snap: dict) -> dict:
     total = snap["total"]
     error_rate = snap["error_rate"]
-    budget = 1 - AVAILABILITY_SLO                      # allowed error fraction
+    budget = round(1 - AVAILABILITY_SLO, 6)            # allowed error fraction
     consumed = (error_rate / budget) if budget else 0.0
     remaining = max(0.0, 1 - consumed)
     burn = round(error_rate / budget, 2) if budget else 0.0

@@ -76,12 +76,14 @@ def traces(limit: int = 25) -> dict:
 # ---- on-call: compress telemetry into an incident summary (LLM) --------------
 
 @app.post("/incident/summary")
-def incident_summary(req: IncidentRequest) -> dict:
+def incident_summary(req: IncidentRequest | None = None) -> dict:
     """Compress the current SLO snapshot + error spans into an on-call incident
     summary, a deterministically-classified severity, and the matching runbook
     steps. Routes through the LLM chain; the offline drafter is the terminal,
     zero-key fallback. When ``client_summary`` is present (browser→host Ollama),
-    the server uses it as the narrative instead of calling its own LLM."""
+    the server uses it as the narrative instead of calling its own LLM. The body
+    is optional — a bare POST summarizes the live state."""
+    req = req or IncidentRequest()
     return incident.summarize(mode=req.mode, client_summary=req.client_summary)
 
 

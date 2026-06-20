@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# run.sh — dev/ops entrypoint for reconcile (replaces make).
+# run.sh — dev/ops entrypoint for rate-atlas (replaces make).
 # Production-grade: strict mode, dependency + version checks, --flag options.
 set -euo pipefail
 
