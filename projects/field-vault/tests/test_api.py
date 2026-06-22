@@ -60,3 +60,28 @@ def test_audit_verify():
                                   "field": "dx_code"})
     assert client.get("/audit").json()["length"] >= 1
     assert client.get("/audit/verify").json()["ok"] is True
+
+
+def test_notes_detect_returns_telemetry():
+    """The PHI detector returns the routing telemetry the Diagnostics view shows."""
+    r = client.post("/notes/detect",
+                    json={"note": "Ada Quill DOB 1972-03-14 at 415-555-1071",
+                          "mode": "offline"}).json()
+    assert r["provider"] == "offline" and r["model"] == "deterministic"
+    assert r["phi_found"] >= 1
+    assert {"provider", "model", "latency_ms", "phi_found"} <= set(r)
+
+
+def test_notes_detect_benchmark_skips_audit():
+    """The Diagnostics benchmark calls /notes/detect with audit_log=false so it
+    never pollutes the tamper-evident chain."""
+    _reset()
+    before = client.get("/audit").json()["length"]
+    client.post("/notes/detect", json={"note": "Ada Quill DOB 1972-03-14",
+                                        "mode": "offline", "audit_log": False})
+    assert client.get("/audit").json()["length"] == before
+    # the default (audit_log omitted) DOES append a value-free scrub entry
+    client.post("/notes/detect", json={"note": "Ada Quill DOB 1972-03-14",
+                                        "mode": "offline"})
+    assert client.get("/audit").json()["length"] == before + 1
+    assert client.get("/audit/verify").json()["ok"] is True

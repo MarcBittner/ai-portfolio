@@ -186,6 +186,37 @@
   .chainline{font-family:var(--mono);font-size:11.5px;color:var(--ink-dim);
     background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);padding:8px 11px;word-break:break-word}
   .drawer .foot{margin-top:auto;padding:16px 20px;border-top:1px solid var(--line);display:flex;gap:10px}
+  /* POLISH KIT: guided demo step list (matches rate-atlas/slo-kit) */
+  .steplist{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  @media(max-width:860px){.steplist{grid-template-columns:1fr 1fr}}
+  .steplist li{position:relative}
+  .steplist a{display:flex;align-items:center;gap:11px;padding:11px 13px;border:1px solid var(--line);
+    border-radius:var(--r-sm);background:var(--surface-2);text-decoration:none;color:inherit;
+    transition:transform .18s var(--ease),border-color .18s var(--ease),box-shadow .18s var(--ease)}
+  .steplist a:hover{border-color:color-mix(in oklch,var(--accent) 40%,var(--line));transform:translateY(-2px);box-shadow:var(--sh)}
+  .steplist a b{display:block;font-size:13px;color:var(--ink)}
+  .steplist a span:last-child{display:block;font-size:11px;color:var(--ink-dim);margin-top:2px;line-height:1.35}
+  .steplist .sn{width:24px;height:24px;border-radius:50%;flex:none;display:grid;place-items:center;
+    font-size:12px;font-weight:700;color:var(--accent-ink);background:var(--grad)}
+  /* in-panel step badge */
+  .stepn{width:21px;height:21px;border-radius:50%;display:inline-grid;place-items:center;flex:none;
+    font-size:11.5px;font-weight:700;color:var(--accent-ink);background:var(--grad);margin-right:2px}
+  .panel h2 .stepn+*{} /* keep the accent bar before the number */
+  [id^="step"]{scroll-margin-top:78px}
+  /* DIAGNOSTICS: resolved engine cards + cross-mode benchmark */
+  .diaggrid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  @media(max-width:720px){.diaggrid{grid-template-columns:1fr 1fr}}
+  .diagcard{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);padding:13px 14px}
+  .diagcard .k{color:var(--ink-faint);font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+  .diagcard .v{font-size:17px;font-weight:700;margin-top:6px;letter-spacing:-.2px;word-break:break-word}
+  .diagcard .v.mono{font-family:var(--mono);font-size:13px;font-weight:600}
+  #dgbench{width:100%}
+  #dgbench th,#dgbench td{padding:8px 10px;font-size:12.5px}
+  #dgbench .num{text-align:right;font-variant-numeric:tabular-nums}
+  #dgbench td.bprov{font-weight:600}
+  #dgbench tr.activerow td{background:color-mix(in oklch,var(--accent) 10%,transparent)}
+  .modechip{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 9px;border-radius:6px;
+    background:var(--surface-3);border:1px solid var(--line);color:var(--ink-dim)}
   /* POLISH KIT: help modal (centered dialog, reuses scrim) */
   #help{position:fixed;top:50%;left:50%;transform:translate(-50%,calc(-50% + 12px));z-index:70;
     width:560px;max-width:94vw;max-height:86vh;overflow:auto;opacity:0;pointer-events:none;
@@ -340,8 +371,18 @@
 </header>
 
 <main>
-  <div class="panel full reveal">
-    <h2>Access console <span class="muted" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">request a field as a role</span></h2>
+  <!-- GUIDED DEMO PATH: an obvious flow for a first-time visitor -->
+  <div class="full reveal" id="steps">
+    <ol class="steplist">
+      <li><span class="sn">1</span><a href="#step1"><b>Scrub a clinical note</b><span>LLM finds PHI → code redacts &amp; audits</span></a></li>
+      <li><span class="sn">2</span><a href="#step2"><b>Re-identification risk</b><span>k-anonymity — tokenizing isn't enough</span></a></li>
+      <li><span class="sn">3</span><a href="#step3"><b>Least-privilege access</b><span>request a field as a role + purpose</span></a></li>
+      <li><span class="sn">4</span><a href="#step4"><b>Verify the audit chain</b><span>tamper one entry → re-verify</span></a></li>
+    </ol>
+  </div>
+
+  <div class="panel full reveal" id="step3">
+    <h2><span class="stepn">3</span>Access console <span class="muted" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">request a field as a role</span></h2>
     <div class="body">
       <div class="ctls">
         <label class="ctl"><span>role</span><select id="role"></select></label>
@@ -372,9 +413,14 @@
     <div class="body" style="padding:0;overflow-x:auto"><table id="scores"></table></div>
   </div>
 
-  <div class="panel full reveal">
-    <h2>PHI in free text <span class="muted" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">LLM finds what column rules miss · routing <span id="llmstat">offline</span></span></h2>
+  <div class="panel full reveal" id="step1">
+    <h2><span class="stepn">1</span>PHI in free text
+      <span class="badge b-info" id="servedby" style="margin-left:auto" title="served by — the provider that detected the last note's PHI spans">served by: offline</span></h2>
     <div class="body" style="padding:16px">
+      <div class="muted" style="margin-bottom:10px">Column rules can't reach a name, DOB, phone, or SSN buried in prose.
+        The <b>LLM reads the note and returns the PHI spans</b>; deterministic code does the redaction and the
+        value-free audit entry (<i>LLM reads, code decides</i>). Routes
+        <code>local Ollama (browser→host) → paid → free → a deterministic regex+roster detector</code>, so it runs with zero keys.</div>
       <textarea id="note" rows="3">Member Ada Quill (DOB 1972-03-14) seen on 2026-01-08 for type 2 diabetes follow-up. Reachable at 415-555-1071 or ada.quill@example.com. Plan: recheck A1c in 3 months.</textarea>
       <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
         <button class="btn primary" id="scrub"><span class="spin"></span><span class="lbl">Detect &amp; redact</span></button>
@@ -384,18 +430,49 @@
     </div>
   </div>
 
-  <div class="panel full reveal">
-    <h2>Re-identification risk <span class="muted" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">k-anonymity — tokenizing isn't enough</span></h2>
+  <div class="panel full reveal" id="step2">
+    <h2><span class="stepn">2</span>Re-identification risk <span class="muted" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">k-anonymity — tokenizing isn't enough</span></h2>
     <div class="body" style="padding:16px"><div id="kanon"><span class="muted">loading…</span></div></div>
   </div>
 
-  <div class="panel full reveal">
-    <h2>Tamper-evident access audit</h2>
+  <div class="panel full reveal" id="step4">
+    <h2><span class="stepn">4</span>Tamper-evident access audit
+      <span class="muted" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">hash-chained · who/what/why/decision · never a value</span></h2>
     <div class="body" style="padding:0;max-height:300px;overflow:auto"><table id="audit"></table></div>
     <div class="verifybar">
       <button class="btn" id="verify">Verify chain</button>
       <button class="chip" id="tamper">Tamper #0 (demo)</button>
       <span id="vres" class="muted" style="margin-left:auto">—</span>
+    </div>
+  </div>
+
+  <!-- DIAGNOSTICS: resolved provider/model/latency + routing chain + cross-mode benchmark -->
+  <div class="panel full reveal" id="step5">
+    <h2><span class="stepn">5</span>Engine diagnostics
+      <span class="muted" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">the technical view behind the PHI detector</span></h2>
+    <div class="body">
+      <div class="diaggrid">
+        <div class="diagcard"><div class="k">Resolved provider</div><div class="v" id="dgprov">—</div></div>
+        <div class="diagcard"><div class="k">Model</div><div class="v mono" id="dgmodel">—</div></div>
+        <div class="diagcard"><div class="k">Latency</div><div class="v" id="dglat">—</div></div>
+        <div class="diagcard"><div class="k">PHI spans found</div><div class="v" id="dgphi">—</div></div>
+      </div>
+      <div class="muted" style="margin:12px 0 4px">Active routing chain <span class="hint" id="dgmode" style="margin-left:6px">mode: auto</span></div>
+      <div class="chainline" id="dgchain" style="margin-bottom:14px">offline (deterministic)</div>
+
+      <div class="row" style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-top:6px">
+        <div class="muted" style="max-width:640px">
+          <b style="color:var(--ink)">Detector benchmark.</b> Run the note above through
+          <b>every routing mode</b> and compare the resolved provider, model, latency, and PHI spans found.
+          <code>local</code> is exercised <b>in your browser</b> (the cloud server can't reach a model on your
+          machine), so it needs host Ollama running — otherwise that row falls back to the deterministic detector.
+          Benchmark runs don't touch the audit chain.
+        </div>
+        <button class="btn primary" id="dgrun"><span class="spin"></span><span class="lbl">Run benchmark</span></button>
+      </div>
+      <div id="dgbenchwrap" style="margin-top:14px;display:none;overflow-x:auto">
+        <table id="dgbench"></table>
+      </div>
     </div>
   </div>
 </main>
@@ -476,16 +553,19 @@
   <div class="body">
     <div><h4>What it is</h4><p>A field-level de-identification gateway: least-privilege access to PHI by role,
       tokenized direct identifiers, k-anonymity risk, and a tamper-evident audit chain.</p></div>
-    <div><h4>How to use</h4><ol>
-      <li><b>Scrub a note</b> — paste free text into <i>PHI in free text</i> and click <i>Detect &amp; redact</i>.</li>
-      <li><b>View k-anonymity</b> — see the <i>Re-identification risk</i> panel for k_min and singletons.</li>
-      <li><b>Request field access</b> — pick a role, record, field, purpose in the <i>Access console</i>.</li>
-      <li><b>Verify the audit</b> — click <i>Verify chain</i>; try <i>Tamper</i> to break it, then re-verify.</li>
+    <div><h4>Guided demo path</h4><ol>
+      <li><b>Scrub a clinical note</b> — paste free text into <i>PHI in free text</i> and click <i>Detect &amp; redact</i>; the model finds the spans, code redacts them and writes a value-free audit entry.</li>
+      <li><b>Re-identification risk</b> — the <i>k-anonymity</i> panel shows k_min and singletons: tokenizing direct identifiers isn't enough, rows are still re-identifiable by linkage.</li>
+      <li><b>Least-privilege access</b> — in the <i>Access console</i> pick a role, record, field, purpose; re-identifying a direct identifier needs both the role and a valid purpose.</li>
+      <li><b>Verify the audit</b> — click <i>Verify chain</i>; try <i>Tamper</i> to break a logged entry, then re-verify to watch detection fire.</li>
+      <li><b>Inspect the engine</b> — <i>Engine diagnostics</i> shows the resolved provider/model/latency and a benchmark across all routing modes (offline · paid · free · local browser→host).</li>
     </ol></div>
+    <div><h4>Cold start</h4><p>This runs on a free dyno that sleeps when idle — first load takes ~30–60s.
+      On a cold start the <b>audit log is empty</b> until you make a request; that's expected, not a bug.</p></div>
     <div><h4>Endpoints</h4><div class="eps">
-      <code>/notes/detect</code><code>/privacy</code><code>/access</code>
+      <code>/notes/detect</code><code>/privacy</code><code>/privacy/sweep</code><code>/access</code>
       <code>/audit/verify</code><code>/evals</code><code>/llm</code></div></div>
-    <div><h4>Keyboard shortcuts</h4><p><span class="kbd">?</span> open this help · <span class="kbd">Esc</span> close any overlay</p></div>
+    <div><h4>Keyboard shortcuts</h4><p><span class="kbd">?</span> open this help · <span class="kbd">G</span> / <span class="kbd">⌘K</span> all demos · <span class="kbd">Esc</span> close any overlay</p></div>
     <div><p class="muted" style="font-size:11.5px">All records and notes are <b>synthetic</b> — no real PHI.</p></div>
   </div>
 </aside>
@@ -524,8 +604,8 @@ $("#gear").onclick=openDrawer;$("#closedrawer").onclick=closeDrawer;$("#scrim").
 $("#savecfg").onclick=()=>{cfg={role:$("#cfgRole").value,purpose:$("#cfgPurpose").value,
     mode:$("#modeseg").querySelector('[aria-pressed="true"]')?.dataset.mode||"auto",
     model:$("#cfgModel").value.trim()};
-  localStorage.setItem(CFG_KEY,JSON.stringify(cfg));applyCfgToConsole();renderRouting();closeDrawer();toast("Settings saved","ok")};
-$("#resetcfg").onclick=()=>{cfg={role:"analyst",purpose:"",mode:"auto",model:""};localStorage.removeItem(CFG_KEY);applyCfgToForm();applyCfgToConsole();renderRouting();toast("Reset to defaults","info")};
+  localStorage.setItem(CFG_KEY,JSON.stringify(cfg));applyCfgToConsole();renderRouting();renderDiagChain();closeDrawer();toast("Settings saved","ok")};
+$("#resetcfg").onclick=()=>{cfg={role:"analyst",purpose:"",mode:"auto",model:""};localStorage.removeItem(CFG_KEY);applyCfgToForm();applyCfgToConsole();renderRouting();renderDiagChain();toast("Reset to defaults","info")};
 
 function cell(v){
   if(isTok(v))return `<span class="tok">${v}</span>`;
@@ -622,6 +702,9 @@ async function scrub(){
     const types=Object.entries(r.by_type).map(([k,v])=>`${k}×${v}`).join(", ")||"none";
     $("#scrubres").innerHTML=`<div style="line-height:1.6">${red}</div>`;
     $("#scrubmeta").textContent=`${r.provider} · ${r.phi_found} PHI (${types}) · ${r.latency_ms}ms`;
+    setServedBy(r.provider);   // visible served-by indicator
+    updateDiag(r);             // reflect the resolved provider/model/latency in Diagnostics
+    refreshAudit();            // the scrub appended a value-free audit entry
   }catch(e){$("#scrubres").textContent="detection failed";}
   btn.classList.remove("loading");
 }
@@ -636,9 +719,7 @@ async function loadPrivacy(){
 }
 async function loadLlm(){
   try{const s=await j("llm");llmProviders=s.providers||{};
-    const active=Object.entries(llmProviders).find(e=>e[1]);
-    $("#llmstat").textContent=active?active[0]:"offline (deterministic)";
-    renderRouting();}catch{}
+    renderRouting();renderDiagChain();}catch{}
 }
 
 /* ===================== POLISH KIT: theme toggle ===================== */
@@ -759,8 +840,87 @@ function renderRouting(){
 async function refreshClientOllama(){
   clientOllama = !!(await probeOllama());
   renderRouting();
+  renderDiagChain();
 }
-$$("#modeseg .segbtn").forEach(b=>b.onclick=()=>{selectMode(b.dataset.mode);renderRouting();});
+$$("#modeseg .segbtn").forEach(b=>b.onclick=()=>{selectMode(b.dataset.mode);renderRouting();renderDiagChain();});
+
+/* ===================== served-by indicator ===================== */
+function setServedBy(provider){
+  const el=$("#servedby"); if(!el) return;
+  const p=provider||"offline";
+  el.textContent=`served by: ${p}`;
+  el.className="badge "+(/offline/.test(p)?"b-info":"b-allow");
+  el.title=`served by — the provider that detected the last note's PHI spans (${p})`;
+}
+
+/* ===================== DIAGNOSTICS: resolved engine + cross-mode benchmark =====================
+   Cards reflect the last real note scrub; the chain mirrors the active routing mode.
+   The benchmark runs the current note through every mode: server-side modes hit
+   /notes/detect (audit_log:false), and `local` runs in the browser via the same
+   browser→host Ollama bridge the scrub flow uses (the cloud can't reach your host). */
+function fmtLat(ms){ if(ms==null)return "—"; return ms<1000?Math.round(ms)+" ms":(ms/1000).toFixed(2)+" s"; }
+function updateDiag(r){
+  if(!r)return;
+  $("#dgprov").textContent=r.provider||"—";
+  $("#dgmodel").textContent=r.model||"—";
+  $("#dglat").textContent=fmtLat(r.latency_ms);
+  $("#dgphi").textContent=(r.phi_found==null?"—":r.phi_found);
+}
+function renderDiagChain(){
+  const m=currentMode();
+  $("#dgmode").textContent=`mode: ${m}`;
+  const chain=(MODE_CHAIN[m]||[]).filter(p=>p.startsWith("ollama")?clientOllama:llmProviders[p]);
+  $("#dgchain").textContent=[...chain,"offline (deterministic)"].join("  →  ");
+}
+const DG_MODES=["auto","paid","local","free","offline"];
+async function benchOne(mode){
+  const note=$("#note").value;
+  // local mode: run detection on host Ollama from the browser (browser→host), timed here.
+  if(mode==="local"){
+    const base=await probeOllama();
+    if(!base)return {mode,provider:"—",model:"—",latency_ms:null,phi:null,
+      err:"no host Ollama reachable from the browser"};
+    try{
+      const t0=performance.now();
+      const spans=await ollamaDetect(base,note);
+      const dt=Math.round(performance.now()-t0);
+      return {mode,provider:"ollama (browser→host)",model:cfg.model||"llama3.1:8b",
+        latency_ms:dt,phi:Array.isArray(spans)?spans.length:null,err:null};
+    }catch{return {mode,provider:"ollama (browser→host)",model:cfg.model||"llama3.1:8b",
+      latency_ms:null,phi:null,err:"ollama call failed (browser→host)"};}
+  }
+  // server-side modes: ask /notes/detect to detect only (no audit entry), report telemetry.
+  try{
+    const r=await j("notes/detect",{method:"POST",headers:{"content-type":"application/json"},
+      body:JSON.stringify({note,mode,audit_log:false})});
+    return {mode,provider:r.provider,model:r.model,latency_ms:r.latency_ms,phi:r.phi_found,err:null};
+  }catch{return {mode,provider:"—",model:"—",latency_ms:null,phi:null,err:"request failed"};}
+}
+async function runBenchmark(){
+  const btn=$("#dgrun");btn.classList.add("loading");
+  const cur=currentMode();
+  try{
+    const rows=[];
+    for(const m of DG_MODES){ rows.push(await benchOne(m)); }
+    $("#dgbenchwrap").style.display="block";
+    $("#dgbench").innerHTML=
+      `<thead><tr><th>mode</th><th>resolved provider</th><th>model</th>
+        <th class="num">latency</th><th class="num">PHI found</th></tr></thead><tbody>`+
+      rows.map(r=>{
+        const active=r.mode===cur?' class="activerow"':"";
+        const phi=r.err?`<span class="badge b-block" title="${(r.err||'').replace(/"/g,'&quot;')}">err</span>`
+          :`${r.phi}`;
+        return `<tr${active}><td><span class="modechip">${r.mode}</span></td>
+          <td class="bprov">${r.provider}</td>
+          <td class="mono">${r.model}</td>
+          <td class="num">${fmtLat(r.latency_ms)}</td>
+          <td class="num">${phi}</td></tr>`;
+      }).join("")+`</tbody>`;
+    toast("Benchmark complete","ok");
+  }catch{toast("Benchmark failed — try again","bad");}
+  btn.classList.remove("loading");
+}
+$("#dgrun").onclick=runBenchmark;
 
 async function boot(){
   loadCfg();
@@ -789,7 +949,8 @@ async function boot(){
   try{renderScores((await j("scores")).providers);}catch{}
   await refreshAudit();
   loadLlm(); loadPrivacy();
-  refreshClientOllama();   // browser-side Ollama check (browser→host)
+  await refreshClientOllama();   // browser-side Ollama check (browser→host)
+  renderDiagChain();
   try{await scrub();}catch{}
   // run the care_coordinator + treatment re-identify example so the panel is populated
   try{
@@ -823,18 +984,68 @@ boot();
   setTimeout(syncOllamaModels,1200);
 })();
 
-/* POLISH KIT: about/stack */
+/* ABOUT: grouped stack + how the LLM is used + design principles, security-and-
+   compliance framed. Injected into the Help drawer so it stays a single-page console. */
 (function(){
   var h=document.getElementById("help"); if(!h || h.querySelector(".about-stack")) return;
-  var items=["Python 3.11", "FastAPI", "zero-build HTML/JS console", "HMAC tokenization", "one-way generalization", "hash-chained audit", "k-anonymity", "LLM PHI detection in notes"]; var llm="paid (Anthropic/OpenAI) \u2192 local Ollama \u2192 free (OpenRouter) \u2192 deterministic offline; the Ollama call runs in your browser (browser\u2192host)";
-  var d=document.createElement("div"); d.className="about-stack";
-  d.style.cssText="margin-top:16px;padding-top:14px;border-top:1px solid var(--line)";
-  d.innerHTML='<h4 style="margin:0 0 8px">Built with</h4>'
-    +'<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">'
-    +items.map(function(s){return '<span style="font-size:11.5px;border:1px solid var(--line);border-radius:999px;padding:3px 10px;color:var(--ink-dim);background:var(--surface-2)">'+s+'</span>';}).join('')
-    +'</div>'
-    +'<p style="margin:0;font-size:11.5px;color:var(--ink-faint)"><b>LLM routing:</b> '+llm+'</p>';
-  h.appendChild(d);
+  var STACK=[
+    ["Core engine", [
+      ["Python 3.11 + FastAPI","stateless de-identification API + zero-build static console"],
+      ["HMAC field tokenization","direct identifiers \u2192 stable, keyed tokens; reversible only through the vault"],
+      ["One-way generalization","quasi-identifiers coarsened (DOB\u2192year, ZIP\u2192prefix) \u2014 not reversible"],
+      ["k-anonymity engine","re-identification-by-linkage risk (k_min, singletons) + a generalization sweep"]
+    ]],
+    ["Access & audit", [
+      ["Least-privilege policy","role \u00d7 field-class \u00d7 action \u00d7 purpose-of-use \u2192 allow/deny, enforced server-side"],
+      ["Purpose-bound re-identification","recovering a direct identifier needs the role AND a valid purpose"],
+      ["Tamper-evident audit","SHA-256 hash-chained log of who/what/why/decision \u2014 never a field value; verify reports the first broken link"]
+    ]],
+    ["AI / LLM (PHI in free text)", [
+      ["Local Ollama (browser\u2192host)","your machine's model, used even against the cloud backend"],
+      ["Anthropic (Claude) / OpenAI","paid path \u2014 best free-text PHI recall"],
+      ["OpenRouter free models","zero-cost default (gemma-4-31b-it:free)"],
+      ["Deterministic regex+roster detector","no-model fallback; detection (and the eval) run with zero keys"]
+    ]],
+    ["Hosting & CI", [
+      ["Docker \u2192 Render (free)","same image runs anywhere; cold-starts ~30\u201360s; no keys/PHI on the public host"],
+      ["GitHub Actions","ruff + pytest + a live smoke/regression suite as the quality gate"]
+    ]]
+  ];
+  var PRINCIPLES=[
+    "LLM reads, code decides \u2014 the model only returns PHI spans; deterministic code does the redaction and the value-free audit entry.",
+    "Spans are validated against the schema and must literally appear in the note (no invented or normalized values).",
+    "De-identification happens at ingest; the analytics surface (provider outcome score) never touches a direct identifier.",
+    "Re-identification is a separate, stricter, purpose-bound action \u2014 and every read, allowed or denied, is logged.",
+    "The audit chain records who/what/why/decision and counts \u2014 never the value that was read.",
+    "A provider is used only when its key is set (or Ollama probes reachable); offline is a true last resort \u2014 degrade to deterministic, never to an error.",
+    "Detection quality is measured by an eval (precision/recall/F1 over labeled notes); recall IS the leak metric, not asserted."
+  ];
+  var html='<div class="about-stack" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line)">'
+    +'<h4 style="margin:0 0 4px">About field-vault</h4>'
+    +'<p style="margin:0 0 12px;font-size:12.5px;color:var(--ink-dim)">A field-level de-identification gateway for regulated records: '
+    +'tokenize direct identifiers and generalize quasi-identifiers at ingest \u2192 serve least-privilege, audited field access \u2192 '
+    +'gate re-identification behind purpose-of-use \u2192 score re-identification risk with k-anonymity \u2192 catch PHI hiding in free-text '
+    +'notes with an LLM. Sample claims are synthetic and fictional; field-vault runs on your own real records too \u2014 in the demo, no real PHI.</p>';
+  STACK.forEach(function(g){
+    html+='<div style="font-size:10.5px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--ink-faint);margin:12px 0 6px">'+g[0]+'</div>';
+    g[1].forEach(function(it){
+      html+='<div style="display:flex;gap:10px;margin:0 0 5px;font-size:12px"><span style="min-width:188px;font-weight:600;color:var(--ink)">'+it[0]+'</span><span style="color:var(--ink-dim)">'+it[1]+'</span></div>';
+    });
+  });
+  html+='<div style="font-size:10.5px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--ink-faint);margin:14px 0 6px">Design principles</div>';
+  PRINCIPLES.forEach(function(p){
+    html+='<div style="display:flex;gap:8px;margin:0 0 5px;font-size:12px;color:var(--ink-dim)"><span style="color:var(--accent)">\u25b8</span><span>'+p+'</span></div>';
+  });
+  html+='<div style="font-size:10.5px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--ink-faint);margin:14px 0 6px">Security &amp; compliance framing</div>'
+    +'<p style="margin:0 0 10px;font-size:12px;color:var(--ink-dim)">The same data-handling discipline behind SOC\u00a02 / CCPA / GDPR programs and '
+    +'production PII redaction, applied to sensitive records: <b>least privilege</b>, <b>purpose-of-use</b>, <b>tamper-evident audit</b>, '
+    +'<b>de-identification with measured re-identification risk</b>, and an <b>LLM-in-the-loop where the model never makes the trust-critical decision</b>. '
+    +'It maps cleanly onto warehouse access governance (column masking, row-access policy, k-anonymity) and an AI-forward security org.</p>';
+  html+='<p style="margin:12px 0 0;font-size:11px;color:var(--ink-faint)">A portfolio demo on the '
+    +'<b>Python \u00b7 FastAPI \u00b7 HMAC tokenization \u00b7 hash-chained audit \u00b7 k-anonymity \u00b7 LLM</b> stack.</p>'
+    +'</div>';
+  var d=document.createElement("div"); d.innerHTML=html;
+  h.appendChild(d.firstChild);
 })();
 
 /* SHOWCASE: loading bar + result fade-in */
@@ -844,7 +1055,7 @@ boot();
   window.fetch=function(){ inflight++; bar.classList.add("on");
     return _f.apply(this,arguments).finally(function(){ inflight=Math.max(0,inflight-1);
       if(inflight===0) setTimeout(function(){ if(inflight===0) bar.classList.remove("on"); },220); }); };
-  var ids=["scrubres","kanon","highlight","redacted","result","records","scores","audit","provrows"];
+  var ids=["scrubres","kanon","highlight","redacted","result","records","scores","audit","provrows","dgbench"];
   ids.forEach(function(id){ var el=document.getElementById(id); if(!el) return;
     new MutationObserver(function(){ el.classList.remove("fx-in"); void el.offsetWidth; el.classList.add("fx-in"); })
       .observe(el,{childList:true}); });

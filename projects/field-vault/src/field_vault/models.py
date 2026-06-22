@@ -20,6 +20,7 @@ class NoteRequest(BaseModel):
     note: str | None = None       # raw note text, or…
     record_id: str | None = None  # …a record whose intake note to scrub
     mode: str | None = None       # auto | paid | local | free | offline
+    audit_log: bool = True        # append a value-free scrub entry (off for benchmarks)
     # PHI spans the BROWSER obtained from a host-local Ollama (browser→host).
     # The cloud server can't reach your machine's Ollama; the browser can, so when
     # these are supplied the server skips its own LLM call and uses them — letting a

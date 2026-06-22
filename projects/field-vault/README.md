@@ -38,6 +38,13 @@ its keep:
 > runs fully offline (the LLM chain falls back to a deterministic detector). The audit log records *who/what/why/decision*, **never a field
 > value**.
 
+This is the same data-handling discipline behind **SOC 2 / CCPA / GDPR** programs and
+production **PII redaction** — least privilege, purpose-of-use, tamper-evident audit,
+de-identification with a *measured* re-identification risk, and an LLM-in-the-loop that
+never makes the trust-critical decision — applied to sensitive records. It maps directly
+onto warehouse access governance (column masking, row-access policy, k-anonymity) and an
+AI-forward security org. (It's a from-scratch reference, not a HIPAA-certified system.)
+
 ## Contents
 
 - [Architecture](#architecture)
@@ -195,6 +202,16 @@ it fell through.
 detector is always terminal, so the service never fails for lack of a key — it
 degrades to deterministic, not to an error.
 
+**Browser→host Ollama.** A cloud-hosted server can't reach a model running on your
+laptop, but your *browser* can. In `local`/`auto` mode the console probes
+`localhost:11434/11435`, runs the same PHI-detection prompt against your host Ollama,
+and submits the spans to `/notes/detect` as `client_spans`; the server validates them
+against the schema (each must literally appear in the note) and skips its own LLM call.
+So the public demo runs a **real local model for free** when you have one — every other
+provider stays server-side. The **served-by** badge on the PHI panel and the **Engine
+diagnostics** view (resolved provider/model/latency + a benchmark across every routing
+mode) make the active path honest and visible.
+
 ## Evals
 
 `./run.sh eval` (or `GET /evals`) scores PHI detection over the labeled note set
@@ -286,7 +303,10 @@ added. Three cardinal invariants hold by construction:
 `POST /access` body: `{ "role": "care_coordinator", "record_id": "rec-0001",
 "field": "member_name", "purpose": "treatment", "reidentify": true }`.
 `POST /notes/detect` body: `{ "note": "<free text>" }` or `{ "record_id":
-"rec-0004" }` (scrub a record's intake note); optional `"mode"` pins the tier.
+"rec-0004" }` (scrub a record's intake note); optional `"mode"` pins the tier,
+`"audit_log": false` detects without appending a scrub entry (used by the Diagnostics
+benchmark so it never touches the chain), and `"client_spans"` lets the browser→host
+Ollama path submit pre-detected spans.
 
 ## Code map
 
