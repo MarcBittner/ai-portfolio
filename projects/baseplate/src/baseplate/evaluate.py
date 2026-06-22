@@ -1,12 +1,12 @@
-"""Reproducible eval: the scaffolder produces valid paved-road files for a
-labeled set of service specs, plus the data-quality SLI on the ingest sample.
+"""Reproducible eval: the scaffolder produces valid platform files for a
+labeled set of service specs, plus the data-quality score on the ingest sample.
 
 For each labeled spec we run the offline parser (the deterministic fallback) on
 its description and assert the extracted ServiceSpec matches the label; then we
 generate the files and assert (a) every required file is present, (b) the
 generated Kubernetes manifest parses as YAML, and (c) the manifest carries the
-paved-road invariants (non-root, probes when HTTP, a PodDisruptionBudget). We
-also score the ingest sample's data-quality pass rate (the SLI).
+platform's standard guarantees (non-root, probes when HTTP, a
+PodDisruptionBudget). We also score the ingest sample's data-quality pass rate.
 
 Writes ``eval-report.md`` at the project root and prints a summary. Deterministic
 offline, so the report reproduces to the digit with zero keys; set ``LLM_MODE`` /
@@ -126,9 +126,9 @@ def _render(r: dict) -> str:
         "## Scaffolder",
         "",
         f"Over **{r['scaffold_total']}** labeled service descriptions: extract the "
-        "ServiceSpec, generate the paved-road files, and assert every required "
+        "service spec, generate the platform files, and assert every required "
         "file is present, the Kubernetes manifest parses as YAML, and it carries "
-        "the paved-road invariants (non-root, probes when HTTP, a "
+        "the platform's standard guarantees (non-root, probes when HTTP, a "
         "PodDisruptionBudget).",
         "",
         f"**{r['scaffold_pass']}/{r['scaffold_total']} cases passed.**",
@@ -144,25 +144,25 @@ def _render(r: dict) -> str:
                      f"{c['files_generated']} | {inv} |")
     lines += [
         "",
-        "## Data-quality SLI (example ingest workload)",
+        "## Data-quality score (example ingest workload)",
         "",
         f"The synthetic machine-readable rate file has **{dq['rows']}** rows; "
         f"**{dq['valid']}** pass schema validation, so the **data-quality pass "
-        f"rate = {dq['data_quality_pass_rate']}** (the SLI). A service can return "
-        "200s while serving bad data, which is why data-quality is an SLI in its "
-        "own right (see `docs/observability.md`).",
+        f"rate = {dq['data_quality_pass_rate']}**. A service can return "
+        "200s while serving bad data, which is why data-quality is tracked as a "
+        "health signal in its own right (see `docs/observability.md`).",
         "",
         "| metric | value |",
         "| --- | --- |",
         f"| rows | {dq['rows']} |",
         f"| valid | {dq['valid']} |",
         f"| invalid | {dq['invalid']} |",
-        f"| data-quality pass rate (SLI) | {dq['data_quality_pass_rate']} |",
+        f"| data-quality pass rate | {dq['data_quality_pass_rate']} |",
         f"| defects | {dq['defects']} |",
         "",
         "Invariants checked: extracted spec matches the label; all required files "
         "present; generated k8s YAML parses and is non-root with probes + a PDB; "
-        "the data-quality SLI is in [0, 1].",
+        "the data-quality score is in [0, 1].",
         "",
     ]
     return "\n".join(lines)
@@ -172,9 +172,9 @@ def main() -> None:
     r = run()
     REPORT.write_text(_render(r))
     print(f"scaffolder: {r['scaffold_pass']}/{r['scaffold_total']} labeled specs "
-          "→ valid paved-road files (spec match + k8s parses + invariants)")
+          "→ valid platform files (spec match + k8s parses + invariants)")
     dq = r["data_quality"]
-    print(f"data-quality SLI: pass_rate={dq['data_quality_pass_rate']} "
+    print(f"data-quality score: pass_rate={dq['data_quality_pass_rate']} "
           f"({dq['valid']}/{dq['rows']} rows valid, defects={dq['defects']})")
     print(f"wrote {REPORT}")
 

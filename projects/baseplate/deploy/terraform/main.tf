@@ -1,7 +1,7 @@
 ###############################################################################
 # baseplate — platform foundation (ILLUSTRATIVE, "what the platform provides").
 #
-# The shared substrate every service on the paved road rides on: remote state
+# The shared infrastructure every service on the standard platform setup runs on: remote state
 # (S3 + DynamoDB lock), a VPC, an EKS cluster, and the reusable `service` module
 # (see modules/service) that each workload invokes for its ECR/IRSA/namespace/
 # RDS. NOT applied anywhere — the live demo runs on Render's free tier. The
@@ -81,7 +81,7 @@ module "eks" {
   }
 }
 
-# --- Services on the paved road: each is one `service` module block ----------
+# --- Services on the standard platform setup: each is one `service` module block ----------
 # New services are onboarded by adding a block like this (the scaffolder
 # generates it). The module gives them ECR + IRSA + namespace [+ RDS].
 module "rate_ingest" {

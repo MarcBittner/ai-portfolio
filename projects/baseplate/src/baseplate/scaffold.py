@@ -3,10 +3,10 @@
 A developer describes a new service in plain English ("a Python API that reads
 rates from Postgres and serves them over HTTP"). The scaffolder turns that into
 a structured ``ServiceSpec`` and then **deterministically** generates the
-paved-road files for it: a Dockerfile, a k8s manifest derived from the base, a
-Terraform ``service`` module invocation, a golden CI workflow, and an SLO stub.
-This is the "add a manifest, get a production-ready service" experience a paved
-road exists to provide.
+standard platform files for it: a Dockerfile, a k8s manifest derived from the
+base, a Terraform ``service`` module invocation, a standard CI/CD workflow, and
+a service-health target file. This is the "describe a service, get a
+production-ready set of deploy files" experience the platform exists to provide.
 
 The free-text → ServiceSpec step routes through the standard LLM chain
 (Anthropic/OpenAI → Ollama → OpenRouter → a deterministic offline parser). The
@@ -23,7 +23,7 @@ from dataclasses import asdict, dataclass
 
 from baseplate import llm, templates
 
-# Languages the paved road ships a base image + CI matrix for.
+# Languages the standard platform setup ships a base image + CI matrix for.
 SUPPORTED_LANGUAGES = ("python", "node", "go")
 _LANG_ALIASES = {
     "py": "python", "python3": "python", "fastapi": "python", "flask": "python",
@@ -186,11 +186,11 @@ def _coerce_json(text: str) -> dict | None:
 
 
 # --------------------------------------------------------------------------- #
-# ServiceSpec → paved-road files (deterministic templating)                   #
+# ServiceSpec → standard platform files (deterministic templating)            #
 # --------------------------------------------------------------------------- #
 
 def generate(spec: ServiceSpec) -> dict:
-    """Generate the full set of paved-road files for a normalized spec.
+    """Generate the full set of standard platform files for a normalized spec.
 
     Returns ``{"spec": {...}, "files": {path: contents}}``. Pure and
     deterministic — identical spec in, identical bytes out.

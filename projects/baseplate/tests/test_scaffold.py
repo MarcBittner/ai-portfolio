@@ -1,6 +1,6 @@
 """The scaffolder: the offline parser extracts the spec, generated files are
-present and deterministic, and the k8s manifest parses + carries the paved-road
-contract."""
+present and deterministic, and the k8s manifest parses + carries the platform's
+standard contract."""
 
 import yaml
 

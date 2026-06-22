@@ -1,6 +1,6 @@
-# baseplate — the GOLDEN CI/CD pipeline (ILLUSTRATIVE reference).
+# baseplate — the STANDARD CI/CD pipeline (ILLUSTRATIVE reference).
 #
-# This is the paved-road pipeline every service inherits; the scaffolder emits a
+# This is the standard pipeline every service inherits; the scaffolder emits a
 # per-service copy with the language test step filled in (see
 # src/baseplate/templates.py). The non-negotiable stages — and why they exist:
 #
@@ -8,10 +8,10 @@
 #   build -> test       fail fast before anything leaves CI
 #   scan                fail the build on HIGH/CRITICAL image CVEs
 #   deploy (GitOps)     bump the image tag in the repo; Argo CD reconciles
-#   post-deploy smoke   verify /health + a golden request; roll back on failure
+#   post-deploy smoke   verify /health + a known-good request; roll back on failure
 #
-# To put a service on the paved road this becomes its .github/workflows/ci.yml.
-name: golden-ci
+# To put a service on the standard platform setup this becomes its .github/workflows/ci.yml.
+name: standard-ci
 on:
   push: { branches: [main] }
   pull_request: {}

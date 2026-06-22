@@ -463,10 +463,12 @@
         <textarea id="desc" style="margin-top:6px">A Python FastAPI service called claim-ingest that reads claims from a Postgres database and serves them over HTTP</textarea>
       </label>
       <div class="note" style="margin-top:6px">Tip: give it a clear name — say <code>called claim-ingest</code> or <code>named rate-gateway</code>. When no model is running, baseplate falls back to a plain word-matching parser, so naming it explicitly helps.</div>
+      <p class="note" style="margin-top:10px"><b>Why generate?</b> Every new service needs the same boilerplate — deploy config, CI/CD, infrastructure. Instead of hand-writing it (and getting it subtly wrong) each time, describe the service once and the platform produces a consistent, review-ready set you can read in a pull request.</p>
       <div class="row" style="margin-top:12px">
         <label class="check"><input type="checkbox" id="onboard" checked> add it to the service catalog</label>
         <button class="btn primary" id="scaffoldbtn" style="margin-left:auto"><span class="spin"></span><span class="lbl">Generate the files</span></button>
       </div>
+      <p class="note" style="margin-top:8px"><b>What does "add to the service catalog" do?</b> It registers this service in the platform's inventory, so the team can see every service running on the standard setup — its language, whether it uses a database, and how it was added.</p>
       <div id="routing" class="note">Generate a service to see the spec we read from your description, and which model read it.</div>
     </div>
   </div>
@@ -489,9 +491,10 @@
 <section class="view" data-view="catalog">
   <div class="panel reveal">
     <div class="body">
-      <p class="lede">Every service generated here (plus the example workload and the platform itself).
-        This is the running inventory — what exists, what language it's in, whether it uses a database,
-        whether it serves HTTP, and how it was added.</p>
+      <p class="lede"><b>Look here to see every service the platform knows about.</b> It lists each service
+        generated here (plus the example workload and the platform itself) — what exists, what language
+        it's in, whether it uses a database, whether it serves HTTP, and how it was added. This is the
+        single inventory a platform team checks to answer "what are we running, and on what?"</p>
     </div>
   </div>
   <div class="panel reveal">
@@ -507,10 +510,10 @@
 <section class="view" data-view="health">
   <div class="panel reveal">
     <div class="body">
-      <p class="lede">Is the service healthy? Three things are tracked: <b>availability</b> (is it up),
-        <b>latency</b> (is it fast enough), and <b>is the data correct</b> — a data-quality check that runs
-        a sample healthcare price-transparency file through validation. A service can be "up" while quietly
-        serving wrong numbers, so correctness is tracked as its own health signal.</p>
+      <p class="lede"><b>Look here to answer "is this service actually healthy?"</b> Three things are tracked:
+        <b>availability</b> (is it up), <b>latency</b> (is it fast enough), and <b>is the data correct</b> — a
+        data-quality check that runs a sample healthcare price-transparency file through validation. A service
+        can be "up" while quietly serving wrong numbers, so correctness is tracked as its own health signal.</p>
     </div>
   </div>
 
@@ -519,6 +522,7 @@
     <div class="body">
       <div id="gauge" class="gauge">—</div>
       <div class="note" id="dqnote">Run a sample healthcare price-transparency file through validation to see how many rows pass.</div>
+      <p class="note" style="margin-top:8px"><b>Why run this?</b> A service can be "up" while silently serving wrong data. This runs sample healthcare price records through validation and tracks the pass rate as a monitored health metric — so you measure correctness, not just uptime.</p>
       <div class="row" style="margin-top:12px">
         <button class="btn" id="ingestbtn"><span class="spin"></span><span class="lbl">Run the data-quality check</span></button>
       </div>
@@ -541,9 +545,10 @@
 <section class="view" data-view="diag">
   <div class="panel reveal">
     <div class="body">
-      <p class="lede">Which model actually read your description, how long it took, and what it cost.
-        baseplate tries providers in order (your local model, then a paid model, then a free model,
-        then a no-model fallback) and reports honestly which one ran.</p>
+      <p class="lede"><b>Look here to see how the AI step actually ran.</b> It shows which model read your
+        description, how long it took, and what it cost. baseplate tries providers in order (your local model,
+        then a paid model, then a free model, then a no-model fallback) and reports honestly which one ran —
+        useful for trusting the result and comparing speed/cost across options.</p>
     </div>
   </div>
 

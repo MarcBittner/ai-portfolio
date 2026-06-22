@@ -190,7 +190,7 @@ def test_generate_is_pure_deterministic_templating():
 
 
 def test_generate_never_emits_secret_material():
-    # The generated paved-road files are templated from the spec only; they must
+    # The generated platform files are templated from the spec only; they must
     # never carry a planted credential value even though keys are in the env.
     spec = ServiceSpec(name="svc", language="go", needs_db=True)
     files = scaffold.generate(spec)["files"]

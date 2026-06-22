@@ -1,16 +1,17 @@
-"""The example workload riding on the paved road: a small price-transparency
-ingest service.
+"""The example workload running on the standard platform setup: a small
+price-transparency ingest service.
 
 It loads a synthetic machine-readable rate file (fictional hospitals/payers),
 validates each row against the canonical rate schema, and reports a
 **data-quality score** — the fraction of rows that pass validation. That score
-is wired up as a first-class **SLI** in ``docs/observability.md``: a service can
-be "up" (200s, low latency) while silently serving bad data, so data-quality
-pass rate is the SLI that catches it.
+is tracked as a first-class **health signal** (see ``docs/observability.md``): a
+service can be "up" (200s, low latency) while silently serving bad data, so the
+data-quality pass rate is the signal that catches it.
 
-This is deliberately lightweight. The platform tooling (IaC, golden CI, GitOps,
-the scaffolder) is the focus; this is the demo workload that proves the paved
-road carries a real, domain-relevant service. All data is synthetic and clearly
+This is deliberately lightweight. The platform tooling (reusable infrastructure,
+the standard CI/CD pipeline, GitOps delivery, the scaffolder) is the focus; this
+is the demo workload that proves the platform carries a real, domain-relevant
+service. All data is synthetic and clearly
 fictional; no real data; this makes no HIPAA claim.
 """
 
@@ -64,9 +65,9 @@ def validate_row(row: dict) -> list[str]:
 
 
 def score(rows: list[dict] | None = None) -> dict:
-    """Validate a rate file and compute the data-quality SLI.
+    """Validate a rate file and compute the data-quality score.
 
-    Returns total/valid/invalid counts, the pass-rate (the SLI value), a defect
+    Returns total/valid/invalid counts, the pass-rate (the data-quality score), a defect
     histogram, and a small sample of offending rows. Deterministic.
     """
     rows = SAMPLE_ROWS if rows is None else rows
@@ -90,7 +91,7 @@ def score(rows: list[dict] | None = None) -> dict:
         "rows": total,
         "valid": valid,
         "invalid": invalid,
-        "data_quality_pass_rate": pass_rate,   # the SLI
+        "data_quality_pass_rate": pass_rate,   # the data-quality health signal
         "defects": dict(sorted(defects.items())),
         "sample_failures": bad_rows,
     }

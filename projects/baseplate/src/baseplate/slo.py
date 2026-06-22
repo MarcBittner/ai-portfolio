@@ -1,9 +1,10 @@
-"""SLO view for the example ingest+serve workload.
+"""Service-health (SLO) view for the example ingest+serve workload.
 
-A compact, Datadog-style SLO set with computed error budgets and a burn-rate
-table. The data-quality pass rate from ``ingest.py`` feeds the data-quality SLO
-so the API can show a live SLI -> SLO -> error-budget chain. Full narrative
-(why these, multi-window burn-rate alerting) lives in docs/observability.md.
+A compact set of reliability targets with computed error budgets and a burn-rate
+table. The data-quality pass rate from ``ingest.py`` feeds the data-quality
+target so the API can show a live measurement -> target -> error-budget chain.
+Full narrative (why these, multi-window burn-rate alerting) lives in
+docs/observability.md.
 """
 
 from __future__ import annotations

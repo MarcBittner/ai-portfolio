@@ -9,7 +9,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  name: paved-road-services
+  name: platform-services
   namespace: argocd
 spec:
   goTemplate: true

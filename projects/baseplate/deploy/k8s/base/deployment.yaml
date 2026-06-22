@@ -1,7 +1,7 @@
-# baseplate — the paved-road k8s BASE (ILLUSTRATIVE). Every service inherits
+# baseplate — the standard platform k8s BASE (ILLUSTRATIVE). Every service inherits
 # this shape; the scaffolder renders a per-service copy with the name filled in
 # (see src/baseplate/templates.py). Placeholders in ALL_CAPS are substituted by
-# the scaffolder / the golden CI pipeline.
+# the scaffolder / the CI/CD pipeline.
 #
 # Contract the base guarantees: non-root, resource requests+limits, readiness +
 # liveness probes on /health, an HPA, and a PodDisruptionBudget so rollouts and
@@ -16,7 +16,7 @@ kind: Deployment
 metadata:
   name: SERVICE_NAME
   namespace: SERVICE_NAME
-  labels: { app: SERVICE_NAME, paved-road: "true" }
+  labels: { app: SERVICE_NAME, platform-managed: "true" }
 spec:
   replicas: 2
   selector:

@@ -1,6 +1,6 @@
 ###############################################################################
 # baseplate — reusable `service` module (ILLUSTRATIVE, "what the platform
-# provides"). Onboarding a new service to the paved road is one `module` block:
+# provides"). Onboarding a new service to the standard platform setup is one `module` block:
 # it gets an ECR repo, a scoped IRSA role (keyless pod identity — no long-lived
 # AWS keys), a Kubernetes namespace, and (when needs_db) an RDS Postgres whose
 # connection string lives in Secrets Manager, never in state.
@@ -33,7 +33,7 @@ locals {
     service     = var.name
     environment = var.environment
     managed     = "terraform"
-    paved_road  = "baseplate"
+    managed_by  = "baseplate"
   }
 }
 

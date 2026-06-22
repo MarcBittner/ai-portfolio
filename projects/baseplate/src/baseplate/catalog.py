@@ -1,7 +1,7 @@
-"""The service catalog — what's riding on the paved road.
+"""The service catalog — what's running on the standard platform setup.
 
 A platform team keeps an inventory of every service it onboards: its language,
-whether it has a database, and which paved-road pieces it inherited. In a real
+whether it has a database, and which standard platform pieces it inherited. In a real
 deployment this is backed by the GitOps repo (each Argo CD Application is a
 catalog entry); here it's an in-process registry seeded with the example
 workload, with ``onboard()`` adding a scaffolded service to it.

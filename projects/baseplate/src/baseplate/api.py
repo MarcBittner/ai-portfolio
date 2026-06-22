@@ -1,9 +1,10 @@
 """FastAPI service: the platform console.
 
-Endpoints expose the paved road — scaffold a new service from a free-text
-description (LLM -> ServiceSpec -> generated Terraform/k8s/CI/SLO files),
-onboard it to the service catalog, run the example price-transparency ingest
-workload, and read its data-quality SLI and the SLO view. Stateless; synthetic
+Endpoints expose the team's standard platform setup — scaffold a new service
+from a free-text description (LLM -> service spec -> generated Terraform/k8s/CI/
+service-health files), add it to the service catalog, run the example
+price-transparency ingest workload, and read its data-quality score and the
+service-health (SLO) view. Stateless; synthetic
 data only; no secrets; runs fully offline (the scaffolder has a deterministic
 offline parser). Makes no HIPAA claim.
 """
@@ -26,8 +27,9 @@ _MODULE_COUNT = 5
 app = FastAPI(
     title="baseplate",
     version=__version__,
-    description="The paved road: IaC + golden CI/CD + GitOps + SLOs + a "
-                "self-service service scaffolder.",
+    description="The team's standard platform setup: reusable infrastructure "
+                "(Terraform) + a standard CI/CD pipeline + GitOps delivery + "
+                "service-health targets + a self-service service scaffolder.",
 )
 
 
@@ -40,8 +42,8 @@ def health() -> HealthResponse:
 @app.post("/scaffold")
 def scaffold_service(req: ScaffoldRequest) -> JSONResponse:
     """Scaffold a new service. Either describe it in free text (the LLM/offline
-    parser extracts the spec) or pass an explicit spec. Returns the ServiceSpec,
-    the routing telemetry, and every generated paved-road file.
+    parser extracts the spec) or pass an explicit spec. Returns the service
+    spec, the routing telemetry, and every generated file.
     """
     routing: dict = {"provider": "explicit", "model": "n/a", "fallbacks": []}
     if req.client_spec is not None and req.mode in (None, "auto", "local"):
@@ -80,8 +82,8 @@ def scaffold_service(req: ScaffoldRequest) -> JSONResponse:
 
 @app.get("/catalog")
 def get_catalog() -> dict:
-    """The services on the paved road (the example workload, the platform, and
-    anything scaffolded with onboard=true)."""
+    """The services running on the standard platform setup (the example
+    workload, the platform itself, and anything scaffolded with onboard=true)."""
     return {"services": catalog.services(), "count": len(catalog.services())}
 
 
