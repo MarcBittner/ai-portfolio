@@ -168,4 +168,8 @@ def admin_reset() -> dict:
 
 @app.get("/", include_in_schema=False)
 def index() -> FileResponse:
-    return FileResponse(STATIC_DIR / "index.html")
+    # no-cache: the browser still revalidates via ETag (cheap 304s) but never
+    # serves a stale SPA without checking — so a new deploy is picked up on the
+    # next load instead of lingering in heuristic cache.
+    return FileResponse(STATIC_DIR / "index.html",
+                        headers={"Cache-Control": "no-cache"})

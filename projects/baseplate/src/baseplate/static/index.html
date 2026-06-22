@@ -707,6 +707,10 @@
       <label>Fallback chain <span class="hint">→ on failure</span></label>
       <div class="chainline" id="chainline">offline (deterministic)</div>
     </div>
+    <div class="field">
+      <label>Last run <span class="hint">which model actually ran</span></label>
+      <div class="chainline" id="cfgroute">generate a service to see which model ran</div>
+    </div>
     <div class="muted" style="font-size:11.5px">Model keys live on the server; this picks which available model reads your
       description. <code>offline</code> uses the plain word-matching fallback (no model call).</div>
   </div>
@@ -970,29 +974,30 @@ function setRoutePill(state, text){
   t.innerHTML=text;
 }
 /* On page load (and mode/Ollama changes): show whether routing is live + which mode/provider. */
+function modeLabel(m){
+  return ({auto:"auto",local:"local model",paid:"paid model",
+           free:"free model",offline:"offline"})[m]||m||"auto";
+}
+// The header chip stays compact — just the selected mode + a live/offline dot.
+// The full route detail (provider · model · latency · cost) goes to Configuration.
 function renderRoutePill(){
   const mode=currentMode();
-  const provider=firstReachable(mode);
-  if(provider){
-    setRoutePill("live", `AI routing: <b>live</b> · ${routeLabel(provider)}`);
-  }else{
-    setRoutePill("offline", `AI routing: <b>offline</b> — no model, using the built-in word-matching fallback`);
-  }
+  setRoutePill(firstReachable(mode)?"live":"offline",
+               `AI routing: <b>${modeLabel(mode)}</b>`);
 }
-/* After a scaffold: show the RESOLVED route (provider · model · latency, cost if >0). */
+/* After a scaffold: keep the chip compact; push the resolved detail to Configuration. */
 function setRoutePillResolved(rt){
   if(!rt){return;}
   const offline = rt.provider==="offline" || rt.provider==="explicit";
-  if(offline){
-    setRoutePill("offline", `AI routing: <b>offline fallback</b> (no model ran)`);
-    return;
-  }
+  setRoutePill(offline?"offline":"live", `AI routing: <b>${modeLabel(currentMode())}</b>`);
+  const el=$("#cfgroute"); if(!el) return;
+  if(offline){ el.textContent="last run: offline (word-matching fallback — no model ran)"; return; }
   const model=(rt.model||"").split("/").pop();
-  let s=`AI routing: <b>live</b> · ${routeLabel(rt.provider)}`;
+  let s=`last run: ${routeLabel(rt.provider)}`;
   if(model && model!=="n/a" && model!=="deterministic") s+=` · ${model}`;
   if(rt.latency_ms!=null) s+=` · ${Math.round(rt.latency_ms)}ms`;
   if(rt.cost_usd!=null && rt.cost_usd>0) s+=` · $${rt.cost_usd.toFixed(6)}`;
-  setRoutePill("live", s);
+  el.textContent=s;
 }
 
 /* ===================== POLISH KIT: served-by + step cues ===================== */

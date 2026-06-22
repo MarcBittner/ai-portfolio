@@ -54,6 +54,33 @@ _DEFAULT_MODEL = {
     "ollama": os.environ.get("OLLAMA_MODEL", "llama3.1:8b"),
 }
 
+# OpenRouter's free tier is volatile: any given free model can be 404 (retired /
+# now paid-only) or 429 (rate-limited) at any moment. So the free provider tries a
+# LIST of free models and falls through to the next on ANY failure (404, 429, or
+# transport error), only giving up to the offline fallback when none respond. The
+# configured OPENROUTER_MODEL is tried first; OPENROUTER_MODEL may be a comma-list.
+_FREE_FALLBACKS = [
+    "google/gemma-4-31b-it:free",
+    "meta-llama/llama-3.3-70b-instruct:free",
+    "meta-llama/llama-3.2-3b-instruct:free",
+    "google/gemma-2-9b-it:free",
+    "mistralai/mistral-7b-instruct:free",
+    "qwen/qwen3-8b:free",
+]
+
+
+def _free_models() -> list[str]:
+    """Ordered, de-duped free-model candidates — configured first, then fallbacks."""
+    configured = [m.strip() for m in
+                  os.environ.get("OPENROUTER_MODEL", "").split(",") if m.strip()]
+    seen: set[str] = set()
+    out: list[str] = []
+    for m in [*configured, *_FREE_FALLBACKS]:
+        if m not in seen:
+            seen.add(m)
+            out.append(m)
+    return out
+
 _OLLAMA_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
 
 
@@ -135,9 +162,9 @@ def _post(url: str, payload: dict, headers: dict, timeout: float) -> dict:
 
 
 def _call(provider: str, system: str, user: str, *, json_mode: bool,
-          max_tokens: int) -> tuple[str, str, int, int]:
+          max_tokens: int, model: str | None = None) -> tuple[str, str, int, int]:
     """Return (text, model, in_tokens, out_tokens) or raise."""
-    model = _DEFAULT_MODEL[provider]
+    model = model or _DEFAULT_MODEL[provider]
     if provider == "anthropic":
         body = {
             "model": model, "max_tokens": max_tokens, "system": system,
@@ -205,12 +232,20 @@ def complete(system: str, user: str, *, offline: Callable[[str, str], str],
         if not _available(provider):
             continue
         t0 = time.monotonic()
-        try:
-            text, model, in_tok, out_tok = _call(
-                provider, system, user, json_mode=json_mode, max_tokens=max_tokens)
-        except Exception:
-            fallbacks.append(provider)
-            continue
+        # The free (OpenRouter) tier tries several free models in turn — a 404
+        # (retired/paid-only) or 429 (rate-limited) on one rolls to the next.
+        candidates = _free_models() if provider == "openrouter" else [None]
+        text = model = ""
+        in_tok = out_tok = 0
+        for cand in candidates:
+            try:
+                text, model, in_tok, out_tok = _call(
+                    provider, system, user, json_mode=json_mode,
+                    max_tokens=max_tokens, model=cand)
+            except Exception:
+                continue
+            if text.strip():
+                break
         if not text.strip():
             fallbacks.append(provider)
             continue
