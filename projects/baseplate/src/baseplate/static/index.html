@@ -490,6 +490,11 @@
     <h2><span class="num-badge">Step 3</span> Review the generated files
       <span class="muted" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">Docker · Kubernetes · Terraform · CI/CD · health</span></h2>
     <div class="body">
+      <div class="row" style="gap:8px;margin-bottom:10px">
+        <button class="btn" id="dlzip" disabled title="Download every generated file as a .zip">⬇ Download all (.zip)</button>
+        <button class="btn" id="dlone" disabled title="Download the file shown below">⬇ Download this file</button>
+        <span class="muted" style="font-size:11.5px">real files you can drop into a repo</span>
+      </div>
       <div class="tabs" id="tabs"></div>
       <p class="filecap" id="filecap">Each file below is a standard deploy artifact baseplate produced for your service. Generate one to see them; pick a tab to read each file and a one-line note on what it is and why it's there.</p>
       <pre id="files">// Generate a service above to see its files:
@@ -797,6 +802,7 @@ async function scaffold(){
     const r=await jpost('/scaffold',body);
     if(r.error){$("#routing").textContent=r.error;toast("Scaffold failed","bad");btn.classList.remove("loading");return;}
     GENERATED=r.files;
+    LAST_REQ=body;   // reuse the exact inputs for the .zip download
     const s=r.spec, rt=r.routing;
     $("#routing").innerHTML=
       `spec: <code>${s.name}</code> · ${s.language} · db=${s.needs_db} · `+
@@ -823,6 +829,8 @@ function renderTabs(){
     tabs.appendChild(t);
   });
   if(paths.length)show(paths[0]);
+  const have=paths.length>0;
+  const dz=$("#dlzip"), d1=$("#dlone"); if(dz)dz.disabled=!have; if(d1)d1.disabled=!have;
 }
 // Plain-English caption for each generated file, so nothing technical shows
 // unexplained. Matched by filename/path pattern (the service name varies).
@@ -843,10 +851,39 @@ function fileCaption(path){
   return "A standard deploy file baseplate generated for your service.";
 }
 function show(p){
+  CUR_PATH=p;
   $("#files").textContent=GENERATED[p];
   const cap=$("#filecap"); if(cap) cap.innerHTML=fileCaption(p);
 }
+// ---- downloads: the generated files are real files you can keep ----
+let LAST_REQ=null, CUR_PATH=null;
+function _save(name, blob){
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download=name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+function downloadOne(){
+  if(!CUR_PATH||!(CUR_PATH in GENERATED)){toast("Generate a service first","info");return;}
+  _save(CUR_PATH.split('/').pop()||CUR_PATH, new Blob([GENERATED[CUR_PATH]],{type:'text/plain'}));
+}
+async function downloadZip(){
+  if(!LAST_REQ){toast("Generate a service first","info");return;}
+  const btn=$("#dlzip"); btn.classList.add("loading");
+  try{
+    const r=await fetch('/scaffold/zip',{method:'POST',
+      headers:{'content-type':'application/json'},body:JSON.stringify(LAST_REQ)});
+    if(!r.ok)throw 0;
+    const cd=r.headers.get('Content-Disposition')||'';
+    const m=cd.match(/filename="?([^"]+)"?/);
+    _save(m?m[1]:'scaffold.zip', await r.blob());
+    toast("Downloaded the .zip","ok");
+  }catch{toast("Download failed","bad");}
+  btn.classList.remove("loading");
+}
 $("#scaffoldbtn").onclick=scaffold;
+$("#dlzip").onclick=downloadZip;
+$("#dlone").onclick=downloadOne;
 $$(".chip[data-desc]").forEach(b=>b.onclick=()=>{$("#desc").value=b.dataset.desc;scaffold();});
 
 /* ===================== domain: ingest / quality ===================== */

@@ -9,10 +9,12 @@ data only; no secrets; runs fully offline (the scaffolder has a deterministic
 offline parser). Makes no HIPAA claim.
 """
 
+import io
+import zipfile
 from pathlib import Path
 
 from fastapi import FastAPI
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 
 from baseplate import __version__, catalog, evaluate, ingest, llm, scaffold, slo
 from baseplate.models import HealthResponse, IngestRequest, ScaffoldRequest
@@ -78,6 +80,46 @@ def scaffold_service(req: ScaffoldRequest) -> JSONResponse:
         "file_paths": sorted(gen["files"]),
         "onboarded": onboarded,
     })
+
+
+def _spec_for_request(req: ScaffoldRequest) -> ServiceSpec:
+    """Resolve a ServiceSpec from a request, mirroring /scaffold (minus telemetry).
+
+    Used by the .zip download so the bundle is byte-identical to what /scaffold
+    showed. Raises ValueError when neither a description nor a name is given.
+    """
+    if req.client_spec is not None and req.mode in (None, "auto", "local"):
+        return scaffold.spec_from_raw(req.client_spec,
+                                      fallback_name=req.description or "")
+    if req.name:
+        return ServiceSpec(
+            name=req.name, language=req.language or "python",
+            needs_db=bool(req.needs_db),
+            exposes_http=True if req.exposes_http is None else bool(req.exposes_http))
+    if req.description:
+        spec, _ = scaffold.extract_spec(req.description, mode=req.mode)
+        return spec
+    raise ValueError("provide 'description' (free text) or an explicit 'name'")
+
+
+@app.post("/scaffold/zip")
+def scaffold_zip(req: ScaffoldRequest):
+    """Download every generated file for a service as a .zip (deterministic —
+    the bundle matches what /scaffold returned for the same input)."""
+    try:
+        spec = _spec_for_request(req)
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    gen = scaffold.generate(spec)
+    name = gen["spec"]["name"] if isinstance(gen["spec"], dict) else spec.name
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for path, content in gen["files"].items():
+            zf.writestr(path, content)
+    buf.seek(0)
+    return StreamingResponse(
+        iter([buf.getvalue()]), media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{name}-scaffold.zip"'})
 
 
 @app.get("/catalog")
