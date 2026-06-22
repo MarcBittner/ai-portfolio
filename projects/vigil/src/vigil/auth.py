@@ -177,6 +177,29 @@ def authenticate(email: str, password: str) -> dict | None:
     return user
 
 
+def ensure_bootstrap_admin() -> bool:
+    """Seed the bootstrap admin from ``VIGIL_ADMIN_PASSWORD`` if it's set and the
+    account doesn't already exist. Called once at startup.
+
+    This makes admin login robust on a free-tier host with no persistent disk: the
+    SQLite DB lives in ephemeral ``/tmp`` and is wiped on every redeploy/cold
+    start, but the env var persists — so the admin is re-created, pre-verified,
+    on each boot. Idempotent: a no-op if the admin already exists or no password
+    is configured. Returns True iff it created the account this call."""
+    if not config.ADMIN_PASSWORD:
+        return False
+    if store.get_user_by_email(config.BOOTSTRAP_ADMIN_EMAIL):
+        return False
+    user = store.create_user(
+        email=config.BOOTSTRAP_ADMIN_EMAIL,
+        password_hash=hash_password(config.ADMIN_PASSWORD),
+        role="admin", verified=True, verify_token=None,
+    )
+    if user:
+        log.info("seeded bootstrap admin %s", config.BOOTSTRAP_ADMIN_EMAIL)
+    return user is not None
+
+
 # --------------------------------------------------------------------------- #
 # OAuth scaffolding (authlib) — NEEDS-CREDENTIAL                                 #
 # --------------------------------------------------------------------------- #

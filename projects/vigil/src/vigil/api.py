@@ -66,6 +66,8 @@ async def lifespan(_app: FastAPI):
     suite (which drives probes explicitly) so repeated TestClient lifespans don't
     leave a probe task bound to a torn-down event loop."""
     store.init_db()
+    # Seed admin from VIGIL_ADMIN_PASSWORD (survives the ephemeral /tmp DB wipes).
+    auth.ensure_bootstrap_admin()
     global _poller_task
     _poller_stop.clear()
     if os.environ.get("VIGIL_DISABLE_POLLER") == "1":

@@ -41,6 +41,13 @@ BOOTSTRAP_ADMIN_EMAIL = os.environ.get(
     "VIGIL_ADMIN_EMAIL", "marc.bittner@gmail.com"
 ).lower()
 
+# Optional admin password, seeded on startup so the bootstrap admin can log in
+# without first signing up — and, crucially, so the admin survives the free-tier
+# ephemeral filesystem (the SQLite DB at /tmp is wiped on every redeploy/cold
+# start; this env var persists, so the admin is re-seeded fresh on each boot).
+# NEEDS-CREDENTIAL: unset → no auto-seed (admin must sign up manually).
+ADMIN_PASSWORD = os.environ.get("VIGIL_ADMIN_PASSWORD") or None
+
 # Session signing secret. NEEDS-CREDENTIAL for production: set VIGIL_SECRET to a
 # strong random value so sessions survive restarts and can't be forged. The dev
 # default is fine for a local demo but is intentionally obvious.

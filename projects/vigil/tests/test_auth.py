@@ -39,6 +39,31 @@ def test_register_admin_is_preverified():
     assert info["channel"] == "bootstrap"
 
 
+def test_ensure_bootstrap_admin_seeds_from_env(monkeypatch):
+    """The startup seed creates a pre-verified admin that can log in, and re-seeds
+    after a wipe — the behavior that keeps admin login alive on the ephemeral
+    free-tier filesystem."""
+    _fresh()
+    monkeypatch.setattr(config, "ADMIN_PASSWORD", "seed-pass-123!")
+    assert auth.ensure_bootstrap_admin() is True          # created
+    assert auth.ensure_bootstrap_admin() is False         # idempotent
+    user = auth.authenticate(config.BOOTSTRAP_ADMIN_EMAIL, "seed-pass-123!")
+    assert user is not None and user["role"] == "admin" and user["verified"] == 1
+    assert auth.authenticate(config.BOOTSTRAP_ADMIN_EMAIL, "nope") is None
+    # After a DB wipe (simulating a redeploy), the seed restores the admin.
+    _fresh()
+    assert auth.authenticate(config.BOOTSTRAP_ADMIN_EMAIL, "seed-pass-123!") is None
+    assert auth.ensure_bootstrap_admin() is True
+    assert auth.authenticate(config.BOOTSTRAP_ADMIN_EMAIL, "seed-pass-123!") is not None
+
+
+def test_ensure_bootstrap_admin_noop_without_password(monkeypatch):
+    _fresh()
+    monkeypatch.setattr(config, "ADMIN_PASSWORD", None)
+    assert auth.ensure_bootstrap_admin() is False
+    assert store.get_user_by_email(config.BOOTSTRAP_ADMIN_EMAIL) is None
+
+
 def test_register_normal_user_needs_verification():
     _fresh()
     user, info = auth.register("alice@example.com", "password123")
