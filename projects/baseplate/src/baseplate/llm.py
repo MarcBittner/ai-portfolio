@@ -91,16 +91,61 @@ def _trip_cooldown(model: str, seconds: float) -> None:
     _COOLDOWN[model] = time.monotonic() + seconds
 
 
+# Automatic free-model discovery: pull the list of free chat models from
+# OpenRouter's live catalog (cached) so the code self-updates as the free tier
+# changes — no hand-maintained list. The static _FREE_FALLBACKS is only the
+# offline safety net for when the catalog fetch fails.
+_CATALOG: dict = {"models": [], "until": 0.0}
+_CATALOG_TTL = float(os.environ.get("FREE_CATALOG_TTL", "3600"))
+
+
+def _fetch_free_catalog() -> list[str]:
+    """Free, text-producing chat models from OpenRouter's live catalog (cached
+    ~1h). Falls back to the static list on any failure."""
+    now = time.monotonic()
+    if _CATALOG["models"] and now < _CATALOG["until"]:
+        return _CATALOG["models"]
+    try:
+        req = urllib.request.Request("https://openrouter.ai/api/v1/models",
+                                     headers={"accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = json.loads(resp.read().decode()).get("data", [])
+        free: list[str] = []
+        for m in data:
+            if str(m.get("pricing", {}).get("prompt", "1")) not in ("0", "0.0"):
+                continue
+            arch = m.get("architecture", {}) or {}
+            outs = arch.get("output_modalities") or []
+            modality = arch.get("modality", "")
+            # keep text-producing chat models; skip audio/image generators
+            if outs and "text" not in outs:
+                continue
+            if not outs and modality and "text" not in modality:
+                continue
+            free.append(m["id"])
+        if free:
+            _CATALOG["models"] = free
+            _CATALOG["until"] = now + _CATALOG_TTL
+            return free
+    except Exception:
+        pass
+    return _FREE_FALLBACKS
+
+
 def _free_models() -> list[str]:
-    """Free-model candidates, de-duped, configured-first — and **fresh models
-    before ones in cooldown**, so a recently-throttled model is tried last (or not
-    at all until it cools). If every model is cooling, we still return them all as
-    a last resort rather than skip the tier entirely."""
+    """Free-model candidates, de-duped, configured-first, then the live catalog —
+    with **fresh models before ones in cooldown**, so a recently-throttled model
+    is tried last (or not at all until it cools). If every model is cooling, we
+    still return them all as a last resort rather than skip the tier entirely."""
     configured = [m.strip() for m in
                   os.environ.get("OPENROUTER_MODEL", "").split(",") if m.strip()]
+    # Order: configured first, then provider-diverse known-good chat models, then
+    # the rest of the live catalog (auto-discovered — picks up new free models, and
+    # any non-chat entries that slip in just error out and get cooled). So the
+    # first attempts are reliable while the set self-updates with no hand edits.
     seen: set[str] = set()
     ordered: list[str] = []
-    for m in [*configured, *_FREE_FALLBACKS]:
+    for m in [*configured, *_FREE_FALLBACKS, *_fetch_free_catalog()]:
         if m not in seen:
             seen.add(m)
             ordered.append(m)
@@ -223,7 +268,10 @@ def _call(provider: str, system: str, user: str, *, json_mode: bool,
         out = _post(f"{base}/chat/completions", body,
                     {"authorization": f"Bearer {key}"},
                     timeout=20 if provider == "openrouter" else 60)
-        text = out["choices"][0]["message"]["content"]
+        choices = out.get("choices") or []
+        # Some models (classifiers, refusals) return null content — treat as empty
+        # so the router rolls to the next model instead of crashing.
+        text = (choices[0].get("message", {}).get("content") if choices else "") or ""
         u = out.get("usage", {})
         return (text, model, u.get("prompt_tokens", 0), u.get("completion_tokens", 0))
 
