@@ -180,13 +180,47 @@ default, no secrets — conforms to CONV-1…4.
 - [ ] Roadmap (see project plan): real image render/redact (Pillow), layout
       analysis, multilingual OCR, Argo deploy
 
-## Backlog complete 🎉
+## Initial backlog complete 🎉
 
-All ten planned projects are built. Future projects to be specified as new
-directions arise; candidates include agent-eval harnesses, a RAG-over-code
-assistant, or extracting shared tooling (the eval/redaction layers) into
-installable packages.
+The first ten planned projects shipped. The portfolio then expanded well beyond
+them — see the current-state section below.
+
+## Current state (2026-06-22) — interview-demo program + observability
+
+The portfolio is now **~27 active projects** (the two retired ones, maskline +
+perimeter, were folded into `postureline`). Every project follows the same shape: a
+deterministic, trust-critical core with the LLM confined to a narrow sub-step, routed
+**local Ollama (browser→host) → paid → free → deterministic offline**, so each demo
+runs with zero keys. Per-project specs/plans live at `projects/<name>/docs/spec/`.
+
+Recent work (this session):
+
+- **Stack-matched interview demos**, each mirroring a target company's stack and live
+  on Render. Polished to a common bar (About page with the stack + how-the-LLM-is-used,
+  an Engine-Diagnostics view with a cross-routing-mode benchmark, browser→host Ollama
+  parity, a guided demo path, dark/light): **rate-atlas** (Turquoise), **baseplate**
+  (Comvex), **slo-kit** (Close), plus **trueline** (CO-Ver/Quin), **field-vault**
+  (Garner), and others.
+- **Render account split.** Account 1 (`Marc's workspace`) is at 24/25 services and near
+  its build-minute cap; new/active deploys now go to **account 2 (`Dot's workspace`)**.
+  rate-atlas + slo-kit were redeployed there (account-1 copies frozen via autoDeploy:no
+  + build filters). Build filters scope each service to `projects/<name>/**` and ignore
+  `*.md` / `docs/**` / `tests/**`, so doc/test pushes don't trigger rebuilds.
+- **Security remediation.** Full secret scan of all public + locally-cloned private
+  repos; purged committed tokens/keys (cw-ts-messaging-api `.env`, papertrail/zee/
+  PulsarConfig/tanglement/custom-shell PATs, a family Messenger PII export) from history
+  and force-pushed; verified `ghostlocalhost.pem` is untracked.
+- **Tests.** Hermetic security-test suites added to the demos (no-leak, input-hardening,
+  offline-determinism, no-debug-disclosure, per-app trust-boundary). trueline's
+  `submitExtraction` trust-boundary gap closed.
+- **vigil** (in progress) — a self-contained observability/SOC app that monitors every
+  demo (and itself), with tiered auth, control-mapped security findings, and an LLM
+  health-summarizer using the standard routing fallback. See `projects/vigil/docs/spec/`.
+
+Roadmap: complete vigil (auth/alerting need provider credentials — see its plan); extend
+the unit/regression/smoke/security test complement across all remaining apps; refresh the
+per-project entries above (this file predates ~17 of the current projects).
 
 ---
 
-**Last Updated:** 2026-06-08
+**Last Updated:** 2026-06-22
