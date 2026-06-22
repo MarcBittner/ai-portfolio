@@ -84,8 +84,8 @@ Clerk mints a JWT; one Convex `auth.config.ts` declares the trusted issuer, so
 `getUserIdentity()` returns verified claims with no DB lookup. `orgId` comes from the
 `org_id` claim (else `user:<subject>`); every table has a `by_org` index. Actions are
 the only place network I/O happens; the browser never holds a model key for the cloud
-path. **Known gap (tracked in the plan):** `submitExtraction` does not yet guard the
-invoice status, so a client could re-submit lines onto an already-approved invoice.
+path. `submitExtraction` guards the invoice status — it rejects unless the invoice is
+still `extracting`, so a client can't re-submit lines onto an already-approved invoice.
 
 ## Conventions
 

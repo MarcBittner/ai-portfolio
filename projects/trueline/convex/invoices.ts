@@ -369,6 +369,12 @@ export const submitExtraction = mutation({
     const { orgId } = await requireOrg(ctx);
     const inv = await ctx.db.get(invoiceId);
     if (!inv || inv.orgId !== orgId) throw new Error("not found");
+    // Trust boundary: the browser→host path accepts client-supplied lines, so only
+    // accept a submission while the invoice is still awaiting extraction. Otherwise a
+    // client could re-submit lines onto an already-reviewed/approved invoice and
+    // clobber the reviewer's decisions.
+    if (inv.status !== "extracting")
+      throw new Error(`invoice ${inv.invoiceNumber} is not awaiting extraction (status: ${inv.status})`);
     const rollup = await insertReconciledLines(ctx, { orgId, invoiceId, extracted: lines });
     await ctx.db.patch(invoiceId, {
       status: "needs_review",

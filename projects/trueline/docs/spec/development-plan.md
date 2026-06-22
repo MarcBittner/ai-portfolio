@@ -140,8 +140,9 @@ Grouped by theme, roughly in priority order. Complements [`ARCHITECTURE` §11](.
       view on the eval page; per-tenant threshold tuning gated by the benchmark.
 
 ### Robustness & security
-- [ ] **`submitExtraction` status guard (HIGH).** Reject client-submitted lines unless
-      the invoice is still `extracting`, so a client can't clobber an approved invoice.
+- [x] **`submitExtraction` status guard (HIGH).** Resolved: rejects client-submitted
+      lines unless the invoice is still `extracting`, so a client can't clobber an
+      already-reviewed/approved invoice.
 - [ ] **Input limits & validation** — file size/type caps, max line counts, rate limits.
 - [ ] **Immutable decision audit log** (who approved/edited/rejected, when) beyond the
       current per-line decision fields.
@@ -158,9 +159,9 @@ Grade **A−** (multi-tenancy isolation scrutinized, came back clean).
 
 - [x] **HIGH — no tests.** Resolved: vitest suite over `reconcileLine` (boundaries,
       SKU-vs-fuzzy, thresholds, recoverable $) + the benchmark (22 cases).
-- [ ] **HIGH — `submitExtraction` trust boundary.** Still open — see Roadmap →
-      Robustness & security. No status guard yet; a client could re-submit onto an
-      already-approved invoice.
+- [x] **HIGH — `submitExtraction` trust boundary.** Resolved: the mutation now rejects
+      unless the invoice is still `extracting`, so a client can't re-submit lines onto
+      an already-reviewed/approved invoice.
 - [ ] **LOW — `MATH_TOL` mislabel.** Effective tolerance is ~1.5¢ (`MATH_TOL + 0.005`),
       not the documented 1¢; reconcile the constant and comment.
 - [ ] **LOW — duplicated org derivation.** `requireOrg`/`optionalOrg` are shared in
