@@ -174,6 +174,8 @@
     padding:7px 11px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface-2)}
   .pstat .pdot{width:8px;height:8px;border-radius:50%;background:var(--ink-faint);flex:none}
   .pstat .pdot.on{background:var(--ok);box-shadow:0 0 0 3px rgba(67,201,138,.18)}
+  .pstat .pdot.cfg{background:var(--warn)}   /* key set, not verified to respond */
+  .pstat .pdot.fail{background:var(--bad)}   /* tried and failed on the last run */
   .chainline{font-family:var(--mono);font-size:11.5px;color:var(--ink-dim);
     background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);padding:8px 11px;word-break:break-word}
   .drawer .foot{margin-top:auto;padding:16px 20px;border-top:1px solid var(--line);display:flex;gap:10px}
@@ -758,7 +760,8 @@ const jpost=async(u,b)=>(await fetch(u,{method:'POST',headers:{'content-type':'a
   body:JSON.stringify(b||{})})).json();
 const CFG_KEY="baseplate.cfg";
 let cfg={mode:"auto",model:""};
-let llmProviders={};   // last GET /llm providers map
+let llmProviders={};   // last GET /llm providers map (key present, NOT verified)
+let lastRouting=null;  // routing telemetry from the most recent actual run
 let GENERATED={};
 
 function toast(msg,type="info"){
@@ -813,8 +816,10 @@ async function scaffold(){
       `http=${s.exposes_http} &nbsp;|&nbsp; via <b>${rt.provider}</b>/${rt.model}`+
       (rt.fallbacks&&rt.fallbacks.length?` · fell back through ${rt.fallbacks.join(", ")}`:"");
     setServedBy(rt.provider, rt.model);
+    lastRouting=rt;
     setRoutePillResolved(rt);
     setDiagnostics(rt);
+    renderRouting();   // refresh provider dots with what actually responded
     renderTabs();
     advanceSteps(3);
     toast(`Scaffolded ${s.name} via ${rt.provider}`,"ok");
@@ -982,8 +987,11 @@ function modeLabel(m){
 // The full route detail (provider · model · latency · cost) goes to Configuration.
 function renderRoutePill(){
   const mode=currentMode();
-  setRoutePill(firstReachable(mode)?"live":"offline",
-               `AI routing: <b>${modeLabel(mode)}</b>`);
+  // Honest: "live" (green) only when something is genuinely verified — a local
+  // model probed in the chain. Key-present cloud providers aren't proven until a
+  // run resolves them (setRoutePillResolved flips this to live/offline for real).
+  const localVerified=(mode==="auto"||mode==="local") && clientOllama;
+  setRoutePill(localVerified?"live":"warn", `AI routing: <b>${modeLabel(mode)}</b>`);
 }
 /* After a scaffold: keep the chip compact; push the resolved detail to Configuration. */
 function setRoutePillResolved(rt){
@@ -1039,29 +1047,29 @@ async function runBenchmark(){
   const modes=["auto","paid","free","offline","local"];
   const rows=[];
   for(const mode of modes){
-    if(mode==="local"){
-      // browser→host Ollama, mirroring the scaffold flow's local path.
-      let provider="ollama (browser→host)",model=cfg.model||"llama3.1:8b",lat="—",name="—",result="";
-      const t0=performance.now();
-      try{
-        const base=await probeOllama();
-        if(!base){result="no host Ollama reachable from the browser";provider="—";model="—";}
-        else{
-          const raw=await ollamaSpec(base,BENCH_DESC);
-          // re-validate through the server (same trust boundary as a real scaffold).
-          const r=await jpost('/scaffold',{client_spec:raw,mode:"local",description:BENCH_DESC,onboard:false});
-          lat=`${((performance.now()-t0)/1000).toFixed(2)}s`;
-          name=r.spec?.name||"—";result=r.error?("err: "+r.error):"ok";
-        }
-      }catch{result="ollama call failed (browser→host)";provider="—";model="—";lat="—";}
-      rows.push({mode,provider,model,lat,name,result});
-      continue;
+    const t0=performance.now();
+    // auto AND local both include the local model in their chain. The cloud
+    // server can't reach your machine's Ollama, so — exactly like a real
+    // scaffold — the BROWSER runs the local model and submits the spec. Without
+    // this, "auto" could only see paid/free server-side and would wrongly read
+    // offline even while your local model is up.
+    const body={description:BENCH_DESC,mode,onboard:false};
+    if(mode==="auto"||mode==="local"){
+      try{ const base=await probeOllama();
+           if(base){ body.client_spec=await ollamaSpec(base,BENCH_DESC); } }catch{}
+      if(mode==="local" && !body.client_spec){
+        rows.push({mode,provider:"—",model:"—",lat:"—",name:"—",
+                   result:"no host Ollama reachable from the browser"});
+        continue;
+      }
     }
     try{
-      const r=await jpost('/scaffold',{description:BENCH_DESC,mode,onboard:false});
+      const r=await jpost('/scaffold',body);
       const rt=r.routing||{};
-      rows.push({mode,provider:rt.provider||"—",model:(rt.model&&rt.model!=="n/a")?rt.model:"—",
-        lat:(rt.latency_ms!=null)?`${(rt.latency_ms/1000).toFixed(rt.latency_ms<1000?3:2)}s`:"—",
+      let model=(rt.model&&rt.model!=="n/a"&&rt.model!=="host")?rt.model:"—";
+      if((rt.provider||"").startsWith("ollama")) model=cfg.model||"llama3.1:8b";
+      rows.push({mode,provider:rt.provider||"—",model,
+        lat:`${((performance.now()-t0)/1000).toFixed(2)}s`,
         name:r.spec?.name||"—",result:r.error?("err: "+r.error):"ok"});
     }catch{rows.push({mode,provider:"—",model:"—",lat:"—",name:"—",result:"request failed"});}
   }
@@ -1169,13 +1177,22 @@ function currentMode(){return $("#modeseg").querySelector('[aria-pressed="true"]
 function renderRouting(){
   const m=currentMode();
   $("#modeactive").textContent=`active: ${m}`;
+  const served=(lastRouting&&lastRouting.provider||"");
+  const failed=(lastRouting&&lastRouting.fallbacks)||[];
   const rows=PROVIDERS.map(p=>{
-    // Ollama is checked in the BROWSER (browser→host); other providers server-side.
-    const on= p==="ollama" ? clientOllama : !!llmProviders[p];
+    // Honest state: green only when VERIFIED — ollama probed from the browser, or
+    // a provider that actually responded on the last run. A key being set is
+    // "configured" (amber), not proof it responds (free tier 429s); a provider
+    // that was tried and fell back on the last run is "failed" (red).
+    let cls="", title="";
+    const didServe = served===p || (p==="ollama" && served.startsWith("ollama"));
+    if(didServe){ cls="on"; title="responded on the last run"; }
+    else if(failed.includes(p)){ cls="fail"; title="tried and failed on the last run (e.g. rate-limited) — fell back"; }
+    else if(p==="ollama"){ cls=clientOllama?"on":""; title=clientOllama?"reachable from your browser":"not reachable from your browser"; }
+    else if(llmProviders[p]){ cls="cfg"; title="key configured — not verified (free tier may be rate-limited)"; }
+    else { title="not configured"; }
     const label= p==="ollama" ? "ollama (browser→host)" : p;
-    const title= p==="ollama" ? (on?"reachable from your browser":"not reachable from your browser")
-                              : (on?"available":"not configured");
-    return `<div class="pstat"><span>${label}</span><span class="pdot ${on?'on':''}" title="${title}"></span></div>`;
+    return `<div class="pstat"><span>${label}</span><span class="pdot ${cls}" title="${title}"></span></div>`;
   }).join("")+
     `<div class="pstat"><span>offline (deterministic)</span><span class="pdot on" title="always available"></span></div>`;
   $("#provrows").innerHTML=rows;
