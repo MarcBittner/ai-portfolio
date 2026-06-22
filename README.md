@@ -38,10 +38,10 @@ sleep after ~15 min idle, so the **first request cold-starts in ~30–60s** (a h
 app like persona-twin toward the upper end, and a free model can add a few seconds);
 just reload if it stalls. Each **Live** link opens the app's UI — #2
 (tanglement-showcase) is a Next.js marketing teaser, #20 (trueline) is a full
-Next.js + Convex + Clerk app (sign in to try), and **#21–27 are net-new demos each
+Next.js + Convex + Clerk app (sign in to try), and **#21–29 are net-new demos each
 built on a specific target stack** — Go (relaytoken), Ruby on Rails (cycleledger),
-Flask (burnrate), and Python (postureline, quorum, baseplate, arbiter). The rest are
-the offline-first FastAPI services.
+Flask (burnrate), and Python (postureline, quorum, baseplate, arbiter, vigil,
+counsel). The rest are the offline-first FastAPI services.
 
 | # | Project | What it is | Stack | Live | Docs |
 |---|---|---|---|---|---|
@@ -73,6 +73,7 @@ the offline-first FastAPI services.
 | 26 | **baseplate** | Platform paved-road — reusable Terraform/EKS/RDS + ArgoCD + golden CI, a self-service LLM service-scaffolder, and data-quality-as-an-SLI ingest | FastAPI · Terraform · k8s | [open ↗](https://baseplate-mlrj.onrender.com) | [README](projects/baseplate/README.md) |
 | 27 | **arbiter** | OpenAI-compatible LLM gateway + cost/quality router — observe vs route modes; reroutes to cheaper/local models only when **measured** quality (real shadow-judging) clears a floor; + prompt-prefix & response caching; ranked savings analytics | FastAPI · SQLite · OpenAI-compatible | [open ↗](https://arbiter-splt.onrender.com) | [README](projects/arbiter/README.md) |
 | 28 | **vigil** | Observability/SOC monitor for the whole portfolio — uptime/latency/error-rate, control-mapped (SOC2/HIPAA/NIST) findings, alerting, an LLM incident summary; tiered auth (guest→admin) | FastAPI · SQLite · UI | [open ↗](https://vigil-ov4i.onrender.com) | [README](projects/vigil/README.md) |
+| 29 | **counsel** | Grounded, trust-gated personal-finance copilot — code decides every number, the LLM only narrates (citations validated + figures verified against code), and actions need human approval (simulated apply, ledger never mutated); guardrail refuses fair-lending/advice asks | FastAPI · Pydantic · LLM | [open ↗](https://counsel-7saj.onrender.com) | [README](projects/counsel/README.md) |
 
 > Verify a deployment's contract any time with the smoke suite:
 > `cd projects/<name> && ./run.sh smoke --url <live-url>` (see [CONV-5](docs/spec/spec.md)).

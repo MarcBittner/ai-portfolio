@@ -119,6 +119,7 @@ _SEED_ROWS: list[tuple] = [
     ("burnrate", "https://burnrate-grza.onrender.com", ["sre", "flask"]),
     ("baseplate", "https://baseplate-mlrj.onrender.com", ["platform"]),
     ("arbiter", "https://arbiter-splt.onrender.com", ["gateway", "llm"]),
+    ("counsel", "https://counsel-7saj.onrender.com", ["finance", "llm"]),
 ]
 
 
