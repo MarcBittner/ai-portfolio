@@ -1,0 +1,557 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>counsel — grounded, trust-gated finance copilot</title>
+<script>
+(function(){
+  try{
+    var t=localStorage.getItem("theme")||"system";
+    var dark = t==="dark" || (t==="system" && !window.matchMedia("(prefers-color-scheme: light)").matches);
+    if(!dark) document.documentElement.classList.add("light");
+  }catch(e){}
+})();
+</script>
+<style>
+  :root{
+    --bg:#0a0d14; --surface:#131826; --surface-2:#1a2032; --surface-3:#212a40;
+    --line:#263149; --line-2:#33405d;
+    --ink:#e9eef7; --ink-dim:#97a3ba; --ink-faint:#67728a;
+    --accent:#43c98a; --accent-2:#6aa1ff; --accent-ink:#06101f;
+    --ok:#43c98a; --warn:#e6ad52; --bad:#f15b6c; --info:#6aa1ff; --violet:#9b86ff;
+    --r:15px; --r-sm:10px; --r-xs:7px;
+    --sh:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.5);
+    --sh-lg:0 1px 2px rgba(0,0,0,.4), 0 24px 64px -24px rgba(0,0,0,.7);
+    --grad:linear-gradient(135deg,var(--accent),var(--accent-2));
+    --ease:cubic-bezier(.22,.61,.36,1);
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+    --header-bg:rgba(10,13,20,.72);
+    --bg-radial-1:rgba(67,201,138,.10); --bg-radial-2:rgba(106,161,255,.06);
+  }
+  html.light{
+    --bg:#f4f6fb; --surface:#ffffff; --surface-2:#f1f4fa; --surface-3:#e6ebf5;
+    --line:#d8dfec; --line-2:#c2ccde;
+    --ink:#16203a; --ink-dim:#566184; --ink-faint:#8b95ad;
+    --accent:#1f9d63; --accent-2:#3a6ff0; --accent-ink:#ffffff;
+    --ok:#1f9d63; --warn:#b9791f; --bad:#d83a4d; --info:#3a6ff0; --violet:#6f53d6;
+    --sh:0 1px 2px rgba(20,32,58,.06), 0 8px 24px -14px rgba(20,32,58,.18);
+    --sh-lg:0 1px 2px rgba(20,32,58,.08), 0 24px 64px -28px rgba(20,32,58,.28);
+    --header-bg:rgba(255,255,255,.78);
+    --bg-radial-1:rgba(31,157,99,.10); --bg-radial-2:rgba(58,111,240,.06);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;
+    font:15px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Inter,sans-serif;
+    background-image:radial-gradient(1200px 600px at 80% -10%,var(--bg-radial-1),transparent 60%),
+      radial-gradient(900px 500px at 0% 0%,var(--bg-radial-2),transparent 55%);
+    background-attachment:fixed;min-height:100vh;transition:background-color .25s var(--ease),color .25s var(--ease)}
+  ::selection{background:rgba(67,201,138,.3)}
+  a{color:var(--accent-2);text-decoration:none}
+  header{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:14px;
+    padding:13px 22px;border-bottom:1px solid var(--line);
+    background:var(--header-bg);backdrop-filter:blur(14px) saturate(140%)}
+  .brand{display:flex;align-items:center;gap:11px;font-weight:650;font-size:16px;letter-spacing:.2px}
+  .logo{width:30px;height:30px;border-radius:9px;background:var(--grad);position:relative;
+    box-shadow:0 4px 16px -4px rgba(67,201,138,.6);flex:none}
+  .logo::after{content:"";position:absolute;inset:8px;border-radius:4px;
+    border:2px solid rgba(255,255,255,.9);border-bottom-color:transparent;transform:rotate(45deg)}
+  .brand .tag{color:var(--ink-dim);font-size:12.5px;font-weight:400}
+  .spacer{flex:1}
+  .pill{font-size:12px;color:var(--ink-dim);border:1px solid var(--line);border-radius:999px;
+    padding:5px 11px;background:var(--surface);white-space:nowrap;display:inline-flex;gap:7px;align-items:center}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--ink-faint)}
+  .dot.ok{background:var(--ok)}.dot.warn{background:var(--warn)}.dot.bad{background:var(--bad)}
+  .iconbtn{width:36px;height:36px;border-radius:10px;border:1px solid var(--line);background:var(--surface);
+    color:var(--ink-dim);cursor:pointer;display:grid;place-items:center;transition:.18s var(--ease);font-size:16px}
+  .iconbtn:hover{color:var(--ink);border-color:var(--line-2);transform:translateY(-1px);background:var(--surface-2)}
+  nav.tabs{display:flex;gap:4px;padding:0 22px;border-bottom:1px solid var(--line);
+    background:var(--header-bg);position:sticky;top:57px;z-index:39;backdrop-filter:blur(14px)}
+  nav.tabs button{font:inherit;font-weight:600;font-size:13.5px;background:none;border:none;cursor:pointer;
+    color:var(--ink-dim);padding:13px 14px;border-bottom:2px solid transparent;transition:.16s var(--ease)}
+  nav.tabs button:hover{color:var(--ink)}
+  nav.tabs button.active{color:var(--ink);border-bottom-color:var(--accent)}
+  main{max-width:1080px;margin:0 auto;padding:24px 22px 64px}
+  .view{display:none}.view.active{display:block;animation:fade .4s var(--ease)}
+  @keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+    box-shadow:var(--sh);overflow:hidden;margin-bottom:18px}
+  .panel h2{margin:0;padding:13px 18px;font-size:11.5px;font-weight:600;letter-spacing:.7px;
+    text-transform:uppercase;color:var(--ink-dim);border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:10px}
+  .panel .body{padding:18px}
+  .lede{color:var(--ink-dim);margin:0 0 16px;font-size:13.5px;max-width:74ch}
+  textarea,select,input{font:inherit;color:var(--ink);background:var(--surface-2);
+    border:1px solid var(--line);border-radius:var(--r-sm);padding:11px 13px;transition:.16s var(--ease);width:100%}
+  textarea:focus,select:focus,input:focus{outline:none;border-color:var(--accent);
+    box-shadow:0 0 0 3px rgba(67,201,138,.16)}
+  .btn{font:inherit;font-weight:600;cursor:pointer;border-radius:var(--r-sm);padding:11px 17px;
+    border:1px solid var(--line);background:var(--surface-2);color:var(--ink);
+    transition:.16s var(--ease);display:inline-flex;align-items:center;gap:8px}
+  .btn:hover{transform:translateY(-1px);border-color:var(--line-2)}
+  .btn.primary{background:var(--grad);border:none;color:var(--accent-ink);
+    box-shadow:0 6px 20px -8px rgba(67,201,138,.7)}
+  .btn.ok{background:rgba(67,201,138,.16);color:var(--ok);border-color:rgba(67,201,138,.4)}
+  .btn.bad{background:rgba(241,91,108,.14);color:var(--bad);border-color:rgba(241,91,108,.4)}
+  .btn[disabled]{opacity:.55;pointer-events:none}
+  .btn .spin{width:14px;height:14px;border:2px solid rgba(6,16,31,.3);border-top-color:currentColor;
+    border-radius:50%;animation:spin .7s linear infinite;display:none}
+  .btn.loading .spin{display:block}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .chip{font:inherit;font-size:12px;cursor:pointer;border:1px dashed var(--line);background:transparent;
+    color:var(--ink-dim);border-radius:999px;padding:5px 12px;transition:.16s var(--ease)}
+  .chip:hover{color:var(--ink);border-color:var(--accent);border-style:solid;background:rgba(67,201,138,.08)}
+  .chip.guard{border-color:rgba(241,91,108,.4);color:var(--bad)}
+  .row{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+  .muted{color:var(--ink-dim);font-size:12.5px}
+  .mono{font-family:var(--mono);font-size:12px}
+  code{background:var(--surface-2);padding:1px 6px;border-radius:6px;font-family:var(--mono);font-size:12px}
+  .badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:700;
+    text-transform:uppercase;letter-spacing:.3px}
+  .b-info{background:rgba(106,161,255,.15);color:var(--info)}
+  .b-ok{background:rgba(67,201,138,.16);color:var(--ok)}
+  .b-warn{background:rgba(230,173,82,.16);color:var(--warn)}
+  .b-bad{background:rgba(241,91,108,.16);color:var(--bad)}
+  .b-violet{background:rgba(155,134,255,.16);color:var(--violet)}
+  .answer{padding:16px;border:1px solid rgba(67,201,138,.4);border-radius:var(--r-sm);
+    background:rgba(67,201,138,.06);margin-bottom:14px}
+  .answer.refused{border-color:rgba(241,91,108,.4);background:rgba(241,91,108,.07)}
+  .answer .label{font-size:11px;text-transform:uppercase;color:var(--ink-dim);letter-spacing:.05em}
+  .answer .val{font-size:16.5px;font-weight:550;margin-top:6px;line-height:1.5}
+  table.v{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}
+  table.v th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;
+    color:var(--ink-faint);padding:6px 10px;border-bottom:1px solid var(--line);font-weight:600}
+  table.v td{padding:7px 10px;border-bottom:1px solid var(--line)}
+  table.v td.num{font-family:var(--mono);text-align:right}
+  .vok{color:var(--ok);font-weight:700}.vbad{color:var(--bad);font-weight:700}
+  .cites{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+  .cite{font-family:var(--mono);font-size:11px;background:var(--surface-2);border:1px solid var(--line);
+    border-radius:6px;padding:3px 8px;color:var(--ink-dim)}
+  .cite.dropped{border-color:rgba(241,91,108,.45);color:var(--bad);text-decoration:line-through}
+  .prop{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);
+    padding:14px 16px;margin-bottom:12px}
+  .prop .title{font-weight:650;font-size:14.5px;display:flex;align-items:center;gap:10px}
+  .prop .why{color:var(--ink-dim);font-size:13px;margin:8px 0}
+  .prop .effect{font-family:var(--mono);font-size:11.5px;background:var(--surface);border:1px solid var(--line);
+    border-radius:var(--r-xs);padding:9px 11px;margin-top:8px;white-space:pre-wrap;word-break:break-word}
+  .empty{color:var(--ink-dim);font-size:13px;padding:8px 0}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .stat{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);padding:13px 15px}
+  .stat .k{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-faint)}
+  .stat .v{font-size:22px;font-weight:700;margin-top:3px}
+  .stat .v small{font-size:13px;color:var(--ink-dim);font-weight:500}
+  .principle{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
+  .principle:last-child{border-bottom:none}
+  .principle .n{width:26px;height:26px;border-radius:8px;background:var(--grad);color:var(--accent-ink);
+    display:grid;place-items:center;font-weight:700;font-size:13px;flex:none}
+  .principle .t{font-weight:600}.principle .d{color:var(--ink-dim);font-size:13px;margin-top:2px}
+  .scrim{position:fixed;inset:0;background:rgba(5,8,14,.55);backdrop-filter:blur(2px);z-index:50;
+    opacity:0;pointer-events:none;transition:.25s var(--ease)}
+  .scrim.open{opacity:1;pointer-events:auto}
+  .drawer{position:fixed;top:0;right:0;height:100%;width:380px;max-width:92vw;z-index:60;
+    background:var(--surface);border-left:1px solid var(--line);box-shadow:var(--sh-lg);
+    transform:translateX(100%);transition:transform .3s var(--ease);display:flex;flex-direction:column}
+  .drawer.open{transform:none}
+  .drawer .dh{display:flex;align-items:center;padding:16px 18px;border-bottom:1px solid var(--line)}
+  .drawer .dh h3{margin:0;font-size:15px;font-weight:650}
+  .drawer .db{padding:18px;overflow:auto;display:grid;gap:18px}
+  .field{display:grid;gap:7px}
+  .field label{font-size:12px;color:var(--ink-dim);font-weight:600}
+  .seg{display:flex;gap:6px;flex-wrap:wrap}
+  .segbtn{font:inherit;font-size:12.5px;cursor:pointer;border:1px solid var(--line);background:var(--surface-2);
+    color:var(--ink-dim);border-radius:var(--r-sm);padding:8px 12px;transition:.16s var(--ease)}
+  .segbtn[aria-pressed="true"]{background:rgba(67,201,138,.14);color:var(--accent);border-color:var(--accent)}
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);z-index:80;
+    background:var(--surface-3);border:1px solid var(--line-2);border-radius:var(--r-sm);padding:11px 18px;
+    box-shadow:var(--sh-lg);opacity:0;transition:.3s var(--ease);font-size:13.5px;pointer-events:none}
+  .toast.show{opacity:1;transform:translateX(-50%)}
+  .toast.ok{border-left:3px solid var(--ok)}.toast.bad{border-left:3px solid var(--bad)}
+  .modecell{font-family:var(--mono);font-size:12px}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><div class="logo"></div>
+    <div>counsel <span class="tag">grounded, trust-gated finance copilot</span></div></div>
+  <div class="spacer"></div>
+  <span class="pill" id="servedby" title="Which engine answered"><span class="dot" id="sbdot"></span><span id="sbtext">engine: —</span></span>
+  <span class="pill" id="health"><span class="dot" id="hdot"></span><span id="htext">…</span></span>
+  <button class="iconbtn" id="themebtn" title="Toggle theme">☾</button>
+  <button class="iconbtn" id="gear" title="Settings">⚙</button>
+</header>
+<nav class="tabs">
+  <button data-view="copilot" class="active">Copilot</button>
+  <button data-view="approvals">Approvals <span id="pendingcount" class="badge b-warn" style="display:none"></span></button>
+  <button data-view="diagnostics">Diagnostics</button>
+  <button data-view="about">About</button>
+</nav>
+
+<main>
+  <!-- ============================ COPILOT ============================ -->
+  <section class="view active" id="view-copilot">
+    <div class="panel">
+      <h2>Ask your records</h2>
+      <div class="body">
+        <p class="lede">Ask about your synthetic accounts. Every number is computed by
+          deterministic code; the LLM only narrates. Citations are validated against the
+          retrieved records, and the verify panel proves the model didn't change a figure.
+          Off-topic asks are refused honestly — counsel never guesses.</p>
+        <div class="field"><textarea id="q" rows="2" placeholder="e.g. What's my net worth right now?"></textarea></div>
+        <div class="row" style="margin:11px 0">
+          <button class="btn primary" id="askbtn"><span class="spin"></span><span>Ask</span></button>
+          <button class="btn" id="demobtn" title="Walk the guided demo questions">▶ Guided demo</button>
+        </div>
+        <div class="row" id="examples"></div>
+      </div>
+    </div>
+    <div id="result"></div>
+  </section>
+
+  <!-- ============================ APPROVALS ============================ -->
+  <section class="view" id="view-approvals">
+    <div class="panel">
+      <h2>Trust-gated agency — earn trust before agency</h2>
+      <div class="body">
+        <p class="lede">The copilot can <b>propose</b> actions but never executes them.
+          Every proposal lands here as <b>pending</b> with a plain-English rationale and the
+          records that back it. Nothing changes until <b>you</b> approve — and even then the
+          effect is <b>simulated</b> (it touches a copy of the world; no real money moves and
+          the ground-truth ledger is never mutated). Decline is equally final.</p>
+        <div class="row">
+          <button class="btn" data-propose="flag_charge">Propose: flag suspicious charges</button>
+          <button class="btn" data-propose="set_budget">Propose: suggest a budget</button>
+          <button class="btn" data-propose="recommend_rebalance">Propose: recommend a rebalance</button>
+          <span class="spacer"></span>
+          <button class="btn" id="resetq" title="Clear the queue">Reset queue</button>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>Approval queue</h2>
+      <div class="body" id="queue"><div class="empty">No proposals yet. Propose one above.</div></div>
+    </div>
+  </section>
+
+  <!-- ============================ DIAGNOSTICS ============================ -->
+  <section class="view" id="view-diagnostics">
+    <div class="panel">
+      <h2>Engine diagnostics</h2>
+      <div class="body">
+        <p class="lede">A cross-routing-mode benchmark over the curated question set:
+          grounded answers that verify against code, citations validated (hallucinations
+          dropped), and refusals firing correctly. The deterministic offline mode reproduces
+          to the digit with zero keys.</p>
+        <button class="btn primary" id="runbench"><span class="spin"></span><span>Run benchmark</span></button>
+        <div id="bench" style="margin-top:16px"></div>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>Safety / bias guardrail</h2>
+      <div class="body"><p class="lede">Deterministic verdicts — discriminatory and
+        unlicensed-advice asks are refused before any retrieval or model call.</p>
+        <div id="guardrail"></div></div>
+    </div>
+  </section>
+
+  <!-- ============================ ABOUT ============================ -->
+  <section class="view" id="view-about">
+    <div class="panel"><h2>What counsel is</h2><div class="body">
+      <p class="lede">counsel is a <b>grounded, trust-gated personal-finance copilot</b>.
+        It answers natural-language questions about a synthetic, PII-free account dataset —
+        but it is built so the LLM can never become the source of truth, and so the agent
+        earns trust before it is given any agency.</p>
+      <div class="grid2">
+        <div class="stat"><div class="k">Dataset</div><div class="v" id="ds-acct">—<small> accounts</small></div></div>
+        <div class="stat"><div class="k">Transactions</div><div class="v" id="ds-txn">—</div></div>
+      </div>
+    </div></div>
+    <div class="panel"><h2>The trust principles</h2><div class="body">
+      <div class="principle"><div class="n">1</div><div><div class="t">Grounded, or it refuses</div>
+        <div class="d">Answers come only from retrieved records. Citations are validated against
+          the retrieved set — hallucinated ones are dropped. If a question isn't in your records,
+          counsel says so rather than guessing.</div></div></div>
+      <div class="principle"><div class="n">2</div><div><div class="t">Code decides the numbers</div>
+        <div class="d">Every figure is computed deterministically in Python. The LLM is handed the
+          code-computed facts and asked only to phrase them. The verify panel shows code-computed
+          vs LLM-stated numbers and flags any drift — the model literally can't change a balance.</div></div></div>
+      <div class="principle"><div class="n">3</div><div><div class="t">Earn trust before agency</div>
+        <div class="d">The copilot proposes actions; it never executes. Proposals go to a human-approval
+          queue; only on explicit approval does deterministic code apply — and the apply is simulated,
+          never touching the ground-truth ledger.</div></div></div>
+      <div class="principle"><div class="n">4</div><div><div class="t">Safety &amp; bias guardrail</div>
+        <div class="d">Discriminatory and unlicensed-advice requests are refused deterministically,
+          before any model call — independent of which provider (or no provider) is live.</div></div></div>
+      <div class="principle"><div class="n">5</div><div><div class="t">Works with zero keys</div>
+        <div class="d">A routing chain (paid → local → free → offline) self-selects from the environment.
+          Offline is a deterministic grounded responder — the whole product runs, and the eval
+          reproduces, with no API keys and no cost.</div></div></div>
+    </div></div>
+    <div class="panel"><h2>Stack &amp; how the LLM is used</h2><div class="body">
+      <p class="muted">FastAPI + a static SPA · SQLite-free, in-memory deterministic dataset ·
+        a vendored multi-provider <code>llm.py</code> router (Anthropic / OpenAI → Ollama → OpenRouter
+        → deterministic offline). The LLM's <b>only</b> job is narration: it receives code-computed
+        facts + the allowed record ids and returns a sentence plus citations. It is never asked for
+        a number, never executes an action, and is gated by a deterministic guardrail.</p>
+    </div></div>
+  </section>
+</main>
+
+<!-- settings drawer -->
+<div class="scrim" id="scrim"></div>
+<div class="drawer" id="drawer">
+  <div class="dh"><h3>Settings</h3><div class="spacer"></div><button class="iconbtn" id="closedrawer">✕</button></div>
+  <div class="db">
+    <div class="field"><label>Routing mode</label>
+      <div class="seg" id="modeseg">
+        <button class="segbtn" data-mode="auto">Auto</button>
+        <button class="segbtn" data-mode="paid">Paid</button>
+        <button class="segbtn" data-mode="local">Local</button>
+        <button class="segbtn" data-mode="free">Free</button>
+        <button class="segbtn" data-mode="offline">Offline</button>
+      </div>
+      <span class="muted">Which tier of the router to use. Offline is deterministic and key-free.</span>
+    </div>
+    <div class="field"><label>Theme</label>
+      <div class="seg" id="themeseg">
+        <button class="segbtn" data-theme="dark">Dark</button>
+        <button class="segbtn" data-theme="light">Light</button>
+        <button class="segbtn" data-theme="system">System</button>
+      </div>
+    </div>
+    <div class="field"><label>Providers reachable</label><div id="providers" class="muted">…</div></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $=(s,r=document)=>r.querySelector(s);
+const $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const j=async(u,o)=>{const r=await fetch(u,o);return r.json();};
+const esc=s=>String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+const usd=n=>"$"+Number(n).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+
+let cfg={mode:"auto"};
+try{cfg={...cfg,...JSON.parse(localStorage.getItem("counsel.cfg")||"{}")};}catch{}
+const saveCfg=()=>localStorage.setItem("counsel.cfg",JSON.stringify(cfg));
+
+/* ---- tabs ---- */
+$$("nav.tabs button").forEach(b=>b.onclick=()=>{
+  $$("nav.tabs button").forEach(x=>x.classList.remove("active"));
+  $$(".view").forEach(x=>x.classList.remove("active"));
+  b.classList.add("active"); $("#view-"+b.dataset.view).classList.add("active");
+  if(b.dataset.view==="approvals") loadQueue();
+  if(b.dataset.view==="diagnostics" && !$("#bench").innerHTML) runBench();
+});
+
+/* ---- toast ---- */
+let tt;
+function toast(msg,kind="ok"){const t=$("#toast");t.textContent=msg;t.className="toast show "+kind;
+  clearTimeout(tt);tt=setTimeout(()=>t.className="toast",2400);}
+
+/* ---- theme ---- */
+function effDark(t){return t==="dark"||(t==="system"&&!matchMedia("(prefers-color-scheme: light)").matches);}
+function applyTheme(t){const d=effDark(t);document.documentElement.classList.toggle("light",!d);
+  $("#themebtn").textContent=d?"☾":"☀";
+  $$("#themeseg .segbtn").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.theme===t)));}
+function setTheme(t){try{localStorage.setItem("theme",t)}catch{} applyTheme(t);}
+const getTheme=()=>{try{return localStorage.getItem("theme")||"system"}catch{return "system"}};
+$("#themebtn").onclick=()=>setTheme(effDark(getTheme())?"light":"dark");
+$$("#themeseg .segbtn").forEach(b=>b.onclick=()=>setTheme(b.dataset.theme));
+applyTheme(getTheme());
+
+/* ---- settings drawer ---- */
+const openD=()=>{$("#scrim").classList.add("open");$("#drawer").classList.add("open");};
+const closeD=()=>{$("#scrim").classList.remove("open");$("#drawer").classList.remove("open");};
+$("#gear").onclick=openD;$("#closedrawer").onclick=closeD;$("#scrim").onclick=closeD;
+function syncModeSeg(){$$("#modeseg .segbtn").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.mode===cfg.mode)));}
+$$("#modeseg .segbtn").forEach(b=>b.onclick=()=>{cfg.mode=b.dataset.mode;saveCfg();syncModeSeg();toast("Routing mode: "+cfg.mode);});
+syncModeSeg();
+
+/* ---- served-by indicator ---- */
+function setServedBy(routing){
+  if(!routing){$("#sbtext").textContent="engine: —";$("#sbdot").className="dot";return;}
+  const p=routing.provider||"—", m=routing.mode||"";
+  $("#sbtext").textContent=`engine: ${p}${m&&m!=="n/a"?" ("+m+")":""}`;
+  $("#sbdot").className="dot "+(p==="offline"?"warn":(p==="guardrail"?"bad":"ok"));
+}
+
+/* ---- health + providers ---- */
+async function loadHealth(){
+  try{const h=await j("health");
+    $("#htext").textContent=`${h.transactions} txns · ${h.accounts} accts`;
+    $("#hdot").className="dot ok";
+    if(h.pending_proposals>0){$("#pendingcount").textContent=h.pending_proposals;$("#pendingcount").style.display="";}
+    else $("#pendingcount").style.display="none";
+  }catch{$("#htext").textContent="offline";$("#hdot").className="dot bad";}
+  try{const s=await j("llm");
+    $("#providers").innerHTML=Object.entries(s.providers).map(([k,v])=>
+      `<span class="badge ${v?'b-ok':'b-info'}" style="margin:2px">${k}: ${v?'up':'—'}</span>`).join("")
+      +`<div style="margin-top:8px">offline fallback: <b>always on</b></div>`;
+  }catch{}
+  try{const d=await j("dataset");$("#ds-acct").innerHTML=`${d.accounts}<small> accounts</small>`;
+    $("#ds-txn").textContent=d.transactions;}catch{}
+}
+
+/* ---- examples ---- */
+async function loadExamples(){
+  try{const e=await j("examples");
+    $("#examples").innerHTML=e.examples.map(x=>
+      `<button class="chip ${x.kind==='guardrail'?'guard':''}" data-q="${esc(x.q)}" title="${x.kind}">${esc(x.q)}</button>`).join("");
+    $$("#examples .chip").forEach(c=>c.onclick=()=>{$("#q").value=c.dataset.q;ask();});
+  }catch{}
+}
+
+/* ---- ask ---- */
+function renderAnswer(r){
+  const refused=r.refused;
+  let html=`<div class="panel"><h2>Answer ${refused?'<span class="badge b-bad">refused</span>':
+    `<span class="badge b-info">${esc(r.intent)}</span>`}
+    ${!refused?(r.verified_ok?'<span class="badge b-ok">verified ✓</span>':'<span class="badge b-warn">verify mismatch</span>'):''}
+    </h2><div class="body">`;
+  html+=`<div class="answer ${refused?'refused':''}"><div class="label">${refused?'counsel declines':'counsel says'}</div>
+    <div class="val">${esc(r.answer)}</div></div>`;
+  if(refused){
+    if(r.refusal_reason.startsWith("guardrail"))
+      html+=`<p class="muted">Guardrail category: <b>${esc(r.refusal_reason.split(":")[1])}</b> — refused deterministically, before any model call.</p>`;
+    else html+=`<p class="muted">Not grounded in your records — counsel refuses rather than guess.</p>`;
+    html+=`</div></div>`; $("#result").innerHTML=html; setServedBy(r.routing); return;
+  }
+  // verify panel
+  if(r.verify&&r.verify.length){
+    html+=`<h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-dim);margin:14px 0 4px">Verify · code-computed vs LLM-stated</h3>
+      <table class="v"><tr><th>fact</th><th>code-computed</th><th>llm-stated</th><th>match</th></tr>`;
+    r.verify.forEach(v=>{html+=`<tr><td>${esc(v.label)}</td><td class="num">${usd(v.code_value)}</td>
+      <td class="num">${v.stated_value==null?'—':usd(v.stated_value)}</td>
+      <td>${v.ok?'<span class="vok">✓</span>':'<span class="vbad">✗ flagged</span>'}</td></tr>`;});
+    html+=`</table>`;
+  }
+  // citations
+  if(r.citations.length||r.dropped_citations.length){
+    html+=`<h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-dim);margin:16px 0 4px">Citations · validated against retrieved records</h3><div class="cites">`;
+    r.citations.slice(0,14).forEach(c=>html+=`<span class="cite">${esc(c)}</span>`);
+    if(r.citations.length>14)html+=`<span class="cite">+${r.citations.length-14} more</span>`;
+    r.dropped_citations.forEach(c=>html+=`<span class="cite dropped" title="hallucinated — dropped">${esc(c)}</span>`);
+    html+=`</div>`;
+    if(r.dropped_citations.length)html+=`<p class="muted" style="margin-top:6px">${r.dropped_citations.length} hallucinated citation(s) dropped (not in the retrieved set).</p>`;
+  }
+  // proposals available
+  if(r.proposals_available&&r.proposals_available.length){
+    html+=`<div class="row" style="margin-top:16px">`;
+    const lbl={flag_charge:"Flag suspicious charges",set_budget:"Suggest a budget",recommend_rebalance:"Recommend a rebalance"};
+    r.proposals_available.forEach(k=>html+=`<button class="btn ok" data-propose="${k}">⚖ Propose: ${lbl[k]||k}</button>`);
+    html+=`</div><p class="muted" style="margin-top:6px">Proposals go to the approval queue — nothing happens until you approve.</p>`;
+  }
+  // routing
+  const rt=r.routing||{};
+  html+=`<p class="muted mono" style="margin-top:14px">engine: ${esc(rt.provider||'—')} · model: ${esc(rt.model||'—')} · mode: ${esc(rt.mode||'—')}${rt.latency_ms!=null?' · '+rt.latency_ms+'ms':''}${rt.cost_usd!=null?' · $'+rt.cost_usd:''}</p>`;
+  html+=`</div></div>`;
+  $("#result").innerHTML=html;
+  setServedBy(r.routing);
+  $$("#result [data-propose]").forEach(b=>b.onclick=()=>propose(b.dataset.propose));
+}
+
+async function ask(){
+  const q=$("#q").value.trim(); if(!q)return;
+  const btn=$("#askbtn");btn.classList.add("loading");btn.disabled=true;
+  try{
+    const r=await j("ask",{method:"POST",headers:{"content-type":"application/json"},
+      body:JSON.stringify({question:q,mode:cfg.mode})});
+    if(r.detail){toast("Error: "+r.detail,"bad");}else renderAnswer(r);
+  }catch(e){toast("Request failed","bad");}
+  finally{btn.classList.remove("loading");btn.disabled=false;loadHealth();}
+}
+$("#askbtn").onclick=ask;
+$("#q").addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();ask();}});
+
+/* ---- guided demo ---- */
+const DEMO_QS=["What's my net worth right now?","Are there any unusual or duplicate charges?",
+  "How much did I spend on dining last month?","What's my credit score?","Which stock should I buy right now?"];
+let demoIdx=0;
+$("#demobtn").onclick=async()=>{
+  const q=DEMO_QS[demoIdx%DEMO_QS.length];demoIdx++;
+  $("#q").value=q;await ask();
+  $("#demobtn").querySelector ? ($("#demobtn").textContent="▶ Next demo question") : null;
+};
+
+/* ---- proposals / approvals ---- */
+async function propose(kind){
+  try{const r=await j("propose",{method:"POST",headers:{"content-type":"application/json"},
+    body:JSON.stringify({kind})});
+    if(r.detail){toast(r.detail,"bad");return;}
+    toast("Proposed — pending your approval","ok");
+    $("#pendingcount").style.display="";loadHealth();
+    // jump to approvals
+    $$("nav.tabs button").forEach(x=>x.classList.remove("active"));
+    $$(".view").forEach(x=>x.classList.remove("active"));
+    document.querySelector('[data-view="approvals"]').classList.add("active");
+    $("#view-approvals").classList.add("active"); loadQueue();
+  }catch{toast("Propose failed","bad");}
+}
+$$("[data-propose]").forEach(b=>b.onclick=()=>propose(b.dataset.propose));
+
+async function decide(id,approve){
+  try{const r=await j("decide",{method:"POST",headers:{"content-type":"application/json"},
+    body:JSON.stringify({id,approve})});
+    if(r.detail){toast(r.detail,"bad");return;}
+    toast(approve?"Approved — applied (simulated)":"Declined","ok");
+    loadQueue();loadHealth();
+  }catch{toast("Decision failed","bad");}
+}
+
+function statusBadge(s){const m={pending:"b-warn",applied:"b-ok",declined:"b-bad",approved:"b-info"};
+  return `<span class="badge ${m[s]||'b-info'}">${s}</span>`;}
+
+async function loadQueue(){
+  try{const r=await j("proposals");
+    const items=r.proposals;
+    if(!items.length){$("#queue").innerHTML='<div class="empty">No proposals yet. Propose one above.</div>';return;}
+    $("#queue").innerHTML=items.map(p=>{
+      let h=`<div class="prop"><div class="title">${esc(p.title)} ${statusBadge(p.status)}</div>
+        <div class="why">${esc(p.rationale)}</div>
+        <div class="cites">`+p.citation_ids.slice(0,10).map(c=>`<span class="cite">${esc(c)}</span>`).join("")+`</div>`;
+      if(p.status==="pending"){
+        h+=`<div class="row" style="margin-top:12px">
+          <button class="btn ok" data-approve="${p.id}">✓ Approve &amp; apply (simulated)</button>
+          <button class="btn bad" data-decline="${p.id}">✕ Decline</button></div>`;
+      }else if(p.effect){
+        h+=`<div class="effect">applied (simulated) · real money moved: <b>${p.effect.real_money_moved}</b>\n`+
+           esc(p.effect.note||"")+`</div>`;
+      }
+      return h+`</div>`;
+    }).join("");
+    $$("#queue [data-approve]").forEach(b=>b.onclick=()=>decide(b.dataset.approve,true));
+    $$("#queue [data-decline]").forEach(b=>b.onclick=()=>decide(b.dataset.decline,false));
+  }catch{$("#queue").innerHTML='<div class="empty">Could not load queue.</div>';}
+}
+$("#resetq").onclick=async()=>{await j("admin/reset_queue",{method:"POST"});loadQueue();loadHealth();toast("Queue reset");};
+
+/* ---- diagnostics ---- */
+async function runBench(){
+  const btn=$("#runbench");btn.classList.add("loading");btn.disabled=true;
+  try{const b=await j("diagnostics");
+    let html=`<table class="v"><tr><th>mode</th><th>passed</th><th>grounded verified</th><th>refusals correct</th></tr>`;
+    Object.values(b.modes).forEach(m=>{
+      html+=`<tr><td class="modecell">${esc(m.mode)}</td>
+        <td class="num">${m.passed}/${m.total}</td>
+        <td class="num">${m.grounded_verified}/${m.grounded_total}</td>
+        <td class="num">${m.refusals_correct}/${m.refusals_total}</td></tr>`;});
+    html+=`</table><p class="muted" style="margin-top:8px">Active mode: <b>${esc(b.active_mode)}</b> · providers: `+
+      Object.entries(b.providers).map(([k,v])=>`${k} ${v?'✓':'—'}`).join(" · ")+`</p>`;
+    $("#bench").innerHTML=html;
+    // guardrail probes
+    $("#guardrail").innerHTML=`<table class="v"><tr><th>request</th><th>verdict</th><th>category</th></tr>`+
+      b.guardrail_refusals.map(g=>`<tr><td>${esc(g.q)}</td>
+        <td>${g.allowed?'<span class="vok">allowed</span>':'<span class="vbad">refused</span>'}</td>
+        <td>${esc(g.category||'—')}</td></tr>`).join("")+`</table>`;
+  }catch{$("#bench").innerHTML='<div class="empty">Benchmark failed.</div>';}
+  finally{btn.classList.remove("loading");btn.disabled=false;}
+}
+$("#runbench").onclick=runBench;
+
+/* ---- init ---- */
+loadHealth();loadExamples();
+setInterval(loadHealth,15000);
+</script>
+</body>
+</html>
