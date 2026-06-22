@@ -133,5 +133,10 @@
     "name": "arbiter",
     "tag": "AI request gateway \u2014 sits in front of your apps' real LLM traffic, analyzes it, and routes/caches for cost savings gated by measured quality",
     "url": "https://arbiter-splt.onrender.com"
+  },
+  {
+    "name": "vigil",
+    "tag": "Observability + SOC monitor \u2014 probes every demo (and itself) for uptime/latency/error-rate, with control-mapped (SOC2/HIPAA/NIST) security findings, alerting, and an LLM incident summarizer",
+    "url": "https://vigil-ov4i.onrender.com"
   }
 ]

@@ -72,6 +72,7 @@ the offline-first FastAPI services.
 | 25 | **burnrate** | Instrumented Flask SRE service — Prometheus RED metrics, multi-window SLO burn rate, TaskTiger tasks, GitOps smoke-gated rollback, LLM incident summary | Flask · Prometheus · ArgoCD | [open ↗](https://burnrate-grza.onrender.com) | [README](projects/burnrate/README.md) |
 | 26 | **baseplate** | Platform paved-road — reusable Terraform/EKS/RDS + ArgoCD + golden CI, a self-service LLM service-scaffolder, and data-quality-as-an-SLI ingest | FastAPI · Terraform · k8s | [open ↗](https://baseplate-mlrj.onrender.com) | [README](projects/baseplate/README.md) |
 | 27 | **arbiter** | OpenAI-compatible LLM gateway + cost/quality router — observe vs route modes; reroutes to cheaper/local models only when **measured** quality (real shadow-judging) clears a floor; + prompt-prefix & response caching; ranked savings analytics | FastAPI · SQLite · OpenAI-compatible | [open ↗](https://arbiter-splt.onrender.com) | [README](projects/arbiter/README.md) |
+|  | **vigil** | Observability/SOC monitor for the whole portfolio — uptime/latency/error-rate, control-mapped (SOC2/HIPAA/NIST) findings, alerting, an LLM incident summary; tiered auth (guest→admin) | FastAPI · SQLite · UI | [open ↗](https://vigil-ov4i.onrender.com) | [README](projects/vigil/README.md) |
 
 > Verify a deployment's contract any time with the smoke suite:
 > `cd projects/<name> && ./run.sh smoke --url <live-url>` (see [CONV-5](docs/spec/spec.md)).
