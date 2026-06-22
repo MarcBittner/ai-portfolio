@@ -756,8 +756,16 @@
 <script>
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const jget=async u=>(await fetch(u)).json();
-const jpost=async(u,b)=>(await fetch(u,{method:'POST',headers:{'content-type':'application/json'},
-  body:JSON.stringify(b||{})})).json();
+const jpost=async(u,b)=>{
+  // Fail gracefully: a slow free-tier roll can make Render's edge return a
+  // non-JSON gateway error — surface it as {error} instead of throwing so the
+  // caller shows a real message, never a bare "request failed".
+  const r=await fetch(u,{method:'POST',headers:{'content-type':'application/json'},
+    body:JSON.stringify(b||{}),signal:AbortSignal.timeout(90000)});
+  if(!r.ok){ let d=null; try{d=await r.json();}catch{}
+    return {error:(d&&(d.error||d.detail))||`HTTP ${r.status}`}; }
+  try{ return await r.json(); }catch{ return {error:"non-JSON response from server"}; }
+};
 const CFG_KEY="baseplate.cfg";
 let cfg={mode:"auto",model:""};
 let llmProviders={};   // last GET /llm providers map (key present, NOT verified)

@@ -218,8 +218,11 @@ def _call(provider: str, system: str, user: str, *, json_mode: bool,
         }
         if json_mode:
             body["response_format"] = {"type": "json_object"}
+        # Shorter timeout on the free tier so rolling through models can't blow
+        # past the host's request limit (a 429 returns fast anyway).
         out = _post(f"{base}/chat/completions", body,
-                    {"authorization": f"Bearer {key}"}, timeout=60)
+                    {"authorization": f"Bearer {key}"},
+                    timeout=20 if provider == "openrouter" else 60)
         text = out["choices"][0]["message"]["content"]
         u = out.get("usage", {})
         return (text, model, u.get("prompt_tokens", 0), u.get("completion_tokens", 0))
@@ -263,7 +266,10 @@ def complete(system: str, user: str, *, offline: Callable[[str, str], str],
         # (retired/paid-only) or 429 (rate-limited) on one rolls to the next, and
         # the failed model goes into a cooldown so we route around it next time
         # (longer for a 429 — it's genuinely overloaded — than a one-off error).
-        candidates = _free_models() if provider == "openrouter" else [None]
+        # Cap attempts per request so one /scaffold can't exceed the host's
+        # request limit; fresh (non-cooled) models are first, so this tries the
+        # most-likely-up ones. 4 × 20s worst case stays well under the edge limit.
+        candidates = _free_models()[:4] if provider == "openrouter" else [None]
         text = model = ""
         in_tok = out_tok = 0
         for cand in candidates:
