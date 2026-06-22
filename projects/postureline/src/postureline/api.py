@@ -1,8 +1,9 @@
 """FastAPI service: ONE posture/compliance engine exposing BOTH surfaces.
 
-Stateless; synthetic sample data (built to run against your real data); no real PHI; no secrets. The board/exec narrative
-routes through the LLM chain and degrades to a deterministic template when no
-provider is configured, so the public demo runs fully offline.
+Stateless; synthetic sample data (built to run against your real data); no real
+PHI; no secrets. The board/exec narrative routes through the LLM chain and
+degrades to a deterministic template when no provider is configured, so the
+public demo runs fully offline.
 
 Shared endpoints take a ``surface`` (warehouse | exposure); the warehouse-only
 endpoints (`/policy`, `/privacy`, `/gate`) expose warehouse-specific artifacts.
