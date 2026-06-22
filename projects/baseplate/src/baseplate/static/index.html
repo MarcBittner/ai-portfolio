@@ -72,6 +72,11 @@
     padding:5px 11px;border:1px solid var(--line);border-radius:999px;background:var(--surface)}
   .dot{width:7px;height:7px;border-radius:50%;background:var(--ink-faint)}
   .dot.ok{background:var(--ok);box-shadow:0 0 0 0 rgba(67,201,138,.5);animation:pulse 2s infinite}
+  .dot.live{background:var(--ok);box-shadow:0 0 0 3px rgba(67,201,138,.16)}
+  .dot.warn{background:var(--warn)}
+  .routepill{cursor:pointer;font-weight:600;color:var(--ink-dim);transition:.18s var(--ease);max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .routepill:hover{color:var(--ink);border-color:var(--line-2)}
+  .routepill b{color:var(--ink);font-weight:700}
   .pill{font-size:12px;color:var(--ink-dim);border:1px solid var(--line);border-radius:999px;
     padding:5px 12px;background:var(--surface);white-space:nowrap}
   .iconbtn{width:36px;height:36px;border-radius:10px;border:1px solid var(--line);background:var(--surface);
@@ -80,7 +85,7 @@
   .iconbtn svg{width:18px;height:18px}
   /* layout */
   main{max-width:1160px;margin:0 auto;padding:26px 24px 64px;display:grid;gap:18px;
-    grid-template-columns:1fr 1fr}
+    grid-template-columns:1fr}
   .full{grid-column:1/-1}
   .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
     box-shadow:var(--sh);overflow:hidden;transition:.25s var(--ease)}
@@ -401,6 +406,7 @@
   </nav>
   <span class="spacer"></span>
   <span class="status"><span class="dot" id="hdot"></span><span id="hstat">connecting…</span></span>
+  <button class="status routepill" id="routepill" title="How the AI routing resolved — click for Diagnostics"><span class="dot" id="rpdot"></span><span id="rptext">AI routing: checking…</span></button>
   <span class="pill" id="catpill">catalog</span>
   <!-- POLISH KIT: theme toggle -->
   <button class="iconbtn" id="themebtn" title="Toggle theme" aria-label="Toggle light/dark theme"><span id="themeicon">☾</span></button>
@@ -424,6 +430,13 @@
         files needed to ship it: a <b>Docker</b> image, <b>Kubernetes</b> deploy files, an <b>AWS Terraform</b>
         module call, and a <b>CI/CD pipeline</b>. An LLM reads your description into a small structured spec;
         every file is then built by deterministic code — same description in, identical files out.</p>
+      <p class="note" style="margin-top:12px"><b>Where the AI is used (and where it isn't):</b> An AI model reads your
+        one-line description and pulls out a small spec — the service's name, language, whether it needs a database,
+        whether it serves HTTP. That's all the AI does. Code — not the AI — then generates every file from that spec.
+        The AI proposes the spec; deterministic code produces the infrastructure, so the output is reviewable and repeatable.</p>
+      <p class="note" style="margin-top:8px"><b>Which model reads it:</b> baseplate tries providers in order —
+        <b>your local model</b> → <b>a paid model</b> → <b>a free model</b> → a built-in <b>offline word-matching fallback</b>
+        if none are reachable. The chip in the top bar shows which one actually ran.</p>
       <div class="steps" aria-hidden="true">
         <span class="step on" id="st1"><span class="n">1</span> Describe the service</span>
         <span class="arr">→</span>
@@ -510,19 +523,23 @@
 <section class="view" data-view="health">
   <div class="panel reveal">
     <div class="body">
-      <p class="lede"><b>Look here to answer "is this service actually healthy?"</b> Three things are tracked:
-        <b>availability</b> (is it up), <b>latency</b> (is it fast enough), and <b>is the data correct</b> — a
-        data-quality check that runs a sample healthcare price-transparency file through validation. A service
-        can be "up" while quietly serving wrong numbers, so correctness is tracked as its own health signal.</p>
+      <p class="lede">Service health answers three questions about a running service:
+        <b>Is it up?</b> (availability) · <b>Is it responding fast?</b> (latency) ·
+        <b>Is it serving correct data?</b> (data quality). The third is the interesting one — a service can be
+        "up" while quietly serving wrong data, so baseplate tracks data correctness as a health signal with its
+        own target, right next to uptime and latency.</p>
     </div>
   </div>
 
   <div class="panel reveal">
     <h2>Is the data correct? <span class="muted" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">data-quality check on a sample price file</span></h2>
     <div class="body">
+      <p class="note" style="margin-top:0">Running this check sends a batch of sample healthcare price records through the
+        service's validation rules and reports how many passed. That pass rate <b>is</b> the data-quality signal — the higher it is,
+        the more of the data the service is serving correctly.</p>
       <div id="gauge" class="gauge">—</div>
-      <div class="note" id="dqnote">Run a sample healthcare price-transparency file through validation to see how many rows pass.</div>
-      <p class="note" style="margin-top:8px"><b>Why run this?</b> A service can be "up" while silently serving wrong data. This runs sample healthcare price records through validation and tracks the pass rate as a monitored health metric — so you measure correctness, not just uptime.</p>
+      <div class="note" id="dqnote">Press the button to run the check; the percentage above is the share of sample records that passed validation (the pass rate).</div>
+      <p class="note" style="margin-top:8px"><b>Why it matters:</b> a service can be "up" while silently serving wrong data. Tracking the pass rate as a health metric means you measure correctness, not just uptime.</p>
       <div class="row" style="margin-top:12px">
         <button class="btn" id="ingestbtn"><span class="spin"></span><span class="lbl">Run the data-quality check</span></button>
       </div>
@@ -534,7 +551,7 @@
   <div class="panel reveal">
     <h2>Uptime &amp; speed targets <span class="muted" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">availability · latency · data correctness</span></h2>
     <div class="body" style="padding:0;overflow-x:auto">
-      <p class="filecap" style="margin:14px 18px 0">Each row is a health target: the goal it must meet, the allowed downtime/error budget per 30 days, and where it stands now. Green means it's meeting the goal.</p>
+      <p class="filecap" style="margin:14px 18px 0">A <b>target</b> (or objective) is the level a service promises to hit — for example, "up 99.5% of the time." The <b>budget</b> is the small amount of failure that target still allows over 30 days (here, 0.5% works out to a few hours of downtime) — spend it and you've missed the target. Each row below is one health target: the goal it must meet, the budget it's allowed, and where it stands now. Green means it's meeting the goal.</p>
       <table id="slo" style="margin-top:8px"><thead><tr><th>health target</th><th>goal</th>
         <th>allowed budget / 30 days</th><th>where it stands now</th></tr></thead><tbody></tbody></table>
     </div>
@@ -786,6 +803,7 @@ async function scaffold(){
       `http=${s.exposes_http} &nbsp;|&nbsp; via <b>${rt.provider}</b>/${rt.model}`+
       (rt.fallbacks&&rt.fallbacks.length?` · fell back through ${rt.fallbacks.join(", ")}`:"");
     setServedBy(rt.provider, rt.model);
+    setRoutePillResolved(rt);
     setDiagnostics(rt);
     renderTabs();
     advanceSteps(3);
@@ -836,11 +854,17 @@ async function loadQuality(){
   const btn=$("#ingestbtn");btn.classList.add("loading");
   try{
     const q=await jget('/quality');
-    const pct=(q.data_quality_pass_rate*100).toFixed(1)+'%';
+    const rate=q.data_quality_pass_rate;
+    const pct=(rate*100).toFixed(1)+'%';
+    const meets=rate>=0.98;
     const g=$("#gauge");g.textContent=pct;
-    g.className='gauge '+(q.data_quality_pass_rate>=0.98?'good':'bad');
-    $("#dqnote").textContent=`${q.valid}/${q.rows} rows valid · defects: `+
-      (Object.entries(q.defects).map(([k,v])=>`${k}×${v}`).join(', ')||'none');
+    g.className='gauge '+(meets?'good':'bad');
+    const failed=(q.invalid!=null)?q.invalid:(q.rows-q.valid);
+    const defects=Object.entries(q.defects||{}).map(([k,v])=>`${k}×${v}`).join(', ')||'none';
+    $("#dqnote").innerHTML=
+      `<b>Records checked:</b> ${q.rows} &nbsp;·&nbsp; <b>Passed:</b> ${q.valid} &nbsp;·&nbsp; `+
+      `<b>Failed:</b> ${failed} &nbsp;·&nbsp; <b>Pass rate:</b> ${pct} `+
+      `(${meets?'meets':'below'} the 98% data-quality target) &nbsp;·&nbsp; <b>Defects:</b> ${defects}`;
     const dqcap=$("#dqcap");if(dqcap)dqcap.style.display='block';
     const dq=$("#dq");dq.style.display='block';dq.textContent=JSON.stringify(q,null,2);
     loadSlo();
@@ -878,7 +902,55 @@ async function loadSlo(){
 /* ===================== domain: llm status ===================== */
 async function loadLlm(){
   try{const s=await jget('/llm');llmProviders=s.providers||{};
-    renderRouting();}catch{}
+    renderRouting();renderRoutePill();}catch{renderRoutePill();}
+}
+
+/* ===================== POLISH KIT: header AI-routing chip (trueline-style) =====================
+   Plain-words label for a provider, so the header never shows a bare provider id. */
+function routeLabel(provider){
+  switch((provider||"").toLowerCase()){
+    case "ollama":     return "your local model";
+    case "anthropic":
+    case "openai":     return "paid model";
+    case "openrouter": return "free model (OpenRouter)";
+    default:           return "no model (word-matching fallback)";
+  }
+}
+/* mode → first provider that's actually reachable in its chain (ollama is browser-probed). */
+function firstReachable(mode){
+  const chain=MODE_CHAIN[mode]||MODE_CHAIN.auto;
+  return chain.find(p=> p==="ollama" ? clientOllama : !!llmProviders[p]) || null;
+}
+/* Set the header chip. state: "live" | "offline"; text is the plain-words detail. */
+function setRoutePill(state, text){
+  const dot=$("#rpdot"), t=$("#rptext"); if(!dot||!t) return;
+  dot.className="dot "+(state==="live"?"live":"warn");
+  t.innerHTML=text;
+}
+/* On page load (and mode/Ollama changes): show whether routing is live + which mode/provider. */
+function renderRoutePill(){
+  const mode=currentMode();
+  const provider=firstReachable(mode);
+  if(provider){
+    setRoutePill("live", `AI routing: <b>live</b> · ${routeLabel(provider)}`);
+  }else{
+    setRoutePill("offline", `AI routing: <b>offline</b> — no model, using the built-in word-matching fallback`);
+  }
+}
+/* After a scaffold: show the RESOLVED route (provider · model · latency, cost if >0). */
+function setRoutePillResolved(rt){
+  if(!rt){return;}
+  const offline = rt.provider==="offline" || rt.provider==="explicit";
+  if(offline){
+    setRoutePill("offline", `AI routing: <b>offline fallback</b> (no model ran)`);
+    return;
+  }
+  const model=(rt.model||"").split("/").pop();
+  let s=`AI routing: <b>live</b> · ${routeLabel(rt.provider)}`;
+  if(model && model!=="n/a" && model!=="deterministic") s+=` · ${model}`;
+  if(rt.latency_ms!=null) s+=` · ${Math.round(rt.latency_ms)}ms`;
+  if(rt.cost_usd!=null && rt.cost_usd>0) s+=` · $${rt.cost_usd.toFixed(6)}`;
+  setRoutePill("live", s);
 }
 
 /* ===================== POLISH KIT: served-by + step cues ===================== */
@@ -1069,9 +1141,10 @@ function renderRouting(){
 }
 async function refreshClientOllama(){
   clientOllama = !!(await probeOllama());
-  renderRouting();
+  renderRouting();renderRoutePill();
 }
-$$("#modeseg .segbtn").forEach(b=>b.onclick=()=>{selectMode(b.dataset.mode);renderRouting();});
+$$("#modeseg .segbtn").forEach(b=>b.onclick=()=>{selectMode(b.dataset.mode);renderRouting();renderRoutePill();});
+$("#routepill")?.addEventListener("click",()=>showView("diag"));
 
 /* ===================== top-nav: one view at a time ===================== */
 function showView(name){
