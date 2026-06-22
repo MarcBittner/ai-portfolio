@@ -336,6 +336,35 @@ def labeled_states() -> list[dict]:
     ]
 
 
+def benchmark(state: dict | None = None) -> list[dict]:
+    """Run one fixed incident snapshot through every routing mode and report the
+    resolved provider, model, latency, and the (deterministic) severity — the
+    Diagnostics view's model benchmark, mirroring trueline's ``benchmark`` action.
+
+    ``local`` is exercised server-side here; on the cloud host the server cannot
+    reach a model on the operator's machine, so the browser re-runs the ``local``
+    row through the browser→host Ollama bridge and overwrites it. ``offline`` is
+    always present as the honest zero-key baseline.
+    """
+    # A representative fast-burn incident so every mode has the same input and the
+    # latency/provider differences are the only variable.
+    if state is None:
+        state = _state_from(1000, 0.05, fast_ratio=0.80, p95=600.0)
+    rows: list[dict] = []
+    for mode in ("offline", "local", "free", "paid", "auto"):
+        out = summarize(state, mode=mode)
+        rows.append({
+            "mode": mode,
+            "provider": out["provider"],
+            "model": out["model"],
+            "latency_ms": out["latency_ms"],
+            "severity": out["severity"],
+            "cost_usd": out["cost_usd"],
+            "fallbacks": out["fallbacks"],
+        })
+    return rows
+
+
 def evaluate(mode: str | None = None) -> dict:
     """Score the summary generator: does it pick the right severity + runbook
     situation for a labeled snapshot, and is the draft non-empty with steps?"""

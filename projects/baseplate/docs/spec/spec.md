@@ -23,6 +23,11 @@ example workload.
 5. Define **observability**: SLIs/SLOs incl. **data-quality-as-an-SLI**, error
    budgets, and burn-rate alerts.
 6. Run **fully offline**, deterministically, with no secrets and synthetic data.
+7. Ship a **reviewable console**: a guided scaffold path (describe → scaffold →
+   review files → SLO/data-quality), an honest **served-by** indicator, **engine
+   diagnostics** (resolved provider/model/latency/cost + a benchmark across
+   routing modes), an About view (stack + LLM usage), dark/light theming, and a
+   Settings control to pick the routing mode.
 
 ## Non-goals / boundaries
 
@@ -37,10 +42,17 @@ example workload.
 ## The LLM feature
 
 The scaffolder's free-text → `ServiceSpec` step routes through the standard chain
-(Anthropic/OpenAI → Ollama → OpenRouter → a deterministic offline parser). The
-model only *extracts the structured spec*; every generated file is deterministic
-templating, so output is reviewable and reproducible, and the whole flow works
-with zero keys via the offline parser.
+(local Ollama → Anthropic/OpenAI → OpenRouter → a deterministic offline parser).
+The model only *extracts the structured spec*; every generated file is
+deterministic templating, so output is reviewable and reproducible, and the whole
+flow works with zero keys via the offline parser.
+
+Because a cloud server can't reach an Ollama on the reviewer's machine, the
+Ollama check + spec-extraction call run in the **browser** (browser→host) and the
+result is submitted as a `client_spec` that the server **re-validates** through
+the exact same path as its own LLM output (it never trusts a raw spec). The
+console surfaces provider/model/latency/cost honestly (the *served-by* indicator
+and the diagnostics benchmark), with `offline` as a true last resort.
 
 ## Invariants
 

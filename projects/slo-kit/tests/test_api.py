@@ -54,3 +54,15 @@ def test_traces_endpoint():
 
 def test_fault_validation():
     assert client.post("/admin/fault", json={"error_rate": 2.0}).status_code == 422
+
+
+def test_diagnostics_benchmark_endpoint():
+    _reset()
+    b = client.get("/diagnostics/benchmark").json()
+    assert "rows" in b and "llm" in b
+    modes = {r["mode"] for r in b["rows"]}
+    assert {"offline", "local", "free", "paid", "auto"} <= modes
+    # severity is deterministic from the SLO numbers, so every mode agrees on it
+    assert len({r["severity"] for r in b["rows"]}) == 1
+    for r in b["rows"]:
+        assert {"provider", "model", "latency_ms", "severity"} <= set(r)

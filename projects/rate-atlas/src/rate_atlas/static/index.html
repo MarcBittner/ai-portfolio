@@ -121,6 +121,17 @@
   .card.hero{background:linear-gradient(135deg,rgba(230,173,82,.14),rgba(241,91,108,.10));
     border-color:rgba(230,173,82,.4)}
   .card.hero .v{color:var(--warn)} .card.hero .k{color:var(--warn)}
+  /* diagnostics cards */
+  .diaggrid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  @media(max-width:720px){.diaggrid{grid-template-columns:1fr 1fr}}
+  .diagcard{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);padding:13px 14px}
+  .diagcard .k{color:var(--ink-faint);font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+  .diagcard .v{font-size:17px;font-weight:700;margin-top:6px;letter-spacing:-.2px;word-break:break-word}
+  .diagcard .v.mono{font-family:var(--mono);font-size:13px;font-weight:600}
+  #dgbench td .bprov{font-weight:600}
+  #dgbench tr.activerow td{background:color-mix(in oklch,var(--accent) 10%,transparent)}
+  .modechip{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 9px;border-radius:6px;
+    background:rgba(106,161,255,.14);color:var(--info)}
   .badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:700;
     text-transform:uppercase;letter-spacing:.3px}
   .b-allow{background:rgba(67,201,138,.16);color:var(--ok)}
@@ -149,6 +160,21 @@
   tbody tr.fresh{animation:rowIn .5s var(--ease)}
   .muted{color:var(--ink-dim);font-size:12.5px}
   code{background:var(--surface-2);padding:1px 6px;border-radius:6px;font-family:var(--mono);font-size:12px}
+  /* guided demo path */
+  .steplist{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  @media(max-width:820px){.steplist{grid-template-columns:1fr 1fr}}
+  .steplist li{position:relative}
+  .steplist a{display:flex;align-items:center;gap:11px;padding:11px 13px;border:1px solid var(--line);
+    border-radius:var(--r-sm);background:var(--surface);text-decoration:none;color:inherit;
+    transition:.18s var(--ease);height:100%}
+  .steplist a:hover{border-color:color-mix(in oklch,var(--accent) 40%,var(--line));transform:translateY(-2px);box-shadow:var(--sh)}
+  .steplist a b{display:block;font-size:13px;color:var(--ink)}
+  .steplist a span:last-child{display:block;font-size:11px;color:var(--ink-dim);margin-top:2px;line-height:1.35}
+  .steplist .sn{width:24px;height:24px;border-radius:50%;flex:none;display:grid;place-items:center;
+    font-size:12px;font-weight:700;color:var(--accent-ink);background:var(--grad);
+    box-shadow:0 3px 10px -4px rgba(106,161,255,.7)}
+  .stepn{width:21px;height:21px;border-radius:50%;display:inline-grid;place-items:center;flex:none;
+    font-size:11px;font-weight:700;color:var(--accent-ink);background:var(--grad);margin-right:2px}
   /* reveal on load */
   .reveal{opacity:0;transform:translateY(14px)}
   .reveal.in{opacity:1;transform:none;transition:.55s var(--ease)}
@@ -332,8 +358,18 @@
 </header>
 
 <main>
-  <div class="panel full reveal">
-    <h2>Compare a procedure's negotiated rate</h2>
+  <!-- GUIDED DEMO PATH: an obvious flow for a first-time visitor -->
+  <div class="full reveal" id="steps">
+    <ol class="steplist">
+      <li><span class="sn">1</span><a href="#step1"><b>Compare a procedure</b><span>pick a code → see the cross-payer spread</span></a></li>
+      <li><span class="sn">2</span><a href="#step2"><b>Spot outliers</b><span>rates flagged by z-score</span></a></li>
+      <li><span class="sn">3</span><a href="#step3"><b>Ingest an unknown file</b><span>load the sample → watch the LLM map &amp; ingest it</span></a></li>
+      <li><span class="sn">4</span><a href="#step4"><b>Inspect the engine</b><span>provider · latency · routing benchmark</span></a></li>
+    </ol>
+  </div>
+
+  <div class="panel full reveal" id="step1">
+    <h2><span class="stepn">1</span>Compare a procedure's negotiated rate</h2>
     <div class="body">
       <div class="row">
         <select id="code" style="max-width:520px"></select>
@@ -352,8 +388,8 @@
     </div>
   </div>
 
-  <div class="panel reveal">
-    <h2>Rate outliers <span class="muted" id="othr" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400"></span></h2>
+  <div class="panel reveal" id="step2">
+    <h2><span class="stepn">2</span>Rate outliers <span class="muted" id="othr" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400"></span></h2>
     <div class="body" style="padding:0;max-height:360px;overflow:auto"><table id="outliers"></table></div>
   </div>
 
@@ -362,9 +398,9 @@
     <div class="body" style="padding:0"><table id="sources"></table></div>
   </div>
 
-  <div class="panel full reveal">
-    <h2>LLM-assisted mapping — an unknown-format file
-      <span class="badge b-info" id="llmmode" style="margin-left:auto">offline</span></h2>
+  <div class="panel full reveal" id="step3">
+    <h2><span class="stepn">3</span>LLM-assisted mapping — an unknown-format file
+      <span class="badge b-info" id="llmmode" style="margin-left:auto" title="served by — the provider that proposed the last mapping">served by: offline</span></h2>
     <div class="body">
       <div class="muted" style="margin-bottom:10px">
         The three adapters are hand-written per known shape. Paste a <b>4th file in an
@@ -386,6 +422,35 @@
         <span class="muted" id="ameta"></span>
       </div>
       <div id="amapout" style="margin-top:14px;display:none"></div>
+    </div>
+  </div>
+
+  <!-- DIAGNOSTICS: resolved provider/model/latency + routing chain + cross-mode benchmark -->
+  <div class="panel full reveal" id="step4">
+    <h2><span class="stepn">4</span>Engine diagnostics
+      <span class="muted" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">the technical view behind the mapping</span></h2>
+    <div class="body">
+      <div class="diaggrid">
+        <div class="diagcard"><div class="k">Resolved provider</div><div class="v" id="dgprov">—</div></div>
+        <div class="diagcard"><div class="k">Model</div><div class="v mono" id="dgmodel">—</div></div>
+        <div class="diagcard"><div class="k">Latency</div><div class="v" id="dglat">—</div></div>
+        <div class="diagcard"><div class="k">Cost / map</div><div class="v" id="dgcost">—</div></div>
+      </div>
+      <div class="muted" style="margin:12px 0 4px">Active routing chain <span class="hint" id="dgmode" style="margin-left:6px">mode: auto</span></div>
+      <div class="chainline" id="dgchain" style="margin-bottom:14px">offline (deterministic)</div>
+
+      <div class="row" style="justify-content:space-between;align-items:flex-start;gap:14px;margin-top:6px">
+        <div class="muted" style="max-width:640px">
+          <b style="color:var(--ink)">Model benchmark.</b> Run the bundled unknown-format file through
+          <b>every routing mode</b> and compare the resolved provider, model, latency, and columns mapped.
+          <code>local</code> is exercised <b>in your browser</b> (the cloud server can't reach a model on your
+          machine), so it needs host Ollama running — otherwise that row falls back to the deterministic matcher.
+        </div>
+        <button class="btn primary" id="dgrun"><span class="spin"></span><span class="lbl">Run benchmark</span></button>
+      </div>
+      <div id="dgbenchwrap" style="margin-top:14px;display:none">
+        <table id="dgbench"></table>
+      </div>
     </div>
   </div>
 </main>
@@ -462,7 +527,9 @@
       <li><b>Review sources</b> — <i>Sources</i> shows each file's detected shape mapped to canonical.</li>
       <li><b>Map an unknown file</b> — paste a 4th file (or load the sample) into <i>LLM-assisted
         mapping</i> and click <i>Map &amp; ingest</i>; the model proposes a column → canonical
-        mapping, applied deterministically.</li>
+        mapping, applied deterministically. The <i>served by</i> badge names the provider that ran it.</li>
+      <li><b>Inspect the engine</b> — <i>Engine diagnostics</i> shows the resolved provider/model/latency
+        and a benchmark across all routing modes (offline · paid · free · local browser→host Ollama).</li>
     </ol></div>
     <div><h4>Endpoints</h4><div class="eps">
       <code>/procedures</code><code>/compare/{code}</code><code>/outliers</code>
@@ -539,7 +606,7 @@ async function boot(){
   // llm routing mode badge + provider status for the routing config
   try{const l=await j("llm");llmProviders=l.providers||{};
     const active=Object.entries(llmProviders).find(e=>e[1]);
-    $("#llmmode").textContent=active?active[0]:(l.mode||"offline");
+    $("#llmmode").textContent="served by: "+(active?active[0]:"offline");
     renderRouting();}catch{}
   refreshClientOllama();   // browser-side Ollama check (browser→host)
   // outliers + first comparison
@@ -584,6 +651,8 @@ async function assistMap(){
       `<div class="muted" style="margin-bottom:8px">Proposed column → canonical mapping
         (applied deterministically):</div>
        <table style="max-width:520px"><tbody>${rows}</tbody></table>`;
+    $("#llmmode").textContent="served by: "+esc(a.provider);  // honest "served by" indicator
+    updateDiag(a);   // reflect the resolved provider/model/latency/cost in Diagnostics
     toast(`Ingested ${a.rows_mapped} rows for ${esc(a.hospital)}`,"ok");
     // refresh sources + the procedure picker so the new rows are visible
     try{renderSources((await j("sources")).sources)}catch{}
@@ -729,6 +798,7 @@ function renderRouting(){
   });
   const display=[...chain,"offline (deterministic)"];
   $("#chainline").textContent=display.join("  →  ");
+  if(typeof renderDiagChain==="function")renderDiagChain();
 }
 async function refreshClientOllama(){
   clientOllama = !!(await probeOllama());
@@ -802,6 +872,79 @@ async function ollamaMap(base, sample){
   return mapping;
 }
 
+/* ===================== DIAGNOSTICS: resolved engine + cross-mode benchmark =====================
+   Cards reflect the last real mapping run; the chain mirrors the active routing mode.
+   The benchmark runs the bundled unknown-format file through every mode: server-side
+   modes hit /normalize/assist (ingest:false), and `local` runs in the browser via the
+   same browser→host Ollama bridge the upload flow uses (the cloud can't reach your host). */
+function fmtLat(ms){ if(ms==null)return "—"; return ms<1000?Math.round(ms)+" ms":(ms/1000).toFixed(2)+" s"; }
+function fmtCost(c){ if(c==null)return "—"; return c===0?"$0":"$"+Number(c).toFixed(6); }
+function updateDiag(a){
+  if(!a)return;
+  $("#dgprov").textContent=a.provider||"—";
+  $("#dgmodel").textContent=a.model||"—";
+  $("#dglat").textContent=fmtLat(a.latency_ms);
+  $("#dgcost").textContent=fmtCost(a.cost_usd);
+}
+function renderDiagChain(){
+  const m=currentMode();
+  $("#dgmode").textContent=`mode: ${m}`;
+  const chain=(MODE_CHAIN[m]||[]).filter(p=>p.startsWith("ollama")?clientOllama:llmProviders[p]);
+  $("#dgchain").textContent=[...chain,"offline (deterministic)"].join("  →  ");
+}
+const DG_MODES=["auto","paid","local","free","offline"];
+async function benchOne(mode){
+  // local mode: run the mapping on host Ollama from the browser (browser→host), timed here.
+  if(mode==="local"){
+    const base=await probeOllama();
+    if(!base)return {mode,provider:"—",model:"—",latency_ms:null,mapped:null,
+      err:"no host Ollama reachable from the browser"};
+    try{
+      const t0=performance.now();
+      const cm=await ollamaMap(base,SAMPLE);
+      const dt=Math.round(performance.now()-t0);
+      if(!cm)return {mode,provider:"ollama (browser→host)",model:cfg.model||"llama3.1:8b",
+        latency_ms:dt,mapped:null,err:"no mapping returned"};
+      const mapped=Object.values(cm).filter(Boolean).length;
+      return {mode,provider:"ollama (browser→host)",model:cfg.model||"llama3.1:8b",
+        latency_ms:dt,mapped,total:Object.keys(cm).length,err:null};
+    }catch{return {mode,provider:"ollama (browser→host)",model:cfg.model||"llama3.1:8b",
+      latency_ms:null,mapped:null,err:"ollama call failed (browser→host)"};}
+  }
+  // server-side modes: ask /normalize/assist to map only (no ingest), report telemetry.
+  try{
+    const a=await j("normalize/assist",{method:"POST",headers:{"content-type":"application/json"},
+      body:JSON.stringify({mode,ingest:false})});
+    return {mode,provider:a.provider,model:a.model,latency_ms:a.latency_ms,
+      mapped:a.columns_mapped,total:a.columns_total,cost:a.cost_usd,err:null};
+  }catch{return {mode,provider:"—",model:"—",latency_ms:null,mapped:null,err:"request failed"};}
+}
+async function runBenchmark(){
+  const btn=$("#dgrun");btn.classList.add("loading");
+  const cur=currentMode();
+  try{
+    const rows=[];
+    for(const m of DG_MODES){ rows.push(await benchOne(m)); }
+    $("#dgbenchwrap").style.display="block";
+    $("#dgbench").innerHTML=
+      `<thead><tr><th>mode</th><th>resolved provider</th><th>model</th>
+        <th class="num">latency</th><th class="num">cols mapped</th></tr></thead><tbody>`+
+      rows.map(r=>{
+        const active=r.mode===cur?" class=\"activerow\"":"";
+        const mapped=r.err?`<span class="badge b-block" title="${esc(r.err)}">err</span>`
+          :`${r.mapped}${r.total?` / ${r.total}`:""}`;
+        return `<tr${active}><td><span class="modechip">${esc(r.mode)}</span></td>
+          <td class="bprov">${esc(r.provider)}</td>
+          <td class="mono">${esc(r.model)}</td>
+          <td class="num">${fmtLat(r.latency_ms)}</td>
+          <td class="num">${mapped}</td></tr>`;
+      }).join("")+`</tbody>`;
+    toast("Benchmark complete","ok");
+  }catch{toast("Benchmark failed — try again","bad");}
+  btn.classList.remove("loading");
+}
+$("#dgrun").onclick=runBenchmark;
+
 boot();
 
 /* POLISH KIT: Ollama model picker — populate the model field with installed host models */
@@ -826,18 +969,64 @@ boot();
   setTimeout(syncOllamaModels,1200);
 })();
 
-/* POLISH KIT: about/stack */
+/* ABOUT: grouped stack + design principles + how the LLM is used (matches the
+   gold-standard About). Company-neutral, on-domain (hospital MRF / price-transparency
+   normalization). Injected into the Help drawer so it stays a single-page console. */
 (function(){
   var h=document.getElementById("help"); if(!h || h.querySelector(".about-stack")) return;
-  var items=["Python 3.11", "FastAPI", "SQLite", "HTML/JS console", "shape-detection adapters", "z-score outliers", "LLM column mapping"]; var llm="paid (Anthropic/OpenAI) \u2192 local Ollama \u2192 free (OpenRouter) \u2192 deterministic offline; the Ollama call runs in your browser (browser\u2192host)";
-  var d=document.createElement("div"); d.className="about-stack";
-  d.style.cssText="margin-top:16px;padding-top:14px;border-top:1px solid var(--line)";
-  d.innerHTML='<h4 style="margin:0 0 8px">Built with</h4>'
-    +'<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">'
-    +items.map(function(s){return '<span style="font-size:11.5px;border:1px solid var(--line);border-radius:999px;padding:3px 10px;color:var(--ink-dim);background:var(--surface-2)">'+s+'</span>';}).join('')
-    +'</div>'
-    +'<p style="margin:0;font-size:11.5px;color:var(--ink-faint)"><b>LLM routing:</b> '+llm+'</p>';
-  h.appendChild(d);
+  var STACK=[
+    ["Core engine", [
+      ["Python 3.11 + FastAPI","stateless price-comparison API + static console"],
+      ["SQLite (Postgres stand-in)","same schema \u00b7 idx_code index \u00b7 queries port to Postgres by connection string"],
+      ["Structural shape detection","one adapter per known MRF shape \u2014 open/closed; the canonical record is the contract"],
+      ["z-score outlier engine","per-code rate outliers on the canonical surface, shape-independent"]
+    ]],
+    ["AI / LLM", [
+      ["Local Ollama (browser\u2192host)","your machine's model, used even against the cloud backend"],
+      ["Anthropic (Claude) / OpenAI","paid path \u2014 best column-crosswalk quality"],
+      ["OpenRouter free models","zero-cost default (gemma-4-31b-it:free)"],
+      ["Deterministic synonym matcher","no-model fallback; the app runs with zero keys"]
+    ]],
+    ["Platform & ops (illustrative envelope)", [
+      ["Terraform \u2192 AWS","VPC \u00b7 EKS (stateless API) \u00b7 RDS Postgres \u00b7 IRSA scoped roles \u00b7 S3/DynamoDB state"],
+      ["Kubernetes + HPA","non-root Deployment \u00b7 requests/limits \u00b7 /health probes \u00b7 2\u21928 on CPU"],
+      ["Argo CD (GitOps)","syncs deploy/k8s from main \u2014 prune + self-heal"],
+      ["Observability","SLIs/SLOs (ingest freshness, /compare p99, data-quality) + multi-window burn-rate alerts"]
+    ]],
+    ["Hosting & CI", [
+      ["Docker \u2192 Render (free)","same image runs anywhere; cold-starts ~30\u201350s; no keys/DB on the public host"],
+      ["GitHub Actions","ruff + pytest + live smoke as the quality gate"]
+    ]]
+  ];
+  var PRINCIPLES=[
+    "The LLM only proposes the column crosswalk (source column \u2192 canonical field) \u2014 it never touches a rate.",
+    "Code applies the mapping deterministically: rates coerced to float, missing code/rate rows skipped (model proposes, code performs).",
+    "Every MRF shape collapses to one 7-field record; nothing downstream branches on source shape.",
+    "A provider is used only when its key is set (or Ollama probes reachable); the chain self-selects from the environment.",
+    "Deterministic offline is a true last resort \u2014 the service degrades to deterministic, never to an error.",
+    "Mapping accuracy is measured by an eval (precision/recall over labeled headers), not asserted."
+  ];
+  var html='<div class="about-stack" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line)">'
+    +'<h4 style="margin:0 0 4px">About rate-atlas</h4>'
+    +'<p style="margin:0 0 12px;font-size:12.5px;color:var(--ink-dim)">Hospital price-transparency normalization: '
+    +'detect each machine-readable file\u2019s shape \u2192 map it to one canonical model \u2192 compare a procedure\u2019s '
+    +'negotiated rate across payers &amp; hospitals \u2192 flag statistical outliers. Unknown formats ingest via an '
+    +'LLM-assisted column mapping. Sample data is synthetic and fictional; rate-atlas runs on your own real data too.</p>';
+  STACK.forEach(function(g){
+    html+='<div style="font-size:10.5px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--ink-faint);margin:12px 0 6px">'+g[0]+'</div>';
+    g[1].forEach(function(it){
+      html+='<div style="display:flex;gap:10px;margin:0 0 5px;font-size:12px"><span style="min-width:172px;font-weight:600;color:var(--ink)">'+it[0]+'</span><span style="color:var(--ink-dim)">'+it[1]+'</span></div>';
+    });
+  });
+  html+='<div style="font-size:10.5px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--ink-faint);margin:14px 0 6px">Design principles</div>';
+  PRINCIPLES.forEach(function(p){
+    html+='<div style="display:flex;gap:8px;margin:0 0 5px;font-size:12px;color:var(--ink-dim)"><span style="color:var(--accent)">\u25b8</span><span>'+p+'</span></div>';
+  });
+  html+='<p style="margin:12px 0 0;font-size:11px;color:var(--ink-faint)">A portfolio demo on the '
+    +'<b>Python \u00b7 FastAPI \u00b7 SQLite/Postgres \u00b7 Terraform/EKS \u00b7 LLM</b> stack.</p>'
+    +'</div>';
+  var d=document.createElement("div"); d.innerHTML=html;
+  h.appendChild(d.firstChild);
 })();
 
 /* SHOWCASE: loading bar + result fade-in (generic) */

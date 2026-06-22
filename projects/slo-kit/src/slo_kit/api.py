@@ -112,6 +112,17 @@ def llm_status() -> dict:
     return llm.status()
 
 
+@app.get("/diagnostics/benchmark")
+def diagnostics_benchmark() -> dict:
+    """Run one fixed incident snapshot through every routing mode and report the
+    resolved provider, model, latency, and (deterministically classified) severity
+    — the Diagnostics view's model benchmark. The cloud server can't reach a model
+    on your machine, so the browser re-runs the ``local`` row through the
+    browser→host Ollama bridge; ``offline`` is always the honest zero-key baseline.
+    """
+    return {"rows": incident.benchmark(), "llm": llm.status()}
+
+
 # ---- operator controls (the incident demo) -----------------------------------
 
 @app.post("/admin/fault")

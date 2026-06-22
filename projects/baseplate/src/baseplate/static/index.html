@@ -204,6 +204,53 @@
     border-radius:50%;animation:spin .8s linear infinite}
   .boot-card .msg{color:var(--ink-dim);font-size:13.5px}
   .boot-card .sub{color:var(--ink-faint);font-size:12px;max-width:280px}
+  /* POLISH KIT: served-by indicator (visible provider/model badge) */
+  .served{display:inline-flex;align-items:center;gap:7px;font-size:11.5px;font-weight:600;
+    border:1px solid var(--line);border-radius:999px;padding:4px 11px;background:var(--surface-2);
+    color:var(--ink-dim);white-space:nowrap}
+  .served .sdot{width:7px;height:7px;border-radius:50%;background:var(--ink-faint);flex:none}
+  .served .sdot.live{background:var(--ok);box-shadow:0 0 0 3px rgba(67,201,138,.16)}
+  .served .sdot.offline{background:var(--warn)}
+  .served b{color:var(--ink);font-weight:700}
+  /* POLISH KIT: guided step cues */
+  .steps{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px}
+  .step{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink-dim);
+    border:1px solid var(--line);border-radius:999px;padding:5px 12px 5px 6px;background:var(--surface-2)}
+  .step .n{width:19px;height:19px;border-radius:50%;background:var(--surface-3);color:var(--ink);
+    display:grid;place-items:center;font-size:11px;font-weight:700;flex:none}
+  .step.on{border-color:var(--accent);color:var(--ink)}
+  .step.on .n{background:var(--grad);color:var(--accent-ink)}
+  .step .arr{color:var(--ink-faint)}
+  /* POLISH KIT: About — grouped stack table + principles (trueline parity) */
+  .stack-grid{display:grid;gap:14px;grid-template-columns:1fr 1fr}
+  @media(max-width:760px){.stack-grid{grid-template-columns:1fr}}
+  .stack-card{border:1px solid var(--line);border-radius:var(--r-sm);padding:14px 15px;background:var(--surface-2)}
+  .stack-card .gh{font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;
+    color:var(--ink-dim);margin:0 0 10px}
+  .stack-card .si{display:flex;gap:10px;padding:5px 0;border-top:1px solid var(--line);align-items:baseline}
+  .stack-card .si:first-of-type{border-top:none}
+  .stack-card .si .sn{min-width:128px;font-weight:600;font-size:12.5px;color:var(--ink)}
+  .stack-card .si .sd{font-size:12px;color:var(--ink-dim)}
+  .principles{margin:14px 0 0;padding:14px 15px;border:1px solid var(--line);border-radius:var(--r-sm);
+    background:var(--surface-2)}
+  .principles .gh{font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;
+    color:var(--ink-dim);margin:0 0 10px}
+  .principles ul{margin:0;padding:0;list-style:none;display:grid;gap:8px}
+  .principles li{display:flex;gap:9px;font-size:12.5px;color:var(--ink-dim);line-height:1.5}
+  .principles li .pk{color:var(--accent);flex:none;font-weight:700}
+  .about-llm{margin-top:14px;padding:14px 15px;border:1px solid var(--line);border-radius:var(--r-sm);
+    background:linear-gradient(135deg,rgba(106,161,255,.08),rgba(155,134,255,.05))}
+  .about-llm .gh{font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;
+    color:var(--ink-dim);margin:0 0 8px}
+  .about-llm p{margin:0 0 6px;font-size:12.5px;color:var(--ink-dim);line-height:1.55}
+  .about-llm code{font-size:11.5px}
+  /* POLISH KIT: Diagnostics */
+  .diag-grid{display:grid;gap:10px;grid-template-columns:repeat(4,1fr);margin-bottom:14px}
+  @media(max-width:760px){.diag-grid{grid-template-columns:1fr 1fr}}
+  .metric{border:1px solid var(--line);border-radius:var(--r-sm);padding:11px 13px;background:var(--surface-2)}
+  .metric .ml{font-size:10.5px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:var(--ink-faint)}
+  .metric .mv{font-size:15px;font-weight:700;margin-top:3px;color:var(--ink);font-family:var(--mono);word-break:break-word}
+  .metric .mv.sm{font-size:12.5px}
   /* keyframes */
   @keyframes spin{to{transform:rotate(360deg)}}
   @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(67,201,138,.5)}70%{box-shadow:0 0 0 6px rgba(67,201,138,0)}100%{box-shadow:0 0 0 0 rgba(67,201,138,0)}}
@@ -325,17 +372,27 @@
 
 <main>
   <div class="panel reveal">
-    <h2>Scaffold a service <span class="muted" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">free text → spec → paved-road files · routing <span id="llmstat">offline</span></span></h2>
+    <h2>Scaffold a service <span class="muted" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">free text → spec → paved-road files · <span class="served" id="servedby" title="which provider extracted the spec"><span class="sdot offline"></span>served by <b>offline</b></span></span></h2>
     <div class="body">
+      <div class="steps" aria-hidden="true">
+        <span class="step on" id="st1"><span class="n">1</span> Describe the service</span>
+        <span class="arr">→</span>
+        <span class="step" id="st2"><span class="n">2</span> Scaffold</span>
+        <span class="arr">→</span>
+        <span class="step" id="st3"><span class="n">3</span> Review files</span>
+        <span class="arr">→</span>
+        <span class="step" id="st4"><span class="n">4</span> SLO / data-quality</span>
+      </div>
       <label class="ctl" style="display:block">
         <span class="muted">Describe the service (the LLM/offline parser extracts a spec)</span>
         <textarea id="desc" style="margin-top:6px">A Python FastAPI service called rate-ingest that reads rates from Postgres and serves them over HTTP</textarea>
       </label>
+      <div class="note" style="margin-top:6px">Tip: include a clean service name — say <code>called rate-ingest</code> or <code>named claim-gateway</code>. With no model running, the deterministic parser keys the name off your wording, so name it explicitly.</div>
       <div class="row" style="margin-top:10px">
         <span class="muted">examples:</span>
         <button class="chip" data-desc="A Python FastAPI service called rate-ingest that reads rates from Postgres and serves them over HTTP">python + db + http</button>
-        <button class="chip" data-desc="A Go worker called event-fanout with no database that does not expose HTTP">go worker, no db</button>
-        <button class="chip" data-desc="A TypeScript service named claim-gateway backed by a database exposing HTTP">typescript gateway</button>
+        <button class="chip" data-desc="A Go scheduled batch worker named event-fanout, no database, no http">go worker, no db, no http</button>
+        <button class="chip" data-desc="A TypeScript service named claim-gateway that uses a database and serves HTTP">typescript gateway, db</button>
       </div>
       <div class="row" style="margin-top:12px">
         <label class="check"><input type="checkbox" id="onboard" checked> onboard to catalog</label>
@@ -379,6 +436,83 @@
     <div class="body" style="padding:0;overflow-x:auto">
       <table id="slo"><thead><tr><th>slo</th><th>objective</th>
         <th>budget /30d</th><th>current</th></tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+
+  <!-- POLISH KIT: Engine diagnostics (resolved provider/model/latency + benchmark across modes) -->
+  <div class="panel full reveal" id="diagpanel">
+    <h2>Engine diagnostics <span class="muted" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">resolved route · latency · benchmark across modes</span></h2>
+    <div class="body">
+      <div class="diag-grid">
+        <div class="metric"><div class="ml">resolved provider</div><div class="mv sm" id="dgProvider">—</div></div>
+        <div class="metric"><div class="ml">model</div><div class="mv sm" id="dgModel">—</div></div>
+        <div class="metric"><div class="ml">latency</div><div class="mv" id="dgLatency">—</div></div>
+        <div class="metric"><div class="ml">cost</div><div class="mv" id="dgCost">—</div></div>
+      </div>
+      <div class="note" id="dgChain">Routing chain: scaffold a service to populate the last extraction.</div>
+      <div class="row" style="margin-top:14px">
+        <span class="muted">Benchmark: run one description through every routing mode and compare resolved provider, model, latency, and the extracted spec.</span>
+        <button class="btn primary" id="benchbtn" style="margin-left:auto"><span class="spin"></span><span class="lbl">Run benchmark</span></button>
+      </div>
+      <div style="overflow-x:auto;margin-top:12px">
+        <table id="bench"><thead><tr><th>mode</th><th>resolved provider</th><th>model</th>
+          <th>latency</th><th>spec name</th><th>result</th></tr></thead>
+          <tbody><tr><td colspan="6" class="muted" style="padding:14px">Run the benchmark to compare modes. <b>local</b> is exercised in your browser (the cloud server can't reach an Ollama on your machine), so it needs host Ollama running.</td></tr></tbody></table>
+      </div>
+    </div>
+  </div>
+
+  <!-- POLISH KIT: About (what this is / the stack / how it works / how the LLM is used) -->
+  <div class="panel full reveal" id="aboutpanel">
+    <h2>About baseplate <span class="muted" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">what it is · the stack · how it works · how the LLM is used</span></h2>
+    <div class="body">
+      <p class="muted" style="margin:0 0 16px;max-width:880px">
+        baseplate is the <b>paved road</b> a platform team builds so the rest of the org ships fast and safely:
+        reusable AWS infrastructure-as-code, a Kubernetes base contract, GitOps delivery, a golden CI/CD pipeline,
+        and SLOs — including <b>data-quality-as-an-SLI</b>. The piece that ties it together is a <b>self-service
+        scaffolder</b>: describe a service in plain English and get a reviewable PR full of production-ready
+        paved-road files. The example workload that rides the road is a healthcare <b>price-transparency rate
+        ingest</b> — the same shape as ingesting EDI / X12 / HL7 / FHIR feeds in RCM: structured, high-stakes,
+        regulated data where correctness is a first-class concern. The IaC is illustrative and all rate data is
+        synthetic; no HIPAA claim is made.
+      </p>
+
+      <div class="stack-grid">
+        <div class="stack-card">
+          <div class="gh">Paved road — IaC &amp; delivery</div>
+          <div class="si"><span class="sn">Terraform</span><span class="sd">remote state (S3 + DynamoDB lock), VPC, EKS, and a reusable <code>service</code> module: ECR · keyless IRSA · namespace · optional RDS Postgres</span></div>
+          <div class="si"><span class="sn">Kubernetes base</span><span class="sd">the contract every service inherits — non-root, resource limits, readiness/liveness probes, HPA, PodDisruptionBudget</span></div>
+          <div class="si"><span class="sn">Argo CD GitOps</span><span class="sd">an ApplicationSet (app-of-apps) — onboard a service by adding a dir and opening a PR</span></div>
+          <div class="si"><span class="sn">Golden CI/CD</span><span class="sd">OIDC keyless → build → test → image scan → GitOps tag bump → post-deploy smoke gate with rollback</span></div>
+        </div>
+        <div class="stack-card">
+          <div class="gh">Console &amp; engine</div>
+          <div class="si"><span class="sn">Python 3.11 · FastAPI</span><span class="sd">stateless API: <code>/scaffold</code> · <code>/ingest</code> · <code>/slo</code> · <code>/evals</code> · <code>/llm</code> · <code>/health</code></span></div>
+          <div class="si"><span class="sn">Zero-build console</span><span class="sd">a single static HTML/JS file — no bundler, no framework, no flash on theme load</span></div>
+          <div class="si"><span class="sn">Scaffolder</span><span class="sd">free-text → <code>ServiceSpec</code> → deterministic templating of every paved-road file</span></div>
+          <div class="si"><span class="sn">Observability</span><span class="sd">SLIs/SLOs with error budgets + multi-window burn-rate alerts; data-quality is its own SLI</span></div>
+          <div class="si"><span class="sn">Hosting</span><span class="sd">containerized (non-root, <code>PORT</code>, <code>/health</code>); runs on Render free tier — the same image runs on the EKS cluster the Terraform sketches</span></div>
+        </div>
+      </div>
+
+      <div class="principles">
+        <div class="gh">Platform-engineering principles</div>
+        <ul>
+          <li><span class="pk">▸</span><span>The LLM only proposes the <b>spec</b> — it never writes infrastructure. Every generated file comes from deterministic templating: <i>the model proposes the spec, code produces the artifacts</i>.</span></li>
+          <li><span class="pk">▸</span><span>Same <code>ServiceSpec</code> in → <b>byte-identical</b> files out, so a scaffold is reviewable in a PR and reproducible in the eval.</span></li>
+          <li><span class="pk">▸</span><span>A scaffolded service <b>inherits</b> the k8s base contract (rendered from the same base) rather than reinventing it — the paved road, not a blank page.</span></li>
+          <li><span class="pk">▸</span><span><b>Data-quality is an SLI.</b> A service can be "up" while silently serving wrong rates, so correctness gets its own SLO and burn-rate alert next to availability and latency.</span></li>
+          <li><span class="pk">▸</span><span>Runs <b>fully offline</b> with zero keys and zero secrets — the deterministic parser is a real last resort, never the design centre.</span></li>
+        </ul>
+      </div>
+
+      <div class="about-llm">
+        <div class="gh">How the LLM is used</div>
+        <p>The free-text → <code>ServiceSpec</code> step routes through one standardized chain:
+          <b>local Ollama (browser→host) → paid (Anthropic / OpenAI) → free (OpenRouter) → deterministic offline parser</b>.
+          A provider is <i>available</i> only when its key is set (Ollama: when a <code>/api/tags</code> probe succeeds), so the chain self-selects from the environment.</p>
+        <p>Because a cloud server can't reach an Ollama on <i>your</i> machine, the Ollama check and spec-extraction call run in the <b>browser</b> (browser→host) and submit the result as a <code>client_spec</code> — which the server <b>re-validates and normalizes</b> through the exact same path as its own LLM output (it never trusts a raw spec). The model extracts only four fields (<code>name</code>, <code>language</code>, <code>needs_db</code>, <code>exposes_http</code>); everything else is code. Provider, model, latency, and cost are surfaced honestly in <b>Engine diagnostics</b>.</p>
+      </div>
     </div>
   </div>
 </main>
@@ -446,12 +580,15 @@
       free-text description into a ServiceSpec, then generates Terraform / k8s / golden CI / SLO files and onboards the
       service to a catalog — plus an example ingest workload with a data-quality SLI and an SLO view.</p></div>
     <div><h4>How to use</h4><ol>
-      <li><b>Scaffold a service</b> — describe it in <i>Scaffold a service</i> (or click an example), choose whether to
-        onboard, and click <i>Generate paved-road files</i>.</li>
-      <li><b>View generated files</b> — switch tabs in <i>Generated files</i> to read each templated paved-road artifact.</li>
-      <li><b>The catalog</b> — onboarded services appear in <i>Service catalog</i> with how they were routed.</li>
-      <li><b>Run ingest</b> — click <i>Run ingest</i> to score the synthetic rate file's data-quality SLI.</li>
-      <li><b>SLOs</b> — the <i>SLOs</i> panel shows objectives, error budgets, and the live data-quality SLI.</li>
+      <li><b>Describe the service</b> — type it in <i>Scaffold a service</i> (or click an example). Include a clean
+        name (<code>called rate-ingest</code>) — with no model running, the offline parser keys the name off your wording.</li>
+      <li><b>Scaffold</b> — choose whether to onboard, then click <i>Generate paved-road files</i>. The
+        <i>served by</i> badge shows which provider extracted the spec.</li>
+      <li><b>Review files</b> — switch tabs in <i>Generated files</i> to read each templated paved-road artifact.</li>
+      <li><b>SLO / data-quality</b> — click <i>Run ingest</i> to score the rate file's data-quality SLI; the
+        <i>SLOs</i> panel shows objectives, error budgets, and the live SLI.</li>
+      <li><b>Diagnostics &amp; About</b> — <i>Engine diagnostics</i> shows the resolved route, latency, and a
+        benchmark across modes; <i>About</i> covers the stack and how the LLM is used.</li>
     </ol></div>
     <div><h4>Endpoints</h4><div class="eps">
       <code>/scaffold</code><code>/catalog</code><code>/ingest</code><code>/quality</code>
@@ -524,7 +661,10 @@ async function scaffold(){
       `spec: <code>${s.name}</code> · ${s.language} · db=${s.needs_db} · `+
       `http=${s.exposes_http} &nbsp;|&nbsp; via <b>${rt.provider}</b>/${rt.model}`+
       (rt.fallbacks&&rt.fallbacks.length?` · fell back through ${rt.fallbacks.join(", ")}`:"");
+    setServedBy(rt.provider, rt.model);
+    setDiagnostics(rt);
     renderTabs();
+    advanceSteps(3);
     toast(`Scaffolded ${s.name} via ${rt.provider}`,"ok");
     loadCatalog();
   }catch(e){$("#routing").textContent="scaffold failed";toast("Scaffold failed","bad");}
@@ -592,10 +732,84 @@ async function loadSlo(){
 /* ===================== domain: llm status ===================== */
 async function loadLlm(){
   try{const s=await jget('/llm');llmProviders=s.providers||{};
-    const active=Object.entries(llmProviders).find(e=>e[1]);
-    $("#llmstat").textContent=active?active[0]:"offline (deterministic)";
     renderRouting();}catch{}
 }
+
+/* ===================== POLISH KIT: served-by + step cues ===================== */
+function setServedBy(provider, model){
+  const el=$("#servedby");if(!el)return;
+  const offline = provider==="offline" || provider==="explicit";
+  const dotcls = offline ? "offline" : "live";
+  const short = (model||"").split("/").pop()||model||"";
+  el.innerHTML=`<span class="sdot ${dotcls}"></span>served by <b>${provider}</b>`+
+    (short && short!=="n/a" && short!=="deterministic" ? ` · ${short}` : (offline?" · deterministic":""));
+  el.title=`spec extracted by ${provider}${short?(" ("+short+")"):""}`;
+}
+function advanceSteps(n){
+  for(let i=1;i<=4;i++){const el=$("#st"+i);if(el)el.classList.toggle("on",i<=n);}
+}
+$("#desc")?.addEventListener("input",()=>advanceSteps(1));
+$("#ingestbtn")?.addEventListener("click",()=>advanceSteps(4));
+
+/* ===================== POLISH KIT: engine diagnostics ===================== */
+function setDiagnostics(rt){
+  if(!rt)return;
+  $("#dgProvider").textContent=rt.provider||"—";
+  $("#dgModel").textContent=(rt.model&&rt.model!=="n/a")?rt.model:"—";
+  $("#dgLatency").textContent=(rt.latency_ms!=null)?`${(rt.latency_ms/1000).toFixed(rt.latency_ms<1000?3:2)}s`:"—";
+  $("#dgCost").textContent=(rt.cost_usd!=null)?(rt.cost_usd===0?"$0":("$"+rt.cost_usd.toFixed(6))):"—";
+  const fell=(rt.fallbacks&&rt.fallbacks.length)?rt.fallbacks.join(" → ")+" → ":"";
+  $("#dgChain").innerHTML=`Routing chain (last extraction): ${fell}<b>${rt.provider}</b>`+
+    (rt.mode?` · mode <code>${rt.mode}</code>`:"");
+}
+
+/* Benchmark one description through every routing mode and tabulate the result.
+   Server-side modes (auto/paid/free/offline) are run via /scaffold. The `local`
+   row is exercised in the BROWSER (browser→host) — the cloud server can't reach
+   an Ollama on your machine — using the same bridge the scaffold flow uses. */
+const BENCH_DESC="A Python FastAPI service called rate-ingest that reads rates from Postgres and serves them over HTTP";
+async function runBenchmark(){
+  const btn=$("#benchbtn");btn.classList.add("loading");
+  const tb=$("#bench tbody");
+  const modes=["auto","paid","free","offline","local"];
+  const rows=[];
+  for(const mode of modes){
+    if(mode==="local"){
+      // browser→host Ollama, mirroring the scaffold flow's local path.
+      let provider="ollama (browser→host)",model=cfg.model||"llama3.1:8b",lat="—",name="—",result="";
+      const t0=performance.now();
+      try{
+        const base=await probeOllama();
+        if(!base){result="no host Ollama reachable from the browser";provider="—";model="—";}
+        else{
+          const raw=await ollamaSpec(base,BENCH_DESC);
+          // re-validate through the server (same trust boundary as a real scaffold).
+          const r=await jpost('/scaffold',{client_spec:raw,mode:"local",description:BENCH_DESC,onboard:false});
+          lat=`${((performance.now()-t0)/1000).toFixed(2)}s`;
+          name=r.spec?.name||"—";result=r.error?("err: "+r.error):"ok";
+        }
+      }catch{result="ollama call failed (browser→host)";provider="—";model="—";lat="—";}
+      rows.push({mode,provider,model,lat,name,result});
+      continue;
+    }
+    try{
+      const r=await jpost('/scaffold',{description:BENCH_DESC,mode,onboard:false});
+      const rt=r.routing||{};
+      rows.push({mode,provider:rt.provider||"—",model:(rt.model&&rt.model!=="n/a")?rt.model:"—",
+        lat:(rt.latency_ms!=null)?`${(rt.latency_ms/1000).toFixed(rt.latency_ms<1000?3:2)}s`:"—",
+        name:r.spec?.name||"—",result:r.error?("err: "+r.error):"ok"});
+    }catch{rows.push({mode,provider:"—",model:"—",lat:"—",name:"—",result:"request failed"});}
+  }
+  tb.innerHTML=rows.map(r=>{
+    const ok=r.result==="ok";
+    const res=ok?`<span class="badge b-good">ok</span>`:`<span class="bad mono">${r.result}</span>`;
+    return `<tr><td><b>${r.mode}</b></td><td>${r.provider}</td><td class="mono">${r.model}</td>`+
+      `<td class="mono">${r.lat}</td><td><code>${r.name}</code></td><td>${res}</td></tr>`;
+  }).join("");
+  btn.classList.remove("loading");
+  toast("Benchmark complete","ok");
+}
+$("#benchbtn").onclick=runBenchmark;
 
 /* ===================== POLISH KIT: theme toggle ===================== */
 const THEME_KEY="theme";
@@ -755,20 +969,6 @@ boot();
   }
   inp.addEventListener("focus",syncOllamaModels);
   setTimeout(syncOllamaModels,1200);
-})();
-
-/* POLISH KIT: about/stack */
-(function(){
-  var h=document.getElementById("help"); if(!h || h.querySelector(".about-stack")) return;
-  var items=["Python 3.11", "FastAPI", "zero-build HTML/JS console", "Terraform / EKS / RDS / ArgoCD + golden CI (illustrative)", "LLM service-scaffolder", "data-quality SLI"]; var llm="paid (Anthropic/OpenAI) \u2192 local Ollama \u2192 free (OpenRouter) \u2192 deterministic offline; the Ollama call runs in your browser (browser\u2192host)";
-  var d=document.createElement("div"); d.className="about-stack";
-  d.style.cssText="margin-top:16px;padding-top:14px;border-top:1px solid var(--line)";
-  d.innerHTML='<h4 style="margin:0 0 8px">Built with</h4>'
-    +'<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">'
-    +items.map(function(s){return '<span style="font-size:11.5px;border:1px solid var(--line);border-radius:999px;padding:3px 10px;color:var(--ink-dim);background:var(--surface-2)">'+s+'</span>';}).join('')
-    +'</div>'
-    +'<p style="margin:0;font-size:11.5px;color:var(--ink-faint)"><b>LLM routing:</b> '+llm+'</p>';
-  h.appendChild(d);
 })();
 
 /* SHOWCASE: loading bar + result fade-in (generic) */

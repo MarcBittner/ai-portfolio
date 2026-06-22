@@ -37,6 +37,7 @@ The thing hand-written adapters can't do, and where this demo earns its keep:
 
 ## Contents
 
+- [Console (the live demo)](#console-the-live-demo)
 - [Architecture](#architecture)
 - [Design decisions](#design-decisions)
 - [LLM-assisted column mapping](#llm-assisted-column-mapping)
@@ -48,6 +49,28 @@ The thing hand-written adapters can't do, and where this demo earns its keep:
 - [Env](#env)
 - [Quickstart](#quickstart)
 - [Deploy](#deploy)
+
+## Console (the live demo)
+
+The static console (`src/rate_atlas/static/index.html`) is a single page with a
+**guided demo path** — four numbered steps for a first-time visitor:
+
+1. **Compare a procedure** — pick a code, see lowest / median / highest / spread and
+   per-payer rates with a rate-vs-range bar (`70450` head CT spans ~$488 → $1,950).
+2. **Spot outliers** — rates flagged by `|z|`-score; tune the threshold in Settings.
+3. **Ingest an unknown file** — load the bundled 4th file (vendor-specific columns)
+   and click *Map & ingest*; watch the LLM-proposed column → canonical mapping get
+   applied deterministically and the new rows join the comparison. A **"served by"**
+   badge names the provider that ran the mapping (honest labels).
+4. **Engine diagnostics** — the resolved provider / model / latency / cost of the last
+   mapping, the active routing chain, and a **benchmark across every routing mode**
+   (offline · paid · free run server-side; **local** is exercised in your browser via
+   the browser→host Ollama bridge, since the cloud server can't reach your machine).
+
+It also ships a **dark/light theme** (no-flash bootstrap, persisted, system-aware), a
+**Settings drawer** (outlier threshold · theme · routing mode · model override · live
+provider-status rows · resolved fallback chain), and an **About** panel (Help `?`) with
+the grouped stack, design principles, and how the LLM is used.
 
 ## Architecture
 

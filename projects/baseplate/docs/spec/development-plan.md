@@ -13,7 +13,11 @@ A staged build; each stage is independently runnable and offline.
 4. **Catalog + SLOs.** `catalog.py` (services on the road) and `slo.py` (SLO
    view with the data-quality SLI plugged in, error budgets, burn-rate table).
 5. **API + console.** `api.py` (`/health`, `/scaffold`, `/catalog`, `/ingest`,
-   `/quality`, `/slo`, `/evals`, `/llm`) + `static/index.html`.
+   `/quality`, `/slo`, `/evals`, `/llm`) + `static/index.html` — a zero-build
+   console: guided scaffold path, served-by indicator, engine diagnostics
+   (resolved route + a benchmark across routing modes, local exercised
+   browser→host), About (stack + LLM usage), dark/light theme, Settings drawer
+   (routing mode + model override), help modal.
 6. **Paved-road artifacts.** `deploy/terraform` (foundation + reusable `service`
    module), `deploy/k8s/base`, `deploy/argocd` (ApplicationSet),
    `deploy/github-actions` (golden CI). Docs: `platform.md`, `observability.md`.

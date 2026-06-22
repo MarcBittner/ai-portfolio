@@ -46,6 +46,7 @@ The two things this demo is built to prove:
 - [Architecture](#architecture)
 - [The paved road](#the-paved-road)
 - [Self-service scaffolder](#self-service-scaffolder)
+- [The console](#the-console)
 - [Observability & SLOs](#observability-slos)
 - [Routing](#routing)
 - [Evals](#evals)
@@ -120,6 +121,33 @@ contract rather than reinventing it. With no provider keys, a deterministic
 parser extracts the spec (handling negations like "no database" / "no http"), so
 the whole flow works offline. `POST /scaffold` returns the spec, the routing
 telemetry, and every generated file.
+
+## The console
+
+A single static HTML/JS file (`src/baseplate/static/index.html`, zero build) with
+a guided demo path: **1) describe the service → 2) scaffold → 3) review the
+generated paved-road files → 4) SLO / data-quality**. Type a clean service name
+(`called rate-ingest`) — with no model running, the deterministic parser keys the
+name off your wording.
+
+- **Served-by indicator.** A visible badge shows which provider extracted the
+  spec (`served by anthropic · claude-haiku-…`, or `served by offline ·
+  deterministic`) — no provider is ever mislabeled.
+- **Engine diagnostics.** The resolved provider / model / latency / cost of the
+  last extraction, the routing chain, and a **benchmark** that runs one
+  description through every routing mode and tabulates the result. The `local`
+  row is exercised **in the browser** (browser→host) because the cloud server
+  can't reach an Ollama on your machine — the same bridge the scaffold flow uses.
+- **About.** What it is, the stack (Terraform/EKS/RDS/Argo CD/golden CI · FastAPI ·
+  the scaffolder · data-quality SLI), platform-engineering principles, and a
+  precise "how the LLM is used" section.
+- **Settings + theme.** A routing-mode control (`auto · local · free · paid ·
+  offline`) with a model override and live provider status, plus a persisted,
+  no-flash **dark/light** theme toggle.
+
+The Ollama check and spec-extraction call run client-side so a cloud-hosted demo
+can still use a **real local model** for free; the server re-validates any
+browser-supplied spec before templating.
 
 ## Observability & SLOs
 

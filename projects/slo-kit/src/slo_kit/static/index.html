@@ -184,20 +184,42 @@
   .pstat .pdot.on{background:var(--ok);box-shadow:0 0 0 3px rgba(67,201,138,.18)}
   .chainline{font-family:var(--mono);font-size:11.5px;color:var(--ink-dim);
     background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);padding:8px 11px;word-break:break-word}
-  /* POLISH KIT: help modal (centered dialog, reuses scrim) */
-  #help{position:fixed;top:50%;left:50%;transform:translate(-50%,calc(-50% + 12px));z-index:70;
+  /* POLISH KIT: help / about / diagnostics modal (centered dialog, reuses scrim) */
+  #help,.sheet{position:fixed;top:50%;left:50%;transform:translate(-50%,calc(-50% + 12px));z-index:70;
     width:560px;max-width:94vw;max-height:86vh;overflow:auto;opacity:0;pointer-events:none;
     background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh-lg);
     transition:opacity .25s var(--ease),transform .25s var(--ease)}
-  #help.open{opacity:1;pointer-events:auto;transform:translate(-50%,-50%)}
-  #help header{position:static;background:none;backdrop-filter:none;border-bottom:1px solid var(--line)}
-  #help .body{padding:20px;display:grid;gap:16px}
-  #help h4{margin:0 0 6px;font-size:11.5px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--ink-dim)}
-  #help p{margin:0;color:var(--ink-dim);font-size:13.5px}
-  #help ol{margin:0;padding-left:20px;color:var(--ink-dim);font-size:13.5px;display:grid;gap:4px}
-  #help .kbd{font-family:var(--mono);font-size:11.5px;background:var(--surface-2);border:1px solid var(--line);
+  .sheet.wide{width:720px}
+  #help.open,.sheet.open{opacity:1;pointer-events:auto;transform:translate(-50%,-50%)}
+  #help header,.sheet header{position:static;background:none;backdrop-filter:none;border-bottom:1px solid var(--line)}
+  #help .body,.sheet .body{padding:20px;display:grid;gap:16px}
+  #help h4,.sheet h4{margin:0 0 6px;font-size:11.5px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--ink-dim)}
+  #help p,.sheet p{margin:0;color:var(--ink-dim);font-size:13.5px}
+  #help ol,.sheet ol{margin:0;padding-left:20px;color:var(--ink-dim);font-size:13.5px;display:grid;gap:4px}
+  #help .kbd,.sheet .kbd{font-family:var(--mono);font-size:11.5px;background:var(--surface-2);border:1px solid var(--line);
     border-bottom-width:2px;border-radius:6px;padding:1px 7px;color:var(--ink)}
-  #help .eps{display:flex;gap:7px;flex-wrap:wrap}
+  #help .eps,.sheet .eps{display:flex;gap:7px;flex-wrap:wrap}
+  /* about: grouped stack + principles */
+  .stackgrp{border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface-2);padding:13px 15px}
+  .stackgrp .grpname{font-size:10.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--ink-faint)}
+  .stackgrp ul{list-style:none;margin:9px 0 0;padding:0;display:grid;gap:7px}
+  .stackgrp li{display:flex;flex-direction:column;gap:1px}
+  .stackgrp li b{font-size:12.5px;font-weight:650;color:var(--ink)}
+  .stackgrp li span{font-size:11.5px;color:var(--ink-dim);line-height:1.4}
+  @media(min-width:520px){.stackgrp li{flex-direction:row;gap:12px}.stackgrp li b{min-width:170px}}
+  .principles{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+  .principles li{display:flex;gap:9px;font-size:12.5px;color:var(--ink-dim);line-height:1.5}
+  .principles li::before{content:"▸";color:var(--accent);flex:none}
+  /* diagnostics: kv rows + benchmark table */
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:12.5px;align-items:baseline}
+  .kv .k{color:var(--ink-faint);font-size:11px;text-transform:uppercase;letter-spacing:.4px}
+  .kv .v{color:var(--ink);font-variant-numeric:tabular-nums}
+  .kv .v code{font-family:var(--mono);font-size:11.5px}
+  .benchwrap{border:1px solid var(--line);border-radius:var(--r-sm);overflow:hidden}
+  .benchwrap table{font-size:12px}
+  .benchwrap td.cur{position:relative}
+  .benchwrap .here{font-size:9px;text-transform:uppercase;letter-spacing:.4px;color:var(--accent-ink);
+    background:var(--grad);border-radius:999px;padding:1px 6px;margin-left:6px}
   .targets{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);padding:13px 14px;display:grid;gap:9px}
   .targets .tr{display:flex;justify-content:space-between;align-items:center;font-size:12.5px}
   .targets .tr .tk{color:var(--ink-dim)} .targets .tr .tv{font-weight:600;font-variant-numeric:tabular-nums}
@@ -330,6 +352,14 @@
   <span class="spacer"></span>
   <span class="status"><span class="dot" id="hdot"></span><span id="hstat">connecting…</span></span>
   <span class="pill" id="slopill">SLO …</span>
+  <!-- Diagnostics (engine view) -->
+  <button class="iconbtn" id="diagbtn" title="Engine diagnostics" aria-label="Engine diagnostics">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2 7 4-16 2 9h6"/></svg>
+  </button>
+  <!-- About -->
+  <button class="iconbtn" id="aboutbtn" title="About slo-kit" aria-label="About">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="8.01"/></svg>
+  </button>
   <!-- POLISH KIT: theme toggle -->
   <button class="iconbtn" id="themebtn" title="Toggle theme" aria-label="Toggle light/dark theme"><span id="themeicon">☾</span></button>
   <!-- POLISH KIT: help modal trigger -->
@@ -344,6 +374,13 @@
 <main>
   <div class="panel full reveal">
     <h2>Operator controls <span class="muted" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">drive traffic · inject an incident · recover</span></h2>
+    <div class="demosteps muted" style="padding:0 16px 2px;font-size:12px;line-height:1.5">
+      <b style="color:var(--ink-dim)">Demo path:</b>
+      <span class="step">1 · <b>Run load</b> for healthy traffic</span> →
+      <span class="step">2 · <b>Inject incident + load</b> — watch burn rate spike &amp; the budget drain</span> →
+      <span class="step">3 · <b>Generate incident summary</b> below</span> →
+      <span class="step">4 · <b>Reset</b> to recover</span>
+    </div>
     <div class="body ctl">
       <button class="btn primary" id="load"><span class="spin"></span><span class="lbl">Run load</span></button>
       <span class="inline">requests <input id="n" type="number" value="300" min="1" max="5000"></span>
@@ -515,6 +552,104 @@
   </div>
 </aside>
 
+<!-- About modal -->
+<aside id="about" class="sheet" role="dialog" aria-modal="true" aria-labelledby="abouttitle" aria-hidden="true">
+  <header><div class="brand" style="font-size:15px"><span class="logo" style="width:24px;height:24px"></span>
+    <span id="abouttitle">About · slo-kit</span></div>
+    <span class="spacer"></span><button class="iconbtn" id="closeabout" aria-label="Close about">✕</button></header>
+  <div class="body">
+    <div>
+      <h4>What this is</h4>
+      <p>An instrumented SRE reference service: a workload wrapped in <b>RED metrics</b>
+        (rate/errors/duration), <b>availability &amp; latency SLOs</b> with an error budget and
+        <b>multiwindow burn rate</b>, <b>OpenTelemetry-style traces</b>, and an injectable
+        incident you can burn the budget with and recover. Around it sit the artifacts that make
+        reliability shippable — <b>Terraform burn-rate alerts</b>, a smoke-gated CI pipeline, and a
+        one-page runbook. Traffic and faults are synthetic, so the burn/recover loop is fully
+        reproducible. The stack and signals are deliberately the ones an SRE shop runs on
+        (Prometheus / Grafana LGTM, OTel, Terraform, Kubernetes-style ops).</p>
+    </div>
+
+    <div>
+      <h4>How it works</h4>
+      <p>One instrumentation choke point records exactly one metric and one span per request, so
+        <code>/metrics</code>, <code>/slo</code>, and the dashboard are all derived from a single
+        snapshot and can never disagree. <code>slo.py</code> turns that snapshot into SLIs, an error
+        budget, and a burn rate — burn rate &gt; 1× means the budget exhausts before the window
+        resets, which is the ship-or-freeze signal. Inject a fault → drive load → the budget burns →
+        reset → it recovers, identically every run.</p>
+    </div>
+
+    <div id="aboutstack"></div>
+
+    <div>
+      <h4>How the LLM is used</h4>
+      <p>The dashboards already expose the raw telemetry; at 3am the on-call job is <i>compressing</i>
+        it into a sentence. <code>POST /incident/summary</code> reads the live SLO snapshot, RED
+        metrics, and error spans and returns an on-call summary + the matching runbook steps. The
+        <b>severity is classified deterministically from the SLO numbers</b> (<code>incident.classify</code>)
+        — the model never decides it. Routing degrades <b>local Ollama (browser→host) → paid → free →
+        deterministic offline drafter</b>; the offline drafter templates the same shape, so the
+        capability (and its eval) reproduce with zero keys.</p>
+    </div>
+
+    <div>
+      <h4>Design principles</h4>
+      <ul class="principles" id="aboutprinciples"></ul>
+    </div>
+
+    <p class="muted" style="font-size:11.5px">A portfolio demo on a Python / FastAPI · Prometheus-RED ·
+      OTel · Terraform stack. Traffic, traces, and incidents are <b>synthetic</b> — generated by the
+      built-in load tester.</p>
+  </div>
+</aside>
+
+<!-- Diagnostics modal -->
+<aside id="diag" class="sheet wide" role="dialog" aria-modal="true" aria-labelledby="diagtitle" aria-hidden="true">
+  <header><div class="brand" style="font-size:15px"><span class="logo" style="width:24px;height:24px"></span>
+    <span id="diagtitle">Engine diagnostics</span></div>
+    <span class="spacer"></span><button class="iconbtn" id="closediag" aria-label="Close diagnostics">✕</button></header>
+  <div class="body">
+    <p>The technical view behind the incident summarizer: the resolved provider/model, the active
+      routing chain, and a benchmark across every routing mode. Provider labels are honest — a mode
+      with no usable provider falls to the deterministic offline drafter.</p>
+
+    <div>
+      <h4>Resolved engine</h4>
+      <div class="kv" id="diagkv">
+        <span class="k">Active mode</span><span class="v" id="dg-mode">—</span>
+        <span class="k">Resolved provider</span><span class="v" id="dg-provider">—</span>
+        <span class="k">Last summary latency</span><span class="v" id="dg-latency">—</span>
+        <span class="k">Host Ollama</span><span class="v" id="dg-ollama">—</span>
+      </div>
+    </div>
+
+    <div>
+      <h4>Routing chain <span class="hint" style="text-transform:none;letter-spacing:0;font-weight:400;color:var(--ink-faint)">→ on failure, in order</span></h4>
+      <div class="chainline" id="dg-chain">offline (deterministic)</div>
+      <div style="display:grid;gap:6px;margin-top:8px" id="dg-provrows"></div>
+    </div>
+
+    <div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <h4 style="margin:0">Model benchmark</h4>
+        <button class="btn primary" id="dg-run" style="margin-left:auto;padding:8px 14px"><span class="spin"></span><span class="lbl">Run benchmark</span></button>
+      </div>
+      <p style="margin:8px 0 10px">One fixed fast-burn incident snapshot through every routing mode —
+        compare resolved provider, model, latency, and the (deterministically classified) severity.
+        <b>local</b> is exercised in your browser via the browser→host Ollama bridge, because the
+        cloud server can&apos;t reach a model on your machine.</p>
+      <div class="benchwrap">
+        <table><thead><tr><th>Mode</th><th>Resolved provider</th><th>Model</th><th class="num">Latency</th><th>Severity</th></tr></thead>
+        <tbody id="dg-bench"><tr><td colspan="5" class="muted" style="padding:14px">Run the benchmark to compare the routing modes.</td></tr></tbody></table>
+      </div>
+      <p class="muted" style="font-size:11.5px;margin-top:8px">Severity is identical across every mode
+        — it is computed from the SLO numbers, not the model. The model only changes the prose and the
+        latency/cost; the trust-critical classification never depends on it.</p>
+    </div>
+  </div>
+</aside>
+
 <div id="toasts"></div>
 
 <script>
@@ -645,6 +780,7 @@ async function summarize(){
       `<div class="barlabel" style="margin:0 0 6px">Suggested next steps · from docs/runbook.md</div>`+
       `<ol style="margin:0;padding-left:20px;font-size:13px;color:var(--ink-dim)">${steps}</ol>`;
     $("#summmeta").textContent=`${r.provider} · ${r.latency_ms}ms`;
+    lastSummary={provider:r.provider,model:r.model,latency_ms:r.latency_ms,mode:r.mode};
   }catch(e){$("#summres").innerHTML='<span class="muted">summary failed</span>';toast("Summary failed","bad");}
   btn.classList.remove("loading");
 }
@@ -683,12 +819,126 @@ function openHelp(){$("#scrim").classList.add("open");$("#help").classList.add("
 function closeHelp(){$("#scrim").classList.remove("open");$("#help").classList.remove("open");
   $("#help").setAttribute("aria-hidden","true");}
 $("#helpbtn").onclick=openHelp;$("#closehelp").onclick=closeHelp;
-$("#scrim").onclick=()=>{closeDrawer();closeHelp();};
+
+/* ===================== About + Diagnostics sheets ===================== */
+function openSheet(id){closeHelp();closeDrawer();$("#scrim").classList.add("open");
+  $(id).classList.add("open");$(id).setAttribute("aria-hidden","false");}
+function closeSheet(id){$("#scrim").classList.remove("open");
+  $(id).classList.remove("open");$(id).setAttribute("aria-hidden","true");}
+$("#aboutbtn").onclick=()=>openSheet("#about");
+$("#closeabout").onclick=()=>closeSheet("#about");
+$("#diagbtn").onclick=()=>{openSheet("#diag");refreshDiagnostics();};
+$("#closediag").onclick=()=>closeSheet("#diag");
+
+$("#scrim").onclick=()=>{closeDrawer();closeHelp();closeSheet("#about");closeSheet("#diag");};
 document.addEventListener("keydown",e=>{
   const typing=/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName||"")||document.activeElement?.isContentEditable;
-  if(e.key==="Escape"){closeDrawer();closeHelp();}
+  if(e.key==="Escape"){closeDrawer();closeHelp();closeSheet("#about");closeSheet("#diag");}
   else if(e.key==="?"&&!typing&&!$("#help").classList.contains("open")){e.preventDefault();openHelp();}
 });
+
+/* ===================== About content (grouped stack + principles) ===================== */
+const ABOUT_STACK=[
+  ["Service & API",[
+    ["Python 3.11 · FastAPI","the instrumented workload + observability surfaces"],
+    ["Zero-build console","one static HTML/JS dashboard, no framework or bundler"],
+  ]],
+  ["Observability (SRE signals)",[
+    ["RED metrics","rate / errors / duration, exposed in Prometheus text format at /metrics"],
+    ["SLO + error budget + burn rate","availability 99.5% & latency 95%<250ms; burn rate is the ship/freeze signal"],
+    ["OpenTelemetry-style traces","trace/span id, duration, status in a bounded ring buffer"],
+    ["Grafana LGTM-shaped","the same RED/SLO/Tempo-style signals an LGTM + Prometheus shop runs on"],
+  ]],
+  ["Reliability artifacts",[
+    ["Terraform","multiwindow burn-rate alerts — 14.4×/1h page, 6×/6h ticket + a p95 alarm"],
+    ["Smoke-gated CI","GitHub Actions: merge → test → deploy → post-deploy smoke gate (rollback signal)"],
+    ["Incident runbook","confirm → triage → mitigate → verify → comms, executable against the live endpoints"],
+  ]],
+  ["AI / LLM",[
+    ["Local Ollama (browser→host)","your machine's model, used even against the cloud demo"],
+    ["Anthropic / OpenAI","paid path — best on-call narrative quality"],
+    ["OpenRouter free models","zero-cost default (gemma-4-31b-it:free)"],
+    ["Deterministic offline drafter","no-model fallback; runs with zero keys and zero cost"],
+  ]],
+  ["Hosting & ops",[
+    ["Render (free tier)","hosts the FastAPI app + dashboard"],
+    ["GitHub","source + CI quality gate"],
+  ]],
+];
+const ABOUT_PRINCIPLES=[
+  "Severity is classified in deterministic code from the SLO numbers — the LLM never decides it.",
+  "Every request records exactly one metric and one span at a single choke point, so the numbers can't drift apart.",
+  "/metrics, /slo, and the dashboard are all derived from one snapshot — they can never disagree.",
+  "Faults are deterministic (fixed cadence, no sampling), so burn and recover are reproducible to the digit.",
+  "Burn rate — not a raw error count — is the ship-or-freeze signal, and the runbook ties freezes back to budget spent.",
+  "The summarizer degrades local → paid → free → deterministic offline; the offline drafter is a true last resort, never the design centre.",
+  "Accuracy is measured by an eval (severity/situation over labeled snapshots), not asserted.",
+];
+(function renderAbout(){
+  $("#aboutstack").innerHTML='<h4>The stack</h4>'+ABOUT_STACK.map(g=>
+    `<div class="stackgrp" style="margin-top:8px"><div class="grpname">${g[0]}</div><ul>`+
+    g[1].map(it=>`<li><b>${it[0]}</b><span>${it[1]}</span></li>`).join("")+`</ul></div>`).join("");
+  $("#aboutprinciples").innerHTML=ABOUT_PRINCIPLES.map(p=>`<li>${p}</li>`).join("");
+})();
+
+/* ===================== Diagnostics (resolved engine + benchmark) ===================== */
+let lastSummary=null;  // {provider, model, latency_ms, mode} from the most recent summarize()
+function refreshDiagnostics(){
+  const m=cfg.mode||"auto";
+  $("#dg-mode").textContent=m;
+  if(lastSummary){
+    $("#dg-provider").textContent=lastSummary.provider;
+    $("#dg-latency").textContent=lastSummary.latency_ms+" ms · "+(lastSummary.model||"—");
+  }else{
+    $("#dg-provider").textContent="— (generate a summary first)";
+    $("#dg-latency").textContent="—";
+  }
+  $("#dg-ollama").textContent=clientOllama?"reachable from your browser (browser→host)":"not reachable from your browser";
+  // provider rows + chain reuse the same source of truth as the settings drawer
+  const rows=PROVIDERS.map(p=>{
+    const on= p==="ollama" ? clientOllama : !!llmProviders[p];
+    const label= p==="ollama" ? "ollama (browser→host)" : p;
+    return `<div class="pstat"><span>${label}</span><span class="pdot ${on?'on':''}"></span></div>`;
+  }).join("")+`<div class="pstat"><span>offline (deterministic)</span><span class="pdot on"></span></div>`;
+  $("#dg-provrows").innerHTML=rows;
+  const chain=(MODE_CHAIN[m]||[]).filter(p=> p.startsWith("ollama")?clientOllama:llmProviders[p]);
+  $("#dg-chain").textContent=[...chain,"offline (deterministic)"].join("  →  ");
+  refreshClientOllama();  // re-probe so the labels are live when the sheet opens
+}
+$("#dg-run").onclick=()=>withLoad($("#dg-run"),runBenchmark);
+async function runBenchmark(){
+  const tb=$("#dg-bench");
+  tb.innerHTML='<tr><td colspan="5" class="muted" style="padding:14px">benchmarking every routing mode…</td></tr>';
+  const data=await j("diagnostics/benchmark");
+  const rows=data.rows||[];
+  // The server can't reach a model on your machine, so its `local` (and `auto`) rows
+  // fall to offline. Exercise local in the BROWSER via the same browser→host bridge
+  // the summary uses, and overwrite the affected rows honestly.
+  const base=await probeOllama();
+  if(base){
+    let localMs=null,localModel=cfg.model||"llama3.1:8b";
+    try{
+      const user=await buildSummaryUser();
+      const t0=performance.now();
+      const summary=await ollamaSummary(base,user);
+      localMs=Math.round(performance.now()-t0);
+      if(summary){
+        for(const r of rows){ if(r.mode==="local"||r.mode==="auto"){
+          r.provider="ollama (browser→host)";r.model=localModel;r.latency_ms=localMs;
+        }}
+      }
+    }catch{}
+  }
+  const cur=cfg.mode||"auto";
+  tb.innerHTML=rows.map(r=>{
+    const sev=SEVCLASS[r.severity]||"b-info";
+    const here=r.mode===cur?'<span class="here">active</span>':'';
+    return `<tr><td class="cur" style="font-weight:600">${r.mode}${here}</td>`+
+      `<td>${r.provider}</td><td style="font-size:11px">${r.model}</td>`+
+      `<td class="num">${r.latency_ms} ms</td>`+
+      `<td><span class="badge ${sev}">${r.severity}</span></td></tr>`;
+  }).join("");
+}
 
 /* ===================== POLISH KIT: routing config ===================== */
 const MODE_BLURBS={
@@ -832,18 +1082,15 @@ boot();
   setTimeout(syncOllamaModels,1200);
 })();
 
-/* POLISH KIT: about/stack */
+/* POLISH KIT: point help \u2192 the full About sheet (stack + principles live there) */
 (function(){
-  var h=document.getElementById("help"); if(!h || h.querySelector(".about-stack")) return;
-  var items=["Python 3.11", "FastAPI", "zero-build HTML/JS console", "RED metrics (Prometheus exposition)", "OTel-shaped spans", "SLO / error-budget / burn-rate", "LLM incident summary"]; var llm="paid (Anthropic/OpenAI) \u2192 local Ollama \u2192 free (OpenRouter) \u2192 deterministic offline; the Ollama call runs in your browser (browser\u2192host)";
-  var d=document.createElement("div"); d.className="about-stack";
-  d.style.cssText="margin-top:16px;padding-top:14px;border-top:1px solid var(--line)";
-  d.innerHTML='<h4 style="margin:0 0 8px">Built with</h4>'
-    +'<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">'
-    +items.map(function(s){return '<span style="font-size:11.5px;border:1px solid var(--line);border-radius:999px;padding:3px 10px;color:var(--ink-dim);background:var(--surface-2)">'+s+'</span>';}).join('')
-    +'</div>'
-    +'<p style="margin:0;font-size:11.5px;color:var(--ink-faint)"><b>LLM routing:</b> '+llm+'</p>';
-  h.appendChild(d);
+  var h=document.getElementById("help"); if(!h || h.querySelector(".about-link")) return;
+  var d=document.createElement("div"); d.className="about-link";
+  d.style.cssText="margin-top:4px;padding-top:14px;border-top:1px solid var(--line)";
+  d.innerHTML='<p class="muted" style="font-size:11.5px">For the full stack, how the LLM is wired, '
+    +'and the design principles, open <b>About</b> (the \u24d8 button) \u00b7 the resolved provider, routing '
+    +'chain, and a per-mode model benchmark are in <b>Diagnostics</b> (the \u223f button).</p>';
+  h.querySelector(".body").appendChild(d);
 })();
 
 /* SHOWCASE: loading bar + result fade-in (generic) */

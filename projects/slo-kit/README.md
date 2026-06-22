@@ -37,6 +37,7 @@ and the burn/recover demo are fully reproducible.
 - [SLOs & invariants](#slos-invariants)
 - [Incident summary (LLM)](#incident-summary-llm)
 - [Routing](#routing)
+- [Diagnostics & About](#diagnostics--about)
 - [Evals](#evals)
 - [API](#api)
 - [Quickstart](#quickstart)
@@ -247,6 +248,30 @@ it fell through.
 drafter is always terminal, so the service never fails for lack of a key — it
 degrades to deterministic, not to an error.
 
+**Browser→host local model.** The cloud server cannot reach an Ollama on your
+machine (`localhost` is the operator's box, not the host), so the *browser* runs
+the local path: it probes the host Ollama, sends `incident.py`'s exact prompt, and
+posts back **only the narrative prose** via `client_summary` — the server keeps
+severity and the runbook steps deterministic. This lets the live cloud demo run a
+real local model for free. The model field autodetects from the host's installed
+models (`/api/tags`), so `local` never 404s on a guessed name.
+
+## Diagnostics & About
+
+The dashboard header has two views beside Help and Settings:
+
+- **Diagnostics** (the ∿ button) — the engine view: the **resolved provider/model**
+  and last-summary latency, the **active routing chain**, live per-provider status,
+  and a **model benchmark** (`GET /diagnostics/benchmark`) that runs one fixed
+  fast-burn incident snapshot through *every* routing mode and compares resolved
+  provider, model, latency, and severity. The `local` row is exercised in the
+  browser via the browser→host bridge. The benchmark makes the trust boundary
+  visible: **severity is identical across every mode** because it is computed from
+  the SLO numbers, not the model — only the prose, latency, and cost change.
+- **About** (the ⓘ button) — what this is, how it works, the grouped stack
+  (FastAPI · Prometheus-RED · OTel · Terraform · the LLM chain), how the LLM is
+  used, and the design principles.
+
 ## Evals
 
 `./run.sh eval` (or `GET /evals`) writes `eval-report.md`. Two evals, both
@@ -284,8 +309,10 @@ reproducible offline:
 | GET | `/slo` | SLIs, SLOs, error budget, budget remaining, burn rate, status |
 | GET | `/traces` | recent spans (bounded buffer) |
 | POST | `/incident/summary` | LLM on-call summary + severity + runbook steps from the live state |
+| GET | `/incident/state` | the exact snapshot + classification the summarizer feeds the model (used by the browser→host local path) |
 | GET | `/evals` | incident-summary severity/situation accuracy over labeled snapshots |
 | GET | `/llm` | configured/reachable providers + active routing mode |
+| GET | `/diagnostics/benchmark` | resolved provider/model/latency/severity for the same snapshot across every routing mode |
 | POST | `/admin/fault` | inject error rate + added latency (the incident) |
 | POST | `/admin/loadtest` | fire N synthetic requests |
 | POST | `/admin/reset` | clear metrics/traces/fault |
@@ -317,13 +344,24 @@ real keys, and leave them unset on a public host. See `.env.example`.
 | `OLLAMA_BASE_URL` / `OLLAMA_MODEL` | local models, autodetected via `/api/tags` |
 | `OPENROUTER_API_KEY` / `OPENROUTER_MODEL` | free-tier models |
 
-In the dashboard: **Run load** for steady traffic, **Inject incident + load** to
-burn the budget (availability goes `burning`/`exhausted`, latency `violated`),
-**Generate incident summary** to compress the live state into an on-call summary +
-runbook steps, then **Reset** to recover. The deploy/alerting artifacts live in
-`deploy/terraform/`
-(burn-rate alerts), `deploy/github-actions/` (smoke-gated pipeline), and
-`docs/runbook.md` (incident runbook).
+### Demo path (in the dashboard)
+
+A guided, obvious flow — the same cue is printed on the operator-controls panel:
+
+1. **Run load** — drive healthy traffic; the SLOs populate green.
+2. **Inject incident + load** — watch the **burn rate spike** and the **error budget
+   drain** (availability goes `burning`/`exhausted`, latency `violated`).
+3. **Generate incident summary** — compress the live state into a severity, an
+   on-call narrative, and the matching runbook steps. The model only writes the
+   prose; the severity is classified deterministically.
+4. **Reset** — clear the fault and watch the budget recover.
+
+Open **Diagnostics** (∿) to see the resolved provider and run the per-mode model
+benchmark, **About** (ⓘ) for the stack and principles, **Settings** (gear) to pick
+the routing mode (auto / local / paid / free / offline) and a host model, and the
+theme toggle for light/dark. The deploy/alerting artifacts live in
+`deploy/terraform/` (burn-rate alerts), `deploy/github-actions/` (smoke-gated
+pipeline), and `docs/runbook.md` (incident runbook).
 
 Proprietary, offline-first, no secrets, synthetic traffic only — conforms to the
 portfolio conventions (CONV-1…5).
