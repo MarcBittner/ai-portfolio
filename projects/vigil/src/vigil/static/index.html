@@ -1,0 +1,546 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>vigil — observability & SOC monitoring</title>
+<script>
+(function(){
+  try{
+    var t=localStorage.getItem("theme")||"system";
+    var dark = t==="dark" || (t==="system" && !window.matchMedia("(prefers-color-scheme: light)").matches);
+    if(!dark) document.documentElement.classList.add("light");
+  }catch(e){}
+})();
+</script>
+<style>
+  :root{
+    --bg:#0a0d14; --surface:#131826; --surface-2:#1a2032; --surface-3:#212a40;
+    --line:#263149; --line-2:#33405d;
+    --ink:#e9eef7; --ink-dim:#97a3ba; --ink-faint:#67728a;
+    --accent:#6aa1ff; --accent-2:#9b86ff; --accent-ink:#06101f;
+    --ok:#43c98a; --warn:#e6ad52; --bad:#f15b6c; --info:#6aa1ff; --violet:#9b86ff;
+    --r:15px; --r-sm:10px; --r-xs:7px;
+    --sh:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.5);
+    --grad:linear-gradient(135deg,var(--accent),var(--accent-2));
+    --ease:cubic-bezier(.22,.61,.36,1);
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+    --header-bg:rgba(10,13,20,.72);
+    --bg-radial-1:rgba(107,130,255,.10); --bg-radial-2:rgba(67,201,138,.05);
+  }
+  html.light{
+    --bg:#f4f6fb; --surface:#ffffff; --surface-2:#f1f4fa; --surface-3:#e6ebf5;
+    --line:#d8dfec; --line-2:#c2ccde;
+    --ink:#16203a; --ink-dim:#566184; --ink-faint:#8b95ad;
+    --accent:#3a6ff0; --accent-2:#7c5cf5; --accent-ink:#ffffff;
+    --ok:#1f9d63; --warn:#b9791f; --bad:#d83a4d; --info:#3a6ff0; --violet:#6f53d6;
+    --sh:0 1px 2px rgba(20,32,58,.06), 0 8px 24px -14px rgba(20,32,58,.18);
+    --header-bg:rgba(255,255,255,.78);
+    --bg-radial-1:rgba(58,111,240,.10); --bg-radial-2:rgba(31,157,99,.06);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;
+    font:15px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Inter,sans-serif;
+    background-image:radial-gradient(1200px 600px at 80% -10%,var(--bg-radial-1),transparent 60%),
+      radial-gradient(900px 500px at 0% 0%,var(--bg-radial-2),transparent 55%);
+    background-attachment:fixed;min-height:100vh}
+  a{color:var(--accent);text-decoration:none}
+  header{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:14px;
+    padding:13px 22px;border-bottom:1px solid var(--line);
+    background:var(--header-bg);backdrop-filter:blur(14px) saturate(140%)}
+  .brand{display:flex;align-items:center;gap:11px;font-weight:650;font-size:16px}
+  .logo{width:30px;height:30px;border-radius:9px;background:var(--grad);position:relative;
+    box-shadow:0 4px 16px -4px rgba(106,161,255,.6);flex:none}
+  .logo::after{content:"";position:absolute;inset:8px;border-radius:50%;
+    border:2px solid rgba(255,255,255,.9);border-right-color:transparent;
+    animation:spin 3s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .brand .tag{color:var(--ink-dim);font-size:12.5px;font-weight:400}
+  .spacer{flex:1}
+  .pill{font-size:12px;color:var(--ink-dim);border:1px solid var(--line);border-radius:999px;
+    padding:5px 12px;background:var(--surface);white-space:nowrap}
+  .pill.ok{color:var(--ok);border-color:rgba(67,201,138,.35);background:rgba(67,201,138,.07)}
+  .pill.bad{color:var(--bad);border-color:rgba(241,91,108,.4);background:rgba(241,91,108,.08)}
+  .pill.warn{color:var(--warn);border-color:rgba(230,173,82,.4);background:rgba(230,173,82,.08)}
+  button,.btn{font:inherit;cursor:pointer;border-radius:var(--r-sm);border:1px solid var(--line);
+    background:var(--surface);color:var(--ink);padding:8px 14px;transition:.16s var(--ease)}
+  button:hover,.btn:hover{border-color:var(--line-2);background:var(--surface-2)}
+  button.primary{background:var(--grad);color:var(--accent-ink);border:none;font-weight:600}
+  button.sm{padding:5px 10px;font-size:13px}
+  input,select{font:inherit;background:var(--surface);color:var(--ink);border:1px solid var(--line);
+    border-radius:var(--r-sm);padding:9px 11px;width:100%}
+  main{max-width:1180px;margin:0 auto;padding:24px 22px 80px}
+  .tabs{display:flex;gap:6px;flex-wrap:wrap;margin:18px 0 20px}
+  .tab{padding:8px 15px;border-radius:999px;border:1px solid var(--line);background:var(--surface);
+    color:var(--ink-dim);font-size:14px;cursor:pointer}
+  .tab.active{color:var(--accent-ink);background:var(--grad);border:none;font-weight:600}
+  .tab.locked{opacity:.5}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+    padding:18px;box-shadow:var(--sh);margin-bottom:16px}
+  .card h2{margin:0 0 4px;font-size:16px}
+  .card .sub{color:var(--ink-dim);font-size:13px;margin-bottom:14px}
+  .grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(230px,1fr))}
+  .app{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);
+    padding:13px 14px;cursor:pointer;transition:.16s var(--ease)}
+  .app:hover{border-color:var(--line-2);transform:translateY(-1px)}
+  .app .name{font-weight:600;display:flex;align-items:center;gap:8px}
+  .app .meta{color:var(--ink-dim);font-size:12.5px;margin-top:6px;display:flex;gap:12px}
+  .dot{width:9px;height:9px;border-radius:50%;flex:none}
+  .dot.up{background:var(--ok)} .dot.down{background:var(--bad)}
+  .dot.degraded{background:var(--warn)} .dot.unknown{background:var(--ink-faint)}
+  .self{font-size:10px;border:1px solid var(--accent);color:var(--accent);
+    border-radius:5px;padding:1px 5px;text-transform:uppercase;letter-spacing:.5px}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+  th{color:var(--ink-dim);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.4px}
+  .mono{font-family:var(--mono);font-size:12.5px}
+  .banner{display:flex;gap:18px;flex-wrap:wrap;align-items:center}
+  .stat{display:flex;flex-direction:column}
+  .stat .v{font-size:26px;font-weight:700} .stat .k{color:var(--ink-dim);font-size:12px}
+  .grade{font-weight:800;font-size:15px;border-radius:6px;padding:2px 9px;display:inline-block}
+  .grade.A{color:var(--ok);background:rgba(67,201,138,.12)}
+  .grade.B{color:var(--info);background:rgba(106,161,255,.12)}
+  .grade.C{color:var(--warn);background:rgba(230,173,82,.12)}
+  .grade.D,.grade.F{color:var(--bad);background:rgba(241,91,108,.12)}
+  .sev{font-weight:700;border-radius:6px;padding:2px 9px;font-size:12px}
+  .sev.none{color:var(--ok)} .sev.sev3{color:var(--warn)}
+  .sev.sev2,.sev.sev1{color:var(--bad)}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:end}
+  .row>div{flex:1;min-width:120px}
+  label{font-size:12px;color:var(--ink-dim);display:block;margin-bottom:4px}
+  .muted{color:var(--ink-faint);font-size:12.5px}
+  .actions li{margin:5px 0}
+  .hidden{display:none}
+  pre{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);
+    padding:12px;overflow:auto;font-size:12px;font-family:var(--mono)}
+  .sparkline{display:flex;align-items:flex-end;gap:2px;height:42px;margin-top:8px}
+  .sparkline .b{flex:1;background:var(--accent);border-radius:2px 2px 0 0;min-height:2px;opacity:.85}
+  .sparkline .b.down{background:var(--bad)}
+  .iconbtn{width:36px;height:36px;display:grid;place-items:center;padding:0}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--surface-3);
+    border:1px solid var(--line-2);border-radius:var(--r-sm);padding:10px 16px;box-shadow:var(--sh);
+    z-index:90;font-size:14px}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><span class="logo"></span>
+    <span>vigil <span class="tag">observability &amp; SOC monitoring</span></span></div>
+  <div class="spacer"></div>
+  <span id="fleetPill" class="pill">loading…</span>
+  <span id="rolePill" class="pill">guest</span>
+  <button class="iconbtn" id="themeBtn" title="Toggle theme">◐</button>
+  <button class="sm" id="authBtn">Sign in</button>
+</header>
+
+<main>
+  <div class="card banner" id="banner"></div>
+
+  <div class="tabs" id="tabs">
+    <div class="tab active" data-tab="status">Status</div>
+    <div class="tab" data-tab="dashboard" data-min="registered">Dashboard</div>
+    <div class="tab" data-tab="incident" data-min="registered">Incident AI</div>
+    <div class="tab" data-tab="alerts" data-min="registered">Alerts</div>
+    <div class="tab" data-tab="security" data-min="elevated">Security &amp; Compliance</div>
+    <div class="tab" data-tab="admin" data-min="admin">Admin</div>
+  </div>
+
+  <!-- STATUS (guest) -->
+  <section id="tab-status">
+    <div class="card">
+      <h2>Fleet status</h2>
+      <div class="sub">Public view — current status and error rate for every monitored
+        app, including vigil itself. Sign in for uptime history, latency, logs, and the
+        incident AI; elevated users see the security &amp; compliance posture.</div>
+      <div class="grid" id="statusGrid"></div>
+    </div>
+  </section>
+
+  <!-- DASHBOARD (registered) -->
+  <section id="tab-dashboard" class="hidden">
+    <div class="card">
+      <h2>Availability &amp; latency</h2>
+      <div class="sub">Rolling availability, error rate, and response time per app.
+        Click a row for history, the response-time series, and recent probe logs.</div>
+      <table><thead><tr><th>App</th><th>Status</th><th>Availability</th>
+        <th>Error rate</th><th>Avg ms</th><th>p95 ms</th><th>Last</th></tr></thead>
+        <tbody id="dashBody"></tbody></table>
+    </div>
+    <div class="card hidden" id="detailCard">
+      <h2 id="detailName"></h2>
+      <div class="sub" id="detailSub"></div>
+      <div class="sparkline" id="spark"></div>
+      <div class="muted" style="margin-top:6px">Response time (oldest → newest); red = down probe.</div>
+      <h2 style="margin-top:16px;font-size:14px">Recent probes</h2>
+      <table><thead><tr><th>When</th><th>Up</th><th>HTTP</th><th>ms</th><th>Error</th></tr></thead>
+        <tbody id="logBody"></tbody></table>
+    </div>
+  </section>
+
+  <!-- INCIDENT AI (registered) -->
+  <section id="tab-incident" class="hidden">
+    <div class="card">
+      <h2>Incident / fleet-health summary</h2>
+      <div class="sub">An LLM reads the live fleet state and writes a status narrative
+        + prioritized actions. <b>Code decides</b> the severity and priority order;
+        the model only narrates. Routes paid → local → free → a deterministic offline
+        drafter, so it always produces output.</div>
+      <div class="row">
+        <div style="flex:0 0 180px">
+          <label>Routing mode</label>
+          <select id="incMode">
+            <option value="auto">auto</option><option value="local">local (Ollama)</option>
+            <option value="free">free</option><option value="paid">paid</option>
+            <option value="offline" selected>offline (deterministic)</option>
+          </select>
+        </div>
+        <div style="flex:0 0 auto"><label>&nbsp;</label>
+          <button class="primary" id="incRun">Generate summary</button></div>
+      </div>
+      <div id="incOut" style="margin-top:16px"></div>
+    </div>
+  </section>
+
+  <!-- ALERTS (registered view / elevated configure) -->
+  <section id="tab-alerts" class="hidden">
+    <div class="card" id="alertCfgCard">
+      <h2>Configure an alert</h2>
+      <div class="sub">Per-app threshold → channel. Console works now; webhook works
+        with a URL; email/SMS are coded and activate when credentials are set
+        (<span class="mono">NEEDS-CREDENTIAL</span>). Requires the elevated role.</div>
+      <div class="row">
+        <div><label>App</label><select id="alSlug"></select></div>
+        <div><label>Metric</label><select id="alMetric">
+          <option value="down">down</option><option value="error_rate">error_rate</option>
+          <option value="availability">availability</option>
+          <option value="response_ms">response_ms</option></select></div>
+        <div><label>Cmp</label><select id="alCmp">
+          <option value="gt">gt</option><option value="lt">lt</option></select></div>
+        <div><label>Threshold</label><input id="alThresh" value="0"></div>
+        <div><label>Channel</label><select id="alChannel"></select></div>
+        <div><label>Address</label><input id="alAddr" placeholder="email/phone/url"></div>
+        <div style="flex:0 0 auto"><label>&nbsp;</label>
+          <button class="primary" id="alAdd">Add rule</button></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Alert rules &amp; recent events</h2>
+      <div class="sub" id="chanStatus"></div>
+      <table><thead><tr><th>App</th><th>Rule</th><th>Channel</th></tr></thead>
+        <tbody id="ruleBody"></tbody></table>
+      <h2 style="margin-top:16px;font-size:14px">Recent alert events</h2>
+      <table><thead><tr><th>When</th><th>App</th><th>Channel</th><th>Message</th></tr></thead>
+        <tbody id="eventBody"></tbody></table>
+    </div>
+  </section>
+
+  <!-- SECURITY (elevated) -->
+  <section id="tab-security" class="hidden">
+    <div class="card">
+      <h2>Security &amp; compliance posture</h2>
+      <div class="sub">Live-endpoint checks (TLS, security headers, exposed surface,
+        health-secret leakage) → risk-qualified findings mapped to six control
+        frameworks (SOC 2 · HIPAA · ISO 27001 · NIST 800-53 · NIST 800-171 · CMMC),
+        scored on postureline's severity-weighted curve. Per-repo secret scan is a
+        clearly-marked stub (per-push CI hook). Worst posture first.</div>
+      <table><thead><tr><th>App</th><th>Grade</th><th>Score</th>
+        <th>Findings</th><th>Failing controls</th></tr></thead>
+        <tbody id="secBody"></tbody></table>
+    </div>
+    <div class="card hidden" id="secDetail"></div>
+  </section>
+
+  <!-- ADMIN -->
+  <section id="tab-admin" class="hidden">
+    <div class="card">
+      <h2>Add a monitored target</h2>
+      <div class="sub">The registry is extensible — add a target here, via
+        <span class="mono">targets.json</span>, or in <span class="mono">config.py</span>.
+        It is probed on the next cycle and appears across every tier.</div>
+      <div class="row">
+        <div><label>Slug</label><input id="tSlug" placeholder="my-app"></div>
+        <div><label>Name</label><input id="tName" placeholder="My App"></div>
+        <div><label>URL</label><input id="tUrl" placeholder="https://my-app.example.com"></div>
+        <div><label>Health path</label><input id="tHealth" value="/health"></div>
+        <div style="flex:0 0 auto"><label>&nbsp;</label>
+          <button class="primary" id="tAdd">Add target</button></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Users &amp; roles</h2>
+      <div class="sub">Promote a user to elevated or admin. You
+        (<span class="mono" id="adminEmail"></span>) are the bootstrap admin.</div>
+      <table><thead><tr><th>Email</th><th>Role</th><th>Verified</th><th></th></tr></thead>
+        <tbody id="userBody"></tbody></table>
+    </div>
+  </section>
+</main>
+
+<!-- AUTH MODAL -->
+<div id="authModal" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,.5);
+  z-index:80;display:grid;place-items:center" >
+  <div class="card" style="width:380px;max-width:92vw">
+    <h2 id="authTitle">Sign in</h2>
+    <div class="sub" id="authSub">Sign in to see uptime history, latency, logs, and the incident AI.</div>
+    <label>Email</label><input id="authEmail" type="email" placeholder="you@example.com">
+    <div style="height:10px"></div>
+    <label>Password</label><input id="authPass" type="password" placeholder="≥ 8 characters">
+    <div id="authMsg" class="muted" style="margin:10px 0;min-height:18px"></div>
+    <div class="row">
+      <button class="primary" id="authSubmit" style="flex:1">Sign in</button>
+      <button id="authToggle" style="flex:0 0 auto">Need an account?</button>
+      <button id="authClose" style="flex:0 0 auto">Close</button>
+    </div>
+    <div id="oauthRow" style="margin-top:12px"></div>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+let ME = {role:"guest", authenticated:false, oauth_providers:[]};
+let AUTH_MODE = "login";
+
+function toast(m){ const t=$("#toast"); t.textContent=m; t.classList.remove("hidden");
+  clearTimeout(t._h); t._h=setTimeout(()=>t.classList.add("hidden"),2600); }
+async function api(path, opts){ const r = await fetch(path, Object.assign({headers:{"content-type":"application/json"}}, opts));
+  if(!r.ok){ let d; try{d=await r.json()}catch(e){} throw {status:r.status, detail:(d&&d.detail)||r.statusText}; }
+  return r.status===204?null:r.json(); }
+const RANK={guest:0,registered:1,elevated:2,admin:3};
+const at = m => RANK[ME.role]>=RANK[m];
+const fmtPct = v => v==null?"—":(v*100).toFixed(1)+"%";
+const ago = ts => { if(!ts)return"—"; const s=Math.max(0,(Date.now()/1000)-ts);
+  return s<60?Math.round(s)+"s":s<3600?Math.round(s/60)+"m":Math.round(s/3600)+"h"; };
+
+$("#themeBtn").onclick = ()=>{ const cur=document.documentElement.classList.toggle("light");
+  localStorage.setItem("theme",cur?"light":"dark"); };
+
+// ---- tabs ----
+document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
+  const need=t.dataset.min;
+  if(need && !at(need)){ toast("Requires the "+need+" role"); openAuth(); return; }
+  document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
+  t.classList.add("active");
+  document.querySelectorAll("main > section").forEach(s=>s.classList.add("hidden"));
+  $("#tab-"+t.dataset.tab).classList.remove("hidden");
+  load(t.dataset.tab);
+});
+
+// ---- auth ----
+function openAuth(){ $("#authModal").classList.remove("hidden"); renderOAuth(); }
+$("#authBtn").onclick = ()=>{ if(ME.authenticated){ logout(); } else openAuth(); };
+$("#authClose").onclick = ()=>$("#authModal").classList.add("hidden");
+$("#authToggle").onclick = ()=>{ AUTH_MODE = AUTH_MODE==="login"?"signup":"login";
+  $("#authTitle").textContent = AUTH_MODE==="login"?"Sign in":"Create account";
+  $("#authSubmit").textContent = AUTH_MODE==="login"?"Sign in":"Sign up";
+  $("#authToggle").textContent = AUTH_MODE==="login"?"Need an account?":"Have an account?";
+  $("#authMsg").textContent=""; };
+function renderOAuth(){
+  const row=$("#oauthRow");
+  if(!ME.oauth_providers.length){ row.innerHTML='<div class="muted">Social login (Google, GitHub) '+
+    'appears here once OAuth client credentials are configured (NEEDS-CREDENTIAL).</div>'; return; }
+  row.innerHTML = ME.oauth_providers.map(p=>'<a class="btn" style="display:inline-block;margin-right:8px" '+
+    'href="/auth/oauth/'+p+'/login">Continue with '+p+'</a>').join("");
+}
+$("#authSubmit").onclick = async ()=>{
+  const email=$("#authEmail").value.trim(), password=$("#authPass").value;
+  $("#authMsg").textContent="…";
+  try{
+    if(AUTH_MODE==="signup"){
+      const r=await api("/auth/signup",{method:"POST",body:JSON.stringify({email,password})});
+      if(r.verified){ $("#authModal").classList.add("hidden"); await refreshMe(); toast("Welcome, admin"); }
+      else { const link=r.verification&&r.verification.link;
+        $("#authMsg").innerHTML = link
+          ? 'Account created. No SMTP configured (NEEDS-CREDENTIAL), so verify here: '+
+            '<a href="'+link+'">verification link</a>.'
+          : 'Account created — check your email to verify.'; }
+    } else {
+      await api("/auth/login",{method:"POST",body:JSON.stringify({email,password})});
+      $("#authModal").classList.add("hidden"); await refreshMe(); toast("Signed in");
+    }
+  }catch(e){ $("#authMsg").textContent = "Error: "+(e.detail||e.status); }
+};
+async function logout(){ await api("/auth/logout",{method:"POST"}); await refreshMe(); toast("Signed out"); }
+
+async function refreshMe(){
+  try{ ME = await api("/auth/me"); }catch(e){ ME={role:"guest",authenticated:false,oauth_providers:[]}; }
+  $("#rolePill").textContent = ME.role;
+  $("#authBtn").textContent = ME.authenticated ? "Sign out" : "Sign in";
+  document.querySelectorAll(".tab").forEach(t=>{
+    if(t.dataset.min) t.classList.toggle("locked", !at(t.dataset.min)); });
+  if(ME.email) $("#adminEmail").textContent = ME.email;
+}
+
+// ---- loaders ----
+async function load(tab){
+  if(tab==="status") return loadStatus();
+  if(tab==="dashboard") return loadDashboard();
+  if(tab==="incident") return;
+  if(tab==="alerts") return loadAlerts();
+  if(tab==="security") return loadSecurity();
+  if(tab==="admin") return loadAdmin();
+}
+
+function statusDot(s){ return '<span class="dot '+s+'"></span>'; }
+
+async function loadStatus(){
+  const d = await api("/api/status"); renderBanner(d.rollup);
+  $("#statusGrid").innerHTML = d.apps.map(a=>`
+    <div class="app">
+      <div class="name">${statusDot(a.status)} ${a.name}
+        ${a.self_monitor?'<span class="self">self</span>':''}</div>
+      <div class="meta"><span>${a.status}</span>
+        <span>err ${a.error_rate==null?"—":(a.error_rate*100).toFixed(1)+"%"}</span></div>
+    </div>`).join("");
+}
+
+function renderBanner(r){
+  $("#fleetPill").textContent = `${r.up} up · ${r.degraded.length} degraded · ${r.down.length} down`;
+  $("#fleetPill").className = "pill "+(r.down.length?"bad":r.degraded.length?"warn":"ok");
+  $("#banner").innerHTML = `
+    <div class="stat"><div class="v">${r.up}</div><div class="k">up</div></div>
+    <div class="stat"><div class="v">${r.degraded.length}</div><div class="k">degraded</div></div>
+    <div class="stat"><div class="v">${r.down.length}</div><div class="k">down</div></div>
+    <div class="stat"><div class="v">${fmtPct(r.fleet_availability)}</div><div class="k">fleet availability</div></div>
+    <div class="stat"><div class="v">${r.targets_total}</div><div class="k">targets</div></div>`;
+}
+
+async function loadDashboard(){
+  const d = await api("/api/dashboard"); renderBanner(d.rollup);
+  $("#dashBody").innerHTML = d.apps.map(a=>`
+    <tr style="cursor:pointer" data-slug="${a.slug}">
+      <td><b>${a.name}</b> ${a.self_monitor?'<span class="self">self</span>':''}</td>
+      <td>${statusDot(a.status)} ${a.status}</td>
+      <td>${fmtPct(a.availability)}</td><td>${fmtPct(a.error_rate)}</td>
+      <td class="mono">${a.avg_response_ms??"—"}</td><td class="mono">${a.p95_response_ms??"—"}</td>
+      <td class="muted">${ago(a.last_probe_ts)} ago</td></tr>`).join("");
+  $("#dashBody").querySelectorAll("tr").forEach(tr=>tr.onclick=()=>showDetail(tr.dataset.slug));
+}
+
+async function showDetail(slug){
+  const d = await api("/api/app/"+slug);
+  $("#detailCard").classList.remove("hidden");
+  $("#detailName").textContent = d.target.name;
+  $("#detailSub").innerHTML = `<a href="${d.target.url}" target="_blank">${d.target.url}</a>
+    · availability ${fmtPct(d.summary.availability)} · ${d.summary.samples} samples`;
+  const series=d.response_series.slice(-60); const max=Math.max(1,...series.map(s=>s.ms||0));
+  $("#spark").innerHTML = series.map(s=>{
+    const h = s.up&&s.ms? Math.max(2,Math.round(s.ms/max*42)) : 6;
+    return `<div class="b ${s.up?'':'down'}" style="height:${h}px" title="${s.ms??'down'} ms"></div>`;
+  }).join("");
+  $("#logBody").innerHTML = d.history.slice(0,20).map(p=>`
+    <tr><td class="muted">${ago(p.ts)} ago</td><td>${p.up?'✓':'✕'}</td>
+      <td class="mono">${p.http_status??"—"}</td><td class="mono">${p.response_ms??"—"}</td>
+      <td class="muted">${p.error??""}</td></tr>`).join("");
+}
+
+$("#incRun").onclick = async ()=>{
+  $("#incOut").innerHTML='<div class="muted">Generating…</div>';
+  try{
+    const o = await api("/api/incident/summary",{method:"POST",
+      body:JSON.stringify({mode:$("#incMode").value})});
+    $("#incOut").innerHTML = `
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px">
+        <span class="sev ${o.severity}">${o.severity.toUpperCase()}</span>
+        <span class="pill">${o.situation}</span>
+        <span class="muted">via ${o.provider||"—"}${o.model?(" · "+o.model):""}${o.latency_ms?(" · "+o.latency_ms+"ms"):""}</span>
+      </div>
+      <p>${o.summary}</p>
+      <h2 style="font-size:14px">Prioritized actions</h2>
+      <ol class="actions">${(o.suggested_actions||[]).map(s=>"<li>"+s+"</li>").join("")}</ol>`;
+  }catch(e){ $("#incOut").innerHTML='<div class="muted">Error: '+(e.detail||e.status)+'</div>'; }
+};
+
+async function loadAlerts(){
+  const d = await api("/api/alerts");
+  $("#chanStatus").innerHTML = "Channels: "+Object.entries(d.channels).map(([k,v])=>
+    `<span class="pill ${v?'ok':''}">${k}${v?'':' (needs creds)'}</span>`).join(" ");
+  $("#ruleBody").innerHTML = d.rules.length? d.rules.map(r=>`
+    <tr><td>${r.slug}</td><td class="mono">${r.metric} ${r.comparator} ${r.threshold}</td>
+    <td>${r.channel}${r.target_addr?(' → '+r.target_addr):''}</td></tr>`).join("")
+    : '<tr><td colspan="3" class="muted">No rules yet.</td></tr>';
+  $("#eventBody").innerHTML = d.events.length? d.events.map(e=>`
+    <tr><td class="muted">${ago(e.ts)} ago</td><td>${e.slug}</td><td>${e.channel}</td>
+    <td class="muted">${e.message}</td></tr>`).join("")
+    : '<tr><td colspan="4" class="muted">No alert events yet.</td></tr>';
+  // config panel only for elevated+
+  $("#alertCfgCard").classList.toggle("hidden", !at("elevated"));
+  if(at("elevated")){
+    const t = await api("/api/targets");
+    $("#alSlug").innerHTML = t.targets.map(x=>`<option>${x.slug}</option>`).join("");
+    $("#alChannel").innerHTML = Object.keys(d.channels).map(c=>`<option>${c}</option>`).join("");
+  }
+}
+$("#alAdd").onclick = async ()=>{
+  try{ await api("/api/alerts",{method:"POST",body:JSON.stringify({
+    slug:$("#alSlug").value, metric:$("#alMetric").value, comparator:$("#alCmp").value,
+    threshold:parseFloat($("#alThresh").value)||0, channel:$("#alChannel").value,
+    target_addr:$("#alAddr").value||null})});
+    toast("Rule added"); loadAlerts();
+  }catch(e){ toast("Error: "+(e.detail||e.status)); }
+};
+
+async function loadSecurity(){
+  const d = await api("/api/security");
+  $("#secBody").innerHTML = d.reports.map(r=>{
+    const p=r.posture, fc=r.framework_rollup.filter(f=>f.status==="fail").length;
+    return `<tr style="cursor:pointer" data-slug="${r.slug}">
+      <td><b>${r.target.name}</b></td>
+      <td><span class="grade ${p.grade}">${p.grade}</span></td>
+      <td class="mono">${p.score}/100</td><td>${p.findings_count}</td>
+      <td>${p.controls_failing} controls · ${fc} frameworks</td></tr>`;
+  }).join("");
+  $("#secBody").querySelectorAll("tr").forEach(tr=>tr.onclick=()=>showSec(tr.dataset.slug));
+}
+async function showSec(slug){
+  const r = await api("/api/security/"+slug);
+  const el=$("#secDetail"); el.classList.remove("hidden");
+  el.innerHTML = `<h2>${r.target.name} — posture detail</h2>
+    <div class="sub">${r.findings.length} live finding(s) · repo scan:
+      <span class="mono">${r.repo_scan?r.repo_scan.status:"n/a"}</span>
+      ${r.repo_scan&&r.repo_scan.status==="not_run"?'(NEEDS-CREDENTIAL: per-push CI hook)':''}</div>
+    <table><thead><tr><th>Severity</th><th>Finding</th><th>Resource</th><th>Controls</th></tr></thead>
+    <tbody>${r.findings.length? r.findings.map(f=>`<tr>
+      <td><span class="sev ${f.severity==='critical'||f.severity==='high'?'sev1':f.severity==='medium'?'sev3':'none'}">${f.severity}</span></td>
+      <td>${f.title}</td><td class="mono">${f.resource}</td>
+      <td class="mono">${f.control_ids.join(", ")}</td></tr>`).join("")
+      :'<tr><td colspan="4" class="muted">No live findings — clean posture.</td></tr>'}</tbody></table>
+    <h2 style="font-size:14px;margin-top:14px">Framework rollup</h2>
+    <table><thead><tr><th>Framework</th><th>Status</th><th>Passing</th><th>Failing</th></tr></thead>
+    <tbody>${r.framework_rollup.map(f=>`<tr><td>${f.framework}</td>
+      <td><span class="pill ${f.status==='pass'?'ok':'bad'}">${f.status}</span></td>
+      <td>${f.controls_passing}</td><td>${f.controls_failing}</td></tr>`).join("")}</tbody></table>`;
+}
+
+async function loadAdmin(){
+  const d = await api("/api/admin/users");
+  $("#userBody").innerHTML = d.users.map(u=>`<tr>
+    <td class="mono">${u.email}</td><td>${u.role}</td><td>${u.verified?'✓':'—'}</td>
+    <td>${u.role!=='admin'?`<button class="sm" data-e="${u.email}" data-r="elevated">→ elevated</button>
+      <button class="sm" data-e="${u.email}" data-r="admin">→ admin</button>`:''}</td></tr>`).join("");
+  $("#userBody").querySelectorAll("button").forEach(b=>b.onclick=async()=>{
+    try{ await api("/api/admin/role",{method:"POST",body:JSON.stringify({email:b.dataset.e,role:b.dataset.r})});
+      toast("Updated "+b.dataset.e); loadAdmin(); }catch(e){ toast("Error: "+(e.detail||e.status)); }});
+}
+$("#tAdd").onclick = async ()=>{
+  try{ await api("/api/admin/targets",{method:"POST",body:JSON.stringify({
+    slug:$("#tSlug").value.trim(), name:$("#tName").value.trim()||$("#tSlug").value.trim(),
+    url:$("#tUrl").value.trim(), health_path:$("#tHealth").value.trim()||"/health"})});
+    toast("Target added — probed next cycle"); $("#tSlug").value=$("#tName").value=$("#tUrl").value="";
+  }catch(e){ toast("Error: "+(e.detail||e.status)); }
+};
+
+// ---- boot ----
+(async function(){
+  await refreshMe();
+  await loadStatus();
+  // poll the public status every 30s so the banner stays live
+  setInterval(()=>{ if($("#tab-status") && !$("#tab-status").classList.contains("hidden")) loadStatus(); }, 30000);
+  const params=new URLSearchParams(location.search);
+  if(params.get("verified")==="ok") toast("Email verified — you're signed in");
+  if(params.get("oauth")==="ok") toast("Signed in via OAuth");
+})();
+</script>
+</body>
+</html>
