@@ -59,27 +59,54 @@ _DEFAULT_MODEL = {
 # LIST of free models and falls through to the next on ANY failure (404, 429, or
 # transport error), only giving up to the offline fallback when none respond. The
 # configured OPENROUTER_MODEL is tried first; OPENROUTER_MODEL may be a comma-list.
+# Spread across DISTINCT upstream providers (Google, OpenAI, NVIDIA, Meta, Qwen):
+# each provider's free pool is throttled independently, so when one 429s the next
+# usually isn't. Ordered by observed reliability. (The :free pool is shared across
+# all OpenRouter users, so a 429 reflects global load, not this account's usage.)
 _FREE_FALLBACKS = [
     "google/gemma-4-31b-it:free",
+    "openai/gpt-oss-120b:free",
+    "openai/gpt-oss-20b:free",
+    "nvidia/nemotron-nano-9b-v2:free",
+    "nvidia/nemotron-3-nano-30b-a3b:free",
+    "google/gemma-4-26b-a4b-it:free",
     "meta-llama/llama-3.3-70b-instruct:free",
-    "meta-llama/llama-3.2-3b-instruct:free",
-    "google/gemma-2-9b-it:free",
-    "mistralai/mistral-7b-instruct:free",
-    "qwen/qwen3-8b:free",
+    "qwen/qwen3-next-80b-a3b-instruct:free",
 ]
 
 
+# Intelligent throttle-avoidance: when a free model 429s (or errors) we put it in
+# a short cooldown and route around it, so we don't keep hammering an overloaded
+# model. Cooldowns are in-process (single instance) and expire on their own.
+_COOLDOWN: dict[str, float] = {}           # model -> monotonic time it's usable again
+_COOLDOWN_S = float(os.environ.get("FREE_COOLDOWN_S", "120"))
+
+
+def _cooling(model: str) -> bool:
+    until = _COOLDOWN.get(model)
+    return until is not None and time.monotonic() < until
+
+
+def _trip_cooldown(model: str, seconds: float) -> None:
+    _COOLDOWN[model] = time.monotonic() + seconds
+
+
 def _free_models() -> list[str]:
-    """Ordered, de-duped free-model candidates — configured first, then fallbacks."""
+    """Free-model candidates, de-duped, configured-first — and **fresh models
+    before ones in cooldown**, so a recently-throttled model is tried last (or not
+    at all until it cools). If every model is cooling, we still return them all as
+    a last resort rather than skip the tier entirely."""
     configured = [m.strip() for m in
                   os.environ.get("OPENROUTER_MODEL", "").split(",") if m.strip()]
     seen: set[str] = set()
-    out: list[str] = []
+    ordered: list[str] = []
     for m in [*configured, *_FREE_FALLBACKS]:
         if m not in seen:
             seen.add(m)
-            out.append(m)
-    return out
+            ordered.append(m)
+    fresh = [m for m in ordered if not _cooling(m)]
+    cooling = [m for m in ordered if _cooling(m)]
+    return fresh + cooling
 
 _OLLAMA_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
 
@@ -233,7 +260,9 @@ def complete(system: str, user: str, *, offline: Callable[[str, str], str],
             continue
         t0 = time.monotonic()
         # The free (OpenRouter) tier tries several free models in turn — a 404
-        # (retired/paid-only) or 429 (rate-limited) on one rolls to the next.
+        # (retired/paid-only) or 429 (rate-limited) on one rolls to the next, and
+        # the failed model goes into a cooldown so we route around it next time
+        # (longer for a 429 — it's genuinely overloaded — than a one-off error).
         candidates = _free_models() if provider == "openrouter" else [None]
         text = model = ""
         in_tok = out_tok = 0
@@ -242,9 +271,17 @@ def complete(system: str, user: str, *, offline: Callable[[str, str], str],
                 text, model, in_tok, out_tok = _call(
                     provider, system, user, json_mode=json_mode,
                     max_tokens=max_tokens, model=cand)
+            except urllib.error.HTTPError as exc:
+                if cand:
+                    _trip_cooldown(cand, _COOLDOWN_S if exc.code == 429 else 30)
+                continue
             except Exception:
+                if cand:
+                    _trip_cooldown(cand, 30)
                 continue
             if text.strip():
+                if cand:
+                    _COOLDOWN.pop(cand, None)   # it responded — clear any cooldown
                 break
         if not text.strip():
             fallbacks.append(provider)
