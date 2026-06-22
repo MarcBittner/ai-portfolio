@@ -197,6 +197,7 @@ def generate(spec: ServiceSpec) -> dict:
     """
     spec = spec.normalized()
     files = {
+        "README.md": templates.readme(spec),
         "Dockerfile": templates.dockerfile(spec),
         f"deploy/k8s/{spec.name}.yaml": templates.k8s_manifest(spec),
         f"deploy/argocd/{spec.name}.yaml": templates.argocd_application(spec),

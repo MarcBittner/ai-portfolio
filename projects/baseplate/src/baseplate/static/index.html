@@ -821,6 +821,9 @@ async function scaffold(){
 function renderTabs(){
   const tabs=$("#tabs");tabs.innerHTML='';
   const paths=Object.keys(GENERATED).sort();
+  // Open to the deployment guide (README) first, so generation lands on the
+  // "what is this and how do I ship it" instructions.
+  const ix=paths.indexOf("README.md"); if(ix>0){paths.splice(ix,1);paths.unshift("README.md");}
   paths.forEach((p,i)=>{
     const t=document.createElement('span');
     t.className='tab'+(i===0?' active':'');
@@ -836,6 +839,8 @@ function renderTabs(){
 // unexplained. Matched by filename/path pattern (the service name varies).
 function fileCaption(path){
   const p=(path||"").toLowerCase();
+  if(p.endsWith("readme.md"))
+    return "<b>README.md</b> — the deployment guide: what's in this bundle and the exact steps to ship the service (provision infra → build image → deploy → CI/CD → monitor).";
   if(p.endsWith("dockerfile"))
     return "<b>Dockerfile</b> — the recipe that packages your service into a container image so it runs the same way on a laptop, in CI, and in the cluster.";
   if(p.includes("/k8s/"))
