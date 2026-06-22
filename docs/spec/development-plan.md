@@ -187,8 +187,9 @@ them — see the current-state section below.
 
 ## Current state (2026-06-22) — interview-demo program + observability
 
-The portfolio is now **~27 active projects** (the two retired ones, maskline +
-perimeter, were folded into `postureline`). Every project follows the same shape: a
+The portfolio is now **29 active projects** (the two retired ones, maskline +
+perimeter, were folded into `postureline`; #28 vigil and #29 counsel are net-new
+this session). Every project follows the same shape: a
 deterministic, trust-critical core with the LLM confined to a narrow sub-step, routed
 **local Ollama (browser→host) → paid → free → deterministic offline**, so each demo
 runs with zero keys. Per-project specs/plans live at `projects/<name>/docs/spec/`.
@@ -210,16 +211,30 @@ Recent work (this session):
   repos; purged committed tokens/keys (cw-ts-messaging-api `.env`, papertrail/zee/
   PulsarConfig/tanglement/custom-shell PATs, a family Messenger PII export) from history
   and force-pushed; verified `ghostlocalhost.pem` is untracked.
-- **Tests.** Hermetic security-test suites added to the demos (no-leak, input-hardening,
-  offline-determinism, no-debug-disclosure, per-app trust-boundary). trueline's
-  `submitExtraction` trust-boundary gap closed.
-- **vigil** (in progress) — a self-contained observability/SOC app that monitors every
-  demo (and itself), with tiered auth, control-mapped security findings, and an LLM
-  health-summarizer using the standard routing fallback. See `projects/vigil/docs/spec/`.
+- **Tests — full sweep complete.** Hermetic security-test suites now cover **all 24
+  runnable apps** (Python `test_security.py`, Rails `security_test.rb`, Go
+  `security_test.go`) on top of existing unit/smoke/eval: no-leak, input-hardening,
+  offline-determinism, no-debug-disclosure, and each app's trust boundary. Go (relaytoken)
+  + Rails (cycleledger) suites were run live in-sandbox; all green. The sweep surfaced 3
+  real bugs (left flagged as strict `xfail`, app code untouched): agent-sandbox/agent-factory
+  calculator `OverflowError`→500, llm-gateway raw-secret-into-audit when `redact_input=False`,
+  burnrate non-string `mode`→500. trueline's `submitExtraction` trust-boundary gap closed.
+- **vigil** ✅ live (`projects/vigil`, account 2) — self-contained observability/SOC app
+  monitoring every demo + itself (28 targets), tiered auth (guest→admin), control-mapped
+  (SOC2/HIPAA/NIST) findings, alerting, and an LLM incident summarizer on the standard
+  routing fallback. Auth/alerting providers (OAuth/SMTP/Twilio) are coded but dormant
+  pending credentials — see its plan.
+- **counsel** ✅ live (`projects/counsel`, account 2 → counsel-7saj.onrender.com) — net-new
+  grounded, trust-gated personal-finance copilot built for **Quin**: guardrail-first
+  (fair-lending/advice refusal), code owns every number, the LLM only narrates with
+  citation-validation + number-verification against code, and actions are human-approved
+  (simulated apply, ground-truth ledger never mutated). Full test + eval suite; the
+  better-fit Quin demo (trueline is B2B AP verification; counsel is the trustworthy
+  finance *agent* thesis).
 
-Roadmap: complete vigil (auth/alerting need provider credentials — see its plan); extend
-the unit/regression/smoke/security test complement across all remaining apps; refresh the
-per-project entries above (this file predates ~17 of the current projects).
+Roadmap: wire vigil auth/alerting once provider credentials are available (OAuth/SMTP/
+Twilio) + optional per-push GitHub-Action repo scan; optionally fix the 3 flagged bugs;
+refresh the per-project entries above (this file predates ~19 of the current projects).
 
 ---
 
