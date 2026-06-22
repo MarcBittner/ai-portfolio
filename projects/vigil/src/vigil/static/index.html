@@ -110,7 +110,7 @@
   label{font-size:12px;color:var(--ink-dim);display:block;margin-bottom:4px}
   .muted{color:var(--ink-faint);font-size:12.5px}
   .actions li{margin:5px 0}
-  .hidden{display:none}
+  .hidden{display:none !important}
   pre{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-sm);
     padding:12px;overflow:auto;font-size:12px;font-family:var(--mono)}
   .sparkline{display:flex;align-items:flex-end;gap:2px;height:42px;margin-top:8px}
@@ -357,10 +357,20 @@ $("#authSubmit").onclick = async ()=>{
           : 'Account created — check your email to verify.'; }
     } else {
       await api("/auth/login",{method:"POST",body:JSON.stringify({email,password})});
-      $("#authModal").classList.add("hidden"); await refreshMe(); toast("Signed in");
+      $("#authModal").classList.add("hidden"); $("#authMsg").textContent="";
+      $("#authPass").value=""; await refreshMe(); toast("Signed in");
     }
-  }catch(e){ $("#authMsg").textContent = "Error: "+(e.detail||e.status); }
+  }catch(e){
+    const msg = e.status===401 ? "Incorrect email or password."
+              : e.status===403 ? "Email not verified yet."
+              : e.status===409 ? "That email is already registered — switch to Sign in."
+              : ("Error: "+(e.detail||e.status));
+    $("#authMsg").textContent = msg;
+  }
 };
+// Click the dark backdrop (outside the card) to dismiss — never a click-trap.
+$("#authModal").addEventListener("click", e=>{
+  if(e.target.id==="authModal") $("#authModal").classList.add("hidden"); });
 async function logout(){ await api("/auth/logout",{method:"POST"}); await refreshMe(); toast("Signed out"); }
 
 async function refreshMe(){
