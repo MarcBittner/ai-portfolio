@@ -168,6 +168,24 @@
   .toast.show{opacity:1;transform:translateX(-50%)}
   .toast.ok{border-left:3px solid var(--ok)}.toast.bad{border-left:3px solid var(--bad)}
   .modecell{font-family:var(--mono);font-size:12px}
+  /* help modal (centered dialog, reuses scrim) */
+  #help{position:fixed;top:50%;left:50%;transform:translate(-50%,calc(-50% + 12px));z-index:70;
+    width:560px;max-width:94vw;max-height:86vh;overflow:auto;opacity:0;pointer-events:none;
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh-lg);
+    transition:opacity .25s var(--ease),transform .25s var(--ease)}
+  #help.open{opacity:1;pointer-events:auto;transform:translate(-50%,-50%)}
+  #help .hh{display:flex;align-items:center;padding:16px 18px;border-bottom:1px solid var(--line)}
+  #help .hh .brand{font-size:15px}
+  #help .body{padding:20px;display:grid;gap:16px}
+  #help h4{margin:0 0 6px;font-size:11.5px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--ink-dim)}
+  #help p{margin:0;color:var(--ink-dim);font-size:13.5px}
+  #help ol{margin:0;padding-left:20px;color:var(--ink-dim);font-size:13.5px;display:grid;gap:5px}
+  /* demo data-source chip on the copilot view */
+  .datasrc{display:flex;gap:10px;align-items:flex-start;margin:0 0 14px;padding:10px 13px;
+    border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:var(--r-sm);
+    background:rgba(67,201,138,.06);font-size:12.5px;color:var(--ink-dim);line-height:1.5}
+  .datasrc .ic{flex:none;color:var(--accent);font-size:14px;line-height:1.5}
+  .datasrc b{color:var(--ink);font-weight:600}
 </style>
 </head>
 <body>
@@ -177,6 +195,7 @@
   <div class="spacer"></div>
   <span class="pill" id="servedby" title="Which engine answered"><span class="dot" id="sbdot"></span><span id="sbtext">engine: —</span></span>
   <span class="pill" id="health"><span class="dot" id="hdot"></span><span id="htext">…</span></span>
+  <button class="iconbtn" id="helpbtn" title="Help (?)" aria-label="Help">?</button>
   <button class="iconbtn" id="themebtn" title="Toggle theme">☾</button>
   <button class="iconbtn" id="gear" title="Settings">⚙</button>
 </header>
@@ -197,6 +216,10 @@
           deterministic code; the LLM only narrates. Citations are validated against the
           retrieved records, and the verify panel proves the model didn't change a figure.
           Off-topic asks are refused honestly — counsel never guesses.</p>
+        <div class="datasrc" id="datasrc" title="The guided demo runs against this built-in dataset, not your own or live data">
+          <span class="ic">🛢</span>
+          <span id="datasrc-text"><b>Demo data:</b> loading the built-in sample ledger…</span>
+        </div>
         <div class="field"><textarea id="q" rows="2" placeholder="e.g. What's my net worth right now?"></textarea></div>
         <div class="row" style="margin:11px 0">
           <button class="btn primary" id="askbtn"><span class="spin"></span><span>Ask</span></button>
@@ -322,6 +345,36 @@
     <div class="field"><label>Providers reachable</label><div id="providers" class="muted">…</div></div>
   </div>
 </div>
+
+<!-- help modal -->
+<aside id="help" role="dialog" aria-modal="true" aria-labelledby="helptitle" aria-hidden="true">
+  <div class="hh"><div class="brand"><div class="logo" style="width:24px;height:24px"></div>
+    <span id="helptitle">Help · counsel</span></div>
+    <div class="spacer"></div><button class="iconbtn" id="closehelp" aria-label="Close help">✕</button></div>
+  <div class="body">
+    <div><h4>What it is</h4><p>counsel answers natural-language questions about a finance account
+      dataset — but the LLM <b>never owns a number</b>. Deterministic code computes every figure,
+      validates the model's citations against the retrieved records, and verifies its stated numbers
+      (if they disagree, the code value wins). Unsafe or ungrounded asks are refused. Actions are only
+      <b>proposed</b>, and applied solely after a human approves — and even then the apply is simulated,
+      so the ground-truth ledger is never mutated.</p></div>
+    <div><h4>How to use</h4><ol>
+      <li><b>Ask</b> — on the <i>Copilot</i> tab, pick an example chip or type a question, then review
+        the answer's citations and the verify panel (code-computed vs LLM-stated).</li>
+      <li><b>See the guardrails</b> — try an ungrounded ask (<code>What's my credit score?</code>) and a
+        guarded one (<code>Which stock should I buy?</code>) to watch counsel refuse honestly.</li>
+      <li><b>Propose &amp; approve</b> — on <i>Approvals</i>, propose an action and approve or decline it;
+        nothing changes until you approve, and the effect is simulated.</li>
+      <li><b>Compare modes</b> — on <i>Diagnostics</i>, run the cross-routing-mode benchmark to see
+        grounding, verification, and refusals hold across every routing tier.</li>
+    </ol></div>
+    <div><h4>Trust model</h4><p>The model reads and phrases; code decides every number and safety call;
+      a human approves every action.</p></div>
+    <div><p class="muted" style="font-size:11.5px">All data is a <b>synthetic, PII-free</b> sample ledger
+      generated in code — no real person and no real balances.</p></div>
+  </div>
+</aside>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -363,7 +416,19 @@ applyTheme(getTheme());
 /* ---- settings drawer ---- */
 const openD=()=>{$("#scrim").classList.add("open");$("#drawer").classList.add("open");};
 const closeD=()=>{$("#scrim").classList.remove("open");$("#drawer").classList.remove("open");};
-$("#gear").onclick=openD;$("#closedrawer").onclick=closeD;$("#scrim").onclick=closeD;
+$("#gear").onclick=openD;$("#closedrawer").onclick=closeD;
+/* ---- help modal ---- */
+const openHelp=()=>{$("#scrim").classList.add("open");$("#help").classList.add("open");
+  $("#help").setAttribute("aria-hidden","false");$("#closehelp").focus();};
+const closeHelp=()=>{$("#scrim").classList.remove("open");$("#help").classList.remove("open");
+  $("#help").setAttribute("aria-hidden","true");};
+$("#helpbtn").onclick=openHelp;$("#closehelp").onclick=closeHelp;
+$("#scrim").onclick=()=>{closeD();closeHelp();};
+document.addEventListener("keydown",e=>{
+  const typing=/^(INPUT|TEXTAREA|SELECT)$/.test((e.target.tagName||""));
+  if(e.key==="Escape"){closeD();closeHelp();}
+  else if(e.key==="?"&&!typing&&!$("#help").classList.contains("open")){e.preventDefault();openHelp();}
+});
 function syncModeSeg(){$$("#modeseg .segbtn").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.mode===cfg.mode)));}
 $$("#modeseg .segbtn").forEach(b=>b.onclick=()=>{cfg.mode=b.dataset.mode;saveCfg();syncModeSeg();toast("Routing mode: "+cfg.mode);});
 syncModeSeg();
@@ -390,7 +455,12 @@ async function loadHealth(){
       +`<div style="margin-top:8px">offline fallback: <b>always on</b></div>`;
   }catch{}
   try{const d=await j("dataset");$("#ds-acct").innerHTML=`${d.accounts}<small> accounts</small>`;
-    $("#ds-txn").textContent=d.transactions;}catch{}
+    $("#ds-txn").textContent=d.transactions;
+    $("#datasrc-text").innerHTML=`<b>Demo data:</b> a synthetic, PII-free sample ledger `+
+      `(${d.accounts} accounts · ${Number(d.transactions).toLocaleString()} transactions · `+
+      `over ${esc(d.window_start)}→${esc(d.today)}) — generated in code (<code>data.py</code>), `+
+      `seeded and reproducible. No real person, no real balances.`;
+  }catch{$("#datasrc-text").innerHTML=`<b>Demo data:</b> a synthetic, PII-free sample ledger generated in code (<code>data.py</code>), seeded and reproducible. No real person, no real balances.`;}
 }
 
 /* ---- examples ---- */
