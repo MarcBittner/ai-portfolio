@@ -5,6 +5,8 @@ Endpoints (all stateless except the in-memory approval queue; no secrets):
   GET  /health                  liveness + dataset/queue counts
   GET  /llm                     which providers are reachable + active mode
   GET  /dataset                 PII-free dataset summary (counts only)
+  GET  /records                 the actual accounts + a page of transactions
+  POST /transactions            human-entered ledger row (explicit data entry)
   GET  /examples                the guided-demo question set
   POST /ask                     guardrail → retrieve → compute → narrate → verify
   GET  /proposals               the approval queue (optionally ?status=pending)
@@ -26,6 +28,7 @@ from fastapi.responses import FileResponse
 from counsel import __version__, agent, approvals, data, diagnostics, llm
 from counsel.approvals import ACTION_KINDS, QUEUE
 from counsel.models import (
+    AddTransactionRequest,
     AskRequest,
     AskResponse,
     DecideRequest,
@@ -43,14 +46,24 @@ app = FastAPI(
                  "the numbers, the LLM narrates, actions need human approval."),
 )
 
-DS = data.build_dataset()  # the deterministic ground truth, built once at startup
+data.build_dataset()  # warm the deterministic ground truth at startup
+
+
+def _ds():
+    """Always resolve the *current* cached dataset.
+
+    The ledger is appendable (human-entered rows) and resettable, so handlers
+    must read the live cache rather than a stale reference captured at import.
+    """
+    return data.build_dataset()
 
 
 @app.get("/health", response_model=HealthResponse)
 def health() -> HealthResponse:
+    ds = _ds()
     return HealthResponse(
         status="ok", version=__version__,
-        accounts=len(DS.accounts), transactions=len(DS.transactions),
+        accounts=len(ds.accounts), transactions=len(ds.transactions),
         pending_proposals=len(QUEUE.list(status="pending")),
         offline_fallback=True,
     )
@@ -65,7 +78,7 @@ def llm_status() -> dict:
 @app.get("/dataset")
 def dataset() -> dict:
     """PII-free summary: counts + categories + the demo's anchor date. No records."""
-    return data.summary(DS)
+    return data.summary(_ds())
 
 
 @app.get("/examples")
@@ -78,7 +91,7 @@ def examples() -> dict:
 def ask(req: AskRequest) -> AskResponse:
     if req.mode is not None and req.mode not in VALID_MODES:
         raise HTTPException(status_code=422, detail="unknown mode")
-    result = agent.answer(DS, req.question, mode=req.mode)
+    result = agent.answer(_ds(), req.question, mode=req.mode)
     return AskResponse(**result.to_dict())
 
 
@@ -100,8 +113,9 @@ def propose(req: ProposeRequest) -> dict:
     """
     if req.kind not in ACTION_KINDS:
         raise HTTPException(status_code=422, detail="unknown action kind")
-    built = approvals.build(req.kind, DS) if req.kind != "set_budget" else \
-        approvals.build_set_budget(DS, req.category)
+    ds = _ds()
+    built = approvals.build(req.kind, ds) if req.kind != "set_budget" else \
+        approvals.build_set_budget(ds, req.category)
     if built is None:
         raise HTTPException(status_code=409,
                             detail="no proposal applies to the current records")
@@ -119,7 +133,7 @@ def decide(req: DecideRequest) -> dict:
     mutated, and no real money moves.
     """
     try:
-        p = QUEUE.decide(req.id, req.approve, DS)
+        p = QUEUE.decide(req.id, req.approve, _ds())
     except KeyError:
         raise HTTPException(status_code=404, detail="unknown proposal id") from None
     except ValueError as exc:
@@ -132,7 +146,102 @@ def diagnostics_endpoint(mode: str | None = None) -> dict:
     """Cross-routing-mode benchmark: grounding/verify/guardrail invariants."""
     if mode is not None and mode not in VALID_MODES:
         raise HTTPException(status_code=422, detail="unknown mode")
-    return diagnostics.benchmark(DS, mode=mode)
+    return diagnostics.benchmark(_ds(), mode=mode)
+
+
+def _txn_row(ds, t) -> dict:
+    """A PII-free transaction row for the Data tab, tagged seed-vs-user-added."""
+    acct = ds.account(t.account_id)
+    return {
+        "id": t.id, "account_id": t.account_id,
+        "account_name": acct.name if acct else None,
+        "date": t.date, "merchant": t.merchant, "category": t.category,
+        "amount": t.amount, "user_added": data.is_user_added(t),
+    }
+
+
+@app.get("/records")
+def records(limit: int = 50, account: str | None = None,
+            category: str | None = None) -> dict:
+    """The ACTUAL ledger so the UI can show what's populated.
+
+    Returns the real accounts (with computed balances), a page of the most-recent
+    transactions (optionally filtered by account/category, each tagged
+    seed-vs-user-added), and totals + the date window. Still PII-free — the
+    dataset is synthetic by construction.
+    """
+    ds = _ds()
+    if limit < 1:
+        limit = 1
+    if limit > 500:
+        limit = 500
+    txns = ds.transactions
+    if account is not None:
+        txns = [t for t in txns if t.account_id == account]
+    if category is not None:
+        txns = [t for t in txns if t.category == category]
+    n_total = len(txns)
+    n_user = sum(1 for t in txns if data.is_user_added(t))
+    # most recent first for browsing
+    ordered = sorted(txns, key=lambda t: (t.date, t.id), reverse=True)[:limit]
+    accounts = [{
+        "id": a.id, "name": a.name, "type": a.type, "mask": a.mask,
+        "balance": data.account_balance(ds, a.id),
+    } for a in ds.accounts]
+    return {
+        "accounts": accounts,
+        "transactions": [_txn_row(ds, t) for t in ordered],
+        "categories": sorted(data.CATEGORIES),
+        "totals": {
+            "transactions": n_total,
+            "user_added": n_user,
+            "seed": n_total - n_user,
+            "returned": len(ordered),
+        },
+        "window": {
+            "start": data.summary(ds)["window_start"],
+            "today": data.TODAY.isoformat(),
+        },
+        "filtered": {"account": account, "category": category},
+    }
+
+
+@app.post("/transactions")
+def add_transaction(req: AddTransactionRequest) -> dict:
+    """Add a human-entered transaction to the ledger.
+
+    This is explicit USER data entry: the human supplies a source record and code
+    recomputes over it (``/ask``, ``/dataset``, compute all read the same list, so
+    the new row flows through automatically). The agent/LLM never mutates data.
+    Malformed input is rejected with 422 — never a 500.
+    """
+    ds = _ds()
+    try:
+        txn = data.add_transaction(
+            ds, account_id=req.account_id, date_iso=req.date,
+            merchant=req.merchant, category=req.category, amount=req.amount)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from None
+    return {
+        "transaction": _txn_row(ds, txn),
+        "counts": {
+            "accounts": len(ds.accounts),
+            "transactions": len(ds.transactions),
+            "user_added": sum(1 for t in ds.transactions
+                              if data.is_user_added(t)),
+        },
+    }
+
+
+@app.post("/admin/reset_data")
+def reset_data() -> dict:
+    """Restore the seed-only ledger (drops every user-added row)."""
+    ds = data.reset_dataset()
+    return {
+        "status": "reset",
+        "transactions": len(ds.transactions),
+        "user_added": 0,
+    }
 
 
 @app.post("/admin/reset_queue")

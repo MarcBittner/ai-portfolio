@@ -16,6 +16,7 @@ number in the product is computed from.
 
 from __future__ import annotations
 
+import math
 import random
 from dataclasses import asdict, dataclass
 from datetime import date, timedelta
@@ -201,6 +202,65 @@ def build_dataset() -> Dataset:
             holdings=list(_HOLDINGS),
         )
     return _CACHE
+
+
+def reset_dataset() -> Dataset:
+    """Drop the cached dataset (including any user-added rows) and rebuild from
+    seed. Used by the admin reset so the demo returns to the pristine sample."""
+    global _CACHE
+    _CACHE = None
+    return build_dataset()
+
+
+# User-added rows carry this id prefix so the UI/API can mark them distinctly
+# from the deterministic seed (which uses ``txn_NNNNNN``). The human enters this
+# source data explicitly; no LLM ever writes here.
+USER_TXN_PREFIX = "txn_user_"
+
+
+def is_user_added(txn: Transaction) -> bool:
+    """True if the transaction was added by a human via the API (not seeded)."""
+    return txn.id.startswith(USER_TXN_PREFIX)
+
+
+def add_transaction(ds: Dataset, account_id: str, date_iso: str, merchant: str,
+                    category: str, amount: float) -> Transaction:
+    """Append a human-entered transaction to the ledger and return it.
+
+    Validates every field against the ground truth (unknown account or category,
+    malformed date, empty merchant, non-finite amount all raise ``ValueError``),
+    assigns a ``txn_user_NNN`` id, keeps ``ds.transactions`` sorted, and returns
+    the created row. This is the *only* mutation path into the ledger and it is
+    driven by explicit human input — code still computes every downstream number.
+    """
+    if ds.account(account_id) is None:
+        raise ValueError(f"unknown account_id: {account_id!r}")
+    if category not in CATEGORIES:
+        raise ValueError(f"unknown category: {category!r}")
+    merchant = (merchant or "").strip()
+    if not merchant:
+        raise ValueError("merchant must not be empty")
+    if len(merchant) > 80:
+        raise ValueError("merchant is too long")
+    try:
+        d = date.fromisoformat(date_iso)
+    except (ValueError, TypeError) as exc:
+        raise ValueError(f"invalid date: {date_iso!r}") from exc
+    try:
+        amt = float(amount)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"invalid amount: {amount!r}") from exc
+    if not math.isfinite(amt):
+        raise ValueError("amount must be a finite number")
+
+    n_user = sum(1 for t in ds.transactions if is_user_added(t))
+    txn = Transaction(
+        id=f"{USER_TXN_PREFIX}{n_user:03d}", account_id=account_id,
+        date=d.isoformat(), merchant=merchant, category=category,
+        amount=_round2(amt))
+    ds.transactions.append(txn)
+    ds.transactions.sort(key=lambda t: (t.date, t.id))
+    return txn
 
 
 # --------------------------------------------------------------------------- #

@@ -20,6 +20,16 @@ class DecideRequest(BaseModel):
     approve: bool
 
 
+class AddTransactionRequest(BaseModel):
+    """A human-entered ledger row. Code recomputes over it; no LLM writes data."""
+
+    account_id: str = Field(min_length=1, max_length=64)
+    date: str = Field(min_length=1, max_length=10)   # ISO yyyy-mm-dd
+    merchant: str = Field(min_length=1, max_length=80)
+    category: str = Field(min_length=1, max_length=32)
+    amount: float       # signed: negative = money out, positive = money in
+
+
 class HealthResponse(BaseModel):
     status: str
     version: str
