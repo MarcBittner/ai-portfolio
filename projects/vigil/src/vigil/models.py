@@ -82,6 +82,32 @@ class LogIngestRequest(BaseModel):
     entries: list[LogEntry] = Field(default_factory=list)
 
 
+class QualityIngestRequest(BaseModel):
+    """One code-quality result pushed from CI (token- or loopback-authenticated).
+
+    The caller supplies raw measurements only; vigil derives the letter ``grade``
+    deterministically (see ``quality.derive_grade``) — the grade is never accepted
+    from the caller."""
+
+    slug: str
+    commit_sha: str | None = None
+    lint_errors: int = Field(default=0, ge=0)
+    tests_passed: int = Field(default=0, ge=0)
+    tests_failed: int = Field(default=0, ge=0)
+    coverage_pct: float | None = Field(default=None, ge=0, le=100)
+    complexity: float | None = None
+    raw: dict | None = None
+
+
+class RepoScanIngestRequest(BaseModel):
+    """A CI-pushed repo secret-scan result (the secretscan finding shape), keyed by
+    commit, used by the live fleet where vigil has no local checkout."""
+
+    slug: str
+    commit_sha: str | None = None
+    findings: list[dict] = Field(default_factory=list)
+
+
 class CheckUpdateRequest(BaseModel):
     """PATCH a check — every field optional; only provided fields are applied."""
 

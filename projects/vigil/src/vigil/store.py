@@ -127,6 +127,38 @@ CREATE TABLE IF NOT EXISTS metric_samples (
 );
 CREATE INDEX IF NOT EXISTS idx_metric_samples_slug_name_ts
     ON metric_samples(slug, name, ts DESC);
+CREATE TABLE IF NOT EXISTS quality (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    slug          TEXT NOT NULL,
+    commit_sha    TEXT,
+    ts            REAL NOT NULL,
+    lint_errors   INTEGER NOT NULL DEFAULT 0,
+    tests_passed  INTEGER NOT NULL DEFAULT 0,
+    tests_failed  INTEGER NOT NULL DEFAULT 0,
+    coverage_pct  REAL,
+    complexity    REAL,
+    grade         TEXT NOT NULL,
+    raw           TEXT                          -- JSON blob of the original payload
+);
+CREATE INDEX IF NOT EXISTS idx_quality_slug_ts ON quality(slug, ts DESC);
+CREATE TABLE IF NOT EXISTS pushes (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    slug        TEXT NOT NULL,
+    commit_sha  TEXT,
+    ts          REAL NOT NULL,
+    pusher      TEXT,
+    message     TEXT,
+    scan        TEXT                            -- JSON: per-push live scan result
+);
+CREATE INDEX IF NOT EXISTS idx_pushes_slug_ts ON pushes(slug, ts DESC);
+CREATE TABLE IF NOT EXISTS repo_scans (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    slug        TEXT NOT NULL,
+    commit_sha  TEXT,
+    ts          REAL NOT NULL,
+    findings    TEXT NOT NULL DEFAULT '[]'      -- JSON list of secretscan findings
+);
+CREATE INDEX IF NOT EXISTS idx_repo_scans_slug_ts ON repo_scans(slug, ts DESC);
 """
 
 # Levels the logs API accepts; anything else is coerced to 'info' on ingest.
@@ -556,6 +588,137 @@ def distinct_metric_names(slug: str) -> list[str]:
             (slug,),
         ).fetchall()
     return [r["name"] for r in rows]
+
+
+# --------------------------------------------------------------------------- #
+# Code-quality (ingested per-commit lint/test/coverage results — self-pruning)  #
+# --------------------------------------------------------------------------- #
+
+def add_quality(slug: str, *, commit_sha: str | None, lint_errors: int,
+                tests_passed: int, tests_failed: int, coverage_pct: float | None,
+                complexity: float | None, grade: str, raw: dict | None) -> dict:
+    """Insert one code-quality result for ``slug`` and return the stored row.
+    Self-prunes to ``config.MAX_QUALITY_PER_TARGET`` rows per slug."""
+    ts = time.time()
+    with _conn() as c:
+        cur = c.execute(
+            """INSERT INTO quality (slug, commit_sha, ts, lint_errors, tests_passed,
+                   tests_failed, coverage_pct, complexity, grade, raw)
+               VALUES (?,?,?,?,?,?,?,?,?,?)""",
+            (slug, commit_sha, ts, int(lint_errors), int(tests_passed),
+             int(tests_failed), coverage_pct, complexity, grade,
+             json.dumps(raw) if raw is not None else None),
+        )
+        qid = cur.lastrowid
+        c.execute(
+            """DELETE FROM quality WHERE slug=? AND id NOT IN (
+                   SELECT id FROM quality WHERE slug=? ORDER BY id DESC LIMIT ?)""",
+            (slug, slug, config.MAX_QUALITY_PER_TARGET),
+        )
+        r = c.execute("SELECT * FROM quality WHERE id=?", (qid,)).fetchone()
+    return _row_to_quality(r)
+
+
+def _row_to_quality(r: sqlite3.Row) -> dict:
+    d = dict(r)
+    d["raw"] = json.loads(d["raw"]) if d.get("raw") else None
+    return d
+
+
+def list_quality(slug: str, limit: int = 30) -> list[dict]:
+    """Newest-first code-quality rows for a target (latest + trend)."""
+    limit = max(1, min(int(limit or 30), 500))
+    with _conn() as c:
+        rows = c.execute(
+            "SELECT * FROM quality WHERE slug=? ORDER BY ts DESC, id DESC LIMIT ?",
+            (slug, limit),
+        ).fetchall()
+    return [_row_to_quality(r) for r in rows]
+
+
+def latest_quality(slug: str) -> dict | None:
+    rows = list_quality(slug, 1)
+    return rows[0] if rows else None
+
+
+# --------------------------------------------------------------------------- #
+# Pushes + per-push repo scans (per-commit history for the webhook pipeline)     #
+# --------------------------------------------------------------------------- #
+
+def record_push(slug: str, commit_sha: str | None, pusher: str | None,
+                message: str | None, scan: dict | None) -> dict:
+    """Record one push event (one row per affected slug) + its live-scan result.
+    Self-prunes to ``config.MAX_PUSHES_PER_TARGET`` rows per slug."""
+    ts = time.time()
+    with _conn() as c:
+        cur = c.execute(
+            """INSERT INTO pushes (slug, commit_sha, ts, pusher, message, scan)
+               VALUES (?,?,?,?,?,?)""",
+            (slug, commit_sha, ts, pusher, message,
+             json.dumps(scan) if scan is not None else None),
+        )
+        pid = cur.lastrowid
+        c.execute(
+            """DELETE FROM pushes WHERE slug=? AND id NOT IN (
+                   SELECT id FROM pushes WHERE slug=? ORDER BY id DESC LIMIT ?)""",
+            (slug, slug, config.MAX_PUSHES_PER_TARGET),
+        )
+        r = c.execute("SELECT * FROM pushes WHERE id=?", (pid,)).fetchone()
+    return _row_to_push(r)
+
+
+def _row_to_push(r: sqlite3.Row) -> dict:
+    d = dict(r)
+    d["scan"] = json.loads(d["scan"]) if d.get("scan") else None
+    return d
+
+
+def list_pushes(slug: str, limit: int = 30) -> list[dict]:
+    """Newest-first push rows for a target (per-push history surface)."""
+    limit = max(1, min(int(limit or 30), 500))
+    with _conn() as c:
+        rows = c.execute(
+            "SELECT * FROM pushes WHERE slug=? ORDER BY ts DESC, id DESC LIMIT ?",
+            (slug, limit),
+        ).fetchall()
+    return [_row_to_push(r) for r in rows]
+
+
+def record_repo_scan(slug: str, commit_sha: str | None,
+                     findings: list[dict]) -> dict:
+    """Persist a CI-pushed repo secret-scan result, keyed by commit. The security
+    report surfaces the latest one for a slug when no local checkout is available.
+    Self-prunes to ``config.MAX_REPO_SCANS_PER_TARGET`` rows per slug."""
+    ts = time.time()
+    with _conn() as c:
+        cur = c.execute(
+            """INSERT INTO repo_scans (slug, commit_sha, ts, findings)
+               VALUES (?,?,?,?)""",
+            (slug, commit_sha, ts, json.dumps(findings or [])),
+        )
+        rid = cur.lastrowid
+        c.execute(
+            """DELETE FROM repo_scans WHERE slug=? AND id NOT IN (
+                   SELECT id FROM repo_scans WHERE slug=? ORDER BY id DESC LIMIT ?)""",
+            (slug, slug, config.MAX_REPO_SCANS_PER_TARGET),
+        )
+        r = c.execute("SELECT * FROM repo_scans WHERE id=?", (rid,)).fetchone()
+    return _row_to_repo_scan(r)
+
+
+def _row_to_repo_scan(r: sqlite3.Row) -> dict:
+    d = dict(r)
+    d["findings"] = json.loads(d["findings"]) if d.get("findings") else []
+    return d
+
+
+def latest_repo_scan(slug: str) -> dict | None:
+    with _conn() as c:
+        r = c.execute(
+            "SELECT * FROM repo_scans WHERE slug=? ORDER BY ts DESC, id DESC LIMIT 1",
+            (slug,),
+        ).fetchone()
+    return _row_to_repo_scan(r) if r else None
 
 
 # --------------------------------------------------------------------------- #

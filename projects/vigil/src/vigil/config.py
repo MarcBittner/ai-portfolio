@@ -52,6 +52,18 @@ DEFAULT_METRICS_PATH = os.environ.get("VIGIL_METRICS_PATH", "/metrics")
 # table in a single cycle.
 MAX_SERIES_PER_SCRAPE = int(os.environ.get("VIGIL_MAX_SERIES_PER_SCRAPE", "200"))
 
+# Retain at most this many code-quality rows / push rows / repo-scan rows per slug
+# (self-pruning, keeps the SQLite file bounded like every other time series).
+MAX_QUALITY_PER_TARGET = int(os.environ.get("VIGIL_MAX_QUALITY", "200"))
+MAX_PUSHES_PER_TARGET = int(os.environ.get("VIGIL_MAX_PUSHES", "200"))
+MAX_REPO_SCANS_PER_TARGET = int(os.environ.get("VIGIL_MAX_REPO_SCANS", "50"))
+
+# GitHub webhook (POST /api/hooks/github) HMAC-SHA256 shared secret. SECURE BY
+# DEFAULT: when this is UNSET, the webhook REJECTS every remote call (a missing
+# secret can't be verified, so we refuse rather than trust). NEEDS-CREDENTIAL:
+# set this to the same value configured on the GitHub webhook to enable it.
+GITHUB_WEBHOOK_SECRET = os.environ.get("VIGIL_GITHUB_WEBHOOK_SECRET") or None
+
 # The single bootstrap admin. Hardcoded by design: this account is auto-elevated
 # to `admin` on signup and can elevate other users. Everyone else signs up as
 # `registered` and is promoted only by an admin.

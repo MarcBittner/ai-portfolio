@@ -48,8 +48,10 @@ targets, check types, alert channels, and auth providers.
 - [x] Pure scoring core (`findings_from_response`) split from the HTTP fetch, so the
       demo/tests score from fixtures and the live path shares identical logic.
 - [x] Per-app posture report: findings + controls + framework rollup + score.
-- [ ] **STUB:** gitleaks-style repo secret scan — real regex ruleset + result shape,
-      returns `status:"not_run"`; per-push CI hook / repo checkout NEEDS-CREDENTIAL.
+- [x] gitleaks-style repo secret scan (`secretscan.py`) — real regex ruleset over a
+      target's local source (in-repo) or CI-pushed results (`POST /api/ingest/scan`),
+      folded into the posture report mapped to `CC6.3`; `not_run` only when neither
+      a local tree nor a pushed scan exists.
 
 ## Phase 4 — Alerting ✅
 
@@ -98,15 +100,15 @@ Legend: ✅ done · ◐ partial · ⛔ missing.
 | 4 | Registered see **availability** | ✅ | availability / error-rate / avg+p95 latency from the probe series |
 | 5 | Registered see **logs** | ✅ | Real structured-log ingestion: `logs` table + `POST /api/ingest/logs` (X-Ingest-Token, loopback-only when unset) + a registered-tier viewer `GET /api/targets/{slug}/logs` with level/since filters; vigil ships its own operational logs under slug `vigil` (poll cycles, alert fires, errors) |
 | 6 | Registered see **metrics** | ✅ | App-metrics scrape: stdlib Prometheus-text parser (`promparse.py`) + `metric_samples` table; the poll cycle scrapes each target's `/metrics` (per-target `metrics_path`, 404/HTML/parse-miss skipped), stores a bounded series set; registered-tier viewer `GET /api/targets/{slug}/metrics` (latest values + SVG sparkline series); vigil exposes its own `/metrics` (real counters/gauges) and is scraped like any target |
-| 7 | Registered see **code-quality** | ⛔ | **Nothing.** No lint/test/coverage/complexity ingestion or display |
-| 8 | Security scans **for each push** | ⛔ | Scans are on-demand, not per-commit; no push history, no per-push diffing |
+| 7 | Registered see **code-quality** | ✅ | `quality` table + `POST /api/ingest/quality` (token/loopback; **vigil derives the letter grade** in `quality.py`, never the caller) + registered viewer `GET /api/targets/{slug}/quality` (latest + trend) and a Code-quality panel on target detail. CI (the reference workflow) posts ruff/pytest/coverage per push |
+| 8 | Security scans **for each push** | ✅ | `POST /api/hooks/github` (HMAC-SHA256 verified, secure-by-default) maps changed `projects/<slug>/` paths to targets, records a `pushes` row per commit, and runs the live security scan keyed to the commit. `GET /api/targets/{slug}/pushes` + a Pushes panel give per-push history/diffing |
 | 9 | **Definition of "up" is surfaced** | ✅ | `GET /api/targets/{slug}/up-definition` + the dashboard detail's "Definition of up" panel show the required checks (method/path/assertions in plain English) and the last raw result per check (HTTP code, latency, which assertion failed) |
 | 10 | Extensible to add new infra/apps | ✅ | admin API + `targets.json` + `SEED_TARGETS`, no consumer code change |
 | 11 | **Extensible custom checks** — curl a specific endpoint + define response conditions | ✅ | `checks`/`check_results` tables + assertion engine (`checks.py`): per-check method/path/headers/body and an assertion set — status (in/eq/lt/gt), latency budget, body-contains (+negate), body-regex, JSON-path (eq/exists/lt/gt/contains), header (eq/exists/contains). "up" = all REQUIRED checks pass. Admin CRUD + "Run now" API & UI; each app's `/health` seeded as the default check (legacy 200–399 preserved) |
 | 12 | Security scan of **live apps** → risk-qualified findings | ✅ | TLS/HSTS/CSP/headers/exposure checks → severity-weighted, control-mapped posture |
-| 13 | Security scan of **repos** | ◐ | gitleaks-style interface present but **STUBBED** — returns "not yet run" (needs repo checkout / CI hook). No dependency-CVE/SAST scanning either |
+| 13 | Security scan of **repos** | ✅ | Real gitleaks-style scanner (`secretscan.py`: AWS/GitHub PAT/Slack/OpenAI/Anthropic/Render/private-key/generic + entropy-gated catch-all). Scans a target's **local source** when vigil runs in-repo, else accepts **CI-pushed** results (`POST /api/ingest/scan`, per-commit). Findings fold into the posture report mapped to `CC6.3`; `not_run` only when neither source exists. (Dependency-CVE/SAST still out of scope) |
 | 14 | Findings map to SOC 2 / HIPAA / NIST (+ISO/CMMC); failing controls listed | ✅ | six-framework crosswalk; failing controls derived from findings |
-| 15 | **Specific CSVs** of findings / failing controls | ⛔ | JSON only; no CSV export endpoint |
+| 15 | **Specific CSVs** of findings / failing controls | ✅ | `GET /api/security/export.csv` + `GET /api/security/{slug}/export.csv` (elevated-gated, stdlib `csv`, `Content-Disposition` attachment): one row per finding × control × framework plus failing-control rows — columns `slug,finding,severity,control_id,framework,framework_control,status` |
 | 16 | Configurable alerting | ✅ | per-target rule: metric + comparator + threshold |
 | 17 | Alert channel: **email** | ◐ | send path coded; **NEEDS-CREDENTIAL** (SMTP env unset) |
 | 18 | Alert channel: **SMS** | ◐ | send path coded; **NEEDS-CREDENTIAL** (Twilio env unset) |
@@ -120,7 +122,7 @@ Legend: ✅ done · ◐ partial · ⛔ missing.
 | 26 | Admin can **elevate** users to (a) full visibility+alerting, (b) admin | ◐ | `elevated`/`admin` promotion exists; the two tiers aren't clearly mapped/labeled to "full visibility + alerting" vs "admin", and there's no UI to choose which |
 | 27 | Self-monitor: own **uptime/response** | ✅ | `vigil (self)` target |
 | 28 | Self-monitor: own **logs/metrics** | ✅ | vigil captures its own structured logs (a `logging` handler mirrors the `vigil` logger into the logs table + an explicit `selflog.slog` hook for poll/alert/error events) and exposes its own `/metrics` (Prometheus text) that its self-target scrapes through the identical parse+store path |
-| 29 | Self-monitor: run the **same tests/security scans on itself** | ◐ | self security-scan runs; the app does **not** run its own test suite as a live, surfaced check |
+| 29 | Self-monitor: run the **same tests/security scans on itself** | ✅ | self security-scan runs (now incl. a real repo secret scan of vigil's own tree); and the reference CI workflow posts vigil's own ruff+pytest+coverage to `/api/ingest/quality` under slug `vigil`, so the self-target carries a code-quality grade like any monitored app |
 | 30 | ≥1 AI feature on trueline's routing fallback | ✅ | incident summarizer via the standard local→paid→free→offline chain |
 | 31 | Persistence of accounts/history across restarts | ⛔ | SQLite in ephemeral `/tmp` on free tier; only the admin is re-seeded — all other users/history are lost on redeploy (needs a persistent disk or external DB) |
 
@@ -166,22 +168,32 @@ Legend: ✅ done · ◐ partial · ⛔ missing.
       poll cycles, checks passed/failed, alerts fired, targets up/down/degraded,
       poll-cycle duration, fleet availability — and its self-target scrapes it through
       the identical parse+store path.
-- [ ] **Code-quality (#7).** Ingest per-commit lint/test/coverage/complexity
-      (`POST /api/ingest/quality` from CI, or read a committed `quality.json`); show
-      a per-app trend + latest grade in the registered tier.
+- [x] **Code-quality (#7).** `quality` table + `POST /api/ingest/quality` (CI-pushed,
+      token/loopback-gated). **vigil derives the letter grade** from the raw numbers
+      in `quality.py` (failing tests dominate, lint penalised + capped, low coverage
+      nudges down) — the caller cannot set its own grade. Registered viewer
+      `GET /api/targets/{slug}/quality` (latest + trend) + a Code-quality panel.
 
 ### P1 — per-push + security completeness
-- [ ] **Per-push pipeline (#8, #16).** A GitHub webhook (`POST /api/hooks/github`) +
-      a CI step that, on each push, posts commit sha + runs repo secret-scan,
-      dependency-CVE, live security scan, and quality — stored as a per-commit row so
-      every dimension has push history and diffs.
-- [ ] **Real repo scanning (#13).** Wire the gitleaks-style secret scan to an actual
-      checkout/diff (read-only token) + add dependency-CVE (pip/npm/go) and a light
-      SAST pass; replace the "not yet run" stub.
-- [ ] **CSV export (#15).** `GET /api/security/export.csv` (and per-target) of
-      findings and failing controls per framework.
-- [ ] **Run vigil's own tests as a live check (#29).** Surface `./run.sh test` /
-      smoke results for vigil itself in the dashboard.
+- [x] **Per-push pipeline (#8, #16).** `POST /api/hooks/github` — a GitHub webhook
+      receiver verifying `X-Hub-Signature-256` (HMAC-SHA256) against
+      `config.GITHUB_WEBHOOK_SECRET` (**secure by default**: rejects when unset). On a
+      `push` it maps changed `projects/<slug>/` paths to targets (`webhook.py`),
+      records a `pushes` row per commit, and runs the live security scan keyed to the
+      commit (`GET /api/targets/{slug}/pushes` + a Pushes panel = per-push history).
+      The reference workflow `.github/workflows/vigil-report.yml` posts ruff/pytest/
+      coverage + a secret scan per changed project (dormant until `VIGIL_URL` +
+      `VIGIL_INGEST_TOKEN` repo secrets exist). Dependency-CVE still out of scope.
+- [x] **Real repo scanning (#13).** `secretscan.py` — a real regex ruleset
+      (`scan_text`/`scan_paths`) over local source (in-repo) or CI-pushed results;
+      folded into the posture report mapped to `CC6.3`. (Dependency-CVE/SAST deferred.)
+- [x] **CSV export (#15).** `GET /api/security/export.csv` + per-target variant
+      (elevated-gated, stdlib `csv`, attachment) of findings + failing controls per
+      framework.
+- [x] **Run vigil's own tests as a surfaced check (#29).** The reference CI workflow
+      posts vigil's own ruff+pytest+coverage to `/api/ingest/quality` under slug
+      `vigil`, so the self-target shows a code-quality grade; its own repo secret scan
+      also runs over the vigil tree.
 
 ### P2 — credentials & durability (need user input / paid tier)
 - [ ] **Enable Google + GitHub OAuth (#20, #21)** once client id/secret are provided.

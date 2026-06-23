@@ -1,0 +1,153 @@
+# vigil-report — the reference per-push quality + security pipeline.
+#
+# On every push, for each project that changed, this runs ruff (lint), pytest
+# (tests), coverage (when easy), and a gitleaks-style secret scan, then POSTs the
+# results to a live vigil instance:
+#   - quality   -> POST /api/ingest/quality   (vigil derives the letter grade)
+#   - secret scan -> POST /api/ingest/scan     (merged into the posture report)
+#
+# It is DORMANT until two repo secrets exist (Settings → Secrets → Actions):
+#   VIGIL_URL           e.g. https://vigil-xxxx.onrender.com   (NEEDS-CREDENTIAL)
+#   VIGIL_INGEST_TOKEN  must equal the instance's VIGIL_INGEST_TOKEN env
+# When VIGIL_URL is unset the post step is skipped, so the workflow is a safe
+# no-op on a fork or before the secrets are configured.
+#
+# vigil monitors ITSELF here too: when projects/vigil changes, its own
+# ruff+pytest+coverage are posted under slug `vigil`, so the self-target shows a
+# code-quality grade like any other app (closes #29's "surface own tests").
+
+name: vigil-report
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      projects: ${{ steps.changed.outputs.projects }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 2 }
+      - id: changed
+        name: Determine changed projects
+        run: |
+          base="${{ github.event.before }}"
+          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
+            base="HEAD~1"
+          fi
+          changed=$(git diff --name-only "$base" HEAD 2>/dev/null \
+            | grep '^projects/' | cut -d/ -f2 | sort -u || true)
+          # Only projects that actually have a run.sh are reportable here.
+          list="[]"
+          if [ -n "$changed" ]; then
+            arr=""
+            for p in $changed; do
+              [ -f "projects/$p/run.sh" ] && arr="$arr\"$p\","
+            done
+            arr="${arr%,}"
+            list="[$arr]"
+          fi
+          echo "projects=$list" >> "$GITHUB_OUTPUT"
+          echo "changed projects: $list"
+
+  report:
+    needs: detect
+    if: ${{ needs.detect.outputs.projects != '[]' && needs.detect.outputs.projects != '' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        project: ${{ fromJSON(needs.detect.outputs.projects) }}
+    defaults:
+      run: { working-directory: projects/${{ matrix.project }} }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+
+      - name: Install tooling
+        run: pip install ruff pytest pytest-cov httpx
+
+      # --- ruff: count lint errors (never fail the job; we report the count) ----
+      - name: Lint (ruff)
+        id: lint
+        run: |
+          set +e
+          out=$(ruff check src tests 2>/dev/null)
+          # ruff prints "Found N errors"; fall back to counting lines.
+          n=$(printf '%s\n' "$out" | grep -oE 'Found [0-9]+ error' | grep -oE '[0-9]+' | head -1)
+          [ -z "$n" ] && n=$(printf '%s\n' "$out" | grep -cE '^\S+:[0-9]+:[0-9]+' )
+          echo "lint_errors=${n:-0}" >> "$GITHUB_OUTPUT"
+
+      # --- pytest (+ coverage when the project is importable that way) ----------
+      - name: Tests (pytest + coverage)
+        id: tests
+        env:
+          VIGIL_DISABLE_POLLER: "1"
+          PYTHONPATH: src
+        run: |
+          set +e
+          pytest -q --cov=src --cov-report=term-missing > pytest.out 2>&1
+          code=$?
+          cat pytest.out
+          passed=$(grep -oE '[0-9]+ passed' pytest.out | grep -oE '[0-9]+' | head -1)
+          failed=$(grep -oE '[0-9]+ failed' pytest.out | grep -oE '[0-9]+' | head -1)
+          cov=$(grep -oE 'TOTAL.* [0-9]+%' pytest.out | grep -oE '[0-9]+%' | tail -1 | tr -d '%')
+          echo "passed=${passed:-0}" >> "$GITHUB_OUTPUT"
+          echo "failed=${failed:-0}" >> "$GITHUB_OUTPUT"
+          echo "coverage=${cov:-}" >> "$GITHUB_OUTPUT"
+
+      # --- secret scan: reuse vigil's own scanner over this project's source ----
+      - name: Secret scan (vigil secretscan)
+        id: scan
+        run: |
+          python - <<'PY' > scan.json
+          import json, os, sys
+          sys.path.insert(0, "${{ github.workspace }}/projects/vigil/src")
+          from vigil import secretscan
+          findings = secretscan.scan_paths(os.getcwd())
+          print(json.dumps(findings))
+          PY
+          echo "scan written ($(wc -c < scan.json) bytes)"
+
+      # --- POST results to vigil (skipped when VIGIL_URL is unset) --------------
+      - name: Report to vigil
+        if: ${{ env.VIGIL_URL != '' }}
+        env:
+          VIGIL_URL: ${{ secrets.VIGIL_URL }}
+          VIGIL_INGEST_TOKEN: ${{ secrets.VIGIL_INGEST_TOKEN }}
+          SLUG: ${{ matrix.project }}
+          SHA: ${{ github.sha }}
+          LINT: ${{ steps.lint.outputs.lint_errors }}
+          PASSED: ${{ steps.tests.outputs.passed }}
+          FAILED: ${{ steps.tests.outputs.failed }}
+          COV: ${{ steps.tests.outputs.coverage }}
+        run: |
+          python - <<'PY'
+          import json, os, urllib.request
+          base = os.environ["VIGIL_URL"].rstrip("/")
+          tok = os.environ.get("VIGIL_INGEST_TOKEN", "")
+          slug, sha = os.environ["SLUG"], os.environ["SHA"]
+          cov = os.environ.get("COV") or None
+          q = {"slug": slug, "commit_sha": sha,
+               "lint_errors": int(os.environ.get("LINT") or 0),
+               "tests_passed": int(os.environ.get("PASSED") or 0),
+               "tests_failed": int(os.environ.get("FAILED") or 0),
+               "coverage_pct": float(cov) if cov else None}
+          findings = json.load(open("scan.json"))
+          scan = {"slug": slug, "commit_sha": sha, "findings": findings}
+
+          def post(path, payload):
+              req = urllib.request.Request(
+                  base + path, data=json.dumps(payload).encode(),
+                  headers={"Content-Type": "application/json",
+                           "X-Ingest-Token": tok}, method="POST")
+              with urllib.request.urlopen(req, timeout=20) as r:
+                  print(path, r.status, r.read(200).decode())
+
+          post("/api/ingest/quality", q)
+          post("/api/ingest/scan", scan)
+          PY

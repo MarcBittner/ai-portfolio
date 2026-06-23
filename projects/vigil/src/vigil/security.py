@@ -14,17 +14,22 @@ Two surfaces, per the spec:
   HTTPS/TLS enforcement, security response headers (HSTS, CSP, X-Content-Type,
   X-Frame-Options, Referrer-Policy), and obviously-exposed surface (a /health that
   leaks secrets). These run now, against the real endpoints.
-- **repo** — a gitleaks-style secret-scan over the app's source. The interface and
-  the rule shape are here; the per-push CI-hook wiring is clearly STUBBED
-  (NEEDS-CREDENTIAL / repo checkout) and returns an explicit "not yet run" result
-  rather than a fake pass, so the architecture is real without faking evidence.
+- **repo** — a real gitleaks-style secret scan (``secretscan.py``) over the app's
+  source. When vigil runs **in-repo** (the local tree at ``projects/<slug>`` is
+  present) it scans that source directly and maps any hits to control ``CC6.3``
+  like the live findings. For the live fleet (a public host with no checkout) it
+  accepts **CI-pushed** scan results (stored per commit by the webhook pipeline);
+  only when neither a local tree nor a pushed result exists does it report
+  ``status:"not_run"`` — never a fabricated pass.
 """
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import httpx
 
-from vigil import config, store
+from vigil import config, secretscan, store
 
 # --------------------------------------------------------------------------- #
 # Control catalog + six-framework crosswalk (postureline's controls.py shape)   #
@@ -167,37 +172,92 @@ def scan_live(target) -> list[dict]:
 
 
 # --------------------------------------------------------------------------- #
-# Repo secret-scan (gitleaks-style) — interface real, CI hook STUBBED            #
+# Repo secret-scan (gitleaks-style) — real scanner over local source / CI push   #
 # --------------------------------------------------------------------------- #
+
+# vigil lives at <repo>/projects/vigil/src/vigil/security.py, so the repo's
+# projects/ dir is this file's parents[3] (vigil-pkg → src → vigil → projects).
+# When vigil runs in-repo we can scan a target's local source directly; on a public
+# host (no checkout) the tree is absent and we fall back to CI-pushed results.
+_PROJECTS_ROOT = Path(__file__).resolve().parents[3]
+
+
+def local_source_root(slug: str) -> Path | None:
+    """The on-disk source tree for ``slug`` if vigil is running in-repo, else None.
+
+    Only returns a path that actually exists (so the public-host deploy, which has
+    no sibling project checkouts, cleanly reports the CI-push / not_run path)."""
+    root = _PROJECTS_ROOT / slug
+    return root if root.is_dir() else None
+
+
+def _secret_findings_to_findings(scan_findings: list[dict], resource: str) -> list[dict]:
+    """Map raw ``secretscan`` hits onto the control-mapped finding shape so a repo
+    secret merges into the identical controls→framework→score pipeline as a live
+    finding. Each secret maps to its rule's control (CC6.3 by default)."""
+    out: list[dict] = []
+    for sf in scan_findings:
+        control = sf.get("control", "CC6.3")
+        loc = sf.get("source") or resource
+        line = sf.get("line")
+        where = f"{loc}:{line}" if line else loc
+        out.append(_finding(
+            f"SECRET_{sf['rule']}", sf.get("severity", "high"), where,
+            f"Secret detected ({sf['rule']})",
+            {"rule": sf["rule"], "match": sf.get("match"), "line": line,
+             "file": sf.get("source")},
+            [control],
+            "Remove the credential from source, rotate it, and load it from an "
+            "environment variable / secret manager instead.", "repo"))
+    return out
+
 
 def scan_repo(target) -> dict:
     """Gitleaks-style per-repo secret scan.
 
-    STUB (NEEDS-CREDENTIAL / repo checkout + CI hook): vigil does not check out
-    every app's git tree on a public host, so this returns an explicit
-    ``status: 'not_run'`` with the rule shape it *would* apply, rather than
-    fabricating a pass. Wiring this live means a per-push CI webhook that POSTs the
-    diff (or a clone token) here; the regex ruleset below is production-ready and
-    the result merges into the same findings/controls engine as the live scan.
+    Resolution order:
+    1. **local source** — if vigil is running in-repo and ``projects/<slug>`` is on
+       disk, scan that tree right now with the real ``secretscan`` ruleset.
+    2. **CI-pushed result** — else, if a webhook/CI run has POSTed a scan result for
+       this slug, surface it (per-push history lives in the ``pushes`` table).
+    3. **not_run** — only when neither is available (a public host that has had no
+       push yet): an explicit ``status:"not_run"`` with the ruleset it *would*
+       apply, rather than a fabricated pass.
     """
-    rules = [
-        {"id": "AWS_AKID", "pattern": r"AKIA[0-9A-Z]{16}", "control": "CC6.3"},
-        {"id": "PRIVATE_KEY", "pattern": r"-----BEGIN (RSA|EC|OPENSSH) PRIVATE KEY-----",
-         "control": "CC6.3"},
-        {"id": "GENERIC_API_KEY",
-         "pattern": r"(?i)(api[_-]?key|secret)['\"]?\s*[:=]\s*['\"][A-Za-z0-9/+]{16,}",
-         "control": "CC6.3"},
-        {"id": "SLACK_TOKEN", "pattern": r"xox[baprs]-[0-9A-Za-z-]{10,}",
-         "control": "CC6.3"},
-    ]
+    ruleset = [{"id": r.id, "pattern": r.pattern, "control": r.control,
+                "severity": r.severity} for r in secretscan.RULES]
+    root = local_source_root(target.slug)
+    if root is not None:
+        raw = secretscan.scan_paths(root)
+        return {
+            "slug": target.slug, "surface": "repo", "status": "scanned",
+            "source": "local", "root": str(root),
+            "ruleset": ruleset, "findings": raw,
+            "finding_count": len(raw),
+        }
+    pushed = store.latest_repo_scan(target.slug)
+    if pushed is not None:
+        return {
+            "slug": target.slug, "surface": "repo", "status": "scanned",
+            "source": "ci", "commit_sha": pushed.get("commit_sha"),
+            "ts": pushed.get("ts"), "ruleset": ruleset,
+            "findings": pushed.get("findings", []),
+            "finding_count": len(pushed.get("findings", [])),
+        }
     return {
-        "slug": target.slug,
-        "surface": "repo",
-        "status": "not_run",  # NEEDS-CREDENTIAL: per-push CI hook / clone token
-        "reason": "repo checkout not wired on public host; see scan_repo() docstring",
-        "ruleset": rules,
-        "findings": [],
+        "slug": target.slug, "surface": "repo", "status": "not_run",
+        "reason": "no local checkout and no CI-pushed scan yet "
+                  "(NEEDS-CREDENTIAL: per-push CI hook / VIGIL_INGEST_TOKEN)",
+        "ruleset": ruleset, "findings": [], "finding_count": 0,
     }
+
+
+def repo_findings(target) -> list[dict]:
+    """Control-mapped findings from the repo secret scan (empty if not_run)."""
+    rep = scan_repo(target)
+    if rep.get("status") != "scanned":
+        return []
+    return _secret_findings_to_findings(rep.get("findings", []), target.slug)
 
 
 # --------------------------------------------------------------------------- #
@@ -271,11 +331,16 @@ def report_from_findings(target, findings: list[dict],
 
 
 def scan_target(slug: str, *, include_repo: bool = True) -> dict:
-    """Full posture report for one target: live findings (+ repo stub), controls,
-    six-framework rollup, and the severity-weighted posture score."""
+    """Full posture report for one target: live findings + (when requested) real
+    repo secret-scan findings, controls, six-framework rollup, and the
+    severity-weighted posture score. Repo findings are folded into the same
+    findings list so they map to controls (CC6.3) exactly like live findings."""
     target = store.get_target(slug)
     if target is None:
         raise KeyError(slug)
     findings = scan_live(target)
-    repo = scan_repo(target) if include_repo else None
+    repo = None
+    if include_repo:
+        repo = scan_repo(target)
+        findings = findings + repo_findings(target)
     return report_from_findings(target, findings, repo)

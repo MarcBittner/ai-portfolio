@@ -16,6 +16,8 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import csv
+import io
 import logging
 import os
 import secrets
@@ -43,6 +45,10 @@ from vigil import (
     selflog,
     selfmetrics,
     store,
+    webhook,
+)
+from vigil import (
+    quality as quality_mod,
 )
 from vigil.config import Target
 from vigil.models import (
@@ -53,6 +59,8 @@ from vigil.models import (
     IncidentRequest,
     LogIngestRequest,
     LoginRequest,
+    QualityIngestRequest,
+    RepoScanIngestRequest,
     RoleRequest,
     SignupRequest,
     TargetRequest,
@@ -391,6 +399,120 @@ def target_metrics(slug: str, series: int = 6, points: int = 60,
     }
 
 
+# --------------------------------------------------------------------------- #
+# Code-quality — CI ingestion (token/loopback) + registered-tier viewer (#7)    #
+# --------------------------------------------------------------------------- #
+
+@app.post("/api/ingest/quality")
+def ingest_quality(req: QualityIngestRequest, request: Request) -> dict:
+    """Push a code-quality result (lint/test/coverage/complexity) for a target,
+    typically from CI. Same auth as log ingestion: ``X-Ingest-Token`` (env
+    ``VIGIL_INGEST_TOKEN``) or a loopback caller when unset.
+
+    **vigil derives the letter grade** from the raw numbers (``quality.derive_grade``)
+    — the caller cannot set its own grade. Returns the stored row (with grade)."""
+    if not _ingest_authorized(request):
+        raise HTTPException(401, "ingestion requires a valid X-Ingest-Token "
+                                 "(or a loopback caller when no token is configured)")
+    if not store.get_target(req.slug):
+        raise HTTPException(404, "unknown target")
+    grade = quality_mod.derive_grade(
+        lint_errors=req.lint_errors, tests_passed=req.tests_passed,
+        tests_failed=req.tests_failed, coverage_pct=req.coverage_pct)
+    row = store.add_quality(
+        req.slug, commit_sha=req.commit_sha, lint_errors=req.lint_errors,
+        tests_passed=req.tests_passed, tests_failed=req.tests_failed,
+        coverage_pct=req.coverage_pct, complexity=req.complexity, grade=grade,
+        raw=req.raw)
+    return {"slug": req.slug, "grade": grade, "quality": row}
+
+
+@app.get("/api/targets/{slug}/quality")
+def target_quality(slug: str, limit: int = 20,
+                   _user=Depends(require_role("registered"))) -> dict:
+    """REGISTERED tier: latest code-quality grade + a short trend for a target."""
+    if not store.get_target(slug):
+        raise HTTPException(404, "unknown target")
+    trend = store.list_quality(slug, limit=limit)
+    return {"slug": slug, "latest": trend[0] if trend else None, "trend": trend,
+            "has_quality": bool(trend)}
+
+
+# --------------------------------------------------------------------------- #
+# Per-push pipeline: GitHub webhook + repo-scan ingest + push history (#8, #16)  #
+# --------------------------------------------------------------------------- #
+
+@app.post("/api/hooks/github")
+async def github_webhook(request: Request) -> dict:
+    """GitHub webhook receiver. Verifies ``X-Hub-Signature-256`` (HMAC-SHA256)
+    against ``config.GITHUB_WEBHOOK_SECRET``. **Secure by default**: when the secret
+    is unset the call is rejected (NEEDS-CREDENTIAL) — a missing secret can't
+    authenticate a payload.
+
+    On a ``push`` event: map changed ``projects/<slug>/`` paths to target slugs,
+    record a ``pushes`` row per affected target, and kick the live security scan,
+    storing the result keyed to the commit so there's per-push history."""
+    body = await request.body()
+    sig = request.headers.get("X-Hub-Signature-256")
+    if not webhook.verify_signature(config.GITHUB_WEBHOOK_SECRET, body, sig):
+        if not config.GITHUB_WEBHOOK_SECRET:
+            raise HTTPException(
+                401, "github webhook secret not configured (NEEDS-CREDENTIAL): "
+                     "set VIGIL_GITHUB_WEBHOOK_SECRET to enable the receiver")
+        raise HTTPException(401, "invalid or missing X-Hub-Signature-256")
+    event = request.headers.get("X-GitHub-Event", "")
+    if event == "ping":
+        return {"ok": True, "pong": True}
+    if event != "push":
+        return {"ok": True, "ignored": event or "unknown-event"}
+    try:
+        payload = await request.json()
+    except Exception:  # noqa: BLE001 — a malformed body is a 400, not a crash
+        raise HTTPException(400, "invalid JSON body") from None
+    meta = webhook.parse_push(payload)
+    slugs = [s for s in webhook.changed_slugs(payload) if store.get_target(s)]
+    recorded = []
+    for slug in slugs:
+        scan = None
+        try:
+            scan = await asyncio.to_thread(security.scan_target, slug, include_repo=False)
+        except Exception as exc:  # noqa: BLE001 — a scan failure must not fail the hook
+            log.warning("per-push scan failed for %s: %s", slug, exc)
+        store.record_push(slug, meta["commit_sha"], meta["pusher"],
+                          meta["message"], {"posture": scan["posture"]} if scan else None)
+        recorded.append(slug)
+    selflog.slog("info", f"github push processed: {len(recorded)} target(s) affected",
+                 source="vigil.webhook", commit=meta["commit_sha"], slugs=recorded)
+    return {"ok": True, "commit_sha": meta["commit_sha"], "affected": recorded}
+
+
+@app.post("/api/ingest/scan")
+def ingest_scan(req: RepoScanIngestRequest, request: Request) -> dict:
+    """Push a repo secret-scan result from CI (the ``secretscan`` finding shape),
+    keyed by commit. Same auth as log/quality ingestion. The live fleet (no local
+    checkout) surfaces the latest pushed scan in its security report."""
+    if not _ingest_authorized(request):
+        raise HTTPException(401, "ingestion requires a valid X-Ingest-Token "
+                                 "(or a loopback caller when no token is configured)")
+    if not store.get_target(req.slug):
+        raise HTTPException(404, "unknown target")
+    row = store.record_repo_scan(req.slug, req.commit_sha, req.findings)
+    return {"slug": req.slug, "stored": len(req.findings), "scan": row}
+
+
+@app.get("/api/targets/{slug}/pushes")
+def target_pushes(slug: str, limit: int = 20,
+                  _user=Depends(require_role("registered"))) -> dict:
+    """REGISTERED tier: recent pushes for a target with their per-push scan posture
+    + latest quality grade (per-push history + a diffing surface)."""
+    if not store.get_target(slug):
+        raise HTTPException(404, "unknown target")
+    pushes = store.list_pushes(slug, limit=limit)
+    return {"slug": slug, "pushes": pushes,
+            "latest_quality": store.latest_quality(slug),
+            "latest_repo_scan": store.latest_repo_scan(slug)}
+
+
 @app.get("/api/security")
 def fleet_security(_user=Depends(require_role("elevated"))) -> dict:
     """ELEVATED tier: per-app posture + control-mapping across six frameworks."""
@@ -404,9 +526,84 @@ def fleet_security(_user=Depends(require_role("elevated"))) -> dict:
     return {"catalog": security.catalog(), "reports": reports}
 
 
+# --------------------------------------------------------------------------- #
+# CSV export of findings + failing controls per framework (#15)                  #
+# --------------------------------------------------------------------------- #
+
+_CSV_COLUMNS = ["slug", "finding", "severity", "control_id", "framework",
+                "framework_control", "status"]
+
+
+def _report_csv_rows(report: dict) -> list[dict]:
+    """Flatten one posture report into CSV rows: one row per (finding, control,
+    framework) plus failing-control rows that have no finding text (so a failing
+    control is listed even if it was rolled up from multiple findings)."""
+    slug = report["slug"]
+    rows: list[dict] = []
+    # Findings × their controls × six frameworks.
+    for f in report.get("findings", []):
+        for cid in f.get("control_ids", []):
+            refs = security._refs(cid) if cid in security.CATALOG else {"SOC 2": cid}
+            for fw, fw_control in refs.items():
+                rows.append({
+                    "slug": slug, "finding": f["title"], "severity": f["severity"],
+                    "control_id": cid, "framework": fw,
+                    "framework_control": fw_control, "status": "fail",
+                })
+    # Failing controls from the rollup that carried no direct finding text.
+    seen_controls = {(r["control_id"], r["framework"]) for r in rows}
+    for c in report.get("controls", []):
+        if c["status"] != "fail":
+            continue
+        for fw, fw_control in c["frameworks"].items():
+            if (c["id"], fw) in seen_controls:
+                continue
+            rows.append({
+                "slug": slug, "finding": "", "severity": "",
+                "control_id": c["id"], "framework": fw,
+                "framework_control": fw_control, "status": "fail",
+            })
+    return rows
+
+
+def _csv_response(rows: list[dict], filename: str) -> Response:
+    buf = io.StringIO()
+    writer = csv.DictWriter(buf, fieldnames=_CSV_COLUMNS)
+    writer.writeheader()
+    for r in rows:
+        writer.writerow(r)
+    return Response(
+        content=buf.getvalue(), media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+
+
+@app.get("/api/security/export.csv")
+def security_export_csv(_user=Depends(require_role("elevated"))) -> Response:
+    """ELEVATED tier: CSV of findings + failing controls per framework, fleet-wide."""
+    rows: list[dict] = []
+    for t in store.list_targets():
+        try:
+            rows.extend(_report_csv_rows(security.scan_target(t.slug, include_repo=True)))
+        except Exception as exc:  # noqa: BLE001
+            log.warning("csv export scan failed for %s: %s", t.slug, exc)
+    return _csv_response(rows, "vigil-security-findings.csv")
+
+
+@app.get("/api/security/{slug}/export.csv")
+def security_export_csv_slug(slug: str,
+                             _user=Depends(require_role("elevated"))) -> Response:
+    """ELEVATED tier: CSV of findings + failing controls per framework for one app."""
+    try:
+        report = security.scan_target(slug, include_repo=True)
+    except KeyError:
+        raise HTTPException(404, "unknown target") from None
+    return _csv_response(_report_csv_rows(report), f"vigil-security-{slug}.csv")
+
+
 @app.get("/api/security/{slug}")
 def app_security(slug: str, _user=Depends(require_role("elevated"))) -> dict:
-    """ELEVATED tier: full posture (live findings + repo-scan stub) for one app."""
+    """ELEVATED tier: full posture (live findings + real repo secret scan) for one
+    app. Repo findings are folded into the findings list, mapped to CC6.3."""
     try:
         return security.scan_target(slug, include_repo=True)
     except KeyError:
