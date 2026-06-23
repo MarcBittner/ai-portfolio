@@ -16,6 +16,8 @@ offline mode, so it reproduces to the digit.
 
 from __future__ import annotations
 
+import concurrent.futures
+
 from counsel import agent, guardrail, llm
 from counsel.data import Dataset
 
@@ -64,8 +66,20 @@ def _score_one(ds: Dataset, ex: dict, mode: str | None) -> dict:
     return row
 
 
-def _run_mode(ds: Dataset, mode: str) -> dict:
-    rows = [_score_one(ds, ex, mode) for ex in EXAMPLES]
+# A small representative probe (one of each kind) for the cross-mode comparison.
+# Only GROUNDED questions call the LLM (refusals fire deterministically before any
+# model call), so probing one grounded question per live mode bounds the benchmark
+# to ~one LLM round-trip per mode instead of six. The full EXAMPLES set still runs
+# on the deterministic `offline` mode, where it's instant and gives real accuracy.
+_PROBE = (
+    [next(e for e in EXAMPLES if e["kind"] == "grounded")]
+    + [next(e for e in EXAMPLES if e["kind"] == "ungrounded")]
+    + [next(e for e in EXAMPLES if e["kind"] == "guardrail")]
+)
+
+
+def _run_mode(ds: Dataset, mode: str, examples: list[dict] | None = None) -> dict:
+    rows = [_score_one(ds, ex, mode) for ex in (examples or EXAMPLES)]
     grounded = [r for r in rows if r["kind"] == "grounded"]
     refusals = [r for r in rows if r["kind"] in ("ungrounded", "guardrail")]
     passed = sum(1 for r in rows if r["pass"])
@@ -82,10 +96,19 @@ def _run_mode(ds: Dataset, mode: str) -> dict:
 
 
 def benchmark(ds: Dataset, mode: str | None = None) -> dict:
-    """Run the example set across one mode, or all modes when ``mode`` is None."""
+    """Cross-routing-mode benchmark. ``offline`` runs the full example set
+    (deterministic, instant); the live modes run a small probe so the whole thing
+    stays well under a UI/edge timeout even when a free model is being slow. Modes
+    run concurrently, so wall time is the slowest single mode, not the sum."""
     status = llm.status()
     modes = [mode] if mode else list(llm.MODES)
-    results = {m: _run_mode(ds, m) for m in modes}
+
+    def run(m: str) -> tuple[str, dict]:
+        examples = EXAMPLES if m == "offline" else _PROBE
+        return m, _run_mode(ds, m, examples)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(modes)) as ex:
+        results = dict(ex.map(run, modes))
     return {
         "providers": status["providers"],
         "active_mode": status["mode"],
