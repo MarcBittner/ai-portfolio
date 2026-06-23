@@ -119,12 +119,12 @@ Legend: ✅ done · ◐ partial · ⛔ missing.
 | 23 | `marc.bittner@gmail.com` sole privileged user | ✅ | bootstrap admin (seeded from `VIGIL_ADMIN_PASSWORD` on each boot) |
 | 24 | Anyone can sign up | ✅ | open signup → `registered` |
 | 25 | Rate-limit the signup endpoint | ✅ | per-IP token bucket |
-| 26 | Admin can **elevate** users to (a) full visibility+alerting, (b) admin | ◐ | `elevated`/`admin` promotion exists; the two tiers aren't clearly mapped/labeled to "full visibility + alerting" vs "admin", and there's no UI to choose which |
+| 26 | Admin can **elevate** users to (a) full visibility+alerting, (b) admin | ✅ | admin Users page now shows a tier legend (registered = status/availability/logs/metrics · **elevated = full visibility + alerting** · **admin = + user management**) with per-role grant/demote buttons; the admin can't change their own role |
 | 27 | Self-monitor: own **uptime/response** | ✅ | `vigil (self)` target |
 | 28 | Self-monitor: own **logs/metrics** | ✅ | vigil captures its own structured logs (a `logging` handler mirrors the `vigil` logger into the logs table + an explicit `selflog.slog` hook for poll/alert/error events) and exposes its own `/metrics` (Prometheus text) that its self-target scrapes through the identical parse+store path |
 | 29 | Self-monitor: run the **same tests/security scans on itself** | ✅ | self security-scan runs (now incl. a real repo secret scan of vigil's own tree); and the reference CI workflow posts vigil's own ruff+pytest+coverage to `/api/ingest/quality` under slug `vigil`, so the self-target carries a code-quality grade like any monitored app |
 | 30 | ≥1 AI feature on trueline's routing fallback | ✅ | incident summarizer via the standard local→paid→free→offline chain |
-| 31 | Persistence of accounts/history across restarts | ⛔ | SQLite in ephemeral `/tmp` on free tier; only the admin is re-seeded — all other users/history are lost on redeploy (needs a persistent disk or external DB) |
+| 31 | Persistence of accounts/history across restarts | ◐ | **Code-ready** — `VIGIL_DB` points the SQLite file anywhere and the store self-migrates existing files; set it to a mounted path and data persists. **Blocked on infra/cost only:** Render's *free* tier has no persistent disk, so making it durable needs a paid instance (disk mounted, `VIGIL_DB` on it) or an external DB. On free tier the admin still re-seeds from `VIGIL_ADMIN_PASSWORD` each boot |
 
 ## Remediation backlog (prioritized — built next, NOT yet done)
 

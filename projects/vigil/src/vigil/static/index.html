@@ -368,8 +368,14 @@
     </div>
     <div class="card">
       <h2>Users &amp; roles</h2>
-      <div class="sub">Promote a user to elevated or admin. You
-        (<span class="mono" id="adminEmail"></span>) are the bootstrap admin.</div>
+      <div class="sub">You (<span class="mono" id="adminEmail"></span>) are the
+        bootstrap admin. Grant a user one of:</div>
+      <ul class="rolelegend" style="margin:6px 0 12px;padding-left:18px;font-size:12.5px;color:var(--ink-dim)">
+        <li><b>registered</b> — status, availability, logs &amp; metrics</li>
+        <li><b>elevated</b> — the above <b>plus full visibility + alerting</b>
+          (security/compliance posture, alert rules)</li>
+        <li><b>admin</b> — everything, plus <b>user management</b> (this page)</li>
+      </ul>
       <table><thead><tr><th>Email</th><th>Role</th><th>Verified</th><th></th></tr></thead>
         <tbody id="userBody"></tbody></table>
     </div>
@@ -919,10 +925,18 @@ async function showSec(slug){
 
 async function loadAdmin(){
   const d = await api("/api/admin/users");
-  $("#userBody").innerHTML = d.users.map(u=>`<tr>
-    <td class="mono">${u.email}</td><td>${u.role}</td><td>${u.verified?'✓':'—'}</td>
-    <td>${u.role!=='admin'?`<button class="sm" data-e="${u.email}" data-r="elevated">→ elevated</button>
-      <button class="sm" data-e="${u.email}" data-r="admin">→ admin</button>`:''}</td></tr>`).join("");
+  const me=ME.email;
+  $("#userBody").innerHTML = d.users.map(u=>{
+    const self=u.email===me;
+    const btn=(role,label,title)=> u.role===role||self ? '' :
+      `<button class="sm" data-e="${u.email}" data-r="${role}" title="${title}">${label}</button>`;
+    const actions = self ? '<span class="muted">you</span>' :
+      btn('registered','→ registered','status, availability, logs & metrics')+' '+
+      btn('elevated','→ elevated','+ full visibility + alerting')+' '+
+      btn('admin','→ admin','+ user management');
+    return `<tr><td class="mono">${u.email}</td><td>${u.role}</td>`+
+      `<td>${u.verified?'✓':'—'}</td><td>${actions}</td></tr>`;
+  }).join("");
   $("#userBody").querySelectorAll("button").forEach(b=>b.onclick=async()=>{
     try{ await api("/api/admin/role",{method:"POST",body:JSON.stringify({email:b.dataset.e,role:b.dataset.r})});
       toast("Updated "+b.dataset.e); loadAdmin(); }catch(e){ toast("Error: "+(e.detail||e.status)); }});
