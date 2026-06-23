@@ -48,3 +48,31 @@ class AlertRuleRequest(BaseModel):
 class IncidentRequest(BaseModel):
     mode: str | None = None
     client_summary: str | None = None
+
+
+class CheckRequest(BaseModel):
+    """Create a synthetic check. ``assertions`` is a list of assertion dicts (shape
+    validated in the handler against ``checks.ASSERTION_TYPES``)."""
+
+    slug: str
+    name: str = Field(min_length=1, max_length=80)
+    method: str = "GET"
+    path: str = "/health"
+    headers: dict[str, str] = Field(default_factory=dict)
+    body: str | None = None
+    assertions: list[dict] = Field(default_factory=list)
+    required: bool = True
+    enabled: bool = True
+
+
+class CheckUpdateRequest(BaseModel):
+    """PATCH a check — every field optional; only provided fields are applied."""
+
+    name: str | None = Field(default=None, min_length=1, max_length=80)
+    method: str | None = None
+    path: str | None = None
+    headers: dict[str, str] | None = None
+    body: str | None = None
+    assertions: list[dict] | None = None
+    required: bool | None = None
+    enabled: bool | None = None

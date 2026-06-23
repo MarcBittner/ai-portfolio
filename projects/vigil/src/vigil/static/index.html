@@ -142,6 +142,7 @@
     <div class="tab" data-tab="incident" data-min="registered">Incident AI</div>
     <div class="tab" data-tab="alerts" data-min="registered">Alerts</div>
     <div class="tab" data-tab="security" data-min="elevated">Security &amp; Compliance</div>
+    <div class="tab" data-tab="checks" data-min="admin">Checks</div>
     <div class="tab" data-tab="admin" data-min="admin">Admin</div>
   </div>
 
@@ -169,6 +170,7 @@
     <div class="card hidden" id="detailCard">
       <h2 id="detailName"></h2>
       <div class="sub" id="detailSub"></div>
+      <div id="upDef" style="margin:6px 0 14px"></div>
       <div class="sparkline" id="spark"></div>
       <div class="muted" style="margin-top:6px">Response time (oldest → newest); red = down probe.</div>
       <h2 style="margin-top:16px;font-size:14px">Recent probes</h2>
@@ -248,6 +250,66 @@
         <tbody id="secBody"></tbody></table>
     </div>
     <div class="card hidden" id="secDetail"></div>
+  </section>
+
+  <!-- CHECKS (admin) — user-definable synthetic checks that define "up" -->
+  <section id="tab-checks" class="hidden">
+    <div class="card">
+      <h2>Synthetic checks — the definition of "up"</h2>
+      <div class="sub">A target is <b>up</b> when all its <b>required</b> checks pass.
+        Each check is an HTTP request (method + path + headers + optional body) plus an
+        assertion set: status range/equality, latency budget, body-contains/regex,
+        JSON-path equals/exists/lt/gt/contains, and header equals/exists/contains. The
+        seeded <span class="mono">health</span> check (GET the health path, status 200–399)
+        preserves the original behavior. Admin only.</div>
+      <div class="row">
+        <div><label>Target</label><select id="ckTarget"></select></div>
+        <div style="flex:0 0 auto"><label>&nbsp;</label>
+          <button class="sm" id="ckReload">Reload</button></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Checks for <span id="ckSlug" class="mono"></span></h2>
+      <table><thead><tr><th>Name</th><th>Method · Path</th><th>Assertions</th>
+        <th>Req</th><th>On</th><th>Last</th><th></th></tr></thead>
+        <tbody id="ckListBody"></tbody></table>
+    </div>
+    <div class="card">
+      <h2 id="ckEditTitle">Add a check</h2>
+      <div class="sub">Assertions are a JSON list. Example:
+        <span class="mono">[{"type":"status","op":"in","value":[200,399]},
+        {"type":"json_path","path":"status","op":"eq","value":"ok"}]</span></div>
+      <div class="row">
+        <div><label>Name</label><input id="ckName" placeholder="health"></div>
+        <div style="flex:0 0 120px"><label>Method</label><select id="ckMethod">
+          <option>GET</option><option>POST</option><option>HEAD</option>
+          <option>PUT</option><option>PATCH</option><option>DELETE</option></select></div>
+        <div><label>Path</label><input id="ckPath" value="/health"></div>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <div><label>Headers (JSON object, optional)</label>
+          <input id="ckHeaders" placeholder='{"Authorization":"Bearer …"}'></div>
+        <div><label>Body (optional)</label><input id="ckBody" placeholder="request body"></div>
+      </div>
+      <div style="margin-top:10px"><label>Assertions (JSON list)</label>
+        <textarea id="ckAssertions" rows="4" style="width:100%;font-family:var(--mono);
+          font-size:12.5px;background:var(--surface);color:var(--ink);
+          border:1px solid var(--line);border-radius:var(--r-sm);padding:9px 11px"
+          >[{"type":"status","op":"in","value":[200,399]}]</textarea></div>
+      <div class="row" style="margin-top:10px;align-items:center">
+        <div style="flex:0 0 auto"><label>&nbsp;</label>
+          <label class="mono" style="display:inline">
+            <input type="checkbox" id="ckRequired" checked style="width:auto"> required (gates up)</label></div>
+        <div style="flex:0 0 auto"><label>&nbsp;</label>
+          <label class="mono" style="display:inline">
+            <input type="checkbox" id="ckEnabled" checked style="width:auto"> enabled</label></div>
+        <div style="flex:0 0 auto"><label>&nbsp;</label>
+          <button class="primary" id="ckSave">Add check</button>
+          <button class="sm" id="ckClear">Clear / new</button></div>
+      </div>
+      <div id="ckMsg" class="muted" style="margin-top:10px;min-height:18px"></div>
+      <div id="ckRunOut" style="margin-top:6px"></div>
+    </div>
   </section>
 
   <!-- ADMIN -->
@@ -389,6 +451,7 @@ async function load(tab){
   if(tab==="incident") return;
   if(tab==="alerts") return loadAlerts();
   if(tab==="security") return loadSecurity();
+  if(tab==="checks") return loadChecks();
   if(tab==="admin") return loadAdmin();
 }
 
@@ -434,6 +497,7 @@ async function showDetail(slug){
   $("#detailName").textContent = d.target.name;
   $("#detailSub").innerHTML = `<a href="${d.target.url}" target="_blank">${d.target.url}</a>
     · availability ${fmtPct(d.summary.availability)} · ${d.summary.samples} samples`;
+  renderUpDef(slug);
   const series=d.response_series.slice(-60); const max=Math.max(1,...series.map(s=>s.ms||0));
   $("#spark").innerHTML = series.map(s=>{
     const h = s.up&&s.ms? Math.max(2,Math.round(s.ms/max*42)) : 6;
@@ -444,6 +508,149 @@ async function showDetail(slug){
       <td class="mono">${p.http_status??"—"}</td><td class="mono">${p.response_ms??"—"}</td>
       <td class="muted">${p.error??""}</td></tr>`).join("");
 }
+
+// Surface the definition of "up" for a target: required checks + last result,
+// including which assertion failed when it's down. This is the visible #9 fix.
+async function renderUpDef(slug){
+  const el = $("#upDef"); el.innerHTML = '';
+  let d;
+  try{ d = await api("/api/targets/"+slug+"/up-definition"); }
+  catch(e){ return; }
+  const rows = d.checks.map(ck=>{
+    const lr = ck.last_result;
+    const ok = lr ? lr.passed : null;
+    const badge = ok===null ? '<span class="pill">no result yet</span>'
+      : ok ? '<span class="pill ok">pass</span>' : '<span class="pill bad">fail</span>';
+    const failed = (ck.failed_assertions||[]).map(f=>f.detail).filter(Boolean);
+    const lastBits = lr ? `HTTP ${lr.http_status??'—'} · ${lr.response_ms??'—'}ms`
+      + (lr.error?(' · '+lr.error):'') : '—';
+    return `<tr><td><b>${ck.name}</b></td>
+      <td class="mono">${ck.method} ${ck.path}</td>
+      <td>${ck.assertions_human.map(a=>`<div class="mono" style="font-size:11.5px">${a}</div>`).join('')}</td>
+      <td>${badge}</td>
+      <td class="muted">${lastBits}${failed.length?('<div class="mono" style="color:var(--bad);font-size:11.5px">↳ '+failed.join('; ')+'</div>'):''}</td></tr>`;
+  }).join('');
+  el.innerHTML = `<div class="card" style="background:var(--surface-2);margin:0">
+    <div style="font-weight:600;margin-bottom:4px">Definition of "up"</div>
+    <div class="muted" style="margin-bottom:8px">${d.summary}.</div>
+    <table><thead><tr><th>Check</th><th>Request</th><th>Assertions</th>
+      <th>Last</th><th>Result</th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="5" class="muted">No required checks.</td></tr>'}</tbody></table></div>`;
+}
+
+// ---- admin: synthetic checks editor ----
+let CK_EDIT_ID = null;  // null = creating; otherwise editing this check id
+async function loadChecks(){
+  const t = await api("/api/targets");
+  const sel = $("#ckTarget");
+  const cur = sel.value;
+  sel.innerHTML = t.targets.map(x=>`<option>${x.slug}</option>`).join("");
+  if(cur) sel.value = cur;
+  ckClearForm();
+  await renderCheckList();
+}
+$("#ckTarget") && ($("#ckTarget").onchange = ()=>{ ckClearForm(); renderCheckList(); });
+$("#ckReload") && ($("#ckReload").onclick = ()=>renderCheckList());
+
+async function renderCheckList(){
+  const slug = $("#ckTarget").value;
+  if(!slug) return;
+  $("#ckSlug").textContent = slug;
+  const d = await api("/api/targets/"+slug+"/checks");
+  $("#ckListBody").innerHTML = d.checks.map(ck=>{
+    const lr = ck.last_result;
+    const last = lr ? (lr.passed?'<span class="pill ok">pass</span>':'<span class="pill bad">fail</span>')
+      +` <span class="muted">${lr.http_status??'—'} · ${lr.response_ms??'—'}ms</span>` : '<span class="muted">—</span>';
+    return `<tr>
+      <td><b>${ck.name}</b></td>
+      <td class="mono">${ck.method} ${ck.path}</td>
+      <td class="muted">${ck.assertions_human.join('; ')||'—'}</td>
+      <td>${ck.required?'✓':'—'}</td><td>${ck.enabled?'✓':'—'}</td>
+      <td>${last}</td>
+      <td style="white-space:nowrap">
+        <button class="sm" data-act="run" data-id="${ck.id}">Run now</button>
+        <button class="sm" data-act="edit" data-id="${ck.id}">Edit</button>
+        <button class="sm" data-act="del" data-id="${ck.id}">Del</button></td></tr>`;
+  }).join("");
+  $("#ckListBody").querySelectorAll("button").forEach(b=>b.onclick=()=>ckAction(b.dataset.act, +b.dataset.id, d.checks));
+}
+
+async function ckAction(act, id, list){
+  if(act==="del"){
+    if(!confirm("Delete this check?")) return;
+    try{ await api("/api/admin/checks/"+id,{method:"DELETE"}); toast("Deleted"); renderCheckList(); }
+    catch(e){ toast("Error: "+(e.detail||e.status)); }
+    return;
+  }
+  if(act==="run"){
+    $("#ckRunOut").innerHTML = '<div class="muted">Running…</div>';
+    try{
+      const r = await api("/api/admin/checks/"+id+"/run",{method:"POST"});
+      const res = r.result, results = (res.detail&&res.detail.results)||[];
+      $("#ckRunOut").innerHTML = `<div class="card" style="background:var(--surface-2);margin:0">
+        <div>${res.passed?'<span class="pill ok">PASS</span>':'<span class="pill bad">FAIL</span>'}
+          <span class="muted">HTTP ${res.http_status??'—'} · ${res.response_ms??'—'}ms${res.error?(' · '+res.error):''}</span></div>
+        <table style="margin-top:8px"><thead><tr><th></th><th>Assertion</th><th>Detail</th></tr></thead>
+          <tbody>${results.map(a=>`<tr><td>${a.ok?'✓':'✕'}</td><td class="mono">${a.type}</td>
+            <td class="mono" style="font-size:11.5px">${a.detail||''}</td></tr>`).join('')
+            ||'<tr><td colspan="3" class="muted">No assertions.</td></tr>'}</tbody></table>
+        ${res.detail&&res.detail.snippet?('<div class="muted" style="margin-top:6px">Response snippet:</div><pre>'+
+          res.detail.snippet.replace(/</g,"&lt;")+'</pre>'):''}</div>`;
+      renderCheckList();
+    }catch(e){ $("#ckRunOut").innerHTML='<div class="muted">Error: '+(e.detail||e.status)+'</div>'; }
+    return;
+  }
+  if(act==="edit"){
+    const ck = list.find(x=>x.id===id);
+    CK_EDIT_ID = id;
+    $("#ckEditTitle").textContent = "Edit check #"+id;
+    $("#ckName").value = ck.name; $("#ckMethod").value = ck.method;
+    $("#ckPath").value = ck.path;
+    $("#ckHeaders").value = Object.keys(ck.headers||{}).length?JSON.stringify(ck.headers):"";
+    $("#ckBody").value = ck.body||"";
+    $("#ckAssertions").value = JSON.stringify(ck.assertions, null, 0);
+    $("#ckRequired").checked = ck.required; $("#ckEnabled").checked = ck.enabled;
+    $("#ckSave").textContent = "Save changes";
+    window.scrollTo({top:document.body.scrollHeight,behavior:"smooth"});
+  }
+}
+
+function ckClearForm(){
+  CK_EDIT_ID = null;
+  $("#ckEditTitle").textContent = "Add a check";
+  $("#ckSave").textContent = "Add check";
+  $("#ckName").value=""; $("#ckMethod").value="GET"; $("#ckPath").value="/health";
+  $("#ckHeaders").value=""; $("#ckBody").value="";
+  $("#ckAssertions").value='[{"type":"status","op":"in","value":[200,399]}]';
+  $("#ckRequired").checked=true; $("#ckEnabled").checked=true;
+  $("#ckMsg").textContent=""; $("#ckRunOut").innerHTML="";
+}
+$("#ckClear") && ($("#ckClear").onclick = ckClearForm);
+
+$("#ckSave") && ($("#ckSave").onclick = async ()=>{
+  const msg = $("#ckMsg"); msg.style.color=""; msg.textContent="…";
+  let headers={}, assertions=[];
+  try{ if($("#ckHeaders").value.trim()) headers = JSON.parse($("#ckHeaders").value); }
+  catch(e){ msg.style.color="var(--bad)"; msg.textContent="Headers must be valid JSON."; return; }
+  try{ assertions = JSON.parse($("#ckAssertions").value||"[]"); }
+  catch(e){ msg.style.color="var(--bad)"; msg.textContent="Assertions must be valid JSON."; return; }
+  const body = {
+    name:$("#ckName").value.trim(), method:$("#ckMethod").value,
+    path:$("#ckPath").value.trim()||"/", headers, body:$("#ckBody").value||null,
+    assertions, required:$("#ckRequired").checked, enabled:$("#ckEnabled").checked,
+  };
+  try{
+    if(CK_EDIT_ID){
+      await api("/api/admin/checks/"+CK_EDIT_ID,{method:"PATCH",body:JSON.stringify(body)});
+      toast("Check updated");
+    } else {
+      body.slug = $("#ckTarget").value;
+      await api("/api/admin/checks",{method:"POST",body:JSON.stringify(body)});
+      toast("Check added");
+    }
+    ckClearForm(); renderCheckList();
+  }catch(e){ msg.style.color="var(--bad)"; msg.textContent="Error: "+(e.detail||e.status); }
+});
 
 $("#incRun").onclick = async ()=>{
   $("#incOut").innerHTML='<div class="muted">Generating…</div>';

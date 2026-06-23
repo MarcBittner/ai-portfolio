@@ -98,9 +98,9 @@ Legend: ✅ done · ◐ partial · ⛔ missing.
 | 6 | Registered see **metrics** | ◐ | Only **black-box** probe metrics (uptime/error-rate/latency). No app-exposed metrics (`/metrics` scrape), no RED/throughput/saturation, no resource metrics, no real charts beyond a sparkline |
 | 7 | Registered see **code-quality** | ⛔ | **Nothing.** No lint/test/coverage/complexity ingestion or display |
 | 8 | Security scans **for each push** | ⛔ | Scans are on-demand, not per-commit; no push history, no per-push diffing |
-| 9 | **Definition of "up" is surfaced** | ⛔ | "up" = HTTP 200–399 on `/health`, hardcoded, and **never shown in the UI** — exactly the "no indication of how up is defined" complaint |
+| 9 | **Definition of "up" is surfaced** | ✅ | `GET /api/targets/{slug}/up-definition` + the dashboard detail's "Definition of up" panel show the required checks (method/path/assertions in plain English) and the last raw result per check (HTTP code, latency, which assertion failed) |
 | 10 | Extensible to add new infra/apps | ✅ | admin API + `targets.json` + `SEED_TARGETS`, no consumer code change |
-| 11 | **Extensible custom checks** — curl a specific endpoint + define response conditions | ⛔ | **Biggest gap.** Only a fixed `GET /health` with a hardcoded 200–399 rule. No user-defined synthetic checks: no per-check method/path/headers/body, no assertions (status set, latency budget, body-contains, JSON-path equals/exists, regex), no per-check schedule |
+| 11 | **Extensible custom checks** — curl a specific endpoint + define response conditions | ✅ | `checks`/`check_results` tables + assertion engine (`checks.py`): per-check method/path/headers/body and an assertion set — status (in/eq/lt/gt), latency budget, body-contains (+negate), body-regex, JSON-path (eq/exists/lt/gt/contains), header (eq/exists/contains). "up" = all REQUIRED checks pass. Admin CRUD + "Run now" API & UI; each app's `/health` seeded as the default check (legacy 200–399 preserved) |
 | 12 | Security scan of **live apps** → risk-qualified findings | ✅ | TLS/HSTS/CSP/headers/exposure checks → severity-weighted, control-mapped posture |
 | 13 | Security scan of **repos** | ◐ | gitleaks-style interface present but **STUBBED** — returns "not yet run" (needs repo checkout / CI hook). No dependency-CVE/SAST scanning either |
 | 14 | Findings map to SOC 2 / HIPAA / NIST (+ISO/CMMC); failing controls listed | ✅ | six-framework crosswalk; failing controls derived from findings |
@@ -125,15 +125,19 @@ Legend: ✅ done · ◐ partial · ⛔ missing.
 ## Remediation backlog (prioritized — built next, NOT yet done)
 
 ### P0 — the explicitly-called-out gaps
-- [ ] **Custom, extensible checks (#11).** A `checks` table + model: per target, define
-      `method`, `path`, headers, optional body, and an **assertion set** — expected
-      status (or set), max-latency budget, `body_contains`, `json_path == value`,
-      `json_path exists`, header equals/exists, regex match. The prober runs each
-      check; "up" becomes "all required assertions passed." Admin UI + API to add/
-      edit/disable checks; seed each app's `/health` as the default check.
-- [ ] **Surface the definition of "up" (#9).** Every status badge links to the exact
-      check(s) that define it (method/URL/assertions) and the last raw probe
-      (HTTP code, latency, response snippet, which assertion failed).
+- [x] **Custom, extensible checks (#11).** `checks` + `check_results` tables + a pure
+      assertion engine (`checks.py`): per target, define `method`, `path`, headers,
+      optional body, and an **assertion set** — status (in/eq/lt/gt), max-latency
+      budget, `body_contains` (+negate), `body_regex`, `json_path`
+      (eq/exists/lt/gt/contains), header equals/exists/contains. The prober runs each
+      enabled check, records a per-check result, and "up" = **all required checks
+      passed** (no checks → legacy single `/health` GET). Admin CRUD + "Run now" API
+      (`/api/admin/checks…`) and an admin Checks UI; each app's `/health` is seeded as
+      the default check so existing behavior (200–399 = up) is preserved.
+- [x] **Surface the definition of "up" (#9).** `GET /api/targets/{slug}/up-definition`
+      returns the required checks (method/URL/assertions in plain English) + the last
+      raw result per check (HTTP code, latency, response snippet, which assertion
+      failed); the dashboard detail renders a "Definition of up" panel from it.
 - [ ] **Logs (#5, #28).** A `logs` ingestion path: a pull adapter (fetch a target's
       `/logs`/journal endpoint where exposed) and a push endpoint
       (`POST /api/ingest/logs`, token-auth) writing a structured `logs` time series;

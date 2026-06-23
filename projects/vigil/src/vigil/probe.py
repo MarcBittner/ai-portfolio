@@ -21,23 +21,22 @@ import time
 
 import httpx
 
-from vigil import alerts, config, metrics, store
+from vigil import alerts, checks, config, metrics, store
 
 
-async def probe_one(client: httpx.AsyncClient, target) -> dict:
-    """Probe a single target's health URL. Never raises — a failure is a 'down'
-    data point, which is exactly what a monitor must record."""
+def _legacy_health_probe(target) -> dict:
+    """Fallback for a target with no checks: the original single /health GET
+    (status 200–399 = up). Synchronous; run in a thread by the async caller."""
     t0 = time.monotonic()
     up = False
     http_status: int | None = None
     error: str | None = None
     response_ms: float | None = None
     try:
-        resp = await client.get(target.health_url, timeout=config.PROBE_TIMEOUT_S,
-                                follow_redirects=True)
+        with httpx.Client(timeout=config.PROBE_TIMEOUT_S) as client:
+            resp = client.get(target.health_url, follow_redirects=True)
         response_ms = round((time.monotonic() - t0) * 1000, 1)
         http_status = resp.status_code
-        # Any 2xx/3xx liveness response counts as up; 4xx/5xx is down.
         up = 200 <= resp.status_code < 400
         if not up:
             error = f"HTTP {resp.status_code}"
@@ -46,9 +45,70 @@ async def probe_one(client: httpx.AsyncClient, target) -> dict:
         error = "timeout"
     except Exception as exc:  # noqa: BLE001 — any transport error is a 'down' sample
         error = type(exc).__name__
-    store.record_probe(target.slug, up, http_status, response_ms, error)
-    return {"slug": target.slug, "up": up, "http_status": http_status,
+    return {"up": up, "http_status": http_status,
             "response_ms": response_ms, "error": error}
+
+
+def _probe_target_sync(target) -> dict:
+    """Run a target's enabled checks, record one ``check_results`` row per check,
+    and roll them up into the target's status. Never raises — a failure (transport
+    or assertion) is a 'down' sample, which is exactly what a monitor records.
+
+    ``up`` = **all REQUIRED checks passed**. A target with no checks falls back to
+    the legacy single /health GET so behavior is preserved end-to-end.
+    """
+    enabled = store.list_checks(target.slug, enabled_only=True)
+    if not enabled:
+        res = _legacy_health_probe(target)
+        store.record_probe(target.slug, res["up"], res["http_status"],
+                           res["response_ms"], res["error"])
+        return {"slug": target.slug, "checks": 0, **res}
+
+    required_total = 0
+    required_passed = 0
+    last_status: int | None = None
+    last_ms: float | None = None
+    errors: list[str] = []
+    for chk in enabled:
+        r = checks.run_check(chk, target.url)
+        store.record_check_result(
+            chk["id"], target.slug, r["passed"], r["http_status"],
+            r["response_ms"], r["error"], r["detail"],
+        )
+        # Roll up the last observed status/latency for the probe time series.
+        if r["http_status"] is not None:
+            last_status = r["http_status"]
+        if r["response_ms"] is not None:
+            last_ms = r["response_ms"]
+        if chk["required"]:
+            required_total += 1
+            if r["passed"]:
+                required_passed += 1
+            else:
+                detail = r["error"] or _first_failed_detail(r)
+                errors.append(f"{chk['name']}: {detail}")
+
+    up = required_total == 0 or required_passed == required_total
+    error = None if up else "; ".join(errors) or "required check failed"
+    store.record_probe(target.slug, up, last_status, last_ms, error)
+    return {"slug": target.slug, "up": up, "http_status": last_status,
+            "response_ms": last_ms, "error": error, "checks": len(enabled),
+            "required_passed": required_passed, "required_total": required_total}
+
+
+def _first_failed_detail(result: dict) -> str:
+    """Pull the first failing assertion's detail from a run_check result."""
+    for r in (result.get("detail") or {}).get("results", []):
+        if not r.get("ok"):
+            return r.get("detail") or "assertion failed"
+    return "check failed"
+
+
+async def probe_one(client: httpx.AsyncClient, target) -> dict:
+    """Async wrapper: run a target's checks in a worker thread (the check runner is
+    synchronous httpx) so the poll cycle stays concurrent. ``client`` is unused but
+    kept for signature compatibility with the existing call sites."""
+    return await asyncio.to_thread(_probe_target_sync, target)
 
 
 async def probe_all() -> list[dict]:

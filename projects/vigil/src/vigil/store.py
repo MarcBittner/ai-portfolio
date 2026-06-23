@@ -79,6 +79,33 @@ CREATE TABLE IF NOT EXISTS alert_events (
     message    TEXT NOT NULL,
     delivered  INTEGER NOT NULL DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS checks (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    slug        TEXT NOT NULL,            -- FK -> targets.slug
+    name        TEXT NOT NULL,
+    method      TEXT NOT NULL DEFAULT 'GET',
+    path        TEXT NOT NULL,            -- appended to target.url
+    headers     TEXT NOT NULL DEFAULT '{}',   -- JSON object
+    body        TEXT,                     -- request body (nullable)
+    assertions  TEXT NOT NULL DEFAULT '[]',   -- JSON list of assertion dicts
+    required    INTEGER NOT NULL DEFAULT 1,    -- does this check gate "up"?
+    enabled     INTEGER NOT NULL DEFAULT 1,
+    created_at  REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_checks_slug ON checks(slug);
+CREATE TABLE IF NOT EXISTS check_results (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    check_id    INTEGER NOT NULL,
+    slug        TEXT NOT NULL,
+    ts          REAL NOT NULL,
+    passed      INTEGER NOT NULL,
+    http_status INTEGER,
+    response_ms REAL,
+    error       TEXT,
+    detail      TEXT                      -- JSON: per-assertion results + snippet
+);
+CREATE INDEX IF NOT EXISTS idx_check_results_cid_ts ON check_results(check_id, ts DESC);
+CREATE INDEX IF NOT EXISTS idx_check_results_slug_ts ON check_results(slug, ts DESC);
 """
 
 
@@ -101,6 +128,7 @@ def init_db() -> None:
     with _conn() as c:
         c.executescript(_SCHEMA)
     seed_targets(config.SEED_TARGETS + config.load_file_targets())
+    seed_default_checks()
 
 
 # --------------------------------------------------------------------------- #
@@ -187,6 +215,152 @@ def recent_probes(slug: str, limit: int = 100) -> list[dict]:
 
 def last_probe(slug: str) -> dict | None:
     rows = recent_probes(slug, 1)
+    return rows[0] if rows else None
+
+
+# --------------------------------------------------------------------------- #
+# Synthetic checks + their results                                              #
+# --------------------------------------------------------------------------- #
+
+def _row_to_check(r: sqlite3.Row) -> dict:
+    d = dict(r)
+    d["headers"] = json.loads(d.get("headers") or "{}")
+    d["assertions"] = json.loads(d.get("assertions") or "[]")
+    d["required"] = bool(d["required"])
+    d["enabled"] = bool(d["enabled"])
+    return d
+
+
+def add_check(slug: str, name: str, path: str, *, method: str = "GET",
+              headers: dict | None = None, body: str | None = None,
+              assertions: list | None = None, required: bool = True,
+              enabled: bool = True) -> dict:
+    with _conn() as c:
+        cur = c.execute(
+            """INSERT INTO checks (slug, name, method, path, headers, body,
+                   assertions, required, enabled, created_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?)""",
+            (slug, name, (method or "GET").upper(), path,
+             json.dumps(headers or {}), body, json.dumps(assertions or []),
+             int(required), int(enabled), time.time()),
+        )
+        cid = cur.lastrowid
+        r = c.execute("SELECT * FROM checks WHERE id=?", (cid,)).fetchone()
+    return _row_to_check(r)
+
+
+# Columns a caller may PATCH, mapped to their JSON-encode (or identity) transform.
+_CHECK_UPDATABLE = {
+    "name": lambda v: v,
+    "method": lambda v: (v or "GET").upper(),
+    "path": lambda v: v,
+    "headers": json.dumps,
+    "body": lambda v: v,
+    "assertions": json.dumps,
+    "required": lambda v: int(bool(v)),
+    "enabled": lambda v: int(bool(v)),
+}
+
+
+def update_check(check_id: int, **fields) -> dict | None:
+    sets, vals = [], []
+    for k, v in fields.items():
+        if v is None or k not in _CHECK_UPDATABLE:
+            continue
+        sets.append(f"{k}=?")
+        vals.append(_CHECK_UPDATABLE[k](v))
+    if not sets:
+        return get_check(check_id)
+    vals.append(check_id)
+    with _conn() as c:
+        cur = c.execute(f"UPDATE checks SET {', '.join(sets)} WHERE id=?", vals)
+        if cur.rowcount == 0:
+            return None
+    return get_check(check_id)
+
+
+def delete_check(check_id: int) -> bool:
+    with _conn() as c:
+        cur = c.execute("DELETE FROM checks WHERE id=?", (check_id,))
+        c.execute("DELETE FROM check_results WHERE check_id=?", (check_id,))
+        return cur.rowcount > 0
+
+
+def list_checks(slug: str | None = None, enabled_only: bool = False) -> list[dict]:
+    q = "SELECT * FROM checks"
+    conds, params = [], []
+    if slug is not None:
+        conds.append("slug=?")
+        params.append(slug)
+    if enabled_only:
+        conds.append("enabled=1")
+    if conds:
+        q += " WHERE " + " AND ".join(conds)
+    q += " ORDER BY slug, id"
+    with _conn() as c:
+        rows = c.execute(q, params).fetchall()
+    return [_row_to_check(r) for r in rows]
+
+
+def get_check(check_id: int) -> dict | None:
+    with _conn() as c:
+        r = c.execute("SELECT * FROM checks WHERE id=?", (check_id,)).fetchone()
+    return _row_to_check(r) if r else None
+
+
+def seed_default_checks() -> None:
+    """Seed a default 'health' check for any target that has none, preserving the
+    original behavior (GET the health path, status in 2xx–3xx counts as up). This
+    keeps existing dashboards identical: a target with only the seeded check is
+    'up' exactly when its /health returns 200–399."""
+    for t in list_targets():
+        if list_checks(t.slug):
+            continue
+        add_check(
+            t.slug, name="health", path=t.health_path, method="GET",
+            assertions=[{"type": "status", "op": "in", "value": [200, 399]}],
+            required=True, enabled=True,
+        )
+
+
+def record_check_result(check_id: int, slug: str, passed: bool,
+                        http_status: int | None, response_ms: float | None,
+                        error: str | None, detail: dict | None) -> None:
+    with _conn() as c:
+        c.execute(
+            """INSERT INTO check_results (check_id, slug, ts, passed, http_status,
+                   response_ms, error, detail)
+               VALUES (?,?,?,?,?,?,?,?)""",
+            (check_id, slug, time.time(), int(passed), http_status, response_ms,
+             error, json.dumps(detail) if detail is not None else None),
+        )
+        # Self-prune per check, mirroring the probes time series.
+        c.execute(
+            """DELETE FROM check_results WHERE check_id=? AND id NOT IN (
+                   SELECT id FROM check_results WHERE check_id=?
+                   ORDER BY id DESC LIMIT ?)""",
+            (check_id, check_id, config.MAX_HISTORY_PER_TARGET),
+        )
+
+
+def _row_to_check_result(r: sqlite3.Row) -> dict:
+    d = dict(r)
+    d["passed"] = bool(d["passed"])
+    d["detail"] = json.loads(d["detail"]) if d.get("detail") else None
+    return d
+
+
+def recent_check_results(check_id: int, limit: int = 50) -> list[dict]:
+    with _conn() as c:
+        rows = c.execute(
+            "SELECT * FROM check_results WHERE check_id=? ORDER BY ts DESC LIMIT ?",
+            (check_id, limit),
+        ).fetchall()
+    return [_row_to_check_result(r) for r in rows]
+
+
+def last_check_result(check_id: int) -> dict | None:
+    rows = recent_check_results(check_id, 1)
     return rows[0] if rows else None
 
 

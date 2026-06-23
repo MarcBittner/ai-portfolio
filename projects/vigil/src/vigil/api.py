@@ -29,6 +29,7 @@ from vigil import (
     __version__,
     alerts,
     auth,
+    checks,
     config,
     incident,
     llm,
@@ -39,6 +40,8 @@ from vigil import (
 from vigil.config import Target
 from vigil.models import (
     AlertRuleRequest,
+    CheckRequest,
+    CheckUpdateRequest,
     HealthResponse,
     IncidentRequest,
     LoginRequest,
@@ -341,6 +344,129 @@ def create_alert(req: AlertRuleRequest, _user=Depends(require_role("elevated")))
         raise HTTPException(404, "unknown target")
     return store.add_alert_rule(req.slug, req.metric, req.comparator, req.threshold,
                                 req.channel, req.target_addr)
+
+
+# --------------------------------------------------------------------------- #
+# Synthetic checks — the user-definable definition of "up"                       #
+# --------------------------------------------------------------------------- #
+
+def _check_view(chk: dict) -> dict:
+    """A check plus its plain-English assertions and last result (for the UI/API)."""
+    last = store.last_check_result(chk["id"])
+    return {
+        **chk,
+        "assertions_human": [checks.describe_assertion(a) for a in chk["assertions"]],
+        "url": checks.check_url(_target_url_or_self(chk["slug"]), chk["path"]),
+        "last_result": last,
+    }
+
+
+def _target_url_or_self(slug: str) -> str:
+    t = store.get_target(slug)
+    return t.url if t else config.SELF_BASE_URL
+
+
+@app.get("/api/targets/{slug}/checks")
+def list_target_checks(slug: str, _user=Depends(require_role("registered"))) -> dict:
+    """REGISTERED tier: the checks that define this target's status, each with its
+    last result."""
+    if not store.get_target(slug):
+        raise HTTPException(404, "unknown target")
+    rows = [_check_view(c) for c in store.list_checks(slug)]
+    return {"slug": slug, "checks": rows}
+
+
+@app.get("/api/targets/{slug}/up-definition")
+def up_definition(slug: str, _user=Depends(require_role("registered"))) -> dict:
+    """REGISTERED tier: surfaces **what "up" means** for a target — the required
+    checks (method + path + assertions in plain form) and the last raw result per
+    check (status, latency, which assertion failed). This is the #9 fix: a viewer
+    never has to wonder how "up" is defined."""
+    if not store.get_target(slug):
+        raise HTTPException(404, "unknown target")
+    all_checks = store.list_checks(slug)
+    required = [c for c in all_checks if c["required"] and c["enabled"]]
+    out = []
+    for chk in required:
+        last = store.last_check_result(chk["id"])
+        failed = None
+        if last and not last["passed"] and last.get("detail"):
+            failed = [r for r in last["detail"].get("results", []) if not r.get("ok")]
+        out.append({
+            "id": chk["id"], "name": chk["name"], "method": chk["method"],
+            "path": chk["path"],
+            "url": checks.check_url(_target_url_or_self(slug), chk["path"]),
+            "assertions": chk["assertions"],
+            "assertions_human": [checks.describe_assertion(a) for a in chk["assertions"]],
+            "last_result": last, "failed_assertions": failed,
+        })
+    summary = (f"up = all {len(required)} required check(s) pass"
+               if required else "up = no required checks defined")
+    return {"slug": slug, "summary": summary,
+            "required_count": len(required), "checks": out,
+            "supported_assertion_types": list(checks.ASSERTION_TYPES)}
+
+
+def _validate_check_body(req) -> None:
+    method = (req.method or "GET").upper()
+    if method not in checks.HTTP_METHODS:
+        raise HTTPException(422, f"method must be one of {list(checks.HTTP_METHODS)}")
+    err = checks.validate_assertions(req.assertions or [])
+    if err:
+        raise HTTPException(422, err)
+
+
+@app.post("/api/admin/checks")
+def create_check(req: CheckRequest, _user=Depends(require_role("admin"))) -> dict:
+    if not store.get_target(req.slug):
+        raise HTTPException(404, "unknown target")
+    _validate_check_body(req)
+    chk = store.add_check(
+        req.slug, req.name, req.path, method=req.method.upper(),
+        headers=req.headers, body=req.body, assertions=req.assertions,
+        required=req.required, enabled=req.enabled,
+    )
+    return {"ok": True, "check": _check_view(chk)}
+
+
+@app.patch("/api/admin/checks/{check_id}")
+def patch_check(check_id: int, req: CheckUpdateRequest,
+                _user=Depends(require_role("admin"))) -> dict:
+    if not store.get_check(check_id):
+        raise HTTPException(404, "unknown check")
+    if req.method is not None and req.method.upper() not in checks.HTTP_METHODS:
+        raise HTTPException(422, f"method must be one of {list(checks.HTTP_METHODS)}")
+    if req.assertions is not None:
+        err = checks.validate_assertions(req.assertions)
+        if err:
+            raise HTTPException(422, err)
+    chk = store.update_check(
+        check_id, name=req.name, method=req.method, path=req.path,
+        headers=req.headers, body=req.body, assertions=req.assertions,
+        required=req.required, enabled=req.enabled,
+    )
+    return {"ok": True, "check": _check_view(chk)}
+
+
+@app.delete("/api/admin/checks/{check_id}")
+def remove_check(check_id: int, _user=Depends(require_role("admin"))) -> dict:
+    return {"removed": store.delete_check(check_id)}
+
+
+@app.post("/api/admin/checks/{check_id}/run")
+async def run_check_now(check_id: int, _user=Depends(require_role("admin"))) -> dict:
+    """Run one check immediately and return the result (for the editor's 'test'
+    button). Records the result like a scheduled run so history stays consistent."""
+    chk = store.get_check(check_id)
+    if not chk:
+        raise HTTPException(404, "unknown check")
+    base = _target_url_or_self(chk["slug"])
+    result = await asyncio.to_thread(checks.run_check, chk, base)
+    store.record_check_result(
+        chk["id"], chk["slug"], result["passed"], result["http_status"],
+        result["response_ms"], result["error"], result["detail"],
+    )
+    return {"check_id": check_id, "slug": chk["slug"], "result": result}
 
 
 # --------------------------------------------------------------------------- #
