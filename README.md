@@ -45,30 +45,30 @@ counsel). The rest are the offline-first FastAPI services.
 
 | # | Project | What it is | Stack | Live | Docs |
 |---|---|---|---|---|---|
-| 1 | **persona-twin** | RAG digital-twins: chunking/embedding/rerank, eval, streaming chat, observability | FastAPI · Mongo Atlas · Vite | [open ↗](https://persona-twin-usu4.onrender.com) | [README](projects/persona-twin/README.md) |
-| 2 | **tanglement-showcase** | P2P multi-provider LLM routing network (proprietary showcase) | spec · Next.js | [open ↗](https://tanglement-teaser.onrender.com) | [README](projects/tanglement-showcase/README.md) |
-| 3 | **pii-redactor** | PII detect/redact — regex+checksum core + LLM NER | FastAPI · UI | [open ↗](https://pii-redactor-lk6x.onrender.com) | [README](projects/pii-redactor/README.md) |
-| 4 | **evalkit** | Offline-first LLM eval toolkit + LLM-judge + regression gate | FastAPI · UI | [open ↗](https://evalkit-2ptv.onrender.com) | [README](projects/evalkit/README.md) |
-| 5 | **doc-extract** | Schema-driven extraction + provenance + LLM fill | FastAPI · UI | [open ↗](https://doc-extract-oyuj.onrender.com) | [README](projects/doc-extract/README.md) |
-| 6 | **agent-sandbox** | ReAct agent over safe tools — rule or LLM planner | FastAPI · UI | [open ↗](https://agent-sandbox-jp4b.onrender.com) | [README](projects/agent-sandbox/README.md) |
-| 7 | **promptguard** | LLM-firewall: injection/secret/PII + LLM classifier | FastAPI · UI | [open ↗](https://promptguard-oiqr.onrender.com) | [README](projects/promptguard/README.md) |
-| 8 | **synth-data** | Deterministic PII-free synthetic data + LLM fields | FastAPI · UI | [open ↗](https://synth-data.onrender.com) | [README](projects/synth-data/README.md) |
-| 9 | **forecast** | Classic-ML forecasting + anomalies (no-LLM core) | FastAPI · UI | [open ↗](https://forecast-h6uf.onrender.com) | [README](projects/forecast/README.md) |
-| 10 | **multimodal-ocr** | OCR → PII → box-level redaction + LLM NER | FastAPI · UI | [open ↗](https://multimodal-ocr-x2g3.onrender.com) | [README](projects/multimodal-ocr/README.md) |
-| 11 | **reconcile** | Document line-item reconciliation — extract → diff vs baseline + market → recoverable $ → review queue | FastAPI · UI | [open ↗](https://reconcile-gfuj.onrender.com) | [README](projects/reconcile/README.md) |
-| 12 | **llm-gateway** | Provider-agnostic LLM gateway — firewall + PII/secret redaction + routing + tamper-evident audit | FastAPI · UI | [open ↗](https://llm-gateway-jwsq.onrender.com) | [README](projects/llm-gateway/README.md) |
+| 1 | **persona-twin** | RAG digital-twins: chunking/embedding/rerank, eval, streaming chat, observability | FastAPI · Mongo Atlas · Vite | [open ↗](https://persona-twin-dm2g.onrender.com) | [README](projects/persona-twin/README.md) |
+| 2 | **tanglement-showcase** | P2P multi-provider LLM routing network (proprietary showcase) | spec · Next.js | [open ↗](https://tanglement-teaser-mtvc.onrender.com) | [README](projects/tanglement-showcase/README.md) |
+| 3 | **pii-redactor** | PII detect/redact — regex+checksum core + LLM NER | FastAPI · UI | [open ↗](https://pii-redactor-zuge.onrender.com) | [README](projects/pii-redactor/README.md) |
+| 4 | **evalkit** | Offline-first LLM eval toolkit + LLM-judge + regression gate | FastAPI · UI | [open ↗](https://evalkit-1rhn.onrender.com) | [README](projects/evalkit/README.md) |
+| 5 | **doc-extract** | Schema-driven extraction + provenance + LLM fill | FastAPI · UI | [open ↗](https://doc-extract-804a.onrender.com) | [README](projects/doc-extract/README.md) |
+| 6 | **agent-sandbox** | ReAct agent over safe tools — rule or LLM planner | FastAPI · UI | [open ↗](https://agent-sandbox-0al5.onrender.com) | [README](projects/agent-sandbox/README.md) |
+| 7 | **promptguard** | LLM-firewall: injection/secret/PII + LLM classifier | FastAPI · UI | [open ↗](https://promptguard-26l9.onrender.com) | [README](projects/promptguard/README.md) |
+| 8 | **synth-data** | Deterministic PII-free synthetic data + LLM fields | FastAPI · UI | [open ↗](https://synth-data-w82w.onrender.com) | [README](projects/synth-data/README.md) |
+| 9 | **forecast** | Classic-ML forecasting + anomalies (no-LLM core) | FastAPI · UI | [open ↗](https://forecast-4m5u.onrender.com) | [README](projects/forecast/README.md) |
+| 10 | **multimodal-ocr** | OCR → PII → box-level redaction + LLM NER | FastAPI · UI | [open ↗](https://multimodal-ocr-3pfq.onrender.com) | [README](projects/multimodal-ocr/README.md) |
+| 11 | **reconcile** | Document line-item reconciliation — extract → diff vs baseline + market → recoverable $ → review queue | FastAPI · UI | [open ↗](https://reconcile-75c4.onrender.com) | [README](projects/reconcile/README.md) |
+| 12 | **llm-gateway** | Provider-agnostic LLM gateway — firewall + PII/secret redaction + routing + tamper-evident audit | FastAPI · UI | [open ↗](https://llm-gateway-s19b.onrender.com) | [README](projects/llm-gateway/README.md) |
 | 13 | **slo-kit** | Instrumented SRE reference — RED metrics, SLOs + error budgets, traces, incident-burn demo | FastAPI · UI | [open ↗](https://slo-kit-qx19.onrender.com) | [README](projects/slo-kit/README.md) |
 | 14 | **field-vault** | Field-level de-identification + least-privilege access + tamper-evident audit for regulated records | FastAPI · UI | [open ↗](https://field-vault-ae0k.onrender.com) | [README](projects/field-vault/README.md) |
-| 15 | **rtc-guard** | Scoped WebRTC access tokens + adversarial test suite + AV-pipeline threat model | FastAPI · UI | [open ↗](https://rtc-guard.onrender.com) | [README](projects/rtc-guard/README.md) |
+| 15 | **rtc-guard** | Scoped WebRTC access tokens + adversarial test suite + AV-pipeline threat model | FastAPI · UI | [open ↗](https://rtc-guard-cb5n.onrender.com) | [README](projects/rtc-guard/README.md) |
 | 16 | **rate-atlas** | Normalize inconsistent price-transparency files → one model; compare negotiated rates across payers | FastAPI · SQLite · UI | [open ↗](https://rate-atlas-6gd3.onrender.com) | [README](projects/rate-atlas/README.md) |
-| 17 | **attack-surface** | CT-log enumeration → service fingerprint → SOC 2 / ISO 27001 control-mapped exposure report | FastAPI · UI | [open ↗](https://attack-surface.onrender.com) | [README](projects/attack-surface/README.md) |
-| 18 | **txn-ledger** | High-volume contributions store — partitioned schema, query-plan tuning, FEC rollups, surge load test | FastAPI · SQLite · UI | [open ↗](https://txn-ledger.onrender.com) | [README](projects/txn-ledger/README.md) |
-| 19 | **agent-factory** | Build a tool-using agent from a declarative spec — template-simple or deep (prompt/tools/planner/model/guardrails); LLM or rule planner | FastAPI · UI | [open ↗](https://agent-factory-ov8r.onrender.com) | [README](projects/agent-factory/README.md) |
-| 20 | **trueline** | Invoice line-item verification — LLM extract → verify math in code → reconcile vs PO + catalog → flag recoverable $ → review → eval. Realtime, multi-tenant. *(sign in to try)* | Next.js · Convex · Clerk · LLM | [open ↗](https://trueline-moys.onrender.com) | [README](projects/trueline/README.md) |
-| 21 | **postureline** | Security posture & compliance — one engine, two scanners: warehouse (Snowflake masking-policy-as-code + k-anonymity + CI gate) and internet-exposure (SOC 2/HIPAA/ISO 27001/NIST/CMMC crosswalk + board report) | FastAPI · DuckDB/Snowflake-SQL · Terraform | [open ↗](https://postureline.onrender.com) | [README](projects/postureline/README.md) |
-| 22 | **relaytoken** | Scoped WebRTC room access tokens on the livekit/protocol auth lib + 8/8 adversarial breaker suite + LLM grant-risk linter | Go · WebRTC JWT | [open ↗](https://relaytoken.onrender.com) | [README](projects/relaytoken/README.md) |
-| 23 | **cycleledger** | High-volume contributions data layer — Postgres cycle-partitioning, FEC rollups, EXPLAIN-as-artifact, NL→SQL behind a read-only SQL guard | Ruby on Rails · Postgres · Sidekiq | [open ↗](https://cycleledger.onrender.com) | [README](projects/cycleledger/README.md) |
-| 24 | **quorum** | Vendor-neutral multi-agent orchestrator — workflow DAG + parallel fan-out, with PII redaction + tamper-evident audit baked into the engine | FastAPI · multi-agent | [open ↗](https://quorum-9x75.onrender.com) | [README](projects/quorum/README.md) |
+| 17 | **attack-surface** | CT-log enumeration → service fingerprint → SOC 2 / ISO 27001 control-mapped exposure report | FastAPI · UI | [open ↗](https://attack-surface-6pma.onrender.com) | [README](projects/attack-surface/README.md) |
+| 18 | **txn-ledger** | High-volume contributions store — partitioned schema, query-plan tuning, FEC rollups, surge load test | FastAPI · SQLite · UI | [open ↗](https://txn-ledger-ad4r.onrender.com) | [README](projects/txn-ledger/README.md) |
+| 19 | **agent-factory** | Build a tool-using agent from a declarative spec — template-simple or deep (prompt/tools/planner/model/guardrails); LLM or rule planner | FastAPI · UI | [open ↗](https://agent-factory-zar2.onrender.com) | [README](projects/agent-factory/README.md) |
+| 20 | **trueline** | Invoice line-item verification — LLM extract → verify math in code → reconcile vs PO + catalog → flag recoverable $ → review → eval. Realtime, multi-tenant. *(sign in to try)* | Next.js · Convex · Clerk · LLM | [open ↗](https://trueline-8u6x.onrender.com) | [README](projects/trueline/README.md) |
+| 21 | **postureline** | Security posture & compliance — one engine, two scanners: warehouse (Snowflake masking-policy-as-code + k-anonymity + CI gate) and internet-exposure (SOC 2/HIPAA/ISO 27001/NIST/CMMC crosswalk + board report) | FastAPI · DuckDB/Snowflake-SQL · Terraform | [open ↗](https://postureline-aq10.onrender.com) | [README](projects/postureline/README.md) |
+| 22 | **relaytoken** | Scoped WebRTC room access tokens on the livekit/protocol auth lib + 8/8 adversarial breaker suite + LLM grant-risk linter | Go · WebRTC JWT | [open ↗](https://relaytoken-ys1f.onrender.com) | [README](projects/relaytoken/README.md) |
+| 23 | **cycleledger** | High-volume contributions data layer — Postgres cycle-partitioning, FEC rollups, EXPLAIN-as-artifact, NL→SQL behind a read-only SQL guard | Ruby on Rails · Postgres · Sidekiq | [open ↗](https://cycleledger-jxmr.onrender.com) | [README](projects/cycleledger/README.md) |
+| 24 | **quorum** | Vendor-neutral multi-agent orchestrator — workflow DAG + parallel fan-out, with PII redaction + tamper-evident audit baked into the engine | FastAPI · multi-agent | [open ↗](https://quorum-nomy.onrender.com) | [README](projects/quorum/README.md) |
 | 25 | **burnrate** | Instrumented Flask SRE service — Prometheus RED metrics, multi-window SLO burn rate, TaskTiger tasks, GitOps smoke-gated rollback, LLM incident summary | Flask · Prometheus · ArgoCD | [open ↗](https://burnrate-grza.onrender.com) | [README](projects/burnrate/README.md) |
 | 26 | **baseplate** | Platform paved-road — reusable Terraform/EKS/RDS + ArgoCD + golden CI, a self-service LLM service-scaffolder, and data-quality-as-an-SLI ingest | FastAPI · Terraform · k8s | [open ↗](https://baseplate-mlrj.onrender.com) | [README](projects/baseplate/README.md) |
 | 27 | **arbiter** | OpenAI-compatible LLM gateway + cost/quality router — observe vs route modes; reroutes to cheaper/local models only when **measured** quality (real shadow-judging) clears a floor; + prompt-prefix & response caching; ranked savings analytics | FastAPI · SQLite · OpenAI-compatible | [open ↗](https://arbiter-splt.onrender.com) | [README](projects/arbiter/README.md) |
@@ -118,7 +118,7 @@ share routing intelligence over a Chord DHT + gossip mesh.
 
 - **`docs/spec/`** — the multi-section technical specification (architecture,
   routing, security, protocols, DHT/NAT-traversal, ops, dev plan)
-- **`demo-site/`** — the public **[teaser site](https://tanglement-teaser.onrender.com)**
+- **`demo-site/`** — the public **[teaser site](https://tanglement-teaser-mtvc.onrender.com)**
   (Next.js, live on Render)
 - **`code/git-encrypt/`** — a self-contained, stdlib-only Go CLI sample
   (transparent git file encryption, ECDH/ECDSA)
