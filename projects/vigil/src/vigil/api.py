@@ -153,7 +153,10 @@ def llm_status() -> dict:
 
 @app.get("/")
 def index() -> FileResponse:
-    return FileResponse(STATIC_DIR / "index.html")
+    # no-cache: still ETag-revalidated, but never serve a stale SPA — a new deploy
+    # is picked up on the next load instead of lingering in the browser cache.
+    return FileResponse(STATIC_DIR / "index.html",
+                        headers={"Cache-Control": "no-cache"})
 
 
 # --------------------------------------------------------------------------- #

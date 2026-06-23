@@ -54,6 +54,105 @@ _DEFAULT_MODEL = {
     "ollama": os.environ.get("OLLAMA_MODEL", "llama3.1:8b"),
 }
 
+# OpenRouter's free tier is volatile: any given free model can be 404 (retired /
+# now paid-only) or 429 (rate-limited) at any moment. So the free provider tries a
+# LIST of free models and falls through to the next on ANY failure (404, 429, or
+# transport error), only giving up to the offline fallback when none respond. The
+# configured OPENROUTER_MODEL is tried first; OPENROUTER_MODEL may be a comma-list.
+# Spread across DISTINCT upstream providers (Google, OpenAI, NVIDIA, Meta, Qwen):
+# each provider's free pool is throttled independently, so when one 429s the next
+# usually isn't. Ordered by observed reliability. (The :free pool is shared across
+# all OpenRouter users, so a 429 reflects global load, not this account's usage.)
+_FREE_FALLBACKS = [
+    "google/gemma-4-31b-it:free",
+    "openai/gpt-oss-120b:free",
+    "openai/gpt-oss-20b:free",
+    "nvidia/nemotron-nano-9b-v2:free",
+    "nvidia/nemotron-3-nano-30b-a3b:free",
+    "google/gemma-4-26b-a4b-it:free",
+    "meta-llama/llama-3.3-70b-instruct:free",
+    "qwen/qwen3-next-80b-a3b-instruct:free",
+]
+
+
+# Intelligent throttle-avoidance: when a free model 429s (or errors) we put it in
+# a short cooldown and route around it, so we don't keep hammering an overloaded
+# model. Cooldowns are in-process (single instance) and expire on their own.
+_COOLDOWN: dict[str, float] = {}           # model -> monotonic time it's usable again
+_COOLDOWN_S = float(os.environ.get("FREE_COOLDOWN_S", "120"))
+
+
+def _cooling(model: str) -> bool:
+    until = _COOLDOWN.get(model)
+    return until is not None and time.monotonic() < until
+
+
+def _trip_cooldown(model: str, seconds: float) -> None:
+    _COOLDOWN[model] = time.monotonic() + seconds
+
+
+# Automatic free-model discovery: pull the list of free chat models from
+# OpenRouter's live catalog (cached) so the code self-updates as the free tier
+# changes — no hand-maintained list. The static _FREE_FALLBACKS is only the
+# offline safety net for when the catalog fetch fails.
+_CATALOG: dict = {"models": [], "until": 0.0}
+_CATALOG_TTL = float(os.environ.get("FREE_CATALOG_TTL", "3600"))
+
+
+def _fetch_free_catalog() -> list[str]:
+    """Free, text-producing chat models from OpenRouter's live catalog (cached
+    ~1h). Falls back to the static list on any failure."""
+    now = time.monotonic()
+    if _CATALOG["models"] and now < _CATALOG["until"]:
+        return _CATALOG["models"]
+    try:
+        req = urllib.request.Request("https://openrouter.ai/api/v1/models",
+                                     headers={"accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = json.loads(resp.read().decode()).get("data", [])
+        free: list[str] = []
+        for m in data:
+            if str(m.get("pricing", {}).get("prompt", "1")) not in ("0", "0.0"):
+                continue
+            arch = m.get("architecture", {}) or {}
+            outs = arch.get("output_modalities") or []
+            modality = arch.get("modality", "")
+            # keep text-producing chat models; skip audio/image generators
+            if outs and "text" not in outs:
+                continue
+            if not outs and modality and "text" not in modality:
+                continue
+            free.append(m["id"])
+        if free:
+            _CATALOG["models"] = free
+            _CATALOG["until"] = now + _CATALOG_TTL
+            return free
+    except Exception:
+        pass
+    return _FREE_FALLBACKS
+
+
+def _free_models() -> list[str]:
+    """Free-model candidates, de-duped, configured-first, then the live catalog —
+    with **fresh models before ones in cooldown**, so a recently-throttled model
+    is tried last (or not at all until it cools). If every model is cooling, we
+    still return them all as a last resort rather than skip the tier entirely."""
+    configured = [m.strip() for m in
+                  os.environ.get("OPENROUTER_MODEL", "").split(",") if m.strip()]
+    # Order: configured first, then provider-diverse known-good chat models, then
+    # the rest of the live catalog (auto-discovered — picks up new free models, and
+    # any non-chat entries that slip in just error out and get cooled). So the
+    # first attempts are reliable while the set self-updates with no hand edits.
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for m in [*configured, *_FREE_FALLBACKS, *_fetch_free_catalog()]:
+        if m not in seen:
+            seen.add(m)
+            ordered.append(m)
+    fresh = [m for m in ordered if not _cooling(m)]
+    cooling = [m for m in ordered if _cooling(m)]
+    return fresh + cooling
+
 _OLLAMA_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
 
 
@@ -135,9 +234,9 @@ def _post(url: str, payload: dict, headers: dict, timeout: float) -> dict:
 
 
 def _call(provider: str, system: str, user: str, *, json_mode: bool,
-          max_tokens: int) -> tuple[str, str, int, int]:
+          max_tokens: int, model: str | None = None) -> tuple[str, str, int, int]:
     """Return (text, model, in_tokens, out_tokens) or raise."""
-    model = _DEFAULT_MODEL[provider]
+    model = model or _DEFAULT_MODEL[provider]
     if provider == "anthropic":
         body = {
             "model": model, "max_tokens": max_tokens, "system": system,
@@ -162,14 +261,17 @@ def _call(provider: str, system: str, user: str, *, json_mode: bool,
                          {"role": "user", "content": user}],
             "max_tokens": max_tokens,
         }
-        # OpenAI reliably honors response_format; on OpenRouter the model is routed
-        # to an underlying provider that may 400 on it (free models especially), so
-        # rely on the prompt-instructed JSON + lenient _parse there instead.
-        if json_mode and provider == "openai":
+        if json_mode:
             body["response_format"] = {"type": "json_object"}
+        # Shorter timeout on the free tier so rolling through models can't blow
+        # past the host's request limit (a 429 returns fast anyway).
         out = _post(f"{base}/chat/completions", body,
-                    {"authorization": f"Bearer {key}"}, timeout=60)
-        text = out["choices"][0]["message"]["content"]
+                    {"authorization": f"Bearer {key}"},
+                    timeout=20 if provider == "openrouter" else 60)
+        choices = out.get("choices") or []
+        # Some models (classifiers, refusals) return null content — treat as empty
+        # so the router rolls to the next model instead of crashing.
+        text = (choices[0].get("message", {}).get("content") if choices else "") or ""
         u = out.get("usage", {})
         return (text, model, u.get("prompt_tokens", 0), u.get("completion_tokens", 0))
 
@@ -208,12 +310,33 @@ def complete(system: str, user: str, *, offline: Callable[[str, str], str],
         if not _available(provider):
             continue
         t0 = time.monotonic()
-        try:
-            text, model, in_tok, out_tok = _call(
-                provider, system, user, json_mode=json_mode, max_tokens=max_tokens)
-        except Exception:
-            fallbacks.append(provider)
-            continue
+        # The free (OpenRouter) tier tries several free models in turn — a 404
+        # (retired/paid-only) or 429 (rate-limited) on one rolls to the next, and
+        # the failed model goes into a cooldown so we route around it next time
+        # (longer for a 429 — it's genuinely overloaded — than a one-off error).
+        # Cap attempts per request so one call can't exceed the host's request
+        # limit; fresh (non-cooled) models are first, so this tries the
+        # most-likely-up ones. 4 × 20s worst case stays well under the edge limit.
+        candidates = _free_models()[:4] if provider == "openrouter" else [None]
+        text = model = ""
+        in_tok = out_tok = 0
+        for cand in candidates:
+            try:
+                text, model, in_tok, out_tok = _call(
+                    provider, system, user, json_mode=json_mode,
+                    max_tokens=max_tokens, model=cand)
+            except urllib.error.HTTPError as exc:
+                if cand:
+                    _trip_cooldown(cand, _COOLDOWN_S if exc.code == 429 else 30)
+                continue
+            except Exception:
+                if cand:
+                    _trip_cooldown(cand, 30)
+                continue
+            if text.strip():
+                if cand:
+                    _COOLDOWN.pop(cand, None)   # it responded — clear any cooldown
+                break
         if not text.strip():
             fallbacks.append(provider)
             continue
