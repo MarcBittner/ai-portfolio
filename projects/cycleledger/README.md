@@ -5,6 +5,7 @@
 [![Rails 7.2 API](https://img.shields.io/badge/Rails-7.2%20API-CC0000?logo=rubyonrails&logoColor=white)](https://rubyonrails.org/)
 [![PostgreSQL 15](https://img.shields.io/badge/PostgreSQL-15-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![License: Proprietary](https://img.shields.io/badge/license-proprietary-red.svg)](LICENSE)
+![cycleledger — contributions data layer](docs/screenshot.png)
 
 **[▶ Live demo](https://cycleledger.onrender.com)**
 
