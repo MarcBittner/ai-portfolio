@@ -1,4 +1,5 @@
 # arbiter
+![arbiter — cost/quality routing console](docs/screenshot.png)
 
 **An OpenAI-compatible proxy that learns, from your real traffic, where you're
 overpaying for model quality you don't need — then reroutes those requests to

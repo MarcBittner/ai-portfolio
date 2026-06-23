@@ -5,6 +5,7 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org)
 [![Ruff](https://img.shields.io/badge/lint-ruff-261230.svg)](https://github.com/astral-sh/ruff)
 [![Flask](https://img.shields.io/badge/api-Flask-000000.svg)](https://flask.palletsprojects.com)
+![burnrate — SRE metrics + SLO burn-rate](docs/screenshot.png)
 
 **[▶ Live demo](https://burnrate-grza.onrender.com)**
 

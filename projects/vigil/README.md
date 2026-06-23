@@ -5,6 +5,7 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org)
 [![Ruff](https://img.shields.io/badge/lint-ruff-261230.svg)](https://github.com/astral-sh/ruff)
 [![FastAPI](https://img.shields.io/badge/api-FastAPI-009688.svg)](https://fastapi.tiangolo.com)
+![vigil — fleet observability + SOC monitor](docs/screenshot.png)
 
 **Public observability + SOC monitoring for the whole ai-portfolio fleet — and for
 itself.** `vigil` probes every live demo's health on a schedule, records a time

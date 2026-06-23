@@ -5,6 +5,7 @@
 [![Go 1.23+](https://img.shields.io/badge/go-1.23+-00ADD8.svg)](https://go.dev)
 [![go vet + gofmt](https://img.shields.io/badge/lint-vet%20%2B%20gofmt-00ADD8.svg)](https://pkg.go.dev/cmd/vet)
 [![Token core: livekit/protocol](https://img.shields.io/badge/token%20core-livekit%2Fprotocol-1f6feb.svg)](https://github.com/livekit/protocol)
+![relaytoken — scoped WebRTC access tokens](docs/screenshot.png)
 
 **[▶ Live demo](https://relaytoken.onrender.com)**
 

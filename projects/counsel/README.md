@@ -1,4 +1,5 @@
 # counsel
+![counsel — grounded, trust-gated finance copilot](docs/screenshot.png)
 
 **A grounded, trust-gated personal-finance copilot.** Code decides the numbers,
 the LLM only narrates, and any action needs explicit human approval.
