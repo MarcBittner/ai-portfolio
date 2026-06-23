@@ -34,6 +34,24 @@ ROLLING_WINDOW = int(os.environ.get("VIGIL_ROLLING_WINDOW", "50"))
 # Retain at most this many probe rows per target (cheap self-pruning time series).
 MAX_HISTORY_PER_TARGET = int(os.environ.get("VIGIL_MAX_HISTORY", "1000"))
 
+# --- Logs + metrics ingestion/scrape knobs --------------------------------- #
+# Token for the push log-ingestion endpoint (POST /api/ingest/logs). If UNSET,
+# the endpoint accepts only loopback callers (dev-friendly, safe by default); set
+# this to require the X-Ingest-Token header from any source.
+# NEEDS-CREDENTIAL for cross-host ingestion: unset → loopback-only.
+INGEST_TOKEN = os.environ.get("VIGIL_INGEST_TOKEN") or None
+
+# Retain at most this many log rows / metric-sample rows per target (self-pruning,
+# mirrors MAX_HISTORY_PER_TARGET so the SQLite file stays bounded).
+MAX_LOGS_PER_TARGET = int(os.environ.get("VIGIL_MAX_LOGS", "2000"))
+MAX_METRICS_PER_TARGET = int(os.environ.get("VIGIL_MAX_METRICS", "5000"))
+
+# Default path scraped for app metrics (Prometheus text); per-target overridable.
+DEFAULT_METRICS_PATH = os.environ.get("VIGIL_METRICS_PATH", "/metrics")
+# Cap the number of series stored per scrape so a chatty target can't blow up the
+# table in a single cycle.
+MAX_SERIES_PER_SCRAPE = int(os.environ.get("VIGIL_MAX_SERIES_PER_SCRAPE", "200"))
+
 # The single bootstrap admin. Hardcoded by design: this account is auto-elevated
 # to `admin` on signup and can elevate other users. Everyone else signs up as
 # `registered` and is promoted only by an admin.
@@ -78,17 +96,26 @@ class Target:
     repo: str | None = None
     self_monitor: bool = False
     tags: list[str] = field(default_factory=list)
+    # Optional override for the metrics scrape path (Prometheus text). None falls
+    # back to DEFAULT_METRICS_PATH; a target that 404s there is simply skipped.
+    metrics_path: str | None = None
 
     @property
     def health_url(self) -> str:
         return self.url.rstrip("/") + "/" + self.health_path.lstrip("/")
+
+    @property
+    def metrics_url(self) -> str:
+        path = self.metrics_path or DEFAULT_METRICS_PATH
+        return self.url.rstrip("/") + "/" + path.lstrip("/")
 
     def to_dict(self) -> dict:
         return {
             "slug": self.slug, "name": self.name, "url": self.url,
             "health_path": self.health_path, "repo": self.repo,
             "self_monitor": self.self_monitor, "tags": list(self.tags),
-            "health_url": self.health_url,
+            "metrics_path": self.metrics_path,
+            "health_url": self.health_url, "metrics_url": self.metrics_url,
         }
 
 
@@ -166,6 +193,7 @@ def load_file_targets() -> list[Target]:
                 health_path=row.get("health_path", "/health"),
                 repo=row.get("repo"), self_monitor=bool(row.get("self_monitor", False)),
                 tags=list(row.get("tags", [])),
+                metrics_path=row.get("metrics_path"),
             ))
         except (KeyError, TypeError):
             continue

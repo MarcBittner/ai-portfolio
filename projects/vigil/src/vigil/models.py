@@ -65,6 +65,23 @@ class CheckRequest(BaseModel):
     enabled: bool = True
 
 
+class LogEntry(BaseModel):
+    """One structured log line pushed to the ingestion endpoint."""
+
+    ts: float | None = None
+    level: str = "info"  # debug | info | warn | error (coerced to 'info' if other)
+    source: str | None = None
+    message: str = Field(min_length=1, max_length=8000)
+    meta: dict | None = None
+
+
+class LogIngestRequest(BaseModel):
+    """Batch of log entries for one target slug (token- or loopback-authenticated)."""
+
+    slug: str
+    entries: list[LogEntry] = Field(default_factory=list)
+
+
 class CheckUpdateRequest(BaseModel):
     """PATCH a check — every field optional; only provided fields are applied."""
 

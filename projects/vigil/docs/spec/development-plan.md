@@ -71,9 +71,11 @@ targets, check types, alert channels, and auth providers.
 ## Phase 6 — UI + docs + tests ✅
 
 - [x] Single-page reactive console: status (guest), dashboard + detail sparkline
-      (registered), incident AI, alerts, security posture (elevated), admin.
-      NOTE: the "logs" shown are the **probe-result feed** (up/down/HTTP/error
-      samples), NOT ingested application logs — see the gap analysis below.
+      (registered), incident AI, alerts, security posture (elevated), admin. The
+      target detail now also carries a **Metrics** panel (scraped `/metrics`,
+      inline-SVG sparklines + latest values) and a **Logs** panel (ingested
+      structured logs with level/time filters) — distinct from the probe-result feed,
+      closing #5/#6/#28 (see the backlog below).
 - [x] Auth modal (sign in / sign up / OAuth buttons / verification-link surfacing).
 - [x] Unit tests (metrics, security, auth, incident, alerts, llm, api) + live
       smoke/regression suite. `./run.sh test` green; `./run.sh smoke` green.
@@ -94,8 +96,8 @@ Legend: ✅ done · ◐ partial · ⛔ missing.
 | 2 | Authentication required | ✅ | scrypt + signed-cookie sessions |
 | 3 | Guests see **only** status + error rate | ✅ | `metrics.guest_view` projects to the minimal shape server-side |
 | 4 | Registered see **availability** | ✅ | availability / error-rate / avg+p95 latency from the probe series |
-| 5 | Registered see **logs** | ⛔ | **No log ingestion at all.** The "logs" panel is the probe-result feed, not application/structured logs from the monitored apps or from vigil itself |
-| 6 | Registered see **metrics** | ◐ | Only **black-box** probe metrics (uptime/error-rate/latency). No app-exposed metrics (`/metrics` scrape), no RED/throughput/saturation, no resource metrics, no real charts beyond a sparkline |
+| 5 | Registered see **logs** | ✅ | Real structured-log ingestion: `logs` table + `POST /api/ingest/logs` (X-Ingest-Token, loopback-only when unset) + a registered-tier viewer `GET /api/targets/{slug}/logs` with level/since filters; vigil ships its own operational logs under slug `vigil` (poll cycles, alert fires, errors) |
+| 6 | Registered see **metrics** | ✅ | App-metrics scrape: stdlib Prometheus-text parser (`promparse.py`) + `metric_samples` table; the poll cycle scrapes each target's `/metrics` (per-target `metrics_path`, 404/HTML/parse-miss skipped), stores a bounded series set; registered-tier viewer `GET /api/targets/{slug}/metrics` (latest values + SVG sparkline series); vigil exposes its own `/metrics` (real counters/gauges) and is scraped like any target |
 | 7 | Registered see **code-quality** | ⛔ | **Nothing.** No lint/test/coverage/complexity ingestion or display |
 | 8 | Security scans **for each push** | ⛔ | Scans are on-demand, not per-commit; no push history, no per-push diffing |
 | 9 | **Definition of "up" is surfaced** | ✅ | `GET /api/targets/{slug}/up-definition` + the dashboard detail's "Definition of up" panel show the required checks (method/path/assertions in plain English) and the last raw result per check (HTTP code, latency, which assertion failed) |
@@ -117,7 +119,7 @@ Legend: ✅ done · ◐ partial · ⛔ missing.
 | 25 | Rate-limit the signup endpoint | ✅ | per-IP token bucket |
 | 26 | Admin can **elevate** users to (a) full visibility+alerting, (b) admin | ◐ | `elevated`/`admin` promotion exists; the two tiers aren't clearly mapped/labeled to "full visibility + alerting" vs "admin", and there's no UI to choose which |
 | 27 | Self-monitor: own **uptime/response** | ✅ | `vigil (self)` target |
-| 28 | Self-monitor: own **logs/metrics** | ⛔ | inherits gaps #5/#6 — vigil doesn't expose or capture its own logs/metrics |
+| 28 | Self-monitor: own **logs/metrics** | ✅ | vigil captures its own structured logs (a `logging` handler mirrors the `vigil` logger into the logs table + an explicit `selflog.slog` hook for poll/alert/error events) and exposes its own `/metrics` (Prometheus text) that its self-target scrapes through the identical parse+store path |
 | 29 | Self-monitor: run the **same tests/security scans on itself** | ◐ | self security-scan runs; the app does **not** run its own test suite as a live, surfaced check |
 | 30 | ≥1 AI feature on trueline's routing fallback | ✅ | incident summarizer via the standard local→paid→free→offline chain |
 | 31 | Persistence of accounts/history across restarts | ⛔ | SQLite in ephemeral `/tmp` on free tier; only the admin is re-seeded — all other users/history are lost on redeploy (needs a persistent disk or external DB) |
@@ -138,14 +140,32 @@ Legend: ✅ done · ◐ partial · ⛔ missing.
       returns the required checks (method/URL/assertions in plain English) + the last
       raw result per check (HTTP code, latency, response snippet, which assertion
       failed); the dashboard detail renders a "Definition of up" panel from it.
-- [ ] **Logs (#5, #28).** A `logs` ingestion path: a pull adapter (fetch a target's
-      `/logs`/journal endpoint where exposed) and a push endpoint
-      (`POST /api/ingest/logs`, token-auth) writing a structured `logs` time series;
-      a registered-tier log viewer with level/source/time filters; vigil ships its
-      own structured logs through the same path.
-- [ ] **Metrics depth (#6, #28).** Scrape an app's `/metrics` (Prometheus text) where
-      present; store named series; render real charts (latency, throughput, error
-      rate, custom gauges) — not just the probe sparkline. vigil exports its own.
+- [x] **Logs (#5, #28).** A structured `logs` table (slug/ts/level/source/message/meta,
+      indexed on (slug, ts DESC), self-pruning to `MAX_LOGS_PER_TARGET`) with
+      `add_logs`/`recent_logs` accessors. A push endpoint `POST /api/ingest/logs`
+      token-authenticated via `X-Ingest-Token` (env `VIGIL_INGEST_TOKEN`; when
+      unset, accepts loopback callers only — dev-usable, safe by default). A
+      registered-tier viewer `GET /api/targets/{slug}/logs?level=&limit=&since=` with
+      a UI Logs panel (level + time filters, level-colored rows; guests blocked
+      server-side). vigil ships its OWN logs through the same path: a `logging`
+      handler (`selflog.DBLogHandler`) mirrors the `vigil` logger into the table plus
+      an explicit `selflog.slog` hook records poll cycles, alert fires, and errors
+      under slug `vigil`.
+- [x] **Metrics depth (#6, #28).** A stdlib-only Prometheus-text parser
+      (`promparse.py` → `(name, labels, value)`, never raises on malformed input,
+      handles HELP/TYPE/labels/escapes/±Inf/NaN). A `metric_samples` table
+      (slug/ts/name/labels/value, indexed on (slug, name, ts DESC), self-pruning to
+      `MAX_METRICS_PER_TARGET`) with `record_metrics`/`metric_series`/
+      `latest_metrics`. The poll cycle scrapes each target's metrics path (default
+      `/metrics`, per-target `metrics_path` override; 404/HTML/parse-miss skipped, a
+      failure never breaks the health poll; series capped per scrape). A
+      registered-tier viewer `GET /api/targets/{slug}/metrics` (latest values + a few
+      series) with a UI Metrics panel (inline-SVG sparklines + latest-values table,
+      clean "no metrics exposed" empty state). vigil exposes its OWN `/metrics`
+      (Prometheus text, public + secret-free) with real counters/gauges — probes run,
+      poll cycles, checks passed/failed, alerts fired, targets up/down/degraded,
+      poll-cycle duration, fleet availability — and its self-target scrapes it through
+      the identical parse+store path.
 - [ ] **Code-quality (#7).** Ingest per-commit lint/test/coverage/complexity
       (`POST /api/ingest/quality` from CI, or read a committed `quality.json`); show
       a per-app trend + latest grade in the registered tier.

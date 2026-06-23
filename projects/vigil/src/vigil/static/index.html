@@ -116,6 +116,13 @@
   .sparkline{display:flex;align-items:flex-end;gap:2px;height:42px;margin-top:8px}
   .sparkline .b{flex:1;background:var(--accent);border-radius:2px 2px 0 0;min-height:2px;opacity:.85}
   .sparkline .b.down{background:var(--bad)}
+  .mcharts{display:flex;flex-wrap:wrap;gap:14px}
+  .mchart{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-sm);padding:8px 10px;min-width:170px}
+  .msvg{display:block;margin:4px 0}
+  .pill.lvl-debug{color:var(--ink-dim);border-color:var(--line)}
+  .pill.lvl-info{color:var(--info);border-color:rgba(106,161,255,.35);background:rgba(106,161,255,.07)}
+  .pill.lvl-warn{color:var(--warn);border-color:rgba(230,173,82,.4);background:rgba(230,173,82,.08)}
+  .pill.lvl-error{color:var(--bad);border-color:rgba(241,91,108,.4);background:rgba(241,91,108,.08)}
   .iconbtn{width:36px;height:36px;display:grid;place-items:center;padding:0}
   .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--surface-3);
     border:1px solid var(--line-2);border-radius:var(--r-sm);padding:10px 16px;box-shadow:var(--sh);
@@ -176,6 +183,28 @@
       <h2 style="margin-top:16px;font-size:14px">Recent probes</h2>
       <table><thead><tr><th>When</th><th>Up</th><th>HTTP</th><th>ms</th><th>Error</th></tr></thead>
         <tbody id="logBody"></tbody></table>
+
+      <!-- Metrics (scraped /metrics, Prometheus text) -->
+      <div id="metricsPanel" style="margin-top:18px"></div>
+
+      <!-- Logs (ingested structured logs) -->
+      <h2 style="margin-top:18px;font-size:14px">Logs</h2>
+      <div class="row" style="align-items:flex-end;margin-bottom:8px">
+        <div style="flex:0 0 150px"><label>Level</label>
+          <select id="logLevel">
+            <option value="">all levels</option><option value="debug">debug</option>
+            <option value="info">info</option><option value="warn">warn</option>
+            <option value="error">error</option>
+          </select></div>
+        <div style="flex:0 0 150px"><label>Since</label>
+          <select id="logSince">
+            <option value="">all time</option><option value="900">last 15m</option>
+            <option value="3600">last 1h</option><option value="86400">last 24h</option>
+          </select></div>
+        <div style="flex:0 0 auto"><label>&nbsp;</label>
+          <button id="logReload">Reload</button></div>
+      </div>
+      <div id="logsBody"></div>
     </div>
   </section>
 
@@ -372,6 +401,7 @@ async function api(path, opts){ const r = await fetch(path, Object.assign({heade
 const RANK={guest:0,registered:1,elevated:2,admin:3};
 const at = m => RANK[ME.role]>=RANK[m];
 const fmtPct = v => v==null?"—":(v*100).toFixed(1)+"%";
+const esc = s => String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const ago = ts => { if(!ts)return"—"; const s=Math.max(0,(Date.now()/1000)-ts);
   return s<60?Math.round(s)+"s":s<3600?Math.round(s/60)+"m":Math.round(s/3600)+"h"; };
 
@@ -507,7 +537,84 @@ async function showDetail(slug){
     <tr><td class="muted">${ago(p.ts)} ago</td><td>${p.up?'✓':'✕'}</td>
       <td class="mono">${p.http_status??"—"}</td><td class="mono">${p.response_ms??"—"}</td>
       <td class="muted">${p.error??""}</td></tr>`).join("");
+  DETAIL_SLUG = slug;
+  renderMetricsPanel(slug);
+  renderLogs(slug);
 }
+
+// ---- scraped metrics panel (registered): latest values + a few sparklines ----
+let DETAIL_SLUG = null;
+function svgSpark(points){
+  if(!points || points.length<2) return '';
+  const vals = points.map(p=>p.value);
+  const min = Math.min(...vals), max = Math.max(...vals), span = (max-min)||1;
+  const W=160, H=34, n=points.length;
+  const pts = points.map((p,i)=>{
+    const x = (i/(n-1))*W;
+    const y = H - ((p.value-min)/span)*(H-4) - 2;
+    return x.toFixed(1)+','+y.toFixed(1);
+  }).join(' ');
+  return `<svg width="${W}" height="${H}" class="msvg"><polyline points="${pts}"
+    fill="none" stroke="var(--accent)" stroke-width="1.5"/></svg>`;
+}
+async function renderMetricsPanel(slug){
+  const el = $("#metricsPanel"); el.innerHTML = '';
+  let d;
+  try{ d = await api("/api/targets/"+slug+"/metrics"); }catch(e){ return; }
+  if(!d.has_metrics){
+    el.innerHTML = `<div class="card" style="background:var(--surface-2);margin:0">
+      <div style="font-weight:600;margin-bottom:4px">Metrics</div>
+      <div class="muted">No metrics exposed. vigil scrapes
+        <span class="mono">${d.metrics_url}</span> each cycle — this target returns
+        no Prometheus metrics there (that's fine; not every app exposes them).</div></div>`;
+    return;
+  }
+  const charts = (d.series||[]).map(s=>`
+    <div class="mchart"><div class="mono" style="font-size:11.5px">${esc(s.name)}</div>
+      ${svgSpark(s.points)}
+      <div class="muted" style="font-size:11px">${s.points[s.points.length-1].value}</div></div>`
+  ).join('');
+  const rows = (d.latest||[]).slice(0,60).map(m=>{
+    const lbl = Object.keys(m.labels||{}).length
+      ? '<span class="muted mono" style="font-size:11px">{'+
+        Object.entries(m.labels).map(([k,v])=>k+'="'+esc(String(v))+'"').join(',')+'}</span>'
+      : '';
+    return `<tr><td class="mono" style="font-size:11.5px">${esc(m.name)} ${lbl}</td>
+      <td class="mono">${m.value}</td></tr>`;
+  }).join('');
+  el.innerHTML = `<div class="card" style="background:var(--surface-2);margin:0">
+    <div style="font-weight:600;margin-bottom:2px">Metrics</div>
+    <div class="muted" style="margin-bottom:8px">Scraped from
+      <span class="mono">${d.metrics_url}</span> (Prometheus text).</div>
+    <div class="mcharts">${charts||''}</div>
+    <details style="margin-top:8px"><summary class="muted">Latest values (${(d.latest||[]).length})</summary>
+      <table style="margin-top:6px"><thead><tr><th>Series</th><th>Value</th></tr></thead>
+        <tbody>${rows}</tbody></table></details></div>`;
+}
+
+// ---- ingested logs panel (registered): level/since filters ----
+async function renderLogs(slug){
+  const el = $("#logsBody"); el.innerHTML = '<div class="muted">Loading…</div>';
+  const level = $("#logLevel").value;
+  const since = $("#logSince").value;
+  let q = "/api/targets/"+slug+"/logs?limit=200";
+  if(level) q += "&level="+encodeURIComponent(level);
+  if(since) q += "&since="+(Date.now()/1000 - parseFloat(since));
+  let d;
+  try{ d = await api(q); }catch(e){ el.innerHTML='<div class="muted">Error: '+(e.detail||e.status)+'</div>'; return; }
+  if(!d.logs.length){ el.innerHTML='<div class="muted">No logs for this filter. '+
+    'Logs arrive via <span class="mono">POST /api/ingest/logs</span>; vigil ships its own under slug <span class="mono">vigil</span>.</div>'; return; }
+  el.innerHTML = `<table><thead><tr><th>When</th><th>Level</th><th>Source</th><th>Message</th></tr></thead>
+    <tbody>${d.logs.map(l=>`
+      <tr><td class="muted" style="white-space:nowrap">${ago(l.ts)} ago</td>
+        <td><span class="pill lvl-${l.level}">${l.level}</span></td>
+        <td class="mono" style="font-size:11.5px">${esc(l.source||'—')}</td>
+        <td>${esc(l.message)}${l.meta?('<div class="muted mono" style="font-size:11px">'+esc(JSON.stringify(l.meta))+'</div>'):''}</td></tr>`).join('')}
+    </tbody></table>`;
+}
+$("#logReload") && ($("#logReload").onclick = ()=>{ if(DETAIL_SLUG) renderLogs(DETAIL_SLUG); });
+$("#logLevel") && ($("#logLevel").onchange = ()=>{ if(DETAIL_SLUG) renderLogs(DETAIL_SLUG); });
+$("#logSince") && ($("#logSince").onchange = ()=>{ if(DETAIL_SLUG) renderLogs(DETAIL_SLUG); });
 
 // Surface the definition of "up" for a target: required checks + last result,
 // including which assertion failed when it's down. This is the visible #9 fix.

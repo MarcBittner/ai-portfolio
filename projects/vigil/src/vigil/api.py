@@ -23,7 +23,12 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.responses import (
+    FileResponse,
+    JSONResponse,
+    PlainTextResponse,
+    RedirectResponse,
+)
 
 from vigil import (
     __version__,
@@ -35,6 +40,8 @@ from vigil import (
     llm,
     metrics,
     security,
+    selflog,
+    selfmetrics,
     store,
 )
 from vigil.config import Target
@@ -44,6 +51,7 @@ from vigil.models import (
     CheckUpdateRequest,
     HealthResponse,
     IncidentRequest,
+    LogIngestRequest,
     LoginRequest,
     RoleRequest,
     SignupRequest,
@@ -69,6 +77,8 @@ async def lifespan(_app: FastAPI):
     suite (which drives probes explicitly) so repeated TestClient lifespans don't
     leave a probe task bound to a torn-down event loop."""
     store.init_db()
+    # Mirror vigil's own logger output into the logs table (self-monitoring logs).
+    selflog.install()
     # Seed admin from VIGIL_ADMIN_PASSWORD (survives the ephemeral /tmp DB wipes).
     auth.ensure_bootstrap_admin()
     global _poller_task
@@ -152,6 +162,19 @@ def health() -> HealthResponse:
 @app.get("/llm")
 def llm_status() -> dict:
     return llm.status()
+
+
+@app.get("/metrics")
+def own_metrics() -> PlainTextResponse:
+    """vigil's OWN metrics in Prometheus text exposition format — public and
+    secret-free, so vigil is scrapeable like any target it monitors (the ``vigil``
+    self-target's metrics scrape points right back here). Real counters/gauges:
+    probes run, targets up/down/degraded, poll-cycle duration, checks passed/failed,
+    alerts fired."""
+    return PlainTextResponse(
+        selfmetrics.render(),
+        media_type="text/plain; version=0.0.4; charset=utf-8",
+    )
 
 
 @app.get("/")
@@ -281,6 +304,91 @@ def app_detail(slug: str, _user=Depends(require_role("registered"))) -> dict:
             "history": probes,
             "response_series": [{"ts": p["ts"], "ms": p["response_ms"],
                                  "up": bool(p["up"])} for p in reversed(probes)]}
+
+
+# --------------------------------------------------------------------------- #
+# Logs — push ingestion (token/loopback) + registered-tier viewer (#5, #28)     #
+# --------------------------------------------------------------------------- #
+
+def _ingest_authorized(request: Request) -> bool:
+    """Authorize a log-ingestion call.
+
+    If ``VIGIL_INGEST_TOKEN`` is set, the ``X-Ingest-Token`` header must match it
+    (constant-time). If it is UNSET, ingestion is accepted only from loopback
+    (127.0.0.1 / ::1) — dev-friendly (the TestClient + a local process can push)
+    but safe by default (no remote host can ingest without configuring a token).
+    """
+    token = config.INGEST_TOKEN
+    if token:
+        supplied = request.headers.get("X-Ingest-Token", "")
+        return secrets.compare_digest(supplied, token)
+    host = request.client.host if request.client else ""
+    return host in ("127.0.0.1", "::1", "testclient", "localhost")
+
+
+@app.post("/api/ingest/logs")
+def ingest_logs(req: LogIngestRequest, request: Request) -> dict:
+    """Push structured logs for a target. Token-authenticated via ``X-Ingest-Token``
+    (env ``VIGIL_INGEST_TOKEN``); when that env is unset, only loopback callers are
+    accepted so the path is usable in dev yet closed to remote hosts by default.
+
+    Body: ``{slug, entries:[{ts?, level, source?, message, meta?}]}``. Returns the
+    number of entries actually ingested (malformed entries are skipped, not 400)."""
+    if not _ingest_authorized(request):
+        raise HTTPException(401, "ingestion requires a valid X-Ingest-Token "
+                                 "(or a loopback caller when no token is configured)")
+    if not store.get_target(req.slug):
+        raise HTTPException(404, "unknown target")
+    entries = [e.model_dump() for e in req.entries]
+    n = store.add_logs(req.slug, entries)
+    selfmetrics.inc("vigil_logs_ingested_total", n)
+    return {"slug": req.slug, "ingested": n}
+
+
+@app.get("/api/targets/{slug}/logs")
+def target_logs(slug: str, level: str | None = None, limit: int = 200,
+                since: float | None = None,
+                _user=Depends(require_role("registered"))) -> dict:
+    """REGISTERED tier: structured logs for a target with ``?level=&limit=&since=``
+    filters. Guests are blocked server-side (the dependency 401/403s)."""
+    if not store.get_target(slug):
+        raise HTTPException(404, "unknown target")
+    if level is not None and level not in store.LOG_LEVELS:
+        raise HTTPException(422, f"level must be one of {list(store.LOG_LEVELS)}")
+    rows = store.recent_logs(slug, level=level, limit=limit, since=since)
+    return {"slug": slug, "levels": list(store.LOG_LEVELS), "logs": rows}
+
+
+# --------------------------------------------------------------------------- #
+# Metrics — registered-tier viewer over scraped app metrics (#6, #28)           #
+# --------------------------------------------------------------------------- #
+
+@app.get("/api/targets/{slug}/metrics")
+def target_metrics(slug: str, series: int = 6, points: int = 60,
+                   _user=Depends(require_role("registered"))) -> dict:
+    """REGISTERED tier: the latest scraped sample set for a target plus a few
+    series for charts. Returns ``{latest:[...], series:[{name, points:[{ts,value}]}]}``.
+    If the target exposes no metrics, ``latest`` is empty and the UI shows a clean
+    'no metrics exposed' state."""
+    t = store.get_target(slug)
+    if not t:
+        raise HTTPException(404, "unknown target")
+    latest = store.latest_metrics(slug, limit=300)
+    # Pick a handful of single-valued (label-free) numeric series for charts.
+    names = [s["name"] for s in latest if not s["labels"]][: max(1, min(series, 24))]
+    out_series = []
+    for name in names:
+        rows = store.metric_series(slug, name, limit=max(2, min(points, 500)))
+        # Only label-free points so a single line is well-defined; newest-first→oldest.
+        pts = [{"ts": r["ts"], "value": r["value"]}
+               for r in reversed(rows) if not r["labels"]]
+        if pts:
+            out_series.append({"name": name, "points": pts})
+    return {
+        "slug": slug, "metrics_url": t.metrics_url,
+        "latest": latest, "series": out_series,
+        "has_metrics": bool(latest),
+    }
 
 
 @app.get("/api/security")

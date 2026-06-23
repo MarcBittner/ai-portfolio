@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS targets (
     repo         TEXT,
     self_monitor INTEGER NOT NULL DEFAULT 0,
     tags         TEXT NOT NULL DEFAULT '[]',
+    metrics_path TEXT,
     created_at   REAL NOT NULL
 );
 CREATE TABLE IF NOT EXISTS probes (
@@ -106,7 +107,30 @@ CREATE TABLE IF NOT EXISTS check_results (
 );
 CREATE INDEX IF NOT EXISTS idx_check_results_cid_ts ON check_results(check_id, ts DESC);
 CREATE INDEX IF NOT EXISTS idx_check_results_slug_ts ON check_results(slug, ts DESC);
+CREATE TABLE IF NOT EXISTS logs (
+    id      INTEGER PRIMARY KEY AUTOINCREMENT,
+    slug    TEXT NOT NULL,                 -- target slug ('vigil' for self logs)
+    ts      REAL NOT NULL,
+    level   TEXT NOT NULL DEFAULT 'info',  -- debug | info | warn | error
+    source  TEXT,                          -- emitting component (nullable)
+    message TEXT NOT NULL,
+    meta    TEXT                           -- JSON object of structured fields
+);
+CREATE INDEX IF NOT EXISTS idx_logs_slug_ts ON logs(slug, ts DESC);
+CREATE TABLE IF NOT EXISTS metric_samples (
+    id     INTEGER PRIMARY KEY AUTOINCREMENT,
+    slug   TEXT NOT NULL,
+    ts     REAL NOT NULL,
+    name   TEXT NOT NULL,
+    labels TEXT NOT NULL DEFAULT '{}',     -- JSON object of label k/v
+    value  REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_metric_samples_slug_name_ts
+    ON metric_samples(slug, name, ts DESC);
 """
+
+# Levels the logs API accepts; anything else is coerced to 'info' on ingest.
+LOG_LEVELS = ("debug", "info", "warn", "error")
 
 
 @contextmanager
@@ -127,8 +151,18 @@ def init_db() -> None:
     """Create tables and upsert the seed + file registry. Idempotent."""
     with _conn() as c:
         c.executescript(_SCHEMA)
+        _migrate(c)
     seed_targets(config.SEED_TARGETS + config.load_file_targets())
     seed_default_checks()
+
+
+def _migrate(c: sqlite3.Connection) -> None:
+    """Add columns introduced after the first schema so an existing DB file (e.g. a
+    persistent disk that predates the metrics scrape) gains them without a wipe.
+    ``ADD COLUMN`` is a no-op-on-conflict pattern guarded by a column probe."""
+    cols = {r["name"] for r in c.execute("PRAGMA table_info(targets)").fetchall()}
+    if "metrics_path" not in cols:
+        c.execute("ALTER TABLE targets ADD COLUMN metrics_path TEXT")
 
 
 # --------------------------------------------------------------------------- #
@@ -141,14 +175,15 @@ def seed_targets(targets: list[Target]) -> None:
         for t in targets:
             c.execute(
                 """INSERT INTO targets (slug, name, url, health_path, repo,
-                       self_monitor, tags, created_at)
-                   VALUES (?,?,?,?,?,?,?,?)
+                       self_monitor, tags, metrics_path, created_at)
+                   VALUES (?,?,?,?,?,?,?,?,?)
                    ON CONFLICT(slug) DO UPDATE SET
                        name=excluded.name, url=excluded.url,
                        health_path=excluded.health_path, repo=excluded.repo,
-                       self_monitor=excluded.self_monitor, tags=excluded.tags""",
+                       self_monitor=excluded.self_monitor, tags=excluded.tags,
+                       metrics_path=excluded.metrics_path""",
                 (t.slug, t.name, t.url, t.health_path, t.repo,
-                 int(t.self_monitor), json.dumps(t.tags), now),
+                 int(t.self_monitor), json.dumps(t.tags), t.metrics_path, now),
             )
 
 
@@ -163,10 +198,12 @@ def remove_target(slug: str) -> bool:
 
 
 def _row_to_target(r: sqlite3.Row) -> Target:
+    cols = r.keys()
     return Target(
         slug=r["slug"], name=r["name"], url=r["url"],
         health_path=r["health_path"], repo=r["repo"],
         self_monitor=bool(r["self_monitor"]), tags=json.loads(r["tags"]),
+        metrics_path=(r["metrics_path"] if "metrics_path" in cols else None),
     )
 
 
@@ -362,6 +399,163 @@ def recent_check_results(check_id: int, limit: int = 50) -> list[dict]:
 def last_check_result(check_id: int) -> dict | None:
     rows = recent_check_results(check_id, 1)
     return rows[0] if rows else None
+
+
+# --------------------------------------------------------------------------- #
+# Logs (ingested structured log lines — self-pruning per slug)                  #
+# --------------------------------------------------------------------------- #
+
+def add_logs(slug: str, entries: list[dict]) -> int:
+    """Insert a batch of structured log entries for ``slug``; return the count
+    actually stored. Each entry: ``{ts?, level, source?, message, meta?}``. An
+    unknown/absent level is coerced to 'info'; a missing message is skipped.
+    Self-prunes to ``config.MAX_LOGS_PER_TARGET`` rows per slug after the batch."""
+    now = time.time()
+    rows = []
+    for e in entries or []:
+        if not isinstance(e, dict):
+            continue
+        msg = e.get("message")
+        if msg is None:
+            continue
+        level = str(e.get("level") or "info").lower()
+        if level not in LOG_LEVELS:
+            level = "info"
+        ts = e.get("ts")
+        ts = float(ts) if isinstance(ts, (int, float)) else now
+        meta = e.get("meta")
+        rows.append((slug, ts, level, e.get("source"), str(msg),
+                     json.dumps(meta) if meta is not None else None))
+    if not rows:
+        return 0
+    with _conn() as c:
+        c.executemany(
+            """INSERT INTO logs (slug, ts, level, source, message, meta)
+               VALUES (?,?,?,?,?,?)""",
+            rows,
+        )
+        c.execute(
+            """DELETE FROM logs WHERE slug=? AND id NOT IN (
+                   SELECT id FROM logs WHERE slug=? ORDER BY id DESC LIMIT ?)""",
+            (slug, slug, config.MAX_LOGS_PER_TARGET),
+        )
+    return len(rows)
+
+
+def _row_to_log(r: sqlite3.Row) -> dict:
+    d = dict(r)
+    d["meta"] = json.loads(d["meta"]) if d.get("meta") else None
+    return d
+
+
+def recent_logs(slug: str | None = None, level: str | None = None,
+                limit: int = 200, since: float | None = None) -> list[dict]:
+    """Newest-first log rows, optionally filtered by slug, level, and a ``since``
+    epoch timestamp (rows with ``ts >= since``). ``limit`` is clamped to 1000."""
+    limit = max(1, min(int(limit or 200), 1000))
+    conds, params = [], []
+    if slug is not None:
+        conds.append("slug=?")
+        params.append(slug)
+    if level is not None:
+        conds.append("level=?")
+        params.append(level)
+    if since is not None:
+        conds.append("ts>=?")
+        params.append(float(since))
+    q = "SELECT * FROM logs"
+    if conds:
+        q += " WHERE " + " AND ".join(conds)
+    q += " ORDER BY ts DESC, id DESC LIMIT ?"
+    params.append(limit)
+    with _conn() as c:
+        rows = c.execute(q, params).fetchall()
+    return [_row_to_log(r) for r in rows]
+
+
+# --------------------------------------------------------------------------- #
+# Metric samples (scraped app metrics — self-pruning per slug)                  #
+# --------------------------------------------------------------------------- #
+
+def record_metrics(slug: str, ts: float, samples: list[tuple]) -> int:
+    """Persist a scrape: ``samples`` is a list of ``(name, labels:dict, value)``.
+    Returns the count stored (capped to ``config.MAX_SERIES_PER_SCRAPE``). Skips
+    non-finite values (NaN/Inf) — they can't render and aren't worth storing.
+    Self-prunes to ``config.MAX_METRICS_PER_TARGET`` rows per slug."""
+    import math
+
+    rows = []
+    for s in (samples or [])[: config.MAX_SERIES_PER_SCRAPE]:
+        try:
+            name, labels, value = s
+        except (ValueError, TypeError):
+            continue
+        if value is None or not math.isfinite(value):
+            continue
+        rows.append((slug, ts, str(name),
+                     json.dumps(labels or {}, sort_keys=True), float(value)))
+    if not rows:
+        return 0
+    with _conn() as c:
+        c.executemany(
+            """INSERT INTO metric_samples (slug, ts, name, labels, value)
+               VALUES (?,?,?,?,?)""",
+            rows,
+        )
+        c.execute(
+            """DELETE FROM metric_samples WHERE slug=? AND id NOT IN (
+                   SELECT id FROM metric_samples WHERE slug=?
+                   ORDER BY id DESC LIMIT ?)""",
+            (slug, slug, config.MAX_METRICS_PER_TARGET),
+        )
+    return len(rows)
+
+
+def _row_to_sample(r: sqlite3.Row) -> dict:
+    d = dict(r)
+    d["labels"] = json.loads(d["labels"]) if d.get("labels") else {}
+    return d
+
+
+def metric_series(slug: str, name: str, limit: int = 100) -> list[dict]:
+    """Time series (newest-first) for one metric ``name`` of a target. Multiple
+    label sets of the same name are interleaved by ts; the caller groups them."""
+    limit = max(1, min(int(limit or 100), 2000))
+    with _conn() as c:
+        rows = c.execute(
+            """SELECT * FROM metric_samples WHERE slug=? AND name=?
+               ORDER BY ts DESC, id DESC LIMIT ?""",
+            (slug, name, limit),
+        ).fetchall()
+    return [_row_to_sample(r) for r in rows]
+
+
+def latest_metrics(slug: str, limit: int = 200) -> list[dict]:
+    """The most recent scrape's samples for a target — one row per (name, labels)
+    at its newest ts. Drives the 'latest values' table + the series picker."""
+    limit = max(1, min(int(limit or 200), 2000))
+    with _conn() as c:
+        # Newest ts per (name, labels), then the value at that ts.
+        rows = c.execute(
+            """SELECT m.* FROM metric_samples m
+               JOIN (SELECT name, labels, MAX(ts) AS mts
+                     FROM metric_samples WHERE slug=?
+                     GROUP BY name, labels) g
+                 ON m.name=g.name AND m.labels=g.labels AND m.ts=g.mts
+               WHERE m.slug=?
+               ORDER BY m.name LIMIT ?""",
+            (slug, slug, limit),
+        ).fetchall()
+    return [_row_to_sample(r) for r in rows]
+
+
+def distinct_metric_names(slug: str) -> list[str]:
+    with _conn() as c:
+        rows = c.execute(
+            "SELECT DISTINCT name FROM metric_samples WHERE slug=? ORDER BY name",
+            (slug,),
+        ).fetchall()
+    return [r["name"] for r in rows]
 
 
 # --------------------------------------------------------------------------- #

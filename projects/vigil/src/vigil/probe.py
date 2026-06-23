@@ -21,7 +21,16 @@ import time
 
 import httpx
 
-from vigil import alerts, checks, config, metrics, store
+from vigil import (
+    alerts,
+    checks,
+    config,
+    metrics,
+    promparse,
+    selflog,
+    selfmetrics,
+    store,
+)
 
 
 def _legacy_health_probe(target) -> dict:
@@ -57,6 +66,7 @@ def _probe_target_sync(target) -> dict:
     ``up`` = **all REQUIRED checks passed**. A target with no checks falls back to
     the legacy single /health GET so behavior is preserved end-to-end.
     """
+    selfmetrics.inc("vigil_probes_total")
     enabled = store.list_checks(target.slug, enabled_only=True)
     if not enabled:
         res = _legacy_health_probe(target)
@@ -74,6 +84,9 @@ def _probe_target_sync(target) -> dict:
         store.record_check_result(
             chk["id"], target.slug, r["passed"], r["http_status"],
             r["response_ms"], r["error"], r["detail"],
+        )
+        selfmetrics.inc(
+            "vigil_checks_passed_total" if r["passed"] else "vigil_checks_failed_total"
         )
         # Roll up the last observed status/latency for the probe time series.
         if r["http_status"] is not None:
@@ -96,6 +109,39 @@ def _probe_target_sync(target) -> dict:
             "required_passed": required_passed, "required_total": required_total}
 
 
+def _scrape_metrics_sync(target) -> int:
+    """Best-effort scrape of a target's metrics path (Prometheus text). Returns the
+    number of samples stored (0 if the target exposes none / 404s / errors). Never
+    raises — a metrics failure must not affect the health poll.
+
+    A non-2xx response, a non-text body, or an unparseable payload all yield 0 and
+    are silently skipped: not every app exposes ``/metrics``, and that's fine."""
+    url = target.metrics_url
+    try:
+        with httpx.Client(timeout=config.PROBE_TIMEOUT_S) as client:
+            resp = client.get(url, follow_redirects=True)
+        if resp.status_code != 200:
+            return 0
+        ctype = resp.headers.get("content-type", "")
+        # Prometheus serves text/plain; reject obvious HTML error pages early.
+        if "html" in ctype.lower():
+            return 0
+        samples = promparse.parse(resp.text)
+        if not samples:
+            return 0
+        stored = store.record_metrics(target.slug, time.time(), samples)
+        if stored:
+            selfmetrics.inc("vigil_metrics_scraped_total", stored)
+        return stored
+    except Exception:  # noqa: BLE001 — any scrape failure is just "no metrics"
+        return 0
+
+
+async def scrape_metrics(target) -> int:
+    """Async wrapper running the synchronous scrape in a worker thread."""
+    return await asyncio.to_thread(_scrape_metrics_sync, target)
+
+
 def _first_failed_detail(result: dict) -> str:
     """Pull the first failing assertion's detail from a run_check result."""
     for r in (result.get("detail") or {}).get("results", []):
@@ -112,15 +158,39 @@ async def probe_one(client: httpx.AsyncClient, target) -> dict:
 
 
 async def probe_all() -> list[dict]:
-    """Probe every registered target once (concurrently) and evaluate alerts."""
+    """Probe every registered target once (concurrently), scrape any exposed app
+    metrics, and evaluate alerts. Records vigil's own cycle metrics + self-logs so
+    self-monitoring covers logs/metrics, not just uptime."""
+    t0 = time.monotonic()
     targets = store.list_targets()
     results: list[dict] = []
     async with httpx.AsyncClient() as client:
         results = await asyncio.gather(*(probe_one(client, t) for t in targets))
+    # Scrape app metrics concurrently (best-effort; a 404/HTML/parse-miss is 0).
+    scraped = await asyncio.gather(*(scrape_metrics(t) for t in targets))
     # Alerts run off the freshly-updated rolling summary so a just-crossed
     # threshold fires this cycle.
+    fired = 0
     for t in targets:
-        alerts.evaluate(t.slug, metrics.summarize(t.slug))
+        events = alerts.evaluate(t.slug, metrics.summarize(t.slug))
+        fired += len(events)
+        for ev in events:
+            selflog.slog("warn", f"alert fired for {t.slug}: {ev['message']}",
+                         source="vigil.alerts", slug=t.slug, channel=ev["channel"])
+    selfmetrics.inc("vigil_alerts_fired_total", fired)
+    selfmetrics.inc("vigil_poll_cycles_total")
+    duration = round(time.monotonic() - t0, 3)
+    selfmetrics.set_gauge("vigil_last_poll_duration_seconds", duration)
+    down = [r["slug"] for r in results if not r.get("up")]
+    selflog.slog(
+        "info" if not down else "warn",
+        f"poll cycle complete: {len(targets)} targets, "
+        f"{sum(scraped)} metric samples scraped, {fired} alert(s) fired"
+        + (f", down: {', '.join(down)}" if down else ""),
+        source="vigil.probe",
+        targets=len(targets), down=len(down), scraped=int(sum(scraped)),
+        duration_s=duration,
+    )
     return list(results)
 
 
