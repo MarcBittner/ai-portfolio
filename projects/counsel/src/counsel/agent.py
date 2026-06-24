@@ -262,48 +262,48 @@ _PROPOSAL_FOR_INTENT = {
 }
 
 
-def answer(ds: Dataset, question: str, *, mode: str | None = None) -> AnswerResult:
-    """Run the full grounded, verified pipeline for one question."""
-    question = (question or "").strip()
+# --------------------------------------------------------------------------- #
+# Deterministic core (guardrail → retrieve → compute), shared by every path.   #
+# --------------------------------------------------------------------------- #
 
-    # 1. Guardrail — refuse discriminatory / unlicensed-advice asks up front.
-    verdict = guardrail.check(question)
-    if not verdict.allowed:
-        return AnswerResult(
-            question=question, refused=True,
-            refusal_reason=f"guardrail:{verdict.category}",
-            answer=verdict.message, intent="refused", facts={}, citations=[],
-            dropped_citations=[],
-            routing={"provider": "guardrail", "model": "deterministic",
-                     "mode": "n/a", "blocked": True},
-        )
+def _guardrail_refusal(question: str, verdict: guardrail.Verdict) -> AnswerResult:
+    return AnswerResult(
+        question=question, refused=True,
+        refusal_reason=f"guardrail:{verdict.category}",
+        answer=verdict.message, intent="refused", facts={}, citations=[],
+        dropped_citations=[],
+        routing={"provider": "guardrail", "model": "deterministic",
+                 "mode": "n/a", "blocked": True},
+    )
 
-    # 2. Retrieve + compute.
-    r, comp = retrieve.route(ds, question)
-    if comp is None or not r.grounded:
-        return AnswerResult(
-            question=question, refused=True, refusal_reason="ungrounded",
-            answer=("I can't find that in your records. I can answer questions "
-                    "about your balances, spending by category, net worth, "
-                    "unusual charges, or a simple balance projection."),
-            intent="unknown", facts={}, citations=[], dropped_citations=[],
-            routing={"provider": "offline", "model": "deterministic",
-                     "mode": "n/a"},
-        )
 
-    # 3. Narrate — LLM phrases the code facts; deterministic offline fallback.
-    res = llm.complete(SYSTEM, _build_user_prompt(comp, r),
-                       offline=_offline_responder(comp, r), mode=mode,
-                       json_mode=True, max_tokens=400)
-    raw_answer, raw_cites = _parse(res.text)
+def _ungrounded_refusal(question: str) -> AnswerResult:
+    return AnswerResult(
+        question=question, refused=True, refusal_reason="ungrounded",
+        answer=("I can't find that in your records. I can answer questions "
+                "about your balances, spending by category, net worth, "
+                "unusual charges, or a simple balance projection."),
+        intent="unknown", facts={}, citations=[], dropped_citations=[],
+        routing={"provider": "offline", "model": "deterministic",
+                 "mode": "n/a"},
+    )
 
+
+def _finalize_narration(
+    question: str, comp: Computation, r: retrieve.Retrieval,
+    raw_answer: str, raw_cites: list[str], routing: dict,
+) -> AnswerResult:
+    """Apply the trust gates (validate citations, verify numbers) to one
+    narration — whoever produced it. This is the single place the server
+    enforces the trust boundary, so a server-routed, an offline, and a
+    browser→host narration are all gated identically.
+    """
     # 4. Validate citations against the retrieved set; drop hallucinations.
     val = retrieve.validate_citations(raw_cites, comp.citation_ids)
 
-    # 5. Verify the model's stated numbers against the code-computed facts.
+    # 5. Verify the stated numbers against the code-computed facts.
     verify_rows, verified_ok = _verify(comp, raw_answer)
 
-    # Which trust-gated proposals are relevant to this answer.
     proposals: list[str] = []
     kind = _PROPOSAL_FOR_INTENT.get(comp.intent)
     if kind:
@@ -314,10 +314,112 @@ def answer(ds: Dataset, question: str, *, mode: str | None = None) -> AnswerResu
         answer=raw_answer, intent=comp.intent, facts=comp.facts,
         citations=val["valid"], dropped_citations=val["dropped"],
         verify=verify_rows, verified_ok=verified_ok, records=r.records,
-        routing={
+        routing=routing, proposals_available=proposals,
+    )
+
+
+@dataclass
+class Prepared:
+    """The output of the deterministic core for a browser→host narration.
+
+    Either a ready-to-return ``refusal`` (guardrail/ungrounded — no narration is
+    needed, the model is never asked to guess), or the exact SYSTEM + built user
+    prompt the browser should send its local Ollama, plus the computed facts and
+    citable ids the server will re-verify the narration against on finalize.
+    """
+
+    refusal: AnswerResult | None
+    intent: str = ""
+    system_prompt: str = ""
+    user_prompt: str = ""
+    facts: dict = field(default_factory=dict)
+    citation_ids: list[str] = field(default_factory=list)
+
+    def to_dict(self) -> dict:
+        if self.refusal is not None:
+            return {"refused": True, "result": self.refusal.to_dict()}
+        return {
+            "refused": False,
+            "intent": self.intent,
+            "system_prompt": self.system_prompt,
+            "user_prompt": self.user_prompt,
+            "facts": self.facts,
+            "citation_ids": self.citation_ids,
+        }
+
+
+def prepare(ds: Dataset, question: str) -> Prepared:
+    """Deterministic core for the browser→host path.
+
+    Runs guardrail + retrieve + compute (never calls a provider) and returns
+    either a refusal (so the browser shows it without an Ollama call) or the
+    exact prompt counsel would send the LLM. The browser runs the narration; the
+    server re-derives all of this on :func:`answer` to verify it.
+    """
+    question = (question or "").strip()
+
+    verdict = guardrail.check(question)
+    if not verdict.allowed:
+        return Prepared(refusal=_guardrail_refusal(question, verdict))
+
+    r, comp = retrieve.route(ds, question)
+    if comp is None or not r.grounded:
+        return Prepared(refusal=_ungrounded_refusal(question))
+
+    return Prepared(
+        refusal=None, intent=comp.intent, system_prompt=SYSTEM,
+        user_prompt=_build_user_prompt(comp, r),
+        facts=comp.facts, citation_ids=comp.citation_ids,
+    )
+
+
+def answer(ds: Dataset, question: str, *, mode: str | None = None,
+           client_summary: str | None = None,
+           client_model: str | None = None) -> AnswerResult:
+    """Run the full grounded, verified pipeline for one question.
+
+    ``client_summary`` is the trust-safe browser→host hook: when present, the
+    server still re-runs guardrail + retrieve + compute itself (it NEVER trusts
+    client-supplied facts), but uses ``client_summary`` as the narration TEXT
+    instead of calling a provider. That text is then run through the identical
+    citation-validation + number-verification gates — so a hostile or garbled
+    local narration (wrong number / hallucinated id) is caught exactly as a
+    cloud model's would be. ``client_model`` is the host model name, echoed into
+    routing for display only.
+    """
+    question = (question or "").strip()
+
+    # 1. Guardrail — refuse discriminatory / unlicensed-advice asks up front.
+    verdict = guardrail.check(question)
+    if not verdict.allowed:
+        return _guardrail_refusal(question, verdict)
+
+    # 2. Retrieve + compute (deterministic — the source of truth for verify).
+    r, comp = retrieve.route(ds, question)
+    if comp is None or not r.grounded:
+        return _ungrounded_refusal(question)
+
+    # 3. Narrate. Browser→host: the narration text was produced by the user's
+    #    local Ollama and passed in; the server does NOT call a provider, but it
+    #    still verifies the text below against its own freshly-computed facts.
+    if client_summary is not None:
+        raw_answer, raw_cites = _parse(client_summary)
+        routing = {
+            "provider": "ollama (browser→host)",
+            "model": client_model or "host", "mode": mode or "local",
+            "latency_ms": None, "cost_usd": 0.0, "fallbacks": [],
+        }
+    else:
+        res = llm.complete(SYSTEM, _build_user_prompt(comp, r),
+                           offline=_offline_responder(comp, r), mode=mode,
+                           json_mode=True, max_tokens=400)
+        raw_answer, raw_cites = _parse(res.text)
+        routing = {
             "provider": res.provider, "model": res.model, "mode": res.mode,
             "latency_ms": res.latency_ms, "cost_usd": res.cost_usd,
             "fallbacks": res.fallbacks,
-        },
-        proposals_available=proposals,
-    )
+        }
+
+    # 4 + 5. Validate citations and verify numbers — the trust gates, applied to
+    #         every narration source identically.
+    return _finalize_narration(question, comp, r, raw_answer, raw_cites, routing)

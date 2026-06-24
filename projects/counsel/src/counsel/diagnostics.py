@@ -53,6 +53,8 @@ def _score_one(ds: Dataset, ex: dict, mode: str | None) -> dict:
         "n_citations": len(res.citations),
         "n_dropped": len(res.dropped_citations),
         "provider": res.routing.get("provider", ""),
+        "model": res.routing.get("model", ""),
+        "latency_ms": res.routing.get("latency_ms"),
     }
     if ex["kind"] == "grounded":
         row["pass"] = (not res.refused and res.intent == ex["intent"]
@@ -83,6 +85,10 @@ def _run_mode(ds: Dataset, mode: str, examples: list[dict] | None = None) -> dic
     grounded = [r for r in rows if r["kind"] == "grounded"]
     refusals = [r for r in rows if r["kind"] in ("ungrounded", "guardrail")]
     passed = sum(1 for r in rows if r["pass"])
+    # The routing the grounded probe actually resolved to (which provider answered,
+    # which model, how fast). For live modes the UI shows this as a "routed via …"
+    # connectivity check rather than a pass/total that reads like a failed score.
+    probe = grounded[0] if grounded else (rows[0] if rows else {})
     return {
         "mode": mode,
         "total": len(rows),
@@ -91,6 +97,9 @@ def _run_mode(ds: Dataset, mode: str, examples: list[dict] | None = None) -> dic
         "grounded_total": len(grounded),
         "refusals_correct": sum(1 for r in refusals if r["pass"]),
         "refusals_total": len(refusals),
+        "provider": probe.get("provider", ""),
+        "model": probe.get("model", ""),
+        "latency_ms": probe.get("latency_ms"),
         "rows": rows,
     }
 

@@ -87,11 +87,33 @@ def examples() -> dict:
     return {"examples": diagnostics.EXAMPLES}
 
 
+@app.post("/ask/prepare")
+def ask_prepare(req: AskRequest) -> dict:
+    """Browser→host step 1: run the deterministic core, return prompt or refusal.
+
+    The cloud server can't reach a user's localhost Ollama — only the browser
+    can. So for the local tier the browser asks the server to prepare: the
+    server runs guardrail + retrieve + compute (NO provider call) and returns
+    either a ready refusal (guardrail/ungrounded — no narration needed) or the
+    exact SYSTEM + user prompt counsel would send the LLM, plus the facts and
+    citable ids. The browser then runs its local Ollama on that prompt and POSTs
+    the narration back to ``/ask`` as ``client_summary`` for verification.
+    """
+    if req.mode is not None and req.mode not in VALID_MODES:
+        raise HTTPException(status_code=422, detail="unknown mode")
+    return agent.prepare(_ds(), req.question).to_dict()
+
+
 @app.post("/ask", response_model=AskResponse)
 def ask(req: AskRequest) -> AskResponse:
     if req.mode is not None and req.mode not in VALID_MODES:
         raise HTTPException(status_code=422, detail="unknown mode")
-    result = agent.answer(_ds(), req.question, mode=req.mode)
+    # Browser→host step 3 (finalize): when ``client_summary`` is present, the
+    # server recomputes every fact itself and uses the client text only as the
+    # narration, then verifies it — the trust boundary stays server-side.
+    result = agent.answer(_ds(), req.question, mode=req.mode,
+                          client_summary=req.client_summary,
+                          client_model=req.model)
     return AskResponse(**result.to_dict())
 
 

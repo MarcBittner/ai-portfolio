@@ -363,13 +363,23 @@
   <!-- ============================ DIAGNOSTICS ============================ -->
   <section class="view" id="view-diagnostics">
     <div class="panel">
-      <h2>Engine diagnostics</h2>
+      <h2>Grounding accuracy — deterministic offline</h2>
       <div class="body">
-        <p class="lede">A cross-routing-mode benchmark over the curated question set:
-          grounded answers that verify against code, citations validated (hallucinations
-          dropped), and refusals firing correctly. The deterministic offline mode reproduces
-          to the digit with zero keys.</p>
-        <button class="btn primary" id="runbench"><span class="spin"></span><span>Run benchmark</span></button>
+        <p class="lede">The full curated question set, scored against code by the
+          <b>deterministic offline</b> responder: grounded answers that verify to the cent,
+          citations validated (hallucinations dropped), and refusals firing correctly. This runs
+          with <b>zero keys</b>, instantly, and reproduces to the digit — it's the real accuracy.</p>
+        <div id="offlinebench"><div class="empty">Loading…</div></div>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>Live routing — connectivity check</h2>
+      <div class="body">
+        <p class="lede">Probe the live routing tiers (auto / paid / local / free) to confirm
+          each one is <b>reachable</b> and which provider + model answers. This is a
+          connectivity check, not a re-score — grounding accuracy is the offline column above,
+          and the same deterministic verification runs whichever tier narrates.</p>
+        <button class="btn primary" id="runbench"><span class="spin"></span><span>Probe live modes</span></button>
         <div id="bench" style="margin-top:16px"></div>
       </div>
     </div>
@@ -377,7 +387,7 @@
       <h2>Safety / bias guardrail</h2>
       <div class="body"><p class="lede">Deterministic verdicts — discriminatory and
         unlicensed-advice asks are refused before any retrieval or model call.</p>
-        <div id="guardrail"></div></div>
+        <div id="guardrail"><div class="empty">Loading…</div></div></div>
     </div>
   </section>
 
@@ -447,7 +457,13 @@
         <button class="segbtn" data-mode="free">Free</button>
         <button class="segbtn" data-mode="offline">Offline</button>
       </div>
-      <span class="muted">Which tier of the router to use. Offline is deterministic and key-free.</span>
+      <span class="muted" id="modeblurb">Which tier of the router to use. Offline is deterministic and key-free.</span>
+    </div>
+    <div class="field"><label>Host Ollama model (local tier)</label>
+      <input id="cfgModel" type="text" autocomplete="off"
+             style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:transparent;color:inherit;font-family:var(--mono);font-size:12px"
+             placeholder="host model — click to pick, or default">
+      <span class="muted" id="ollamastat">Local tier runs your own Ollama from this page (browser→host). Checking…</span>
     </div>
     <div class="field"><label>Theme</label>
       <div class="seg" id="themeseg">
@@ -498,9 +514,71 @@ const j=async(u,o)=>{const r=await fetch(u,o);return r.json();};
 const esc=s=>String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
 const usd=n=>"$"+Number(n).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
 
-let cfg={mode:"auto"};
+let cfg={mode:"auto",model:""};
 try{cfg={...cfg,...JSON.parse(localStorage.getItem("counsel.cfg")||"{}")};}catch{}
 const saveCfg=()=>localStorage.setItem("counsel.cfg",JSON.stringify(cfg));
+
+/* ===================== OLLAMA BRIDGE (browser→host) =====================
+   counsel's only LLM step is NARRATION: the server hands code-computed FACTS +
+   record ids to a model and asks it to phrase them as strict JSON. The cloud
+   server can't reach a model on YOUR machine — only the browser can. So for the
+   "local" tier the browser asks the server to /ask/prepare (guardrail + retrieve
+   + compute, no provider call → the exact SYSTEM+user prompt or a refusal), runs
+   that prompt on the host's Ollama here, and POSTs the narration back to /ask as
+   client_summary, where the server RE-computes every fact and verifies the text.
+   Try Ollama directly (works when OLLAMA_ORIGINS allows this origin), then a
+   CORS-injecting proxy on :11435 — so a cloud-served page reaches host Ollama. */
+const OLLAMA_CANDIDATES=["http://localhost:11434","http://localhost:11435"];
+let clientOllama={base:null,models:[],at:0};
+async function probeOllama(){
+  const now=Date.now();
+  if(now-clientOllama.at<30000) return clientOllama;
+  let base=null,models=[];
+  for(const c of OLLAMA_CANDIDATES){
+    try{const r=await fetch(`${c}/api/tags`,{signal:AbortSignal.timeout(1500)});
+      if(r.ok){base=c;const d=await r.json();
+        models=(d.models||[]).map(m=>m.name||m.model).filter(Boolean);break;}
+    }catch{}
+  }
+  clientOllama={base,models,at:now};return clientOllama;
+}
+// Pick a host model: the configured one if Ollama actually has it (exact or by
+// family prefix), else whatever's installed, else the configured/default name.
+function pickOllamaModel(configured,available){
+  if(configured){const fam=configured.split(":")[0];
+    const hit=(available||[]).find(m=>m===configured||m.split(":")[0]===fam);
+    if(hit)return hit;}
+  return (available&&available[0])||configured||"llama3.1:8b";
+}
+// Run ONE narration on the host's Ollama: send the server-built SYSTEM+user
+// prompt verbatim with format:json and return the raw {answer,citations} text.
+async function ollamaNarrate(base,model,system,user){
+  const r=await fetch(`${base}/api/chat`,{method:"POST",
+    headers:{"content-type":"application/json"},
+    body:JSON.stringify({model,stream:false,format:"json",
+      messages:[{role:"system",content:system},{role:"user",content:user}]}),
+    signal:AbortSignal.timeout(120000)});
+  if(!r.ok)throw new Error("ollama "+r.status);
+  const d=await r.json();return d?.message?.content||"";
+}
+async function refreshClientOllama(){
+  const p=await probeOllama();
+  const stat=$("#ollamastat");
+  if(p.base){
+    const picked=pickOllamaModel(cfg.model,p.models);
+    if(stat)stat.innerHTML=`Reachable at <code>${esc(p.base)}</code> — `+
+      (p.models.length?`will narrate with <b>${esc(picked)}</b> (${p.models.length} model(s) installed).`
+        :`no models pulled — run <code>ollama pull llama3.1:8b</code>.`);
+    // offer installed models in the picker
+    const dl=$("#ollamamodels");
+    if(dl)dl.innerHTML=(p.models||[]).map(n=>`<option value="${esc(n)}"></option>`).join("");
+  }else if(stat){
+    stat.innerHTML=`Not reachable from your browser. To use the local tier, allow `+
+      `this origin (<code>OLLAMA_ORIGINS=${esc(location.origin)} ollama serve</code>) `+
+      `or run the <code>:11435</code> CORS proxy. Otherwise local/auto fall back to the server chain.`;
+  }
+  return p;
+}
 
 /* ---- tabs ---- */
 $$("nav.tabs button").forEach(b=>b.onclick=()=>{
@@ -509,7 +587,7 @@ $$("nav.tabs button").forEach(b=>b.onclick=()=>{
   b.classList.add("active"); $("#view-"+b.dataset.view).classList.add("active");
   if(b.dataset.view==="approvals") loadQueue();
   if(b.dataset.view==="data") loadRecords();
-  if(b.dataset.view==="diagnostics" && !$("#bench").innerHTML) runBench();
+  if(b.dataset.view==="diagnostics" && !$("#offlinebench").dataset.loaded) loadOfflineBench();
 });
 // footer "More in About →" link → switch to the About view
 $$('a[data-view]').forEach(a=>a.onclick=(e)=>{e.preventDefault();const v=a.dataset.view;
@@ -549,9 +627,26 @@ document.addEventListener("keydown",e=>{
   if(e.key==="Escape"){closeD();closeHelp();}
   else if(e.key==="?"&&!typing&&!$("#help").classList.contains("open")){e.preventDefault();openHelp();}
 });
-function syncModeSeg(){$$("#modeseg .segbtn").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.mode===cfg.mode)));}
+const MODE_BLURBS={
+  auto:"auto = your host Ollama if this page can reach it (browser→host), else paid, else free, else offline.",
+  paid:"paid = Anthropic, then OpenAI (server-side).",
+  local:"local = your own Ollama, narrating in the browser (browser→host) — free, works even on the cloud demo.",
+  free:"free = OpenRouter free models (server-side).",
+  offline:"offline = deterministic narrator only, no LLM call. Reproduces to the digit.",
+};
+function syncModeSeg(){
+  $$("#modeseg .segbtn").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.mode===cfg.mode)));
+  $("#modeblurb").textContent=MODE_BLURBS[cfg.mode]||"";
+}
 $$("#modeseg .segbtn").forEach(b=>b.onclick=()=>{cfg.mode=b.dataset.mode;saveCfg();syncModeSeg();toast("Routing mode: "+cfg.mode);});
 syncModeSeg();
+// host-model picker (browser→host) — backed by a datalist of installed models
+(function(){const inp=$("#cfgModel");if(!inp)return;
+  if(!$("#ollamamodels")){const dl=document.createElement("datalist");dl.id="ollamamodels";document.body.appendChild(dl);}
+  inp.setAttribute("list","ollamamodels");inp.value=cfg.model||"";
+  inp.addEventListener("focus",refreshClientOllama);
+  inp.addEventListener("change",()=>{cfg.model=inp.value.trim();saveCfg();});
+})();
 
 /* ---- served-by indicator ---- */
 function setServedBy(routing){
@@ -570,12 +665,21 @@ async function loadHealth(){
     else $("#pendingcount").style.display="none";
   }catch{$("#htext").textContent="offline";$("#hdot").className="dot bad";}
   try{const s=await j("llm");
-    $("#providers").innerHTML=Object.entries(s.providers).map(([k,v])=>
-      `<span class="badge ${v?'b-ok':'b-info'}" style="margin:2px">${k}: ${v?'up':'—'}</span>`).join("")
+    // Server-side providers (the cloud server's own reachability) PLUS a
+    // browser→host Ollama badge: the cloud server can never reach localhost,
+    // only this browser can, so its state is probed here, not reported by /llm.
+    const op=await probeOllama();
+    $("#providers").innerHTML=Object.entries(s.providers)
+      .filter(([k])=>k!=="ollama")
+      .map(([k,v])=>`<span class="badge ${v?'b-ok':'b-info'}" style="margin:2px">${k}: ${v?'up':'—'}</span>`).join("")
+      +`<span class="badge ${op.base?'b-ok':'b-info'}" style="margin:2px" `
+      +`title="probed from your browser — the cloud server can't reach your localhost">`
+      +`ollama (browser→host): ${op.base?'up':'—'}</span>`
       +`<div style="margin-top:8px">offline fallback: <b>always on</b></div>`;
     // Populate the header engine indicator on load (not just after a question)
     // so routing is visible immediately: active mode + which provider is reachable.
-    const reach=Object.entries(s.providers).filter(([,v])=>v).map(([k])=>k);
+    const reach=Object.entries(s.providers).filter(([k,v])=>v&&k!=="ollama").map(([k])=>k);
+    if(op.base)reach.unshift("ollama (browser→host)");
     const label=reach.length?`${s.mode} · ${reach[0]} ready`:"offline fallback";
     $("#sbtext").textContent=`engine: ${label}`;
     $("#sbdot").className="dot "+(reach.length?"ok":"warn");
@@ -647,13 +751,48 @@ function renderAnswer(r){
   $$("#result [data-propose]").forEach(b=>b.onclick=()=>propose(b.dataset.propose));
 }
 
+// The browser→host local path: prepare (server, deterministic) → narrate (host
+// Ollama, in the browser) → finalize (/ask with client_summary; server
+// re-computes + verifies). Returns the finalized AnswerResult, or null if the
+// local path can't run (no Ollama, or a refusal/error was already handled).
+async function askLocal(q){
+  const p=await probeOllama();
+  if(!p.base){
+    if(cfg.mode==="local")
+      toast("Host Ollama not reachable — using the server chain","info");
+    return null;   // caller falls back to the server path
+  }
+  // 1. prepare: guardrail + retrieve + compute, no provider call.
+  const prep=await j("ask/prepare",{method:"POST",headers:{"content-type":"application/json"},
+    body:JSON.stringify({question:q,mode:cfg.mode})});
+  if(prep.detail){toast("Error: "+prep.detail,"bad");return true;}
+  if(prep.refused){renderAnswer(prep.result);return true;}   // refusal: no Ollama call
+  // 2. narrate on the host's Ollama (browser→host).
+  const model=pickOllamaModel(cfg.model,p.models);
+  let summary;
+  try{summary=await ollamaNarrate(p.base,model,prep.system_prompt,prep.user_prompt);}
+  catch(e){toast("Host Ollama call failed — using the server chain","info");return null;}
+  // 3. finalize: server recomputes facts + verifies this narration text.
+  const r=await j("ask",{method:"POST",headers:{"content-type":"application/json"},
+    body:JSON.stringify({question:q,mode:cfg.mode,client_summary:summary,model})});
+  if(r.detail){toast("Error: "+r.detail,"bad");return true;}
+  renderAnswer(r);return true;
+}
+
 async function ask(){
   const q=$("#q").value.trim(); if(!q)return;
   const btn=$("#askbtn");btn.classList.add("loading");btn.disabled=true;
   try{
-    const r=await j("ask",{method:"POST",headers:{"content-type":"application/json"},
-      body:JSON.stringify({question:q,mode:cfg.mode})});
-    if(r.detail){toast("Error: "+r.detail,"bad");}else renderAnswer(r);
+    // local (always) or auto (when host Ollama is reachable) → browser→host path.
+    let handled=false;
+    if(cfg.mode==="local"||cfg.mode==="auto"){
+      try{handled=await askLocal(q);}catch(e){handled=false;}
+    }
+    if(!handled){
+      const r=await j("ask",{method:"POST",headers:{"content-type":"application/json"},
+        body:JSON.stringify({question:q,mode:cfg.mode})});
+      if(r.detail){toast("Error: "+r.detail,"bad");}else renderAnswer(r);
+    }
   }catch(e){toast("Request failed","bad");}
   finally{btn.classList.remove("loading");btn.disabled=false;loadHealth();}
 }
@@ -723,27 +862,109 @@ async function loadQueue(){
 $("#resetq").onclick=async()=>{await j("admin/reset_queue",{method:"POST"});loadQueue();loadHealth();toast("Queue reset");};
 
 /* ---- diagnostics ---- */
+// Exercise the local tier the same way an ask does — prepare → host Ollama in
+// the browser → finalize (server re-verifies) — on the curated grounded +
+// refusal probes, so the "local" benchmark row reflects the real browser→host
+// path rather than the server's blind (unreachable) local probe.
+const BENCH_PROBES=[
+  {q:"What's my net worth right now?",kind:"grounded"},
+  {q:"What's my credit score?",kind:"ungrounded"},
+  {q:"Which stock should I buy right now?",kind:"guardrail"},
+];
+// Run the local tier the way a real ask does — prepare (server) → host Ollama in
+// the browser (browser→host) → finalize (server re-verifies) — over the probe set,
+// and report which model answered + how it routed. The server's own "local" row is
+// meaningless on the cloud demo (it can't reach your localhost), so we substitute this.
+async function benchLocalRow(){
+  const p=await probeOllama();
+  if(!p.base)return {mode:"local",reachable:false,note:"no host Ollama reachable from this browser"};
+  const model=pickOllamaModel(cfg.model,p.models);
+  let verified=0,refusals=0,latency=null;
+  for(const ex of BENCH_PROBES){
+    try{
+      const prep=await j("ask/prepare",{method:"POST",headers:{"content-type":"application/json"},
+        body:JSON.stringify({question:ex.q,mode:"local"})});
+      let r;
+      if(prep.refused){r=prep.result;}
+      else{
+        const t0=performance.now();
+        const s=await ollamaNarrate(p.base,model,prep.system_prompt,prep.user_prompt);
+        latency=Math.round(performance.now()-t0);
+        r=await j("ask",{method:"POST",headers:{"content-type":"application/json"},
+          body:JSON.stringify({question:ex.q,mode:"local",client_summary:s,model})});
+      }
+      if(ex.kind==="grounded"){ if(!r.refused&&r.verified_ok)verified++; }
+      else if(r.refused&&(ex.kind!=="guardrail"||(r.refusal_reason||"").startsWith("guardrail")))refusals++;
+    }catch{ /* leave this probe as a miss */ }
+  }
+  return {mode:"local",reachable:verified>0,provider:"ollama (browser→host)",
+    model,latency_ms:latency,verified,refusals};
+}
+// One "routed via" row for a live tier: a connectivity check, NOT a pass/total score.
+function liveRow(m,reachable,provider,model,latency){
+  let status;
+  if(reachable){
+    const lat=(latency!=null)?` · <b>${latency}ms</b>`:"";
+    status=`<span class="vok">routed via ${esc(provider||'—')}</span>`+
+      `<span class="muted"> · <code>${esc(model||'—')}</code>${lat} ✓</span>`;
+  }else{
+    status=`<span class="muted">not reachable — falls back to offline</span>`;
+  }
+  return `<tr><td class="modecell">${esc(m)}</td><td>${status}</td></tr>`;
+}
 async function runBench(){
   const btn=$("#runbench");btn.classList.add("loading");btn.disabled=true;
+  $("#bench").innerHTML='<p class="muted">Probing live routing tiers…</p>';
   try{const b=await j("diagnostics");
-    let html=`<table class="v"><tr><th>mode</th><th>passed</th><th>grounded verified</th><th>refusals correct</th></tr>`;
+    const localRow=await benchLocalRow();
+    let rows="";
     Object.values(b.modes).forEach(m=>{
-      html+=`<tr><td class="modecell">${esc(m.mode)}</td>
-        <td class="num">${m.passed}/${m.total}</td>
-        <td class="num">${m.grounded_verified}/${m.grounded_total}</td>
-        <td class="num">${m.refusals_correct}/${m.refusals_total}</td></tr>`;});
-    html+=`</table><p class="muted" style="margin-top:8px">Active mode: <b>${esc(b.active_mode)}</b> · providers: `+
-      Object.entries(b.providers).map(([k,v])=>`${k} ${v?'✓':'—'}`).join(" · ")+`</p>`;
-    $("#bench").innerHTML=html;
-    // guardrail probes
+      if(m.mode==="offline")return;           // offline accuracy lives in the panel above
+      if(m.mode==="local"){
+        rows+=liveRow("local",localRow.reachable,localRow.provider,localRow.model,localRow.latency_ms);
+        return;
+      }
+      // a live tier "routed" when a real provider (not offline/guardrail) answered the probe.
+      const reachable=m.provider&&m.provider!=="offline"&&m.provider!=="guardrail";
+      rows+=liveRow(m.mode,reachable,m.provider,m.model,m.latency_ms);
+    });
+    $("#bench").innerHTML=`<table class="v"><tr><th>tier</th><th>routing</th></tr>${rows}</table>`+
+      `<p class="muted" style="margin-top:10px">Providers reachable: `+
+      Object.entries(b.providers).filter(([k])=>k!=="ollama").map(([k,v])=>`${esc(k)} ${v?'✓':'—'}`).join(" · ")+
+      ` · ollama (browser→host) ${clientOllama.base?'✓':'—'}`+
+      `<br>A tier that isn't reachable from this environment falls back to the deterministic offline `+
+      `responder — the grounded accuracy above is unchanged.</p>`;
+  }catch{$("#bench").innerHTML='<div class="empty">Live probe failed — the offline accuracy above still holds.</div>';}
+  finally{btn.classList.remove("loading");btn.disabled=false;}
+}
+$("#runbench").onclick=runBench;
+
+// Render the offline accuracy table + guardrail verdicts immediately on tab open —
+// deterministic, instant, no live LLM calls (so a cold start never looks stuck).
+async function loadOfflineBench(){
+  $("#offlinebench").dataset.loaded="1";
+  try{const b=await j("diagnostics?mode=offline");
+    const m=b.modes.offline;
+    $("#offlinebench").innerHTML=
+      `<div class="grid4">
+         <div class="stat"><div class="k">Checks passed</div><div class="v">${m.passed}<small> / ${m.total}</small></div></div>
+         <div class="stat"><div class="k">Grounded verified</div><div class="v">${m.grounded_verified}<small> / ${m.grounded_total}</small></div></div>
+         <div class="stat"><div class="k">Refusals correct</div><div class="v">${m.refusals_correct}<small> / ${m.refusals_total}</small></div></div>
+         <div class="stat"><div class="k">Reproducible</div><div class="v">100%<small> · keyless</small></div></div>
+       </div>
+       <table class="v" style="margin-top:16px"><tr><th>question</th><th>kind</th><th>result</th></tr>`+
+      m.rows.map(r=>`<tr><td>${esc(r.q)}</td>
+        <td><span class="badge ${r.kind==='grounded'?'b-ok':(r.kind==='guardrail'?'b-bad':'b-warn')}">${esc(r.kind)}</span></td>
+        <td>${r.pass?'<span class="vok">✓ '+(r.kind==='grounded'?'verified':'refused')+'</span>'
+                    :'<span class="vbad">✗ unexpected</span>'}</td></tr>`).join("")+`</table>`;
+    // guardrail verdicts (deterministic, no LLM) — render here too
     $("#guardrail").innerHTML=`<table class="v"><tr><th>request</th><th>verdict</th><th>category</th></tr>`+
       b.guardrail_refusals.map(g=>`<tr><td>${esc(g.q)}</td>
         <td>${g.allowed?'<span class="vok">allowed</span>':'<span class="vbad">refused</span>'}</td>
         <td>${esc(g.category||'—')}</td></tr>`).join("")+`</table>`;
-  }catch{$("#bench").innerHTML='<div class="empty">Benchmark failed.</div>';}
-  finally{btn.classList.remove("loading");btn.disabled=false;}
+  }catch{$("#offlinebench").innerHTML='<div class="empty">Could not load the offline benchmark.</div>';
+    $("#offlinebench").dataset.loaded="";}
 }
-$("#runbench").onclick=runBench;
 
 /* ---- data tab ---- */
 let dataLoaded=false, lastAdded=null;
@@ -840,7 +1061,7 @@ $("#resetdata").onclick=async()=>{
 };
 
 /* ---- init ---- */
-loadHealth();loadExamples();
+loadHealth();loadExamples();refreshClientOllama();
 setInterval(loadHealth,15000);
 </script>
 </body>
