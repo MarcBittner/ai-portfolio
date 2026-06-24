@@ -201,9 +201,20 @@ Legend: ✅ done · ◐ partial · ⛔ missing.
 - [ ] **Clarify the elevation tiers (#26):** make `elevated` = full visibility +
       alerting and `admin` = user management, label them in the admin UI, and let the
       admin pick which to grant.
-- [ ] **Durable persistence (#31):** move off ephemeral `/tmp` — a Render persistent
-      disk (`VIGIL_DB` on the mount) or an external DB — so non-admin accounts and
-      history survive redeploys.
+- [x] **Durable persistence (#31):** a MongoDB storage backend is implemented and
+      ships in the image (`pymongo`). The store is a facade over two interchangeable
+      backends — SQLite (default, count-pruned single file) and MongoDB — selected by
+      `MONGODB_URI`. The Mongo model is idiomatic: checks **embedded** in `targets`;
+      `probes`/`check_results`/`logs`/`metric_samples` as **time-series collections**
+      with a **TTL** (`VIGIL_MONGODB_TTL_SECONDS`, default 14d) replacing manual
+      pruning; `users` unique on `email`; indexed `{slug, ts:-1}` document
+      collections. Ids are opaque strings across both backends. Enable durable
+      storage by **setting `MONGODB_URI`** (DB defaults to the dedicated `vigil`
+      database, isolated from other apps on the cluster). The SQLite path + the whole
+      test suite still run with **no pymongo**; `test_store_contract` covers the
+      active backend (plus a mongomock unit + a `MONGODB_URI`-gated live smoke). See
+      `docs/spec/spec.md` → *Storage model*. (Persistent-disk `VIGIL_DB` remains a
+      valid alternative for the SQLite backend.)
 
 ### P3 — originally-listed polish
 - [ ] Persist alert-dedup + rate-limit state for multi-replica HA.

@@ -761,7 +761,7 @@ async function renderCheckList(){
         <button class="sm" data-act="edit" data-id="${ck.id}">Edit</button>
         <button class="sm" data-act="del" data-id="${ck.id}">Del</button></td></tr>`;
   }).join("");
-  $("#ckListBody").querySelectorAll("button").forEach(b=>b.onclick=()=>ckAction(b.dataset.act, +b.dataset.id, d.checks));
+  $("#ckListBody").querySelectorAll("button").forEach(b=>b.onclick=()=>ckAction(b.dataset.act, b.dataset.id, d.checks));
 }
 
 async function ckAction(act, id, list){

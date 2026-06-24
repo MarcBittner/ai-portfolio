@@ -27,6 +27,21 @@ TARGETS_FILE = Path(
     os.environ.get("VIGIL_TARGETS_FILE", str(DB_PATH.parent / "targets.json"))
 )
 
+# --- Storage backend selection --------------------------------------------- #
+# vigil persists to SQLite by default (the dependency-free single-file backend the
+# whole test suite runs on). Setting ``MONGODB_URI`` switches the entire store to a
+# durable MongoDB backend (pymongo, imported lazily so SQLite never needs it). The
+# Mongo DB name defaults to ``vigil`` — a DEDICATED database, isolated from any
+# other app on the same cluster (e.g. persona-twin's ``persona_twin`` vector DB);
+# vigil never reads or writes another app's database/collections.
+# NEEDS-CREDENTIAL for durable storage: set MONGODB_URI to a connection string.
+MONGODB_URI = os.environ.get("MONGODB_URI") or None
+MONGODB_DB = os.environ.get("VIGIL_MONGODB_DB", "vigil")
+# Time-based retention for the Mongo time-series collections (probes, check_results,
+# logs, metric_samples). This replaces SQLite's count-based manual pruning with a
+# self-managing TTL — idiomatic for Mongo time series. Default: 14 days.
+MONGODB_TTL_SECONDS = int(os.environ.get("VIGIL_MONGODB_TTL_SECONDS", str(14 * 86400)))
+
 POLL_INTERVAL_S = float(os.environ.get("VIGIL_POLL_INTERVAL", "60"))
 PROBE_TIMEOUT_S = float(os.environ.get("VIGIL_PROBE_TIMEOUT", "8"))
 # Rolling window (number of recent probes) used for availability + error rate.

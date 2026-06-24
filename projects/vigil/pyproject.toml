@@ -20,6 +20,9 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.6"]
+# Durable MongoDB storage backend (imported lazily in _store_mongo.py, only when
+# MONGODB_URI is set). The default SQLite path + the test suite never need this.
+mongo = ["pymongo>=4.6"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/vigil"]

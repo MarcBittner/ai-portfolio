@@ -735,7 +735,7 @@ def create_check(req: CheckRequest, _user=Depends(require_role("admin"))) -> dic
 
 
 @app.patch("/api/admin/checks/{check_id}")
-def patch_check(check_id: int, req: CheckUpdateRequest,
+def patch_check(check_id: str, req: CheckUpdateRequest,
                 _user=Depends(require_role("admin"))) -> dict:
     if not store.get_check(check_id):
         raise HTTPException(404, "unknown check")
@@ -754,12 +754,12 @@ def patch_check(check_id: int, req: CheckUpdateRequest,
 
 
 @app.delete("/api/admin/checks/{check_id}")
-def remove_check(check_id: int, _user=Depends(require_role("admin"))) -> dict:
+def remove_check(check_id: str, _user=Depends(require_role("admin"))) -> dict:
     return {"removed": store.delete_check(check_id)}
 
 
 @app.post("/api/admin/checks/{check_id}/run")
-async def run_check_now(check_id: int, _user=Depends(require_role("admin"))) -> dict:
+async def run_check_now(check_id: str, _user=Depends(require_role("admin"))) -> dict:
     """Run one check immediately and return the result (for the editor's 'test'
     button). Records the result like a scheduled run so history stays consistent."""
     chk = store.get_check(check_id)

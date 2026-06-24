@@ -5,10 +5,13 @@ RUN useradd --create-home --uid 1001 app
 WORKDIR /app
 
 # Runtime deps only (no dev/test extras). authlib + itsdangerous power the auth +
-# OAuth surface; httpx is the prober's HTTP client.
+# OAuth surface; httpx is the prober's HTTP client. pymongo is the optional durable
+# storage backend — imported lazily and only used when MONGODB_URI is set, but
+# baked into the image so flipping that env var needs no rebuild.
 RUN pip install --no-cache-dir \
     "fastapi>=0.115" "uvicorn>=0.30" "pydantic>=2.7" \
-    "authlib>=1.3" "itsdangerous>=2.1" "httpx>=0.27"
+    "authlib>=1.3" "itsdangerous>=2.1" "httpx>=0.27" \
+    "pymongo>=4.6"
 
 COPY src/ /app/src/
 ENV PYTHONPATH=/app/src \

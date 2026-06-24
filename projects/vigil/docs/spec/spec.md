@@ -91,7 +91,9 @@ deterministic offline), and stdlib/`authlib` auth. The live link is in
 | Module | Responsibility |
 |---|---|
 | `config.py` | Knobs + the seed/`targets.json` registry + `Target` model |
-| `store.py` | SQLite: targets, probe time series, users, alert rules/events |
+| `store.py` | Storage facade → selects SQLite (default) or MongoDB by `MONGODB_URI` |
+| `_store_sqlite.py` | SQLite backend: targets, probe time series, users, alerts, … |
+| `_store_mongo.py` | MongoDB backend (pymongo, lazy): embedded checks + TS + TTL |
 | `probe.py` | Async poller → records probes, evaluates alerts |
 | `metrics.py` | Deterministic rolling availability/error-rate/latency reducer |
 | `security.py` | Live checks → control-mapped findings + posture (postureline math) |
@@ -111,3 +113,70 @@ deterministic offline), and stdlib/`authlib` auth. The live link is in
   `client_summary` cannot change severity (`test_incident`).
 - Posture score is in `[0,100]` on the saturating curve; clean = A/100.
 - Signup is rate-limited per IP; the bootstrap admin is the only auto-admin.
+- The store contract (`test_store_contract`) holds for the active backend: ids are
+  opaque strings, get/update/delete-by-id round-trip, and the time-series + user +
+  alert + quality/push/scan shapes match across SQLite and Mongo.
+
+## Storage model
+
+vigil persists through a single facade, `store.py`, which selects one of two
+interchangeable backends **at import time**:
+
+- **SQLite (default).** A dependency-free single file (`VIGIL_DB`, default
+  `/tmp/vigil.db`). Used for every local run and the **entire test suite** — no
+  external service, no extra deps, no pymongo. Selected whenever `MONGODB_URI` is
+  unset.
+- **MongoDB (durable).** Selected **only** when `MONGODB_URI` is set. `pymongo` is
+  imported lazily inside `_store_mongo.py`, so the SQLite path never needs it. The
+  Mongo database name is `VIGIL_MONGODB_DB` (default **`vigil`**) — a **dedicated**
+  database, isolated from any other app on the same cluster (e.g. persona-twin's
+  `persona_twin` vector DB). vigil never reads or writes another app's database or
+  collections.
+
+Both backends expose the identical public function surface and return shapes.
+
+### Collections (Mongo) and why
+
+The Mongo model is **idiomatic, not a 1:1 copy** of the SQLite tables:
+
+| Collection | Kind | Notes |
+|---|---|---|
+| `targets` | document | `_id = slug`; the target's **checks are embedded** as a `checks` array of subdocs (stable string `id`, name, method, path, headers, body, assertions, required, enabled, created_at) |
+| `probes` | **time series** | `timeField=ts`, `metaField=slug`; TTL-retained |
+| `check_results` | **time series** | `metaField={slug, check_id}`; TTL-retained |
+| `logs` | **time series** | `metaField={slug, level, source}`; TTL-retained |
+| `metric_samples` | **time series** | `metaField={slug, name}`; TTL-retained |
+| `users` | document | `_id` ObjectId; **unique index on `email`** |
+| `alert_rules` | document | indexed `{slug, enabled}` |
+| `alert_events` | document | indexed `{ts:-1}` |
+| `quality` / `pushes` / `repo_scans` | document | indexed `{slug, ts:-1}` |
+
+- **Checks are embedded in `targets`** because a target's checks are bounded and are
+  **always read together with the target** during a poll: embedding makes the common
+  read one document fetch and admin check-CRUD a single array update (`$push` /
+  positional `$set` / `$pull`) — no join, no second collection.
+- **The four append-only series are native time-series collections** with a **TTL**
+  (`expireAfterSeconds`, `VIGIL_MONGODB_TTL_SECONDS`, default 14 days). This is a
+  deliberate **behaviour change** from SQLite: retention becomes **time-based and
+  self-managing** (the server expires old samples) instead of SQLite's count-based
+  manual pruning. On a server too old for time-series collections, the backend falls
+  back to a normal collection with a TTL index on a `Date` expiry field — same
+  retention, detected at `init_db` time.
+- The non-series document collections (`quality`/`pushes`/`repo_scans`) keep the
+  SQLite count-based cap (`MAX_*_PER_TARGET`) since those are small per-commit
+  histories, not high-rate series.
+
+### Opaque string ids (cross-backend)
+
+SQLite assigns integer `rowid`s; Mongo uses `ObjectId`. To keep one API/UI working
+over both, **every id is returned as a string** (`str(rowid)` / `str(ObjectId)`),
+and every get/update/delete-by-id accepts the string form. `api.py`'s check routes
+take `check_id: str` and the SPA treats ids as opaque strings — so neither backend
+leaks its native id type. This is asserted by `test_store_contract`.
+
+### Backend toggle, in one line
+
+```
+MONGODB_URI unset  → SQLite (local + CI; no pymongo)
+MONGODB_URI set    → MongoDB (durable; dedicated `vigil` DB; pymongo loaded lazily)
+```
