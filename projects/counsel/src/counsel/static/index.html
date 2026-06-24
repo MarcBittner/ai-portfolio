@@ -879,7 +879,7 @@ async function benchLocalRow(){
   const p=await probeOllama();
   if(!p.base)return {mode:"local",reachable:false,note:"no host Ollama reachable from this browser"};
   const model=pickOllamaModel(cfg.model,p.models);
-  let verified=0,refusals=0,latency=null;
+  let routed=false,verified=0,refusals=0,latency=null;
   for(const ex of BENCH_PROBES){
     try{
       const prep=await j("ask/prepare",{method:"POST",headers:{"content-type":"application/json"},
@@ -890,6 +890,7 @@ async function benchLocalRow(){
         const t0=performance.now();
         const s=await ollamaNarrate(p.base,model,prep.system_prompt,prep.user_prompt);
         latency=Math.round(performance.now()-t0);
+        routed=true;   // the host Ollama answered — the local tier IS routing
         r=await j("ask",{method:"POST",headers:{"content-type":"application/json"},
           body:JSON.stringify({question:ex.q,mode:"local",client_summary:s,model})});
       }
@@ -897,7 +898,10 @@ async function benchLocalRow(){
       else if(r.refused&&(ex.kind!=="guardrail"||(r.refusal_reason||"").startsWith("guardrail")))refusals++;
     }catch{ /* leave this probe as a miss */ }
   }
-  return {mode:"local",reachable:verified>0,provider:"ollama (browser→host)",
+  // "reachable" = the browser→host Ollama actually answered (routed), NOT whether
+  // its phrasing verified — a working local model that phrases a number its own way
+  // still routed. (verified is reported separately for transparency.)
+  return {mode:"local",reachable:routed,provider:"ollama (browser→host)",
     model,latency_ms:latency,verified,refusals};
 }
 // One "routed via" row for a live tier: a connectivity check, NOT a pass/total score.
@@ -907,6 +911,12 @@ function liveRow(m,reachable,provider,model,latency){
     const lat=(latency!=null)?` · <b>${latency}ms</b>`:"";
     status=`<span class="vok">routed via ${esc(provider||'—')}</span>`+
       `<span class="muted"> · <code>${esc(model||'—')}</code>${lat} ✓</span>`;
+  }else if(m==="paid"){
+    status=`<span class="muted">no API key set — this demo runs keyless `+
+      `(add an Anthropic/OpenAI key to enable)</span>`;
+  }else if(m==="local"){
+    status=`<span class="muted">Ollama not detected in your browser — `+
+      `start Ollama to route locally (browser→host)</span>`;
   }else{
     status=`<span class="muted">not reachable — falls back to offline</span>`;
   }
@@ -917,9 +927,11 @@ async function runBench(){
   $("#bench").innerHTML='<p class="muted">Probing live routing tiers…</p>';
   try{const b=await j("diagnostics");
     const localRow=await benchLocalRow();
-    let rows="";
+    // offline is the always-on deterministic baseline — show it as such, not omitted.
+    let rows=`<tr><td class="modecell">offline</td><td>`+
+      `<span class="vok">always available · deterministic, zero keys ✓</span></td></tr>`;
     Object.values(b.modes).forEach(m=>{
-      if(m.mode==="offline")return;           // offline accuracy lives in the panel above
+      if(m.mode==="offline")return;           // rendered above as the always-on baseline
       if(m.mode==="local"){
         rows+=liveRow("local",localRow.reachable,localRow.provider,localRow.model,localRow.latency_ms);
         return;
