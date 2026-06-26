@@ -80,6 +80,11 @@
     color:var(--ink-dim);cursor:pointer;display:grid;place-items:center;transition:.18s var(--ease)}
   .iconbtn:hover{color:var(--ink);border-color:var(--line-2);transform:translateY(-1px);background:var(--surface-2)}
   .iconbtn svg{width:18px;height:18px}
+  /* footer stack indicator */
+  .appfoot{max-width:1160px;margin:30px auto 10px;padding:14px 24px;border-top:1px solid var(--line);
+    color:var(--ink-dim);font-size:12px;line-height:1.75;text-align:center}
+  .appfoot b{color:var(--ink)} .appfoot .sep{opacity:.4;margin:0 5px}
+  .appfoot a{color:var(--accent);text-decoration:none}
   /* layout */
   main{max-width:1160px;margin:0 auto;padding:26px 24px 64px;display:grid;gap:18px;
     grid-template-columns:1fr 1fr}
@@ -364,6 +369,16 @@
     <h2>Available tools <span class="muted" style="margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400">safe, deterministic</span></h2>
     <div class="body"><div class="toolslist" id="tools"><span class="empty">loading…</span></div></div>
   </div>
+
+  <footer class="appfoot">
+    <b>agent-sandbox</b> — a ReAct-style agent that reasons over safe, deterministic tools
+    (math, unit &amp; date conversions, project lookup), chaining tool results across steps.
+    <span class="sep">·</span> Python 3.11 · FastAPI · Pydantic · a zero-build static SPA
+    <span class="sep">·</span> a vendored multi-provider LLM planner
+    (paid → local Ollama → free OpenRouter → deterministic offline) — runs with <b>zero keys</b>
+    <span class="sep">·</span> the <b>rule</b> planner decides by default; the LLM only plans, tools run server-side with no side effects.
+    <span class="sep">·</span> <a href="#" id="aboutlink">How it works →</a>
+  </footer>
 </main>
 
 <!-- settings drawer -->
@@ -586,6 +601,7 @@ function openHelp(){$("#scrim").classList.add("open");$("#help").classList.add("
 function closeHelp(){$("#scrim").classList.remove("open");$("#help").classList.remove("open");
   $("#help").setAttribute("aria-hidden","true");}
 $("#helpbtn").onclick=openHelp;$("#closehelp").onclick=closeHelp;
+$("#aboutlink")?.addEventListener("click",e=>{e.preventDefault();openHelp();});
 $("#scrim").onclick=()=>{closeDrawer();closeHelp();};
 document.addEventListener("keydown",e=>{
   const typing=/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName||"")||document.activeElement?.isContentEditable;

@@ -370,8 +370,12 @@
     </div>
   </div>
 
-  <footer class="full muted" style="text-align:center;padding:8px">Single-instance demo · synthetic & deterministic · no secrets ·
-    <a href="/metrics">/metrics</a> · <a href="/slo">/slo</a> · <a href="/tasks">/tasks</a> · <a href="/healthz">/healthz</a></footer>
+  <footer class="full muted" style="max-width:960px;margin:30px auto 10px;padding:14px 18px;border-top:1px solid var(--line);text-align:center;font-size:12px;line-height:1.7">
+    <b style="color:var(--ink)">burnrate</b> — an instrumented Flask SRE service: RED metrics, SLO error budgets & a multiwindow burn-rate alerting policy.
+    <span style="opacity:.4;margin:0 5px">·</span> Python 3.11 · Flask · prometheus_client · TaskTiger/Redis · a static SPA
+    <span style="opacity:.4;margin:0 5px">·</span> an LLM incident-summary chain (paid → local Ollama → free → deterministic offline) — runs with <b style="color:var(--ink)">zero keys</b>
+    <span style="opacity:.4;margin:0 5px">·</span> synthetic &amp; deterministic, no secrets
+    <span style="opacity:.4;margin:0 5px">·</span> <a href="/metrics">/metrics</a> · <a href="/slo">/slo</a> · <a href="/tasks">/tasks</a> · <a href="/healthz">/healthz</a></footer>
 </main>
 
 <!-- settings drawer -->

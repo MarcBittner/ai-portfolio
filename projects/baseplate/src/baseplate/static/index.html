@@ -388,6 +388,11 @@
   .ecard .ed{font-size:12px;color:var(--ink-dim);line-height:1.45}
   .num-badge{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;
     color:var(--accent-ink);background:var(--grad);border-radius:999px;padding:2px 9px;margin-right:9px;vertical-align:middle}
+  /* POLISH KIT: footer stack indicator */
+  .appfoot{max-width:960px;margin:30px auto 10px;padding:14px 18px;border-top:1px solid var(--line);
+    color:var(--ink-dim);font-size:12px;line-height:1.75;text-align:center}
+  .appfoot b{color:var(--ink)} .appfoot .sep{opacity:.4;margin:0 5px}
+  .appfoot a{color:var(--accent);text-decoration:none}
 </style>
 </head>
 <body>
@@ -663,6 +668,17 @@
     </div>
   </div>
 </section>
+
+<!-- POLISH KIT: footer stack indicator -->
+<footer class="appfoot">
+  <b>baseplate</b> — describe a service in plain English; it generates the standard, reviewable
+  Docker / Kubernetes / Terraform / CI-CD files and a per-service health view.
+  <span class="sep">·</span> Python · FastAPI · Pydantic · a static SPA
+  <span class="sep">·</span> a vendored multi-provider LLM router
+  (local → paid → free OpenRouter → deterministic offline) — runs with <b>zero keys</b>
+  <span class="sep">·</span> the model only reads your description into a spec; <b>code generates every file</b>.
+  <span class="sep">·</span> <a href="#about" onclick="showView('about');return false;">More in How it works →</a>
+</footer>
 </main>
 
 <!-- settings drawer -->

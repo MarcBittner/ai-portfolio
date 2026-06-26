@@ -211,6 +211,11 @@
     color:var(--ink-dim);border-radius:var(--r-sm);padding:7px 11px;transition:.16s var(--ease)}
   .seg .segbtn:hover{color:var(--ink);border-color:var(--line-2)}
   .seg .segbtn[aria-pressed="true"]{background:var(--grad);border-color:transparent;color:var(--accent-ink);font-weight:600}
+  /* POLISH KIT: footer stack indicator */
+  .appfoot{max-width:960px;margin:30px auto 10px;padding:14px 18px;border-top:1px solid var(--line);
+    color:var(--ink-dim);font-size:12px;line-height:1.75;text-align:center}
+  .appfoot b{color:var(--ink)} .appfoot .sep{opacity:.4;margin:0 5px}
+  .appfoot a{color:var(--accent);text-decoration:none}
   .pstat{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12.5px;
     padding:7px 11px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface-2)}
   .pstat .pdot{width:8px;height:8px;border-radius:50%;background:var(--ink-faint);flex:none}
@@ -491,6 +496,17 @@
     <h2>Measured quality <span class="hint">shadow-judged candidate vs baseline per task class — never assumed</span></h2>
     <div class="body" style="padding:0;overflow-x:auto"><table id="quality"></table></div>
   </div>
+
+  <footer class="appfoot">
+    <b>arbiter</b> — an OpenAI-compatible proxy that learns where you overpay for model quality you don't need,
+    then reroutes — <b>only</b> when measured quality stays above a floor you set.
+    <span class="sep">·</span> Python 3.11 · FastAPI · Pydantic · SQLite · a static SPA
+    <span class="sep">·</span> a vendored multi-provider LLM router
+    (paid → local Ollama → free OpenRouter → deterministic offline)
+    <span class="sep">·</span> quality is <b>measured</b> by real shadow-judging, never assumed; offline it says
+    <b>"can't measure"</b> rather than faking a number.
+    <span class="sep">·</span> <a href="#" id="footHelp">More in Help →</a>
+  </footer>
 </main>
 
 <!-- POLISH KIT: settings drawer -->
@@ -972,6 +988,7 @@ function openHelp(){$("#scrim").classList.add("open");$("#help").classList.add("
 function closeHelp(){$("#scrim").classList.remove("open");$("#help").classList.remove("open");
   $("#help").setAttribute("aria-hidden","true");}
 $("#helpbtn").onclick=openHelp;$("#closehelp").onclick=closeHelp;
+$("#footHelp")?.addEventListener("click",e=>{e.preventDefault();openHelp();});
 $("#scrim").onclick=()=>{closeDrawer();closeHelp();};
 document.addEventListener("keydown",e=>{
   const typing=/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName||"")||document.activeElement?.isContentEditable;

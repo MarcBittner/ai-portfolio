@@ -103,11 +103,11 @@
     transition:.16s var(--ease);display:inline-flex;align-items:center;gap:8px;position:relative}
   .btn:hover{transform:translateY(-1px);border-color:var(--line-2)}
   .btn:active{transform:translateY(0)}
-  .btn.primary{background:var(--grad);border:none;color:#06101f;
+  .btn.primary{background:var(--grad);border:none;color:var(--accent-ink);
     box-shadow:0 6px 20px -8px rgba(106,161,255,.7)}
   .btn.primary:hover{box-shadow:0 10px 28px -8px rgba(106,161,255,.8)}
   .btn[disabled]{opacity:.6;pointer-events:none}
-  .btn .spin{width:14px;height:14px;border:2px solid rgba(6,16,31,.35);border-top-color:#06101f;
+  .btn .spin{width:14px;height:14px;border:2px solid rgba(6,16,31,.35);border-top-color:var(--accent-ink);
     border-radius:50%;animation:spin .7s linear infinite;display:none}
   .btn.loading .spin{display:block}.btn.loading .lbl{opacity:.7}
   .chip{font:inherit;font-size:12px;cursor:pointer;border:1px dashed var(--line);background:transparent;
@@ -338,6 +338,11 @@
   table tbody tr:hover td, table tr:hover td{ background:color-mix(in oklch,var(--accent) 9%,transparent); }
   mark{ transition:filter .2s var(--ease); } mark:hover{ filter:brightness(1.12); }
   @media (prefers-reduced-motion:reduce){ #topbar.on{animation:none} .fx-in{animation:none} }
+  /* STANDARD: footer stack indicator */
+  .appfoot{max-width:1080px;margin:30px auto 10px;padding:14px 18px;border-top:1px solid var(--line);
+    color:var(--ink-dim);font-size:12px;line-height:1.75;text-align:center}
+  .appfoot b{color:var(--ink)} .appfoot .sep{opacity:.4;margin:0 5px}
+  .appfoot a{color:var(--accent);text-decoration:none}
 </style>
 </head>
 <body>
@@ -426,6 +431,17 @@
       </div>
     </div>
   </div>
+
+  <footer class="appfoot">
+    <b>attack-surface</b> — turns an exposure scan into governance evidence:
+    assets → findings → a SOC 2 / ISO 27001 control crosswalk → a posture grade → a board-ready exec narrative.
+    <span class="sep">·</span> Python 3.11 · FastAPI · a zero-build static SPA
+    <span class="sep">·</span> CT-log enumeration + service fingerprinting + control mapping
+    <span class="sep">·</span> exec narrative via a vendored multi-provider LLM router
+    (paid → local Ollama → free OpenRouter → deterministic offline) — runs with <b>zero keys</b>
+    <span class="sep">·</span> synthetic, owned-domain fixtures; <b>no real targets</b>.
+    <span class="sep">·</span> <a href="#" id="aboutlink">More in About →</a>
+  </footer>
 </main>
 
 <!-- settings drawer -->
@@ -707,6 +723,7 @@ function openHelp(){$("#scrim").classList.add("open");$("#help").classList.add("
 function closeHelp(){$("#scrim").classList.remove("open");$("#help").classList.remove("open");
   $("#help").setAttribute("aria-hidden","true");}
 $("#helpbtn").onclick=openHelp;$("#closehelp").onclick=closeHelp;
+$("#aboutlink")?.addEventListener("click",e=>{e.preventDefault();openHelp();});
 $("#scrim").onclick=()=>{closeDrawer();closeHelp();};
 document.addEventListener("keydown",e=>{
   const typing=/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName||"")||document.activeElement?.isContentEditable;
