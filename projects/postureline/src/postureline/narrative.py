@@ -184,6 +184,18 @@ def _slim(report: dict) -> dict:
              "controls", "framework_rollup") if k in report}
 
 
+def prepare(report: dict) -> tuple[str, str]:
+    """The (system, user_prompt) for the board/exec narrative, WITHOUT calling a
+    model. The browser runs this exact pair on the user's host Ollama for the local
+    tier (browser→host) and posts the raw output back as ``client_narrative``, so
+    the cloud demo's local mode works without the server ever reaching
+    ``localhost:11434``. ``generate()`` builds the same pair, so both paths share one
+    prompt-builder (mirroring promptguard's ``llm_classify.prepare()``)."""
+    surface = report.get("surface", "exposure")
+    slim = _slim(report)
+    return _system(surface), "Posture report (JSON):\n" + json.dumps(slim)
+
+
 def generate(report: dict, *, mode: str | None = None,
              client_narrative: str | None = None) -> dict:
     """Generate the board/exec risk report for a governed posture report.
@@ -211,8 +223,8 @@ def generate(report: dict, *, mode: str | None = None,
             "provider": "ollama (browser→host)", "model": "host",
             "mode": "local", "latency_ms": 0, "cost_usd": 0.0, "fallbacks": [],
         }
-    user = "Posture report (JSON):\n" + json.dumps(slim)
-    res = llm.complete(_system(surface), user, offline=_offline_narrative,
+    system, user = prepare(report)
+    res = llm.complete(system, user, offline=_offline_narrative,
                        mode=mode, json_mode=True, max_tokens=1000)
     parsed = _parse(res.text, slim)
     return {

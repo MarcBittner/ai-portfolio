@@ -83,31 +83,44 @@ _LLM_SYSTEM = (
 )
 
 
+def prepare(text: str) -> tuple[str, str]:
+    """The (system, user) prompt for the line-item extractor. The browser runs this
+    on the user's host Ollama for the local tier (browser→host), so the cloud demo's
+    local mode works without the server ever reaching ``localhost:11434``."""
+    return _LLM_SYSTEM, f"Document:\n{text}\n\nReturn the line items as JSON."
+
+
+def rows_to_items(rows: list, base: float = 0.9) -> list[LineItem] | None:
+    """Turn a list of raw extracted dict rows into validated ``LineItem``s (method
+    ``llm``). Shared by the server-side LLM path and the browser→host fold-in.
+    Returns None when no row validates, so callers fall back to the table parser."""
+    items: list[LineItem] = []
+    for row in rows:
+        try:
+            q = float(row["quantity"])
+            uc = float(row["unit_cost"])
+            tot = float(row.get("total", q * uc) if row.get("total") is not None
+                        else q * uc)
+            items.append(LineItem(
+                csi=str(row["csi"]).strip(), description=str(row["description"]).strip(),
+                quantity=q, unit=str(row["unit"]).upper(), unit_cost=uc, total=tot,
+                method="llm", confidence=_confidence(q, uc, tot, base=base),
+            ))
+        except (KeyError, TypeError, ValueError):
+            continue
+    return items or None
+
+
 def llm_extract(text: str, provider: str | None = "auto",
                 model: str | None = None) -> tuple[list[LineItem] | None, llm.LLMResult]:
     """Schema-constrained line-item extraction via the LLM router. Returns
     ``(items_or_None, routing)`` — None when no model is available or parse fails,
     so the caller falls back to the deterministic parser."""
-    parsed, result = llm.complete_json(
-        f"Document:\n{text}\n\nReturn the line items as JSON.", _LLM_SYSTEM,
-        provider=provider, model=model,
-    )
+    system, user = prepare(text)
+    parsed, result = llm.complete_json(user, system, provider=provider, model=model)
     if not isinstance(parsed, list):
         return None, result
-    items: list[LineItem] = []
-    for row in parsed:
-        try:
-            q = float(row["quantity"])
-            uc = float(row["unit_cost"])
-            tot = float(row.get("total", q * uc))
-            items.append(LineItem(
-                csi=str(row["csi"]).strip(), description=str(row["description"]).strip(),
-                quantity=q, unit=str(row["unit"]).upper(), unit_cost=uc, total=tot,
-                method="llm", confidence=_confidence(q, uc, tot, base=0.9),
-            ))
-        except (KeyError, TypeError, ValueError):
-            continue
-    return (items or None), result
+    return rows_to_items(parsed), result
 
 
 def extract_line_items(text: str, use_llm: bool = True, provider: str | None = "auto",

@@ -14,8 +14,8 @@ from fastapi.responses import FileResponse
 from reconcile import __version__, llm
 from reconcile.data import BASELINE, MARKET, SAMPLES
 from reconcile.evaluate import run_eval
-from reconcile.extract import extract_line_items
-from reconcile.models import AnalyzeRequest, HealthResponse, SampleInfo
+from reconcile.extract import extract_line_items, parse_table, prepare, rows_to_items
+from reconcile.models import AnalyzeRequest, HealthResponse, RoutingInfo, SampleInfo
 from reconcile.review import build_queue
 from reconcile.variance import reconcile_items
 
@@ -69,22 +69,40 @@ def eval_extraction() -> dict:
     return run_eval()
 
 
+def _resolve_text(request: AnalyzeRequest) -> tuple[str, str | None]:
+    """Resolve the request to ``(text, doc_name)`` — a bundled sample or pasted
+    text. Raises 404/422 the same way for /analyze and /analyze/prepare."""
+    if request.sample is not None:
+        if request.sample not in SAMPLES:
+            raise HTTPException(404, f"unknown sample; valid: {list(SAMPLES)}")
+        return SAMPLES[request.sample], request.sample
+    if request.text:
+        return request.text, None
+    raise HTTPException(422, "provide either 'text' or 'sample'")
+
+
 @app.post("/analyze")
 def analyze(request: AnalyzeRequest) -> dict:
     if request.provider not in VALID_PROVIDERS:
         raise HTTPException(422, f"unknown provider; valid: {list(VALID_PROVIDERS)}")
-    if request.sample is not None:
-        if request.sample not in SAMPLES:
-            raise HTTPException(404, f"unknown sample; valid: {list(SAMPLES)}")
-        text, doc = SAMPLES[request.sample], request.sample
-    elif request.text:
-        text, doc = request.text, None
-    else:
-        raise HTTPException(422, "provide either 'text' or 'sample'")
+    text, doc = _resolve_text(request)
 
-    items, routing, method = extract_line_items(
-        text, request.use_llm, request.provider, request.model
-    )
+    ce = request.client_extraction
+    if request.use_llm and ce is not None:
+        # Browser→host: the user's own Ollama already extracted the rows in the
+        # browser; fold them in here rather than calling the model server-side.
+        # Fall back to the deterministic table parser if none validate.
+        client_items = rows_to_items([i.model_dump() for i in ce.items])
+        if client_items is not None:
+            items, method = client_items, "llm"
+            routing = RoutingInfo(provider="ollama (browser→host)",
+                                  model=ce.model or "ollama", fallbacks=[])
+        else:
+            items, routing, method = parse_table(text), None, "table"
+    else:
+        items, routing, method = extract_line_items(
+            text, request.use_llm, request.provider, request.model
+        )
     reconciled = reconcile_items(items)
     return {
         "document": doc,
@@ -97,6 +115,19 @@ def analyze(request: AnalyzeRequest) -> dict:
         "lines": reconciled["lines"],
         "review_queue": build_queue(reconciled),
     }
+
+
+@app.post("/analyze/prepare")
+def analyze_prepare(request: AnalyzeRequest) -> dict:
+    """Browser→host step 1: return the extractor prompt WITHOUT calling a model, so
+    the browser can run it on the user's own host Ollama (the local tier) and POST
+    the rows back to ``/analyze`` as ``client_extraction``. ``applies`` is False when
+    the LLM path wouldn't run (no use_llm), in which case the browser should just
+    call ``/analyze`` normally."""
+    text, _doc = _resolve_text(request)
+    system, user_prompt = prepare(text)
+    return {"applies": bool(request.use_llm), "system": system,
+            "user_prompt": user_prompt}
 
 
 @app.get("/", include_in_schema=False)

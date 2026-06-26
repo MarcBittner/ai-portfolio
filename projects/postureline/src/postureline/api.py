@@ -163,6 +163,23 @@ def report_post(req: ReportRequest) -> dict:
         client_narrative=req.client_narrative)
 
 
+@app.post("/report/prepare")
+def report_prepare(req: ReportRequest) -> dict:
+    """Browser→host step 1 for the board narrative: return the LLM prompt
+    ``{system, user_prompt}`` for ``surface``'s computed posture WITHOUT calling a
+    model, so the browser can run it on the user's own host Ollama (the local tier)
+    and POST the raw output back to ``POST /report`` as ``client_narrative``.
+
+    The deterministic posture (findings/scores/controls/roll-up) is computed
+    server-side here and embedded in the prompt; only the model's prose comes from
+    the browser. Mirrors ``/scan/warehouse/freetext`` for the classify step and
+    promptguard's ``/scan/prepare``."""
+    _require_surface(req.surface)
+    report = scan.run(req.surface, remediated=req.remediated)
+    system, user_prompt = narrative.prepare(report)
+    return {"surface": req.surface, "system": system, "user_prompt": user_prompt}
+
+
 @app.get("/evidence")
 def evidence_export(surface: str = "exposure", control: str | None = None,
                     format: str = "json"):

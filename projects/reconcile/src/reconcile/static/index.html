@@ -512,18 +512,85 @@ async function loadSamples(){
 }
 $("#load").onclick=()=>{$("#doc").value=window._samples[$("#sample").value]||"";$("#srcnote").textContent=`loaded · ${$("#sample").value}`};
 
+/* ---- browser→host Ollama bridge ----
+   A cloud server can never reach your localhost Ollama, so for the LOCAL tier the
+   browser runs the line-item extractor on YOUR host Ollama and posts the rows to
+   /analyze as client_extraction. Tries :11434, then a CORS proxy on :11435
+   (set `OLLAMA_ORIGINS=<this origin> ollama serve` so the browser may call it). */
+const OLLAMA_CANDIDATES=["http://localhost:11434","http://localhost:11435"];
+let _ollama={base:null,models:[],at:0};
+async function probeOllama(){
+  const now=Date.now();
+  if(_ollama.base!==null && now-_ollama.at<30000) return _ollama;
+  for(const base of OLLAMA_CANDIDATES){
+    try{
+      const r=await fetch(base+"/api/tags",{signal:AbortSignal.timeout(1500)});
+      if(r.ok){const j=await r.json();
+        _ollama={base,models:(j.models||[]).map(m=>m.name),at:now};return _ollama;}
+    }catch(e){}
+  }
+  _ollama={base:null,models:[],at:now};return _ollama;
+}
+function pickOllamaModel(configured,available){
+  if(configured && available.some(m=>m===configured||m.split(":")[0]===configured.split(":")[0]))
+    return configured;
+  return available.length?available[0]:(configured||"llama3.1:8b");
+}
+async function ollamaExtract(base,model,system,user){
+  const r=await fetch(base+"/api/chat",{method:"POST",
+    headers:{"content-type":"application/json"},
+    body:JSON.stringify({model,stream:false,format:"json",
+      messages:[{role:"system",content:system},{role:"user",content:user}]}),
+    signal:AbortSignal.timeout(45000)});
+  if(!r.ok)throw new Error("ollama "+r.status);
+  const j=await r.json(); const txt=(j.message&&j.message.content)||"";
+  let parsed; try{parsed=JSON.parse(txt);}catch(e){
+    const s=txt.indexOf("["),e2=txt.lastIndexOf("]"); if(s>=0&&e2>s)parsed=JSON.parse(txt.slice(s,e2+1));}
+  // Models sometimes wrap the array in an object ({items:[...]} / {line_items:[...]}).
+  let rows=Array.isArray(parsed)?parsed:(parsed&&(parsed.items||parsed.line_items||parsed.lines));
+  if(!Array.isArray(rows))throw new Error("no array");
+  return {items:rows,model};
+}
+// Local tier in the browser: returns a client_extraction, or null to let the
+// server handle it (no host Ollama, LLM off, or a non-local mode).
+async function localExtract(body,mode){
+  if(!cfg.use_llm)return null;
+  if(!(mode==="auto"||mode==="offline"||mode==="ollama"))return null;
+  const p=await probeOllama(); if(!p.base)return null;
+  let prep;
+  try{prep=await fetch("analyze/prepare",{method:"POST",headers:{"content-type":"application/json"},
+    body:JSON.stringify({...body,provider:mode})}).then(r=>r.json());}
+  catch(e){return null;}
+  if(!prep.applies)return null;
+  try{return await ollamaExtract(p.base,pickOllamaModel(cfg.model,p.models),prep.system,prep.user_prompt);}
+  catch(e){toast("Host Ollama call failed — using the server chain","info");return null;}
+}
+
 async function analyze(){
   const btn=$("#analyze");btn.classList.add("loading");
   const text=$("#doc").value.trim();
   const sample=$("#sample").value;
   const body=text?{text}:{sample};
   // "local" mode pins the on-box Ollama provider; other modes pass through verbatim.
-  body.use_llm=cfg.use_llm;body.provider=(cfg.mode==="local"?"ollama":(cfg.mode||"auto"));body.model=cfg.model||null;
+  const mode=(cfg.mode==="local"?"ollama":(cfg.mode||"auto"));
+  body.use_llm=cfg.use_llm;body.provider=mode;body.model=cfg.model||null;
   try{
+    // Browser→host: run the local tier's extractor on the user's own Ollama.
+    if(cfg.use_llm){
+      const ce=await localExtract(body,mode);
+      if(ce)body.client_extraction=ce;
+    }
     const r=await fetch("analyze",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
     if(!r.ok){toast("Analyze failed · "+r.status,"bad");return}
-    render(await r.json());
-    $("#srcnote").textContent=text?"analyzed · pasted document":`analyzed · ${sample}`;
+    const data=await r.json();
+    render(data);
+    // Honest routing note: "browser→host" only when the server folded in the rows
+    // our browser extracted on the user's own Ollama.
+    const src=text?"pasted document":sample;
+    const rt=data.routing;
+    $("#srcnote").textContent=rt
+      ? `analyzed · ${src} · ${data.extraction.method} via ${rt.provider} (${rt.model})`
+      : `analyzed · ${src} · ${data.extraction.method}`;
   }catch(e){toast("Analyze request failed","bad")}
   finally{btn.classList.remove("loading")}
 }

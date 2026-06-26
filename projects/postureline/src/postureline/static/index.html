@@ -701,8 +701,9 @@ async function loadSurface(){
     try{
       const base=await probeOllama();
       if(base){
-        const ft=await j(`scan/warehouse/freetext`);   // free-text columns + samples
-        clientClassify=await ollamaClassify(base, ft.columns||[]);
+        const ft=await j(`scan/warehouse/freetext`);   // server prompt + free-text columns + samples
+        const model=pickOllamaModel(cfg.model, _ollamaProbe.models);
+        clientClassify=await ollamaClassify(base, model, ft.system, ft.phi_types||[], ft.columns||[]);
       }else if(mode==="local")toast("Host Ollama not reachable — using offline classifier","info");
     }catch{toast("Host Ollama classification failed — falling back","info");}
   }
@@ -728,10 +729,12 @@ async function loadSurface(){
     try{
       const base=await probeOllama();
       if(base){
-        // The slim payload mirrors narrative.py's _slim(): exactly what the server prompts with.
-        const payload={surface:SURFACE, posture:p.posture, findings:p.findings,
-          severity_counts:p.severity_counts, controls:c.controls, framework_rollup:c.framework_rollup};
-        body.client_narrative=await ollamaNarrative(base,payload);
+        // Server builds the exact prompt (narrative.prepare) so there's no client copy
+        // to drift; the browser just runs it on the host model and posts the result back.
+        const prep=await j(`report/prepare`,{method:"POST",headers:{"content-type":"application/json"},
+          body:JSON.stringify({surface:SURFACE, mode:cfg.mode||null})});
+        const model=pickOllamaModel(cfg.model, _ollamaProbe.models);
+        body.client_narrative=await ollamaNarrative(base, model, prep.system, prep.user_prompt);
       }else if(mode==="local")toast("Host Ollama not reachable — using offline fallback","info");
     }catch{toast("Host Ollama call failed — falling back","info");}
   }
@@ -817,51 +820,38 @@ const PROVIDERS=["anthropic","openai","ollama","openrouter"];
    Only the Ollama check + call run in the BROWSER (your machine can reach
    localhost; the cloud server can't). Every other provider stays server-side. */
 const OLLAMA_CANDIDATES=["http://localhost:11434","http://localhost:11435"];
-// Mirrors narrative.py's _system()/user prompt so the host model returns the exact
-// JSON shape the server's _parse() expects:
+// The board-narrative system prompt + user payload are built SERVER-SIDE by
+// narrative.prepare() and handed to the browser via POST /report/prepare, so there
+// is one prompt-builder of record (no client copy to drift). The host model returns
+// the JSON the server's _parse() expects:
 // {summary, top_risks:[{id,risk,impact}], remediation, residual_risk}.
-const NARR_SURFACE_FRAME={
-  warehouse:"the organization's regulated analytics warehouse (data-access governance: "+
-    "unmasked sensitive columns and re-identification risk)",
-  exposure:"the organization's externally observable internet estate (open services, "+
-    "TLS certificates, end-of-life software)",
-};
-function narrSystem(surface){
-  const frame=NARR_SURFACE_FRAME[surface]||"the organization's estate";
-  return "You are a Director of Security / GRC writing a board-level risk report. You "+
-    "are given the machine-computed output of a security-posture run over "+frame+
-    ": a severity-weighted posture score and grade, severity counts, the open "+
-    "findings, the per-control pass/fail roll-up, and a multi-framework "+
-    "(SOC 2 / HIPAA / ISO 27001 / NIST 800-53 / 800-171 / CMMC) summary. Write a "+
-    "board-ready risk report framed as a governance program, not a findings dump. "+
-    'Return STRICT JSON {"summary": <3-5 sentence plain-prose posture summary '+
-    "naming the grade, the severity profile, and how many controls/frameworks are "+
-    'failing>, "top_risks": [{"id": <finding id>, "risk": <short risk '+
-    'name>, "impact": <one sentence on business / compliance impact>}], '+
-    '"remediation": <2-3 sentences on what fixing the top risks buys, in '+
-    'posture and framework terms>, "residual_risk": <1-2 sentences on what risk '+
-    "remains after the top fixes>}. Cover EVERY critical and high finding in "+
-    "top_risks, highest severity first. Use ONLY the findings, scores, controls, "+
-    "and frameworks given — never invent findings, numbers, or controls. Output "+
-    "JSON only.";
-}
-let _ollamaProbe={base:null,at:0};
+let _ollamaProbe={base:null,models:[],at:0};
 async function probeOllama(){
   const now=Date.now();
-  if(now-_ollamaProbe.at<30000)return _ollamaProbe.base;
-  let base=null;
+  if(_ollamaProbe.base!==null && now-_ollamaProbe.at<30000)return _ollamaProbe.base;
+  let base=null, models=[];
   for(const c of OLLAMA_CANDIDATES){
-    try{const r=await fetch(`${c}/api/tags`,{signal:AbortSignal.timeout(1500)});if(r.ok){base=c;break;}}catch{}
+    try{const r=await fetch(`${c}/api/tags`,{signal:AbortSignal.timeout(1500)});
+      if(r.ok){base=c;const d=await r.json();models=(d.models||[]).map(m=>m.name||m.model).filter(Boolean);break;}}catch{}
   }
-  _ollamaProbe={base,at:now};return base;
+  _ollamaProbe={base,models,at:now};return base;
 }
-// Run narrative.py's prompt against the host model; return the raw text the
-// server submits as `client_narrative` (the server parses it the same way).
-async function ollamaNarrative(base, payload){
-  const user="Posture report (JSON):\n"+JSON.stringify(payload);
+// Use the configured model if it's actually installed on the host (match on the
+// full tag or the base name), else the host's first model, else the default — so a
+// stale/absent configured model doesn't 500 the host call and silently fall back.
+function pickOllamaModel(configured,available){
+  if(configured && (available||[]).some(m=>m===configured||m.split(":")[0]===configured.split(":")[0]))
+    return configured;
+  return (available&&available.length)?available[0]:(configured||"llama3.1:8b");
+}
+// Run the board-narrative prompt against the host model and return the raw text the
+// server submits as `client_narrative` (the server parses it the same way). The
+// {system,user} come from the server's /report/prepare so the server-side prompt
+// builder (narrative.prepare) is the single source of truth.
+async function ollamaNarrative(base, model, system, user){
   const r=await fetch(`${base}/api/chat`,{method:"POST",headers:{"content-type":"application/json"},
-    body:JSON.stringify({model:cfg.model||"llama3.1:8b",stream:false,format:"json",
-      messages:[{role:"system",content:narrSystem(payload.surface)},{role:"user",content:user}]}),
+    body:JSON.stringify({model,stream:false,format:"json",
+      messages:[{role:"system",content:system},{role:"user",content:user}]}),
     signal:AbortSignal.timeout(120000)});
   if(!r.ok)throw new Error("ollama "+r.status);
   const data=await r.json();
@@ -869,38 +859,32 @@ async function ollamaNarrative(base, payload){
 }
 
 /* ---- Warehouse free-text PHI classification (browser→host) ----------------
-   Mirrors classify.py's SYSTEM prompt + per-column user prompt so the host model
-   returns the exact JSON {phi_types:[...], contains_phi:bool} the server's
-   _parse_phi() expects. We send the server only the PHI *labels* per column
-   (client_classify); the server re-derives masking/k-anon/controls itself. */
-const PHI_TYPES=["NAME","DOB","DATE","PHONE","EMAIL","SSN","MRN","ADDRESS","ZIP"];
-function classifySystem(){
-  return "You are a PHI (protected health information) classifier for a data-warehouse "+
-    "governance tool. You are given sample values from one free-text column. "+
-    'Return STRICT JSON {"phi_types": [<subset of '+PHI_TYPES.join(", ")+
-    '>], "contains_phi": <bool>}. List a type only if a value of that type '+
-    "LITERALLY appears in the samples. Output JSON only.";
-}
-function parsePhi(text){
+   The SYSTEM prompt + the allowed PHI type list come SERVER-SIDE from
+   /scan/warehouse/freetext (classify.SYSTEM / classify.PHI_TYPES), so there is one
+   prompt of record. The host model returns {phi_types:[...], contains_phi:bool}; we
+   send the server only the PHI *labels* per column (client_classify) and it
+   re-derives masking/k-anon/controls itself. */
+function parsePhi(text, phiTypes){
   let s=(text||"").trim();
   if(s.includes("```"))s=s.split("```")[1].replace(/^json/,"").trim();
   const a=s.indexOf("{"), b=s.lastIndexOf("}");
   let obj={}; try{obj=a>=0?JSON.parse(s.slice(a,b+1)):{};}catch{return [];}
-  return (obj.phi_types||[]).map(x=>String(x).toUpperCase()).filter(t=>PHI_TYPES.includes(t));
+  return (obj.phi_types||[]).map(x=>String(x).toUpperCase()).filter(t=>(phiTypes||[]).includes(t));
 }
 // Classify each free-text column against the host model; returns the
 // {"TABLE.COLUMN": ["NAME","DOB",...]} map the server accepts as client_classify.
-async function ollamaClassify(base, columns){
+// `system`/`phiTypes` come from /scan/warehouse/freetext; `model` from pickOllamaModel.
+async function ollamaClassify(base, model, system, phiTypes, columns){
   const out={};
   for(const col of columns){
     const user="Column: "+col.column+"\nSamples:\n"+(col.samples||[]).join("\n");
     const r=await fetch(`${base}/api/chat`,{method:"POST",headers:{"content-type":"application/json"},
-      body:JSON.stringify({model:cfg.model||"llama3.1:8b",stream:false,format:"json",
-        messages:[{role:"system",content:classifySystem()},{role:"user",content:user}]}),
+      body:JSON.stringify({model,stream:false,format:"json",
+        messages:[{role:"system",content:system},{role:"user",content:user}]}),
       signal:AbortSignal.timeout(120000)});
     if(!r.ok)throw new Error("ollama "+r.status);
     const data=await r.json();
-    out[`${col.table}.${col.column}`]=parsePhi(data?.message?.content||"");
+    out[`${col.table}.${col.column}`]=parsePhi(data?.message?.content||"", phiTypes);
   }
   return out;
 }
