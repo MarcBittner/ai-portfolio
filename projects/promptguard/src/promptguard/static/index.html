@@ -528,16 +528,72 @@ function loadSamples(){
   });
 }
 
+/* ---- browser→host Ollama bridge ----
+   A cloud server can never reach your localhost Ollama, so for the LOCAL tier the
+   browser runs the injection classifier on YOUR host Ollama and posts the verdict
+   to /scan as client_classification. Tries :11434, then a CORS proxy on :11435
+   (set `OLLAMA_ORIGINS=<this origin> ollama serve` so the browser may call it). */
+const OLLAMA_CANDIDATES=["http://localhost:11434","http://localhost:11435"];
+let _ollama={base:null,models:[],at:0};
+async function probeOllama(){
+  const now=Date.now();
+  if(_ollama.base!==null && now-_ollama.at<30000) return _ollama;
+  for(const base of OLLAMA_CANDIDATES){
+    try{
+      const r=await fetch(base+"/api/tags",{signal:AbortSignal.timeout(1500)});
+      if(r.ok){const j=await r.json();
+        _ollama={base,models:(j.models||[]).map(m=>m.name),at:now};return _ollama;}
+    }catch(e){}
+  }
+  _ollama={base:null,models:[],at:now};return _ollama;
+}
+function pickOllamaModel(configured,available){
+  if(configured && available.some(m=>m===configured||m.split(":")[0]===configured.split(":")[0]))
+    return configured;
+  return available.length?available[0]:(configured||"llama3.1:8b");
+}
+async function ollamaClassify(base,model,system,user){
+  const r=await fetch(base+"/api/chat",{method:"POST",
+    headers:{"content-type":"application/json"},
+    body:JSON.stringify({model,stream:false,format:"json",
+      messages:[{role:"system",content:system},{role:"user",content:user}]}),
+    signal:AbortSignal.timeout(45000)});
+  if(!r.ok)throw new Error("ollama "+r.status);
+  const j=await r.json(); const txt=(j.message&&j.message.content)||"";
+  let parsed={}; try{parsed=JSON.parse(txt);}catch(e){
+    const s=txt.indexOf("{"),e2=txt.lastIndexOf("}"); if(s>=0&&e2>s)parsed=JSON.parse(txt.slice(s,e2+1));}
+  return {injection:!!parsed.injection,reason:String(parsed.reason||"").slice(0,400),model};
+}
+// Local tier in the browser: returns a client_classification, or null to let the
+// server handle it (no host Ollama, classifier doesn't apply, or a non-local mode).
+async function localClassify(text,direction,mode,cfgModel){
+  if(!(mode==="auto"||mode==="offline"||mode==="ollama"))return null;
+  const p=await probeOllama(); if(!p.base)return null;
+  let prep;
+  try{prep=await fetch("scan/prepare",{method:"POST",headers:{"content-type":"application/json"},
+    body:JSON.stringify({text,direction,use_llm:true,provider:mode})}).then(r=>r.json());}
+  catch(e){return null;}
+  if(!prep.applies)return null;
+  try{return await ollamaClassify(p.base,pickOllamaModel(cfgModel,p.models),prep.system,prep.user_prompt);}
+  catch(e){toast("Host Ollama call failed — using the server chain","info");return null;}
+}
+
 async function scan(){
   const text=$("text").value;
   if(!text.trim()){toast("Paste some text to scan","info");return;}
   const btn=$("scan");btn.classList.add("loading");
   try{
+    const dir=$("direction").value, useLlm=$("useLlm").checked, mode=$("provider").value;
+    const cfgModel=(($("model")||{}).value)||"";
+    const body={text,direction:dir,use_llm:useLlm,provider:mode,model:cfgModel||null};
+    // Browser→host: run the local tier's classifier on the user's own Ollama.
+    if(useLlm){
+      const cc=await localClassify(text,dir,mode,cfgModel);
+      if(cc)body.client_classification=cc;
+    }
     const res=await fetch("scan",{
       method:"POST",headers:{"content-type":"application/json"},
-      body:JSON.stringify({text,direction:$("direction").value,
-        use_llm:$("useLlm").checked,provider:$("provider").value,
-        model:$("model").value||null}),
+      body:JSON.stringify(body),
     });
     if(!res.ok){toast("Scan failed: "+res.status,"bad");btn.classList.remove("loading");return;}
     const data=await res.json();
@@ -621,7 +677,7 @@ const MODE_BLURBS={
   auto:"auto = free if an OpenRouter key is set, else paid, else local, else mock.",
   free:"free = OpenRouter free models only.",
   paid:"paid = Anthropic (Claude), then OpenAI.",
-  offline:"offline = local Ollama if reachable, else deterministic mock (no API call).",
+  offline:"offline = your own Ollama, run in THIS browser (browser→host) — works even on the cloud demo; else a deterministic mock (no API call).",
 };
 const MODE_CHAIN={
   auto:["openrouter","anthropic","openai","ollama","mock"],

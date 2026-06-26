@@ -17,9 +17,17 @@ _SYSTEM = (
 )
 
 
+def prepare(text: str) -> tuple[str, str]:
+    """The (system, user) prompt for the injection classifier. The browser runs
+    this on the user's host Ollama for the local tier (browser→host), so the cloud
+    demo's local mode works without the server ever reaching ``localhost:11434``."""
+    return _SYSTEM, f"INPUT:\n{text}"
+
+
 def classify(text: str, provider: str | None = "auto",
              model: str | None = None) -> tuple[bool | None, str, llm.LLMResult]:
-    parsed, result = llm.complete_json(f"INPUT:\n{text}", _SYSTEM, provider, model)
+    system, user = prepare(text)
+    parsed, result = llm.complete_json(user, system, provider, model)
     if isinstance(parsed, dict) and isinstance(parsed.get("injection"), bool):
         return parsed["injection"], str(parsed.get("reason", ""))[:200], result
     return None, "", result
