@@ -1,8 +1,14 @@
 # reconcile
 
-![reconcile UI](docs/screenshot.png)
+[![CI](https://github.com/MarcBittner/ai-portfolio/actions/workflows/projects-ci.yml/badge.svg)](https://github.com/MarcBittner/ai-portfolio/actions/workflows/projects-ci.yml)
+[![License: Proprietary](https://img.shields.io/badge/license-proprietary-red.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org)
+[![Ruff](https://img.shields.io/badge/lint-ruff-261230.svg)](https://github.com/astral-sh/ruff)
+[![FastAPI](https://img.shields.io/badge/api-FastAPI-009688.svg)](https://fastapi.tiangolo.com)
 
-**[▶ Live demo](https://reconcile-gfuj.onrender.com)**
+![reconcile screenshot](docs/screenshot.png)
+
+**[▶ Live demo](https://reconcile-75c4.onrender.com)**
 
 Document **line-item reconciliation**: extract the line items from a document
 (change order, invoice, purchase order), diff each one against a **baseline
@@ -24,11 +30,25 @@ decisions that move money.
 
 ## Contents
 
+- [Stack](#stack)
 - [Architecture](#architecture)
 - [Design decisions](#design-decisions)
 - [Data model & invariants](#data-model-invariants)
 - [API](#api)
 - [Quickstart](#quickstart)
+
+## Stack
+
+Python 3.11 · FastAPI · Pydantic request/response models · a static
+zero-build SPA (`src/reconcile/static/`) · a vendored, stdlib-only multi-provider
+LLM router with a deterministic offline fallback. The whole pipeline —
+extract → variance → review → eval — runs **offline with zero keys and no
+network**: a regex table parser plus a deterministic mock provider stand in for
+any model, so the hosted demo is zero-cost and fully reviewable. With a provider
+configured (`ANTHROPIC_API_KEY`, Ollama, OpenAI/OpenRouter) the extract stage
+upgrades to schema-constrained structured outputs and falls back to the
+deterministic parser the moment no model is available. Sample documents are
+synthetic and clearly fictional; it also runs on your own real documents.
 
 ## Architecture
 

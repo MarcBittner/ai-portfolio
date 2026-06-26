@@ -1,8 +1,14 @@
 # evalkit
 
-![evalkit UI](docs/screenshot.png)
+[![CI](https://github.com/MarcBittner/ai-portfolio/actions/workflows/projects-ci.yml/badge.svg)](https://github.com/MarcBittner/ai-portfolio/actions/workflows/projects-ci.yml)
+[![License: Proprietary](https://img.shields.io/badge/license-proprietary-red.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org)
+[![Ruff](https://img.shields.io/badge/lint-ruff-261230.svg)](https://github.com/astral-sh/ruff)
+[![FastAPI](https://img.shields.io/badge/api-FastAPI-009688.svg)](https://fastapi.tiangolo.com)
 
-**[▶ Live demo](https://evalkit-2ptv.onrender.com)**
+![evalkit screenshot](docs/screenshot.png)
+
+**[▶ Live demo](https://evalkit-1rhn.onrender.com)**
 
 A **deterministic, offline-first LLM evaluation toolkit** — a library, a FastAPI service,
 and a web UI. It scores `(prediction, reference)` pairs across **layered metrics**
@@ -15,8 +21,18 @@ A single "accuracy %" hides what matters. evalkit keeps the signals separate so 
 *how* a system is right or wrong — and freeze a release on the specific metric you care about
 rather than an opaque blend.
 
+## Stack
+
+Python 3.11 · FastAPI · Pydantic · a stdlib-only metrics core (regex tokenizer, MD5-hashed
+bag-of-tokens "semantic" embedding, refusal-phrase detection) · a static single-page UI ·
+a vendored multi-provider LLM router (`ollama → anthropic → openrouter → openai → mock`)
+with a deterministic offline fallback for the optional judge. The deterministic core runs
+fully offline with zero keys and no network — every score is byte-for-byte reproducible —
+and ships with synthetic sample pairs (it scores your own data just as well).
+
 ## Contents
 
+- [Stack](#stack)
 - [Architecture](#architecture)
 - [Design decisions](#design-decisions)
 - [Data model & invariants](#data-model-invariants)
@@ -36,7 +52,7 @@ stays tiny and results stay byte-for-byte reproducible.
 | `metrics.py` | Deterministic scorers, each `(prediction, reference) → [0, 1]`. Stdlib-only: regex tokenizer, MD5-hashed bag-of-tokens embedding for the cosine "semantic" metric, refusal-phrase detection. Exposes a name→`(fn, description)` `METRICS` registry. |
 | `evaluate.py` | Pure functions over score rows: `evaluate` (per-item + aggregate mean), `gate` (aggregate vs per-metric thresholds → pass/fail + failures), `compare` (two aggregate runs → per-metric delta). No I/O. |
 | `judge.py` | The `llm_judge` metric: ask a model "is this answer correct given the reference?", parse a `{"correct": bool}` verdict, fall back to a token-F1 threshold when the provider is mock/unreachable/unparseable. |
-| `llm.py` | Vendored stdlib router. Tries `ollama → openrouter → openai → mock`; the mock is a deterministic terminal fallback so a call never raises. JSON extraction, reachability, provider-status reporting. |
+| `llm.py` | Vendored stdlib router. Tries `ollama → anthropic → openrouter → openai → mock`; the mock is a deterministic terminal fallback so a call never raises. JSON extraction, reachability, provider-status reporting. |
 | `models.py` | Pydantic request/response models (`EvalItem`, `EvaluateRequest`, `EvaluateResponse`, `GateResult`, …). |
 | `api.py` | FastAPI app: `/evaluate`, `/compare`, `/metrics`, `/providers`, `/health`, and the UI at `/`. Splits the pure deterministic pass from the optional per-item judge pass. |
 

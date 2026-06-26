@@ -1,12 +1,20 @@
 # agent-factory
 
+[![CI](https://github.com/MarcBittner/ai-portfolio/actions/workflows/projects-ci.yml/badge.svg)](https://github.com/MarcBittner/ai-portfolio/actions/workflows/projects-ci.yml)
+[![License: Proprietary](https://img.shields.io/badge/license-proprietary-red.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org)
+[![Ruff](https://img.shields.io/badge/lint-ruff-261230.svg)](https://github.com/astral-sh/ruff)
+[![FastAPI](https://img.shields.io/badge/api-FastAPI-009688.svg)](https://fastapi.tiangolo.com)
+
+![agent-factory screenshot](docs/screenshot.png)
+
+**[▶ Live demo](https://agent-factory-zar2.onrender.com)**
+
 **Build a configurable tool-using agent from a declarative spec — then run it.**
 Simple by default (pick a template, ask a question); deep when you want it (edit the
 system prompt, choose tools, the planner, the model tier, the step budget, and the
 guardrails). The deterministic core runs **fully offline**; a free model only sharpens
 planning and the final answer.
-
-![screenshot](docs/screenshot.png)
 
 ```bash
 ./run.sh setup
@@ -25,6 +33,7 @@ ANTHROPIC_API_KEY=sk-ant-...  LLM_MODE=paid ./run.sh serve   # your own paid key
 
 ## Contents
 
+- [Stack](#stack)
 - [The spec is the agent](#the-spec-is-the-agent)
 - [How a run works](#how-a-run-works)
 - [Templates](#templates)
@@ -32,6 +41,15 @@ ANTHROPIC_API_KEY=sk-ant-...  LLM_MODE=paid ./run.sh serve   # your own paid key
 - [API](#api)
 - [Commands](#commands)
 - [Design notes](#design-notes)
+
+## Stack
+
+Python 3.11 · FastAPI · Pydantic v2 (the validated `AgentSpec`) · a static single-page
+UI (vanilla, no build step) · a vendored multi-provider LLM router with deterministic
+offline fallback (OpenRouter free → Anthropic/OpenAI paid → local Ollama → a deterministic
+mock) · sandboxed offline tools (the calculator walks a whitelisted AST, never `eval`).
+Runs **offline with zero keys** on synthetic sample data — the rule planner and the mock
+keep every path working, and a model is a sharpener, not a dependency.
 
 ## The spec is the agent
 

@@ -1,8 +1,14 @@
 # agent-sandbox
 
-![agent-sandbox UI](docs/screenshot.png)
+[![CI](https://github.com/MarcBittner/ai-portfolio/actions/workflows/projects-ci.yml/badge.svg)](https://github.com/MarcBittner/ai-portfolio/actions/workflows/projects-ci.yml)
+[![License: Proprietary](https://img.shields.io/badge/license-proprietary-red.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org)
+[![Ruff](https://img.shields.io/badge/lint-ruff-261230.svg)](https://github.com/astral-sh/ruff)
+[![FastAPI](https://img.shields.io/badge/api-FastAPI-009688.svg)](https://fastapi.tiangolo.com)
 
-**[▶ Live demo](https://agent-sandbox-jp4b.onrender.com)**
+![agent-sandbox screenshot](docs/screenshot.png)
+
+**[▶ Live demo](https://agent-sandbox-0al5.onrender.com)**
 
 A **ReAct-style agent** over a closed set of **safe, deterministic tools** — it
 reasons (a *thought*), calls a tool (an *action*), reads the result (an
@@ -15,13 +21,24 @@ arbitrary code or touch the network.
 
 > Offline by default: the **rule planner** is fully deterministic and needs no
 > model. An optional **LLM planner** proposes a JSON plan over the same tool
-> registry, routed local-first (Ollama → OpenRouter → OpenAI → mock); it falls
+> registry, routed local-first (Ollama → Anthropic → OpenRouter → OpenAI → mock); it falls
 > back to the rule planner whenever no model is reachable or the plan won't
 > parse. The agent loop, tools, and `{n}` step-chaining are shared by both
 > planners. All knowledge-base content is synthetic.
 
+## About
+
+Python 3.11 · FastAPI · Pydantic · a static SPA trace UI · a vendored stdlib-only
+multi-provider LLM router (Ollama → Anthropic → OpenRouter → OpenAI → deterministic mock). The
+default path is fully deterministic and runs **offline with zero keys**: the rule
+planner needs no model and no network, the sandboxed tools are pure and side-effect-free,
+and all knowledge-base content is synthetic. The optional LLM planner is a drop-in
+upgrade behind the same `plan(query) -> list[Step]` contract that falls back to the rule
+planner whenever no model is reachable.
+
 ## Contents
 
+- [About](#about)
 - [Architecture](#architecture)
 - [Design decisions](#design-decisions)
 - [Data model & invariants](#data-model-invariants)
@@ -40,7 +57,7 @@ Seven small modules under `src/agent_sandbox/`. The deterministic core
 | `tools.py` | The sandboxed tool registry. `calculator` (whitelisted-AST eval, never `eval`), `convert` (length/mass/temperature), `date_diff`, `search` (KB). Each is pure, offline, and returns a **bare string** so results chain into later args. `ToolError` for unsafe/invalid input. |
 | `planner.py` | Deterministic rule planner. Regex-maps a query to an ordered `list[Step]`: four single-tool intents plus one **chained** case ("N% of the days between A and B") that wires `date_diff → calculator` via `{0}`. |
 | `llm_planner.py` | Optional LLM planner. Sends the tool catalog + question, asks for a JSON array of steps, validates each `tool` against the registry; returns `None` (→ rule fallback) on mock provider or unparseable output. |
-| `llm.py` | Vendored stdlib-only multi-provider router. Local-first chain Ollama → OpenRouter → OpenAI → **deterministic mock**; `complete_json` strips fences and extracts a JSON value; never raises. |
+| `llm.py` | Vendored stdlib-only multi-provider router. Local-first chain Ollama → Anthropic → OpenRouter → OpenAI → **deterministic mock**; `complete_json` strips fences and extracts a JSON value; never raises. |
 | `agent.py` | The agent loop: run each step, substitute `{n}` placeholders from earlier observations, capture observation/error, build the `TraceStep` list. `MAX_STEPS=8`. Answer = last observation. |
 | `models.py` | Pydantic request/response schemas (`RunRequest`, `RunResponse`, `StepOut`, `RoutingInfo`, `ToolInfo`, `HealthResponse`). |
 | `api.py` | FastAPI service + static trace UI. Thin orchestration over `run()`; validates `provider`, shapes the trace into the response. |
