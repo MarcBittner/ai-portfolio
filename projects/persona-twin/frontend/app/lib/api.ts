@@ -243,11 +243,40 @@ export interface ChatHandlers {
   onError?: (detail: string) => void;
 }
 
+export interface ChatBody {
+  persona_id: string;
+  message: string;
+  session_id?: string;
+  // Browser→host bridge: prose produced by the user's own Ollama (against the
+  // prompt from /chat/prepare). When set, the server uses it as the answer
+  // instead of calling a provider, and records routing as "ollama (browser→host)".
+  client_completion?: string;
+  client_model?: string;
+}
+
+export interface ChatPrepared {
+  session_id: string;
+  system: string;
+  user: string;
+  chunk_ids: string[];
+}
+
+// Browser→host step 1: ask the server to build the local tier's prompt
+// (retrieval + prompt) WITHOUT calling a model. The browser runs the returned
+// prompt on the host's Ollama, then posts the completion back via streamChat.
+export function prepareChat(body: ChatBody): Promise<ChatPrepared> {
+  return request<ChatPrepared>("/chat/prepare", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
 // Streamed conversational twin. Reads the Server-Sent Events body off the
 // POST /chat response and dispatches each event to the handlers; resolves
 // when the stream closes.
 export async function streamChat(
-  body: { persona_id: string; message: string; session_id?: string },
+  body: ChatBody,
   handlers: ChatHandlers,
   signal?: AbortSignal,
 ): Promise<void> {

@@ -198,6 +198,54 @@ async def test_chat_endpoint_unknown_persona_404(client):
     assert r.status_code == 404
 
 
+# ---- browser→host bridge: prepare → client_completion ----
+
+async def test_chat_prepare_returns_prompt_without_calling_model(client):
+    r = await client.post("/chat/prepare", json={
+        "persona_id": "ada-quill",
+        "message": "What tomato variety are you growing this year?",
+    })
+    assert r.status_code == 200
+    body = r.json()
+    assert body["session_id"]
+    # the prompt is the local tier's actual inputs, built server-side
+    assert "Ada" in body["system"]
+    assert "Black Krim" in body["user"]  # retrieved context is in the user prompt
+    assert body["chunk_ids"] and all(
+        cid.startswith("ada-quill/") for cid in body["chunk_ids"])
+
+
+async def test_chat_prepare_does_not_record_history(client):
+    """Prepare is a read-only probe — only the finalizing /chat appends turns."""
+    r = await client.post("/chat/prepare", json={
+        "persona_id": "ada-quill", "session_id": "sess-prep", "message": "hi there",
+    })
+    assert r.status_code == 200
+    assert app.state.twin.sessions.history("sess-prep") == []
+
+
+async def test_chat_uses_client_completion_and_attributes_browser_host(client):
+    """When the browser supplies its host-Ollama prose, the server uses it as
+    the answer (no provider call), still validates citations, and records
+    routing as the browser→host provider."""
+    r = await client.post("/chat", json={
+        "persona_id": "ada-quill",
+        "message": "What tomato variety are you growing this year?",
+        "client_completion": "I'm growing Black Krim tomatoes this year.",
+        "client_model": "llama3.1:8b",
+    })
+    assert r.status_code == 200
+    events = _parse_sse(r.text)
+    answer = "".join(d["text"] for n, d in events if n == "token")
+    assert answer == "I'm growing Black Krim tomatoes this year."  # client text verbatim
+    done = next(d for n, d in events if n == "done")
+    assert done["routing"]["provider"] == "ollama (browser→host)"
+    assert done["routing"]["model"] == "llama3.1:8b"
+    # citation tail still runs server-side against the real retrieved set
+    citations = next(d for n, d in events if n == "citations")
+    assert citations["answered"] is True and citations["citations"]
+
+
 # ---- history-aware retrieval (condense) ----
 
 from persona_twin.retrieval.rewrite import condense_query  # noqa: E402

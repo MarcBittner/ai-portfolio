@@ -127,6 +127,36 @@
   .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--surface-3);
     border:1px solid var(--line-2);border-radius:var(--r-sm);padding:10px 16px;box-shadow:var(--sh);
     z-index:90;font-size:14px}
+  /* About — grouped stack cards + principles + footer stack indicator */
+  .lede{font-size:14px;line-height:1.6;color:var(--ink-dim);margin:0 0 16px}
+  .lede b{color:var(--ink)}
+  .stack-grid{display:grid;gap:14px;grid-template-columns:1fr 1fr}
+  @media(max-width:760px){.stack-grid{grid-template-columns:1fr}}
+  .stack-card{border:1px solid var(--line);border-radius:var(--r-sm);padding:14px 15px;background:var(--surface-2)}
+  .stack-card .gh{font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;
+    color:var(--ink-dim);margin:0 0 10px}
+  .stack-card .si{display:flex;gap:10px;padding:5px 0;border-top:1px solid var(--line);align-items:baseline}
+  .stack-card .si:first-of-type{border-top:none}
+  .stack-card .si .sn{min-width:128px;font-weight:600;font-size:12.5px;color:var(--ink)}
+  .stack-card .si .sd{font-size:12px;color:var(--ink-dim)}
+  .principles{margin:14px 0 0;padding:14px 15px;border:1px solid var(--line);border-radius:var(--r-sm);
+    background:var(--surface-2)}
+  .principles .gh{font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;
+    color:var(--ink-dim);margin:0 0 10px}
+  .principles ul{margin:0;padding:0;list-style:none;display:grid;gap:8px}
+  .principles li{display:flex;gap:9px;font-size:12.5px;color:var(--ink-dim);line-height:1.5}
+  .principles li .pk{color:var(--accent);flex:none;font-weight:700}
+  .about-llm{margin-top:14px;padding:14px 15px;border:1px solid var(--line);border-radius:var(--r-sm);
+    background:linear-gradient(135deg,rgba(106,161,255,.08),rgba(155,134,255,.05))}
+  .about-llm .gh{font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;
+    color:var(--ink-dim);margin:0 0 8px}
+  .about-llm p{margin:0 0 6px;font-size:12.5px;color:var(--ink-dim);line-height:1.55}
+  .about-llm code{font-size:11.5px}
+  .appfoot{max-width:1180px;margin:36px auto 0;padding:18px 22px 0;border-top:1px solid var(--line);
+    font-size:12px;color:var(--ink-faint);line-height:1.7}
+  .appfoot b{color:var(--ink-dim)}
+  .appfoot .sep{color:var(--line-2);margin:0 6px}
+  .appfoot a{color:var(--accent)}
 </style>
 </head>
 <body>
@@ -151,6 +181,7 @@
     <div class="tab" data-tab="security" data-min="elevated">Security &amp; Compliance</div>
     <div class="tab" data-tab="checks" data-min="admin">Checks</div>
     <div class="tab" data-tab="admin" data-min="admin">Admin</div>
+    <div class="tab" data-tab="about">About</div>
   </div>
 
   <!-- STATUS (guest) -->
@@ -380,7 +411,74 @@
         <tbody id="userBody"></tbody></table>
     </div>
   </section>
+
+  <!-- ABOUT / HOW IT WORKS -->
+  <section id="tab-about" class="hidden">
+    <div class="card">
+      <h2>About vigil <span class="muted" style="font-weight:400">what it is · how it works · how the model is used</span></h2>
+      <p class="lede">
+        vigil is a <b>public observability + SOC monitor for a whole fleet of apps</b> — and for itself.
+        On a schedule it <b>probes each app's health URL</b>, records a time series, and derives rolling
+        <b>uptime, error rate, and latency</b>. It scores each app's <b>security &amp; compliance posture</b>
+        from live endpoint checks, turning them into risk-qualified findings <b>mapped to real controls</b>
+        across SOC 2, HIPAA, ISO 27001, NIST 800-53, NIST 800-171, and CMMC. It dispatches <b>configurable
+        alerts</b> when a target degrades, and compresses the live fleet state into an <b>LLM-written incident
+        narrative</b>. What you can see is <b>tiered and enforced server-side</b>: guests see live status,
+        registered users get history + the incident AI, elevated users see the compliance posture, and an
+        admin manages the registry and roles.
+      </p>
+
+      <div class="stack-grid">
+        <div class="stack-card">
+          <div class="gh">What it watches</div>
+          <div class="si"><span class="sn">Uptime &amp; latency</span><span class="sd">a background poller hits every target's health URL each cycle and records up/down, status, and response time</span></div>
+          <div class="si"><span class="sn">Error rate</span><span class="sd">deterministic rolling availability, error rate, and avg/p95 latency over a recent probe window</span></div>
+          <div class="si"><span class="sn">Compliance posture</span><span class="sd">live checks (TLS, security headers, banner &amp; health-secret leakage) → control-mapped findings + a letter grade</span></div>
+          <div class="si"><span class="sn">Alerts</span><span class="sd">edge-triggered rules per target, delivered to console / webhook / email / SMS</span></div>
+          <div class="si"><span class="sn">Itself</span><span class="sd">vigil is a first-class entry in its own registry, probed on the same code path as everything else</span></div>
+        </div>
+        <div class="stack-card">
+          <div class="gh">How it's built</div>
+          <div class="si"><span class="sn">Python · FastAPI</span><span class="sd">tier-gated endpoints + a background async poller, all behind this page</span></div>
+          <div class="si"><span class="sn">Storage</span><span class="sd">a self-pruning SQLite time series by default; an optional MongoDB backend switches on via <code>MONGODB_URI</code></span></div>
+          <div class="si"><span class="sn">This page</span><span class="sd">one self-contained static SPA — no build step, no framework</span></div>
+          <div class="si"><span class="sn">Auth &amp; tiers</span><span class="sd">scrypt passwords, signed-cookie sessions, email verification, optional Google/GitHub OAuth, four roles</span></div>
+          <div class="si"><span class="sn">Hosting</span><span class="sd">a single Docker web service with zero external paid services</span></div>
+        </div>
+      </div>
+
+      <div class="principles">
+        <div class="gh">The principle</div>
+        <ul>
+          <li><span class="pk">▸</span><span><b>The LLM reads, the code decides.</b> Status, severity, the posture score, and alert thresholds are all computed in deterministic Python — the model only narrates the result.</span></li>
+          <li><span class="pk">▸</span><span>Every compliance finding is <b>risk-qualified and mapped to at least one control</b>, then crosswalked across six frameworks and rolled into a single severity-weighted grade.</span></li>
+          <li><span class="pk">▸</span><span><b>Tiering is enforced server-side</b>, not by hiding buttons — each endpoint checks the caller's role and returns 401/403.</span></li>
+          <li><span class="pk">▸</span><span>Runs <b>fully offline with zero keys</b>: no model, no SMTP, no OAuth required — each integration switches on only when its credential is set, and degrades gracefully until then.</span></li>
+        </ul>
+      </div>
+
+      <div class="about-llm">
+        <div class="gh">How the model is used</div>
+        <p>There's one genuine LLM surface: the <b>incident / fleet-health summarizer</b>. It reads the live
+          fleet state and writes a concise status narrative plus prioritized actions. <b>Code decides</b> the
+          severity and the impacted priority order from the metrics — never the model.</p>
+        <p>Summaries are generated <b>server-side</b> through a vendored stdlib router that tries providers in
+          order — <b>paid (Anthropic / OpenAI) → local (Ollama) → free (OpenRouter) → a deterministic offline
+          drafter</b>. The offline drafter emits the same JSON shape, so the feature reproduces end-to-end with
+          no keys at all.</p>
+      </div>
+    </div>
+  </section>
 </main>
+
+<!-- footer stack indicator -->
+<footer class="appfoot">
+  <b>vigil</b> — public observability + SOC monitoring for a fleet of apps (and itself): uptime / latency /
+  error-rate, control-mapped SOC 2 / HIPAA / NIST posture, alerting, an LLM incident summary, and tiered auth.
+  <span class="sep">·</span> Python 3.11 · FastAPI · SQLite (with an optional MongoDB backend via <code>MONGODB_URI</code>) · a static SPA
+  <span class="sep">·</span> a vendored LLM router (server-side incident summaries) with a deterministic offline fallback
+  <span class="sep">·</span> <a href="#about" onclick="document.querySelector('.tab[data-tab=about]').click();return false;">More in About →</a>
+</footer>
 
 <!-- AUTH MODAL -->
 <div id="authModal" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,.5);

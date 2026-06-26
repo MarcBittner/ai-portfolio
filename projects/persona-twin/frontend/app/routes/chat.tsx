@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Route } from "./+types/chat";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -6,11 +6,15 @@ import { Card, CardContent } from "~/components/ui/card";
 import { Textarea } from "~/components/ui/textarea";
 import {
   listPersonas,
+  prepareChat,
   streamChat,
+  type ChatBody,
+  type ChatHandlers,
   type Citation,
   type Persona,
   type RoutingDecision,
 } from "~/lib/api";
+import { ollamaChat, pickModel, probeOllama } from "~/lib/ollama";
 import { cn } from "~/lib/utils";
 import { Nav } from "~/components/nav";
 
@@ -34,7 +38,25 @@ export default function Chat({ loaderData }: Route.ComponentProps) {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Host-Ollama reachability: null = unknown/checking, string base = reachable.
+  // The local tier runs the model in THIS page against the user's own Ollama
+  // (browser→host) — the only way the cloud demo can use a local model.
+  const [hostOllama, setHostOllama] = useState<{ base: string; models: string[] } | null>(
+    null,
+  );
   const sessionId = useRef<string | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    probeOllama()
+      .then((p) => {
+        if (live) setHostOllama(p.base ? { base: p.base, models: p.models } : null);
+      })
+      .catch(() => live && setHostOllama(null));
+    return () => {
+      live = false;
+    };
+  }, []);
 
   function pickPersona(p: Persona) {
     setSelected(p);
@@ -62,32 +84,69 @@ export default function Chat({ loaderData }: Route.ComponentProps) {
       { role: "assistant", content: "", streaming: true },
     ]);
 
+    const handlers: ChatHandlers = {
+      onMeta: (sid) => (sessionId.current = sid),
+      onToken: (text) =>
+        setMessages((prev) =>
+          prev.map((m, i) =>
+            i === prev.length - 1 ? { ...m, content: m.content + text } : m,
+          ),
+        ),
+      onCitations: (c) => patchLast({ answered: c.answered, citations: c.citations }),
+      onDone: (routing) => patchLast({ routing }),
+      onError: (detail) => setError(detail),
+    };
+    const base: ChatBody = {
+      persona_id: selected.persona_id,
+      message,
+      session_id: sessionId.current ?? undefined,
+    };
+
     try {
-      await streamChat(
-        {
-          persona_id: selected.persona_id,
-          message,
-          session_id: sessionId.current ?? undefined,
-        },
-        {
-          onMeta: (sid) => (sessionId.current = sid),
-          onToken: (text) =>
-            setMessages((prev) =>
-              prev.map((m, i) =>
-                i === prev.length - 1 ? { ...m, content: m.content + text } : m,
-              ),
-            ),
-          onCitations: (c) =>
-            patchLast({ answered: c.answered, citations: c.citations }),
-          onDone: (routing) => patchLast({ routing }),
-          onError: (detail) => setError(detail),
-        },
-      );
+      // Local tier (browser→host): when a host Ollama is reachable, run the
+      // model in THIS page and post the result back. Any failure falls through
+      // to the normal server chat — so the demo never dead-ends on a local tier
+      // the cloud server could never reach.
+      const local = await tryBrowserHost(base);
+      await streamChat(local ?? base, handlers);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       patchLast({ streaming: false });
       setBusy(false);
+    }
+  }
+
+  // Returns a ChatBody carrying `client_completion` when the host Ollama
+  // produced the prose, or null to fall back to the server chat path.
+  async function tryBrowserHost(base: ChatBody): Promise<ChatBody | null> {
+    const probe = await probeOllama();
+    if (!probe.base) {
+      setHostOllama(null);
+      return null;
+    }
+    setHostOllama({ base: probe.base, models: probe.models });
+    try {
+      // 1. prepare: retrieval + prompt, no provider call (echoes session_id).
+      const prepared = await prepareChat(base);
+      sessionId.current = prepared.session_id;
+      // 2. generate on the host's Ollama (browser→host).
+      const model = pickModel(null, probe.models);
+      const completion = await ollamaChat(
+        probe.base,
+        model,
+        prepared.system,
+        prepared.user,
+      );
+      // 3. finalize: server uses this prose + validates citations server-side.
+      return {
+        ...base,
+        session_id: prepared.session_id,
+        client_completion: completion,
+        client_model: model,
+      };
+    } catch {
+      return null; // no host model, or an error — use the server chain
     }
   }
 
@@ -100,6 +159,32 @@ export default function Chat({ loaderData }: Route.ComponentProps) {
           A multi-turn conversation: the twin answers in character, streamed
           token-by-token and grounded in its retrieved documents — citations
           attached once each answer lands.
+        </p>
+        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <span
+            className={cn(
+              "h-1.5 w-1.5 rounded-full",
+              hostOllama ? "bg-primary" : "bg-muted-foreground",
+            )}
+          />
+          {hostOllama ? (
+            <>
+              local tier:{" "}
+              <span className="font-medium text-foreground">browser→host</span> —
+              answers run on <span className="font-mono">{hostOllama.base}</span> in
+              your browser
+              {hostOllama.models.length > 0 && (
+                <> (<span className="font-mono">{pickModel(null, hostOllama.models)}</span>)</>
+              )}
+              . The server still validates citations.
+            </>
+          ) : (
+            <>
+              no host Ollama reachable — answers use the server chain. Run{" "}
+              <span className="font-mono">OLLAMA_ORIGINS={"{this origin}"} ollama serve</span>{" "}
+              (or the :11435 CORS proxy) to route the local tier browser→host.
+            </>
+          )}
         </p>
       </header>
 
@@ -212,7 +297,12 @@ function MessageBubble({
       )}
 
       {!isUser && message.routing && (
-        <span className="px-1 font-mono text-[10px] text-muted-foreground">
+        <span className="flex items-center gap-1.5 px-1 font-mono text-[10px] text-muted-foreground">
+          {message.routing.provider.includes("browser→host") && (
+            <Badge variant="accent" className="font-sans text-[9px]">
+              browser→host
+            </Badge>
+          )}
           {message.routing.provider}/{message.routing.model}
         </span>
       )}

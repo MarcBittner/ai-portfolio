@@ -24,7 +24,7 @@ from persona_twin.embedding.base import Embedder
 from persona_twin.llm.base import LLMRequest
 from persona_twin.llm.router import AllProvidersFailedError, LLMRouter
 from persona_twin.log import get_logger, kv
-from persona_twin.models import Citation, Persona, RoutingDecision
+from persona_twin.models import Citation, Persona, RoutingDecision, ScoredChunk
 from persona_twin.persona.prompting import (
     build_chat_system_prompt,
     build_chat_user_prompt,
@@ -80,6 +80,38 @@ class DoneEvent:
 
 ChatEvent = TokenEvent | CitationsEvent | DoneEvent
 
+# Provider attribution for the browser→host bridge: the local model ran in the
+# user's browser against their own Ollama, not server-side. We still record a
+# routing decision so the console reads honestly.
+BROWSER_HOST_PROVIDER = "ollama (browser→host)"
+
+
+@dataclass
+class ChatPrepared:
+    """Everything the browser needs to run the local tier itself.
+
+    The cloud server can't reach a user's ``localhost:11434`` — only the
+    browser can. So for the local tier the browser asks the server to
+    *prepare*: the server runs retrieval and builds the exact SYSTEM + user
+    prompt ``chat_twin`` would send the model (NO provider call), and the
+    browser runs that on the host's Ollama, then POSTs the completion back to
+    ``/chat`` as ``client_completion``. The reranked chunks ride along so the
+    server-side citation tail still validates against the real retrieved set."""
+
+    system: str
+    user: str
+    reranked: list[ScoredChunk]
+
+    def to_payload(self) -> dict:
+        # The chunk ids are what the citation tail validates against; the
+        # browser doesn't need them, but echoing the retrieved set keeps the
+        # prepare response self-describing (and useful in the console).
+        return {
+            "system": self.system,
+            "user": self.user,
+            "chunk_ids": [sc.chunk.chunk_id for sc in self.reranked],
+        }
+
 
 class ChatSessionStore:
     """In-process conversation memory: ``session_id`` → turns, LRU-capped.
@@ -113,7 +145,7 @@ def _history_pairs(persona: Persona, turns: list[ChatTurn]) -> list[tuple[str, s
     return [(speaker[t.role], t.content) for t in turns[-HISTORY_TURNS:]]
 
 
-async def chat_twin(
+async def _retrieve_and_build(
     persona: Persona,
     message: str,
     history: list[ChatTurn],
@@ -121,22 +153,16 @@ async def chat_twin(
     embedder: Embedder,
     store: VectorStore,
     router: LLMRouter,
-    reranker: LexicalReranker | None = None,
-    bm25: BM25Index | None = None,
-    k: int = 5,
-    condense: bool = False,
-) -> AsyncIterator[ChatEvent]:
-    """Stream a grounded conversational answer, then a validated citation tail.
+    reranker: LexicalReranker,
+    bm25: BM25Index | None,
+    k: int,
+    condense: bool,
+) -> tuple[list[ScoredChunk], LLMRequest]:
+    """Retrieve (vector + hybrid + rerank) and build the prose ``LLMRequest``.
 
-    Yields ``TokenEvent`` deltas while generating, then one ``CitationsEvent``
-    and one ``DoneEvent``. Retrieval mirrors ``ask_twin``; the citation tail
-    is a separate structured call so the visible prose stays clean.
-
-    With ``condense`` and prior turns, the follow-up message is first folded
-    into a standalone retrieval query (resolving "them"/"it") so retrieval is
-    history-aware, not just the latest message. Generation always sees the
-    full history regardless."""
-    reranker = reranker or LexicalReranker()
+    Shared by the streamed server-side path and the browser→host ``prepare``
+    step so both run the *identical* retrieval and prompt — only who calls the
+    model differs."""
     pairs = _history_pairs(persona, history)
 
     retrieval_query = message
@@ -154,20 +180,110 @@ async def chat_twin(
         candidates = reciprocal_rank_fusion([candidates, keyword], k=N_CANDIDATES)
     reranked = reranker.rerank(retrieval_query, candidates)[:k]
 
-    prose_request = LLMRequest(
+    request = LLMRequest(
         system=build_chat_system_prompt(persona),
         user=build_chat_user_prompt(pairs, message, reranked),
         max_tokens=1024,
     )
-    parts: list[str] = []
+    return reranked, request
+
+
+async def prepare_chat(
+    persona: Persona,
+    message: str,
+    history: list[ChatTurn],
+    *,
+    embedder: Embedder,
+    store: VectorStore,
+    router: LLMRouter,
+    reranker: LexicalReranker | None = None,
+    bm25: BM25Index | None = None,
+    k: int = 5,
+    condense: bool = False,
+) -> ChatPrepared:
+    """Browser→host step 1: run retrieval + build the prompt, NO model call.
+
+    Returns the exact SYSTEM + user prompt ``chat_twin`` would send, plus the
+    reranked chunks (so the later citation tail validates against the same
+    retrieved set). The browser runs this prompt on the host's Ollama and posts
+    the completion back to ``/chat`` as ``client_completion``."""
+    reranker = reranker or LexicalReranker()
+    reranked, request = await _retrieve_and_build(
+        persona, message, history,
+        embedder=embedder, store=store, router=router, reranker=reranker,
+        bm25=bm25, k=k, condense=condense,
+    )
+    return ChatPrepared(system=request.system, user=request.user, reranked=reranked)
+
+
+def _browser_host_decision(model: str | None) -> RoutingDecision:
+    """A routing record for an answer that ran in the browser against the
+    user's host Ollama. Honest attribution — no server-side provider touched
+    this completion, and there's no measured cost/latency to report."""
+    return RoutingDecision(
+        provider=BROWSER_HOST_PROVIDER,
+        model=model or "ollama",
+        objective="local",
+        task="twin_chat",
+    )
+
+
+async def chat_twin(
+    persona: Persona,
+    message: str,
+    history: list[ChatTurn],
+    *,
+    embedder: Embedder,
+    store: VectorStore,
+    router: LLMRouter,
+    reranker: LexicalReranker | None = None,
+    bm25: BM25Index | None = None,
+    k: int = 5,
+    condense: bool = False,
+    client_completion: str | None = None,
+    client_model: str | None = None,
+) -> AsyncIterator[ChatEvent]:
+    """Stream a grounded conversational answer, then a validated citation tail.
+
+    Yields ``TokenEvent`` deltas while generating, then one ``CitationsEvent``
+    and one ``DoneEvent``. Retrieval mirrors ``ask_twin``; the citation tail
+    is a separate structured call so the visible prose stays clean.
+
+    With ``condense`` and prior turns, the follow-up message is first folded
+    into a standalone retrieval query (resolving "them"/"it") so retrieval is
+    history-aware, not just the latest message. Generation always sees the
+    full history regardless.
+
+    Browser→host bridge: when ``client_completion`` is supplied, the prose was
+    already generated by the user's own Ollama in the browser (against the
+    prompt from ``prepare_chat``), so the server skips its provider call and
+    uses that text as the answer — emitting it as one ``TokenEvent`` — while
+    still running the citation tail server-side. Routing is recorded as the
+    browser→host provider."""
+    reranker = reranker or LexicalReranker()
+    reranked, prose_request = await _retrieve_and_build(
+        persona, message, history,
+        embedder=embedder, store=store, router=router, reranker=reranker,
+        bm25=bm25, k=k, condense=condense,
+    )
+
     decision: RoutingDecision | None = None
-    async for event in router.stream_complete(prose_request, task="twin_chat"):
-        if event.done:
-            decision = event.decision
-        elif event.delta:
-            parts.append(event.delta)
-            yield TokenEvent(text=event.delta)
-    answer = "".join(parts)
+    if client_completion is not None:
+        # Browser→host: the host Ollama already produced the prose. Surface it
+        # whole (one delta) instead of streaming from a server-side provider.
+        answer = client_completion
+        decision = _browser_host_decision(client_model)
+        if answer:
+            yield TokenEvent(text=answer)
+    else:
+        parts: list[str] = []
+        async for event in router.stream_complete(prose_request, task="twin_chat"):
+            if event.done:
+                decision = event.decision
+            elif event.delta:
+                parts.append(event.delta)
+                yield TokenEvent(text=event.delta)
+        answer = "".join(parts)
 
     answered, citations = await _citation_tail(router, message, answer, reranked)
     yield CitationsEvent(answered=answered, citations=citations)
@@ -181,6 +297,7 @@ async def chat_twin(
             answered=answered,
             citations=len(citations),
             provider=decision.provider if decision else "none",
+            bridge="browser-host" if client_completion is not None else "server",
         ),
     )
 

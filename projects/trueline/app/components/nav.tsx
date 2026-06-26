@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { OrganizationSwitcher, UserButton } from "@clerk/nextjs";
+import { Moon, Sun } from "lucide-react";
 
 import { AppLauncher } from "./app-launcher";
 
@@ -31,11 +32,24 @@ function ThemeToggle() {
     <button
       type="button"
       onClick={toggle}
-      aria-label="Toggle light / dark theme"
+      aria-label={
+        light === null
+          ? "Toggle light / dark theme"
+          : light
+            ? "Switch to dark theme"
+            : "Switch to light theme"
+      }
       title="Toggle light / dark theme"
-      className="cursor-pointer rounded-md px-2 py-1 text-sm text-[--color-muted] transition-all duration-150 hover:bg-[--color-accent]/10 hover:text-[--color-ink] active:scale-90"
+      className="flex cursor-pointer items-center rounded-md px-2 py-1 text-sm text-[--color-muted] transition-all duration-150 hover:bg-[--color-accent]/10 hover:text-[--color-ink] active:scale-90"
     >
-      {light ? "☾" : "☀"}
+      {/* In light mode show the moon (click → go dark); in dark mode show the
+          sun (click → go light). Before mount `light` is null, so render an
+          invisible-but-stable icon to keep SSR markup deterministic. */}
+      {light ? (
+        <Moon size={16} aria-hidden />
+      ) : (
+        <Sun size={16} aria-hidden className={light === null ? "opacity-0" : undefined} />
+      )}
     </button>
   );
 }
