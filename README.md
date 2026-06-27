@@ -8,15 +8,19 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Deploy: Argo GitOps](https://img.shields.io/badge/deploy-Argo%20GitOps-success)](ROADMAP.md)
 [![Live demos: Render](https://img.shields.io/badge/live%20demos-Render-46E3B7?logo=render&logoColor=white)](#live-demos)
-[![Projects: 20](https://img.shields.io/badge/projects-20-blueviolet)](#live-demos)
+[![Projects: 29](https://img.shields.io/badge/projects-29-blueviolet)](#live-demos)
 
 Production-grade AI engineering projects. Each project is self-contained,
 source-available (proprietary), and runnable with **zero paid accounts** — offline fallbacks
 (in-memory vector store, deterministic mock LLM) are first-class, and real
 providers (Ollama, MongoDB Atlas, OpenAI, OpenRouter) switch on via
-environment variables. All twenty services run as free
+environment variables. All 29 services run as free
 **[live demos on Render](#live-demos)**; the core nine also deploy to Kubernetes
-via Argo CD.
+via Argo CD. Every web demo shares the same UX spine — a system-aware **dark/light
+theme**, an **About / stack** panel, and a vendored multi-provider **LLM router**
+(`paid → local Ollama → free → deterministic offline`) whose **local tier runs in
+your browser** against your own `localhost` Ollama, so the hosted demos use your
+local model without the server ever reaching it.
 
 ![ai-portfolio UIs](docs/screenshots/hero.png)
 
@@ -30,10 +34,12 @@ via Argo CD.
 
 ## Live demos
 
-All twenty services run as **free live demos on Render**. The LLM-backed demos route
+All 29 services run as **free live demos on Render**. The LLM-backed demos route
 to **live free models** (OpenRouter free tier) by default, and each lets you switch
-**offline / free / paid** from its config panel; the deterministic SRE/security/data
-demos have no model by design. In-memory stores, no accounts, no cost. Free instances
+**offline / free / paid** from its config panel — and the **local (Ollama) tier runs
+in your browser** against your own `localhost:11434`, so the cloud demo can use your
+local model (run Ollama with `OLLAMA_ORIGINS` set to the demo origin). The
+deterministic SRE/security/data demos have no model by design. In-memory stores, no accounts, no cost. Free instances
 sleep after ~15 min idle, so the **first request cold-starts in ~30–60s** (a heavier
 app like persona-twin toward the upper end, and a free model can add a few seconds);
 just reload if it stalls. Each **Live** link opens the app's UI — #2
@@ -573,6 +579,11 @@ project's v0.2.0 milestone (per-project detail in `docs/spec/development-plan.md
 - No secrets in the repo — environment variables via gitignored `.env`,
   placeholder `.env.example` committed per project
 - All sample data is synthetic and fictional; the demos also run on your own real data
+- **Shared UX/LLM spine** — every web demo carries a system-aware dark/light theme
+  (persisted), an About/stack panel, and one vendored multi-provider LLM router
+  (`paid → local Ollama → free → deterministic offline`); the **local tier is
+  browser→host** (the page runs your own `localhost` Ollama), so cloud demos use your
+  local model without the server reaching it
 
 ## License
 
