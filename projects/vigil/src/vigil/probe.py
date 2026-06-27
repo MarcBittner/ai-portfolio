@@ -77,6 +77,15 @@ def _one_get(url: str, timeout: float) -> tuple[httpx.Response | None, float, st
         return None, round((time.monotonic() - t0) * 1000, 1), type(exc).__name__
 
 
+def _self_alive(response_ms: float | None) -> dict:
+    """vigil's self target when the loopback probe can't *connect*: the very fact
+    this prober is executing proves vigil is serving, so a connection-level failure
+    is a probe-config issue (host port mapping), not an outage. A real HTTP error
+    from vigil's own /health is NOT routed here — it still records 'down'."""
+    return {"up": True, "http_status": 200, "response_ms": response_ms,
+            "error": None, "self_inferred": True}
+
+
 def _legacy_health_probe(target) -> dict:
     """Single health-route GET (status 200–399 = up), but **cold-start aware**: a
     free host that's asleep answers the first probe with a timeout or a transient
@@ -94,12 +103,16 @@ def _legacy_health_probe(target) -> dict:
         if resp2 is not None:
             resp, response_ms, error = resp2, ms2, err2
         else:
+            if getattr(target, "self_monitor", False):
+                return _self_alive(ms2)
             # Still not answering after the warm budget → genuinely down (record the
             # warm attempt's elapsed time + error so the detail reflects the wait).
             return {"up": False, "http_status": None, "response_ms": ms2,
                     "error": err2 or "down after warmup", "warming": True}
 
     if resp is None:
+        if getattr(target, "self_monitor", False):
+            return _self_alive(response_ms)
         return {"up": False, "http_status": None, "response_ms": response_ms,
                 "error": error or "transport error"}
     up = 200 <= resp.status_code < 400
