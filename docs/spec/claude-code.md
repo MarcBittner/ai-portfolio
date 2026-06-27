@@ -68,6 +68,42 @@ the gateway. Keep `./run.sh test` green.
 
 ## Section 2: State Transfer Prompts
 
+---
+
+### 2026-06-27 — fleet polish + full live-demo redeploy + CO-Ver onboarding
+
+**What happened this session (ai-portfolio + life-ops):**
+- **Crash recovery → session-workflow automation.** Built auto-transcript capture so a crash
+  never loses work again: `claude-code-utilities/scripts/mirror-transcript.py` (Stop/SessionEnd
+  hook → mirrors the live `.jsonl` into `docs/spec/untracked/*-session-transcript.md`),
+  `session-context.sh` (SessionStart hook injects the workflow rules), `install-hooks.sh` (wires
+  them into `~/.claude/settings.json`; `session-init.sh`/`install-cc-alias.sh` call it). Takes
+  full effect on the NEXT `cc` session (hooks load at startup).
+- **Fleet consistency pass (committed):** dark/light theme + About/stack on the 6 group-A apps;
+  fixed the browser→host Ollama bridge on promptguard/reconcile/postureline (local tier now runs
+  the model in the BROWSER via host Ollama — the recurring "diagnostics broken" bug); README
+  badges/screenshots on 4 thin ones; cross-stack fixes (persona-twin bridge, trueline theme,
+  vigil About). All test/adversarially verified.
+- **Live-demo crisis fixed:** accounts 1–3 were system-suspended. Redeployed all 29 demos onto
+  accounts 4/5/6; fixed a Docker build-context bug (`rootDir`), set `OPENROUTER_API_KEY` fleet-wide
+  (routing was falling back to offline), made **vigil cold-start-aware** (re-probes Render warmup
+  signals with a 55s budget; fixed `/healthz` health paths + self-monitor port). **27/29 live.**
+  Added `scripts/live-urls.json`, `scripts/postdeploy-check.py`, `docs/POSTDEPLOY-CHECKLIST.md`.
+- **Quin/Ben + CO-Ver:** Gmail drafts prepared (draft-only integration — no send tool). Saved
+  personal/job context to memory (`~/.claude/projects/-workspace/memory/`): Marc's bio + the new
+  **CO-Ver** contract role (senior fullstack; Vinny DiDonato; Next.js/Convex/Clerk/Anthropic).
+
+**State now:** `origin/main` is pushed and current. 27/29 demos live (README = source of truth).
+
+**Next session — pick up here:**
+1. **cycleledger** + **trueline** are the only demos down — provision a free Postgres
+   (`DATABASE_URL`) for cycleledger; trueline needs the user's Convex URL + Clerk keys.
+2. CO-Ver day-1 onboarding (NDA signed; await onboarding sheet; customer story + context bundles).
+3. Run `python3 scripts/postdeploy-check.py` first to re-confirm live state (free tiers may
+   re-sleep / accounts 1–3 minutes may reset).
+
+---
+
 **Last Updated:** 2026-06-08
 
 **Project Status:** persona-twin **v0.14.0**, live on the local
