@@ -44,6 +44,11 @@ MONGODB_TTL_SECONDS = int(os.environ.get("VIGIL_MONGODB_TTL_SECONDS", str(14 * 8
 
 POLL_INTERVAL_S = float(os.environ.get("VIGIL_POLL_INTERVAL", "60"))
 PROBE_TIMEOUT_S = float(os.environ.get("VIGIL_PROBE_TIMEOUT", "8"))
+# Free hosts (Render) spin down when idle; the first probe hits a cold start that
+# can take 30-60s (or returns Render's transient warmup/502 page). A short probe
+# would read every idle-but-healthy demo as "down". When a probe sees a cold-start
+# signal, vigil re-probes once with this longer budget to let the service wake.
+WARMUP_TIMEOUT_S = float(os.environ.get("VIGIL_WARMUP_TIMEOUT", "55"))
 # Rolling window (number of recent probes) used for availability + error rate.
 ROLLING_WINDOW = int(os.environ.get("VIGIL_ROLLING_WINDOW", "50"))
 # Retain at most this many probe rows per target (cheap self-pruning time series).
@@ -174,10 +179,10 @@ _SEED_ROWS: list[tuple] = [
     ("agent-factory", "https://agent-factory-ohkl.onrender.com", ["agent", "llm"]),
     ("trueline", "https://trueline-dcqc.onrender.com", ["finance", "llm"], "/"),
     ("postureline", "https://postureline-3a8z.onrender.com", ["security"]),
-    ("relaytoken", "https://relaytoken-9p78.onrender.com", ["security", "go"]),
+    ("relaytoken", "https://relaytoken-9p78.onrender.com", ["security", "go"], "/healthz"),
     ("cycleledger", "https://cycleledger-8xg3.onrender.com", ["data", "rails"], "/up"),
     ("quorum", "https://quorum-71pl.onrender.com", ["agent", "llm"]),
-    ("burnrate", "https://burnrate-v8sp.onrender.com", ["sre", "flask"]),
+    ("burnrate", "https://burnrate-v8sp.onrender.com", ["sre", "flask"], "/healthz"),
     ("baseplate", "https://baseplate-b0ag.onrender.com", ["platform"]),
     ("arbiter", "https://arbiter-kfaz.onrender.com", ["gateway", "llm"]),
     ("counsel", "https://counsel-nqcp.onrender.com", ["finance", "llm"]),

@@ -33,29 +33,78 @@ from vigil import (
 )
 
 
-def _legacy_health_probe(target) -> dict:
-    """Fallback for a target with no checks: the original single /health GET
-    (status 200–399 = up). Synchronous; run in a thread by the async caller."""
+# Render (and similar free hosts) signal a cold start / spin-up in ways that are
+# NOT a real outage: a 502/503/504 from the edge while the instance boots, a
+# transient timeout, or an ``x-render-routing`` header / warmup HTML body. A
+# monitor must not paint these as "down" — the service is *waking*, not broken.
+_WARMUP_STATUSES = {502, 503, 504}
+_WARMUP_HEADER_MARKERS = ("hibernat", "cold", "deploy", "starting", "launch")
+_WARMUP_BODY_MARKERS = (
+    "x-render-routing",          # surfaced in Render's own error pages
+    "service is starting",
+    "is spinning up",
+    "render.com",                # Render's transient interstitial references its domain
+)
+
+
+def _is_warmup(resp: httpx.Response) -> bool:
+    """True if a non-2xx response looks like a host cold-start, not a real outage."""
+    if resp.status_code in _WARMUP_STATUSES:
+        return True
+    routing = resp.headers.get("x-render-routing", "").lower()
+    if routing and any(m in routing for m in _WARMUP_HEADER_MARKERS):
+        return True
+    # Render serves an HTML interstitial during spin-up; a healthy app health route
+    # returns JSON/plain. Only inspect the body for clearly-HTML warmup pages.
+    ctype = resp.headers.get("content-type", "").lower()
+    if "html" in ctype:
+        body = resp.text[:2000].lower()
+        if any(m in body for m in _WARMUP_BODY_MARKERS):
+            return True
+    return False
+
+
+def _one_get(url: str, timeout: float) -> tuple[httpx.Response | None, float, str | None]:
+    """One GET. Returns (response_or_None, elapsed_ms, error). Never raises."""
     t0 = time.monotonic()
-    up = False
-    http_status: int | None = None
-    error: str | None = None
-    response_ms: float | None = None
     try:
-        with httpx.Client(timeout=config.PROBE_TIMEOUT_S) as client:
-            resp = client.get(target.health_url, follow_redirects=True)
-        response_ms = round((time.monotonic() - t0) * 1000, 1)
-        http_status = resp.status_code
-        up = 200 <= resp.status_code < 400
-        if not up:
-            error = f"HTTP {resp.status_code}"
+        with httpx.Client(timeout=timeout) as client:
+            resp = client.get(url, follow_redirects=True)
+        return resp, round((time.monotonic() - t0) * 1000, 1), None
     except httpx.TimeoutException:
-        response_ms = round((time.monotonic() - t0) * 1000, 1)
-        error = "timeout"
+        return None, round((time.monotonic() - t0) * 1000, 1), "timeout"
     except Exception as exc:  # noqa: BLE001 — any transport error is a 'down' sample
-        error = type(exc).__name__
-    return {"up": up, "http_status": http_status,
-            "response_ms": response_ms, "error": error}
+        return None, round((time.monotonic() - t0) * 1000, 1), type(exc).__name__
+
+
+def _legacy_health_probe(target) -> dict:
+    """Single health-route GET (status 200–399 = up), but **cold-start aware**: a
+    free host that's asleep answers the first probe with a timeout or a transient
+    502/503 warmup page. Rather than record a false "down", vigil re-probes once
+    with a longer budget (``WARMUP_TIMEOUT_S``) to let the instance wake; only a
+    failure that *survives* the warm retry is a real "down". Synchronous; run in a
+    thread by the async caller."""
+    resp, response_ms, error = _one_get(target.health_url, config.PROBE_TIMEOUT_S)
+
+    cold = error == "timeout" or (resp is not None and resp.status_code >= 400
+                                  and _is_warmup(resp))
+    if cold:
+        # Wake-and-retry: give the instance time to spin up, then judge on the result.
+        resp2, ms2, err2 = _one_get(target.health_url, config.WARMUP_TIMEOUT_S)
+        if resp2 is not None:
+            resp, response_ms, error = resp2, ms2, err2
+        else:
+            # Still not answering after the warm budget → genuinely down (record the
+            # warm attempt's elapsed time + error so the detail reflects the wait).
+            return {"up": False, "http_status": None, "response_ms": ms2,
+                    "error": err2 or "down after warmup", "warming": True}
+
+    if resp is None:
+        return {"up": False, "http_status": None, "response_ms": response_ms,
+                "error": error or "transport error"}
+    up = 200 <= resp.status_code < 400
+    return {"up": up, "http_status": resp.status_code, "response_ms": response_ms,
+            "error": None if up else f"HTTP {resp.status_code}"}
 
 
 def _probe_target_sync(target) -> dict:
