@@ -104,7 +104,13 @@ ADMIN_PASSWORD = os.environ.get("VIGIL_ADMIN_PASSWORD") or None
 SECRET_KEY = os.environ.get("VIGIL_SECRET", "dev-insecure-change-me")
 
 # Public base URL of this vigil instance (used for self-monitoring + email links).
-SELF_BASE_URL = os.environ.get("VIGIL_SELF_URL", "http://127.0.0.1:8020").rstrip("/")
+# Self-monitor target. Probe the loopback on the SAME port the app actually binds
+# (the host injects PORT at runtime — Render's is not the Dockerfile default), so
+# self-monitoring works without hand-setting a URL. Override with VIGIL_SELF_URL.
+SELF_BASE_URL = (
+    os.environ.get("VIGIL_SELF_URL")
+    or f"http://127.0.0.1:{os.environ.get('PORT', '8020')}"
+).rstrip("/")
 
 # Signup rate limit: a per-IP token bucket (capacity / refill-per-second).
 SIGNUP_RATE_CAPACITY = int(os.environ.get("VIGIL_SIGNUP_CAPACITY", "5"))
