@@ -21,21 +21,40 @@ implementations stay server-side. The browser never executes tools itself.
 from dataclasses import asdict
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 
-from agent_factory import __version__, agent, llm
+from agent_factory import __version__, agent, llm, scaffold
 from agent_factory.models import (
+    CustomizeRequest,
     HealthResponse,
     RunRequest,
+    ScaffoldRequest,
     TemplateInfo,
     ToolRequest,
     ToolResponse,
 )
 from agent_factory.spec import TEMPLATES, AgentSpec, template
 from agent_factory.tools import TOOL_NAMES, TOOLS, ToolError, tool_catalog
+
+
+def _resolve_spec(spec: AgentSpec | None, name: str | None) -> AgentSpec:
+    """Pick the spec: an inline ``spec``, else a ``template`` name, else assistant."""
+    if spec is not None:
+        chosen = spec
+    elif name is not None:
+        try:
+            chosen = template(name)
+        except KeyError as exc:
+            raise HTTPException(422, str(exc)) from exc
+    else:
+        chosen = template("assistant")
+    try:
+        return AgentSpec.model_validate(chosen.model_dump())
+    except ValidationError as exc:
+        raise HTTPException(422, exc.errors()) from exc
 
 app = FastAPI(title="agent-factory", version=__version__)
 _STATIC = Path(__file__).parent / "static"
@@ -96,23 +115,62 @@ def run_tool(request: ToolRequest) -> ToolResponse:
 
 @app.post("/run")
 def run(request: RunRequest) -> dict:
-    if request.spec is not None:
-        spec = request.spec
-    elif request.template is not None:
-        try:
-            spec = template(request.template)
-        except KeyError as exc:
-            raise HTTPException(422, str(exc)) from exc
-    else:
-        spec = template("assistant")
-    try:
-        spec = AgentSpec.model_validate(spec.model_dump())
-    except ValidationError as exc:
-        raise HTTPException(422, exc.errors()) from exc
+    spec = _resolve_spec(request.spec, request.template)
     result = agent.run(request.task, spec)
     out = asdict(result)
     out["spec"] = spec.model_dump()
     return out
+
+
+@app.post("/spec/customize")
+def spec_customize(request: CustomizeRequest) -> dict:
+    """AI-assisted: turn a description into a validated spec (model proposes,
+    deterministic keyword fallback when offline). Optionally refines a base."""
+    base = (_resolve_spec(request.spec, request.template)
+            if (request.spec or request.template) else None)
+    spec, meta = scaffold.customize_spec(request.prompt, base)
+    return {"spec": spec.model_dump(), "meta": meta}
+
+
+@app.get("/scaffold/languages")
+def scaffold_languages() -> dict:
+    return {"languages": list(scaffold.LANGUAGES)}
+
+
+@app.post("/scaffold")
+def scaffold_project(
+    request: ScaffoldRequest,
+    format: str = Query("files", pattern="^(files|dockerfile)$"),
+) -> dict:
+    """Generate a runnable project (paved road). ``format=files`` returns the
+    whole file tree as JSON; ``format=dockerfile`` returns just the Dockerfile."""
+    if request.language not in scaffold.LANGUAGES:
+        raise HTTPException(422, f"unknown language {request.language!r}; "
+                                 f"valid: {list(scaffold.LANGUAGES)}")
+    spec = _resolve_spec(request.spec, request.template)
+    if format == "dockerfile":
+        return {"language": request.language,
+                "dockerfile": scaffold.dockerfile(spec, request.language)}
+    return {
+        "language": request.language,
+        "project": scaffold.slug(spec.name),
+        "files": scaffold.scaffold(spec, request.language),
+    }
+
+
+@app.post("/scaffold/zip")
+def scaffold_project_zip(request: ScaffoldRequest) -> Response:
+    """Download the generated project as a zip (README + Dockerfile included)."""
+    if request.language not in scaffold.LANGUAGES:
+        raise HTTPException(422, f"unknown language {request.language!r}; "
+                                 f"valid: {list(scaffold.LANGUAGES)}")
+    spec = _resolve_spec(request.spec, request.template)
+    data = scaffold.scaffold_zip(spec, request.language)
+    filename = f"{scaffold.slug(spec.name)}-{request.language}.zip"
+    return Response(
+        content=data, media_type="application/zip",
+        headers={"content-disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @app.get("/", include_in_schema=False)

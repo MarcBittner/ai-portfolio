@@ -105,10 +105,30 @@ def _mock(system: str, prompt: str, model: str) -> str:
     return f"[mock] {prompt.strip()[:200]}"
 
 
+# Cache Ollama reachability so `auto` can prefer it without a network probe on
+# every call. Keyed by base URL (so tests that repoint the URL aren't poisoned).
+_REACH_TTL = 20.0
+_reach_cache: dict[str, tuple[float, bool]] = {}
+
+
+def _ollama_up() -> bool:
+    """Reachability of the configured Ollama, cached for ``_REACH_TTL`` seconds."""
+    import time
+    url = OLLAMA_BASE_URL
+    hit = _reach_cache.get(url)
+    now = time.monotonic()
+    if hit and now - hit[0] < _REACH_TTL:
+        return hit[1]
+    ok = reachable()
+    _reach_cache[url] = (now, ok)
+    return ok
+
+
 def _resolve_order(provider: str | None) -> list[str]:
     """Map a provider/mode hint to an ordered provider chain. Accepts a concrete
     provider name (pins it), a mode (``free``/``paid``/``offline``), or
-    ``auto``/None (free-first when keyed, else paid, else local, else mock)."""
+    ``auto``/None. ``auto`` prefers a **reachable local Ollama** (free + private),
+    then free OpenRouter, then paid, then Ollama as offline fallback, then mock."""
     if provider and provider not in ("auto", "free", "paid", "offline", None):
         return [provider]
     mode = provider if provider in ("free", "paid", "offline") else LLM_MODE
@@ -124,15 +144,20 @@ def _resolve_order(provider: str | None) -> list[str]:
             order.append("openai")
         order.append("mock")
         return order
-    # auto: free (OpenRouter) leads when keyed, then paid, then local, then mock.
+    # auto: a reachable local Ollama LEADS (it's free and private); otherwise the
+    # free OpenRouter model, then paid, then Ollama as an offline fallback.
     order = []
+    if _ollama_up():
+        order.append("ollama")
     if OPENROUTER_API_KEY:
         order.append("openrouter")
     if ANTHROPIC_API_KEY:
         order.append("anthropic")
     if OPENAI_API_KEY:
         order.append("openai")
-    order += ["ollama", "mock"]  # local-first offline, mock always terminal
+    if "ollama" not in order:
+        order.append("ollama")  # offline fallback when not reachable up front
+    order.append("mock")  # mock always terminal
     return order
 
 

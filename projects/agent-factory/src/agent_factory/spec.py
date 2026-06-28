@@ -40,6 +40,10 @@ class AgentSpec(BaseModel):
     temperature: float = Field(default=0.2, ge=0.0, le=1.0)
     answer_style: AnswerStyle = "concise"
     guardrails: Guardrails = Field(default_factory=Guardrails)
+    # ---- orchestration layer (LangGraph-style durable execution) ----
+    hitl: bool = False    # human-in-the-loop: plan, then pause for approval before acting
+    checkpoint: bool = False  # persist durable per-thread state (auto-on when hitl)
+    audit: bool = True    # append each step's trace to an audit log (governance)
 
     @field_validator("tools")
     @classmethod

@@ -297,12 +297,17 @@
   .btn.primary{ background-image:linear-gradient(115deg,var(--accent),var(--accent-2),var(--accent));
     background-size:220% 100%; animation:btnGrad 7s linear infinite; }
   @keyframes btnGrad{ to{ background-position:220% 0 } }
+  /* Reveal-in: starts blurred, then self-clears via animation so content is
+     NEVER left blurred even if no JS runs. The .in class (added on scroll by JS)
+     is a progressive enhancement, not a requirement for readability. */
   .reveal{ opacity:0; transform:translateY(14px); filter:blur(6px);
-    transition:opacity .6s var(--ease),transform .6s var(--ease),filter .6s var(--ease); }
-  .reveal.in{ opacity:1; transform:none; filter:none; }
+    transition:opacity .6s var(--ease),transform .6s var(--ease),filter .6s var(--ease);
+    animation:revealIn .6s var(--ease) .05s forwards; }
+  @keyframes revealIn{ to{ opacity:1; transform:none; filter:none } }
+  .reveal.in{ opacity:1; transform:none; filter:none; animation:none; }
   @media (prefers-reduced-motion:reduce){
     .brand,.brandword,header::after,.btn.primary{ animation:none } .panel::after{ display:none }
-    .reveal{ opacity:1; transform:none; filter:none; transition:none } }
+    .reveal{ opacity:1; transform:none; filter:none; transition:none; animation:none } }
 
   /* SHOWCASE: richer effects */
   #topbar{ position:fixed; top:0; left:0; height:2.5px; width:100%; z-index:100;
@@ -426,6 +431,26 @@
       <label class="chk"><input type="checkbox" id="sGin" /> Input guardrail</label>
       <label class="chk"><input type="checkbox" id="sGout" /> Output guardrail</label>
     </div>
+    <div><label>Orchestration <span class="hint">durable execution</span></label>
+      <div class="twocol">
+        <label class="chk" title="Plan, then pause for human approval before acting"><input type="checkbox" id="sHitl" /> Human-in-the-loop</label>
+        <label class="chk" title="Persist durable per-thread state (resume after a crash)"><input type="checkbox" id="sCheckpoint" /> Checkpoint</label>
+      </div>
+      <label class="chk" title="Append every step's trace to an append-only audit log"><input type="checkbox" id="sAudit" /> Audit trail</label>
+    </div>
+    <div><label>Generate project <span class="hint">paved road</span></label>
+      <div class="seg" id="sLang" data-k="language">
+        <button data-v="python" class="on">Python</button><button data-v="typescript">TypeScript</button></div>
+      <div class="twocol" style="margin-top:7px">
+        <button class="btn" id="dlZip" title="Download a standalone, runnable project (README + Dockerfile inside)">Download .zip</button>
+        <button class="btn" id="dlDocker" title="Show just the Dockerfile">Dockerfile</button>
+      </div>
+    </div>
+    <div><label>Describe an agent <span class="hint">AI-assisted spec</span></label>
+      <div class="twocol" style="grid-template-columns:1fr auto">
+        <input id="aiPrompt" placeholder="e.g. an agent that does math and converts units" />
+        <button class="btn" id="aiGo">Propose</button>
+      </div></div>
   </div>
   <div class="foot">
     <label class="chk" style="flex:1"><input type="checkbox" id="useCustom" /> Run with this custom spec</label>
@@ -453,7 +478,8 @@
     </ol></div>
     <div><h4>Endpoints</h4><div class="eps">
       <code>GET /health</code><code>GET /providers</code><code>GET /tools</code>
-      <code>GET /templates</code><code>POST /spec/validate</code><code>POST /run</code></div></div>
+      <code>GET /templates</code><code>POST /spec/validate</code><code>POST /run</code>
+      <code>POST /spec/customize</code><code>POST /scaffold</code><code>POST /scaffold/zip</code></div></div>
     <div><h4>Keyboard shortcuts</h4><p><span class="kbd">?</span> open this help · <span class="kbd">Esc</span> close any overlay</p></div>
     <div><p class="muted" style="font-size:11.5px">Tools, templates, and sample tasks are <b>synthetic</b> —
       a self-contained sandbox, no external data or accounts.</p></div>
@@ -513,6 +539,9 @@ function currentSpec(){
     temperature:(+$("#sTemp").value)/100,
     answer_style:$("#sStyle .on")?.dataset.v||"concise",
     guardrails:{input:$("#sGin").checked,output:$("#sGout").checked},
+    hitl:$("#sHitl").checked,
+    checkpoint:$("#sCheckpoint").checked,
+    audit:$("#sAudit").checked,
   };
 }
 
@@ -527,6 +556,7 @@ function fillDrawer(){
   // routing mode comes from cfg, not the template's model_mode — keep them in sync on first fill
   $("#sModel").value=(cfg.model||s.model||""); $("#sSteps").value=s.max_steps; $("#sTemp").value=Math.round(s.temperature*100);
   $("#sGin").checked=s.guardrails.input; $("#sGout").checked=s.guardrails.output;
+  $("#sHitl").checked=!!s.hitl; $("#sCheckpoint").checked=!!s.checkpoint; $("#sAudit").checked=s.audit!==false;
   $("#sStepsV").textContent=s.max_steps; $("#sTempV").textContent=(s.temperature).toFixed(2);
   selectMode(cfg.mode||uiMode(s.model_mode)); renderRouting();
 }
@@ -631,6 +661,40 @@ $("#sSteps").oninput=e=>$("#sStepsV").textContent=e.target.value;
 $("#sTemp").oninput=e=>$("#sTempV").textContent=(e.target.value/100).toFixed(2);
 $("#useCustom").onchange=()=>{spec=currentSpec();updateSummary();toast($("#useCustom").checked?"Using custom spec":"Using template: "+sel)};
 $("#resetSpec").onclick=()=>{spec=defaultSpec(sel);fillDrawer();$("#useCustom").checked=false;updateSummary();toast("Spec reset to "+sel)};
+
+// ---- paved-road scaffolder + AI-assisted spec ----
+function curLang(){return $("#sLang .on")?.dataset.v||"python"}
+$("#dlZip").onclick=async()=>{
+  try{
+    const r=await fetch("/scaffold/zip",{method:"POST",headers:{"content-type":"application/json"},
+      body:JSON.stringify({spec:currentSpec(),language:curLang()})});
+    if(!r.ok)throw new Error((await r.text()).slice(0,200));
+    const cd=r.headers.get("content-disposition")||"", m=/filename="?([^"]+)"?/.exec(cd);
+    const name=m?m[1]:`${currentSpec().name||"agent"}-${curLang()}.zip`;
+    const url=URL.createObjectURL(await r.blob()), a=document.createElement("a");
+    a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
+    toast("Downloaded "+name);
+  }catch(e){toast("Scaffold failed: "+e.message)}
+};
+$("#dlDocker").onclick=async()=>{
+  try{
+    const r=await j("/scaffold?format=dockerfile",{method:"POST",headers:{"content-type":"application/json"},
+      body:JSON.stringify({spec:currentSpec(),language:curLang()})});
+    $("#result").innerHTML=`<div class="card"><div class="head"><b>Dockerfile · ${curLang()}</b></div>`+
+      `<pre style="white-space:pre-wrap;overflow:auto;font-size:12px">${esc(r.dockerfile)}</pre></div>`;
+    closeDrawer();
+  }catch(e){toast("Dockerfile failed: "+e.message)}
+};
+$("#aiGo").onclick=async()=>{
+  const prompt=$("#aiPrompt").value.trim();
+  if(!prompt){toast("Describe the agent first");return}
+  try{
+    const r=await j("/spec/customize",{method:"POST",headers:{"content-type":"application/json"},
+      body:JSON.stringify({prompt})});
+    spec=r.spec;fillDrawer();$("#useCustom").checked=true;updateSummary();
+    toast("Spec proposed ("+((r.meta&&r.meta.source)||"?")+")");
+  }catch(e){toast("Customize failed: "+e.message)}
+};
 
 /* ===================== POLISH KIT: theme toggle ===================== */
 const THEME_KEY="theme";
@@ -828,6 +892,21 @@ async function boot(){
   finally{ renderRouting(); $("#boot").classList.add("gone"); }
 }
 boot();
+
+/* Reveal-on-view: .reveal starts blurred (filter:blur(6px)) and clears only when
+   .in is added. Add it via IntersectionObserver, with an immediate fallback so
+   content is never left permanently blurred (unsupported API, or already in view). */
+(function revealOnView(){
+  const els=$$(".reveal");
+  const show=el=>el.classList.add("in");
+  if(!("IntersectionObserver" in window)){ els.forEach(show); return; }
+  const io=new IntersectionObserver((entries,obs)=>{
+    entries.forEach(e=>{ if(e.isIntersecting){ show(e.target); obs.unobserve(e.target); } });
+  },{rootMargin:"0px 0px -8% 0px"});
+  els.forEach(el=>io.observe(el));
+  // safety net: anything still un-revealed shortly after load gets shown anyway
+  setTimeout(()=>els.forEach(show),1200);
+})();
 
 /* POLISH KIT: Ollama model picker — populate the model field with installed host models */
 (function(){

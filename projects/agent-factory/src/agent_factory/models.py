@@ -48,3 +48,23 @@ class TemplateInfo(BaseModel):
     name: str
     description: str
     spec: AgentSpec
+
+
+class ScaffoldRequest(BaseModel):
+    """Generate a standalone, runnable project from a spec (advanced) or a
+    ``template`` name (simple). ``language`` is ``python`` or ``typescript``."""
+
+    language: str = "python"
+    template: str | None = None
+    spec: AgentSpec | None = None
+
+
+class CustomizeRequest(BaseModel):
+    """Turn a plain-English description into a validated ``AgentSpec``.
+
+    The model proposes the spec; a deterministic keyword fallback runs when no
+    model is configured. Optionally refine an existing ``spec``/``template``."""
+
+    prompt: str = Field(min_length=1, max_length=2000)
+    template: str | None = None
+    spec: AgentSpec | None = None

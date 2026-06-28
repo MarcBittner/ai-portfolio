@@ -30,3 +30,8 @@ src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+# scaffold.py embeds generated Python/TypeScript as string templates; those
+# lines must keep the generated code's own formatting, not this repo's width.
+"src/agent_factory/scaffold.py" = ["E501"]

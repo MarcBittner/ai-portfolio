@@ -43,12 +43,14 @@ class AgentRun:
     answer: str
     planner: str = "rule"               # "rule" | "llm"
     blocked: bool = False
+    status: str = "complete"            # "complete" | "awaiting_approval" | "blocked"
     steps: list[TraceStep] = field(default_factory=list)
     routing: Routing | None = None
     input_findings: list[dict] = field(default_factory=list)
     output_findings: list[dict] = field(default_factory=list)
     tokens_estimated: int = 0
     elapsed_ms: float = 0.0
+    thread_id: str | None = None        # set by the orchestrator for durable runs
 
 
 def _fill(args: dict, observations: list[str]) -> dict:
@@ -61,8 +63,11 @@ def _fill(args: dict, observations: list[str]) -> dict:
     return out
 
 
-def _build_plan(task: str, spec: AgentSpec) -> tuple[list[Step], str, Routing | None]:
-    """Return (steps, planner_used, routing)."""
+def build_plan(task: str, spec: AgentSpec) -> tuple[list[Step], str, Routing | None]:
+    """Return (steps, planner_used, routing) — the *plan* half of a run.
+
+    Exposed so an orchestrator can checkpoint the plan and pause for human
+    approval before :func:`execute` acts on it (human-in-the-loop)."""
     if spec.planner in ("auto", "llm"):
         from agent_factory.llm_planner import llm_plan
         steps, result = llm_plan(task, spec)
@@ -74,26 +79,41 @@ def _build_plan(task: str, spec: AgentSpec) -> tuple[list[Step], str, Routing | 
     return rule_plan(task, spec.tools), "rule", None
 
 
-def run(task: str, spec: AgentSpec) -> AgentRun:
-    """Execute ``spec`` over ``task`` and return the full run record."""
-    started = time.monotonic()
+def input_guard(task: str, spec: AgentSpec) -> list[guardrails.Finding]:
+    """Scan the task for prompt-injection / jailbreak phrasing."""
+    if not spec.guardrails.input:
+        return []
+    return guardrails.scan_input(task)
 
-    # 1) input guardrail
-    input_findings: list[guardrails.Finding] = []
-    if spec.guardrails.input:
-        input_findings = guardrails.scan_input(task)
-        if any(f.category in _HARD_BLOCK for f in input_findings):
-            return AgentRun(
-                agent=spec.name, task=task,
-                answer="Blocked: the request looks like a prompt-injection / "
-                       "jailbreak attempt, so the agent declined to act on it.",
-                blocked=True,
-                input_findings=guardrails.findings_as_dicts(input_findings),
-                elapsed_ms=round((time.monotonic() - started) * 1000, 1),
-            )
 
-    # 2) plan
-    steps, planner_used, routing = _build_plan(task, spec)
+def is_blocked(findings: list[guardrails.Finding]) -> bool:
+    """True when the input findings include a hard-block category."""
+    return any(f.category in _HARD_BLOCK for f in findings)
+
+
+def blocked_run(spec: AgentSpec, task: str, findings: list[guardrails.Finding],
+                started: float | None = None) -> AgentRun:
+    started = time.monotonic() if started is None else started
+    return AgentRun(
+        agent=spec.name, task=task,
+        answer="Blocked: the request looks like a prompt-injection / "
+               "jailbreak attempt, so the agent declined to act on it.",
+        blocked=True, status="blocked",
+        input_findings=guardrails.findings_as_dicts(findings),
+        elapsed_ms=round((time.monotonic() - started) * 1000, 1),
+    )
+
+
+def execute(task: str, spec: AgentSpec, steps: list[Step], planner_used: str,
+            routing: Routing | None,
+            input_findings: list[guardrails.Finding] | None = None,
+            started: float | None = None) -> AgentRun:
+    """The *act → answer → guard* half of a run, over an already-built plan.
+
+    Split out from :func:`run` so an orchestrator can run it *after* a human
+    approves the checkpointed plan (the approve-before-acting gate)."""
+    started = time.monotonic() if started is None else started
+    input_findings = input_findings or []
 
     # 3) act
     observations: list[str] = []
@@ -137,9 +157,23 @@ def run(task: str, spec: AgentSpec) -> AgentRun:
            + sum(len(o) for o in observations) + len(answer)) // 4
     return AgentRun(
         agent=spec.name, task=task, answer=answer, planner=planner_used,
-        steps=trace, routing=routing,
+        status="complete", steps=trace, routing=routing,
         input_findings=guardrails.findings_as_dicts(input_findings),
         output_findings=guardrails.findings_as_dicts(output_findings),
         tokens_estimated=est,
         elapsed_ms=round((time.monotonic() - started) * 1000, 1),
     )
+
+
+def run(task: str, spec: AgentSpec) -> AgentRun:
+    """Execute ``spec`` over ``task`` end to end: guard → plan → act → answer.
+
+    For durable, resumable, human-in-the-loop runs use
+    :func:`agent_factory.orchestrate.run` instead — it inserts a checkpoint and
+    an approval gate between :func:`build_plan` and :func:`execute`."""
+    started = time.monotonic()
+    findings = input_guard(task, spec)
+    if is_blocked(findings):
+        return blocked_run(spec, task, findings, started)
+    steps, planner_used, routing = build_plan(task, spec)
+    return execute(task, spec, steps, planner_used, routing, findings, started)

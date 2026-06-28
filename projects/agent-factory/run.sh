@@ -35,9 +35,14 @@ Commands:
   lint        Run ruff
   check       lint + test
   demo        Run the offline library demo
+  scaffold    Generate a standalone agent project (paved road) to a directory
   smoke       Run the live smoke/regression suite (local server, or --url <deploy>)
   doctor      Report Python / venv / model status
   help        Show this help
+
+Examples:
+  ./run.sh scaffold --template calculator --language typescript --out ./my-agent
+  ./run.sh scaffold --spec ./spec.json --language python --out ./bot.zip --zip
 
 Options:
   --port <n>   Port for serve (default $DEFAULT_PORT; or env PORT)
@@ -126,6 +131,7 @@ cmd_smoke() {
   return $rc
 }
 
+cmd_scaffold() { ensure_installed; py -m agent_factory.scaffold "$@"; }
 cmd_serve() { ensure_installed; tool uvicorn "$APP" --host "$HOST" --port "$PORT" --reload; }
 cmd_test()  { ensure_installed; py -m pytest -q "$@"; }
 cmd_lint()  { ensure_installed; tool ruff check src tests; }
@@ -135,6 +141,7 @@ cmd_demo()  {
 }
 
 CMD=""
+SCAFFOLD_ARGS=()
 while (( $# )); do
   case "$1" in
     --port) PORT="${2:?--port needs a value}"; shift 2;;
@@ -145,6 +152,7 @@ while (( $# )); do
     --url=*) SMOKE_URL="${1#*=}"; shift;;
     --no-venv) USE_VENV=0; shift;;
     -h|--help) usage; exit 0;;
+    scaffold) CMD="scaffold"; shift; SCAFFOLD_ARGS=("$@"); break;;
     setup|serve|test|lint|check|demo|smoke|doctor|help) CMD="$1"; shift;;
     *) die "unknown argument: $1  (run './run.sh --help')";;
   esac
@@ -158,6 +166,7 @@ case "$CMD" in
   lint)  cmd_lint;;
   check) cmd_lint; cmd_test;;
   demo)  cmd_demo;;
+  scaffold) cmd_scaffold "${SCAFFOLD_ARGS[@]}";;
   smoke) cmd_smoke;;
   doctor) cmd_doctor;;
   help)  usage;;
