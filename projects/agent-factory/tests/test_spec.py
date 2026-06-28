@@ -1,14 +1,38 @@
 import pytest
 from pydantic import ValidationError
 
-from agent_factory.spec import TEMPLATE_NAMES, TEMPLATES, AgentSpec, template
+from agent_factory.spec import (
+    TEMPLATE_META,
+    TEMPLATE_NAMES,
+    TEMPLATES,
+    AgentSpec,
+    template,
+    template_meta,
+)
+
+_GENERAL = {"assistant", "researcher", "calculator", "analyst"}
+_ARCHETYPES = {"ingestion", "retrieval", "model-construction", "simulation",
+               "qa", "report", "orchestrator"}
 
 
 def test_templates_are_valid_and_named():
-    assert set(TEMPLATE_NAMES) == {"assistant", "researcher", "calculator", "analyst"}
+    assert set(TEMPLATE_NAMES) >= _GENERAL
+    assert set(TEMPLATE_NAMES) >= _ARCHETYPES  # the 7 pipeline roles
     for name, spec in TEMPLATES.items():
         assert spec.name == name
         assert spec.tools  # non-empty allowlist
+
+
+def test_archetypes_carry_role_metadata():
+    for name in _ARCHETYPES:
+        meta = template_meta(name)
+        assert meta["kind"] == "archetype"
+        assert meta["guards"] and isinstance(meta["stage"], int)
+    # the human-gated roles default to the approval gate
+    assert template("report").hitl and template("orchestrator").hitl
+    assert template("orchestrator").checkpoint
+    # every template has metadata
+    assert set(TEMPLATE_META) == set(TEMPLATE_NAMES)
 
 
 def test_template_returns_independent_copy():

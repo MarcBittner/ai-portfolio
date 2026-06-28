@@ -164,9 +164,26 @@ curl -s localhost:8017/spec/customize -H content-type:application/json \
 
 ## Templates
 
-`assistant` (full toolset) · `researcher` (knowledge base + docs) · `calculator`
-(math, units, dates) · `analyst` (JSON/regex/text + math). Each is just a starting
-`AgentSpec` you can edit in the UI's spec drawer.
+**General agents:** `assistant` (full toolset) · `researcher` (knowledge base +
+docs) · `calculator` (math, units, dates) · `analyst` (JSON/regex/text + math).
+
+**Pipeline roles (archetypes) — pick the agent *type* you're building.** Each is
+a narrow, independently-testable role pre-wired with its system prompt, a fitting
+tool subset, and the failure mode it guards — narrow roles beat one mega-agent:
+
+| # | archetype | guards against | defaults |
+|---|---|---|---|
+| 1 | `ingestion` | garbage-in (unvalidated data passing through) | audit |
+| 2 | `retrieval` (RAG) | invented / uncited requirements | audit |
+| 3 | `model-construction` | fabricated or mis-typed inputs | temp 0, audit |
+| 4 | `simulation` | the LLM estimating numbers instead of computing them | temp 0, audit |
+| 5 | `qa` | a violation reaching the deliverable | audit |
+| 6 | `report` | an unreviewed document reaching a stamp | **hitl**, audit |
+| 7 | `orchestrator` | an unrouted/unaudited/unapproved step | **hitl**, **checkpoint**, audit |
+
+Each is a starting `AgentSpec` you can edit in the spec drawer, then run or
+scaffold. `GET /templates` returns each role's `kind`, `guards`, and pipeline
+`stage`.
 
 ## Tools
 

@@ -48,6 +48,9 @@ class TemplateInfo(BaseModel):
     name: str
     description: str
     spec: AgentSpec
+    kind: str = "general"            # "general" | "archetype" (a pipeline role)
+    guards: str | None = None        # the failure mode this role guards against
+    stage: int | None = None         # pipeline stage order (archetypes only)
 
 
 class ScaffoldRequest(BaseModel):

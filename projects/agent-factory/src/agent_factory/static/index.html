@@ -104,6 +104,11 @@
   .tpl .nm{font-weight:640;display:flex;align-items:center;gap:8px}
   .tpl .ds{font-size:12.5px;color:var(--muted);margin-top:3px}
   .tpl .tl{font-size:11px;color:var(--faint);margin-top:7px}
+  .templates .tgroup{flex-basis:100%;width:100%;font-size:11px;text-transform:uppercase;
+    letter-spacing:.6px;color:var(--faint);margin:6px 2px 0}
+  .tpl .nm .stg{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;
+    background:var(--grad);color:var(--accent-ink);font-size:11px;font-weight:700;flex:none}
+  .tpl .gd{font-size:11px;color:var(--accent);margin-top:6px;opacity:.92}
 
   textarea,input,select{width:100%;background:var(--surface-2);color:var(--ink);border:1px solid var(--line);
     border-radius:10px;padding:11px 12px;font:inherit;transition:.15s}
@@ -508,12 +513,20 @@ function saveCfg(){cfg={mode:currentMode(), model:$("#sModel").value.trim()};
 function defaultSpec(name){const t=TEMPLATES[name]; return t?JSON.parse(JSON.stringify(t.spec)):null}
 
 function renderTemplates(){
-  $("#templates").innerHTML=Object.values(TEMPLATES).map(t=>`
+  const all=Object.values(TEMPLATES);
+  const general=all.filter(t=>(t.kind||"general")!=="archetype");
+  const arche=all.filter(t=>t.kind==="archetype").sort((a,b)=>(a.stage||0)-(b.stage||0));
+  const card=t=>`
     <button class="tpl ${t.name===sel?'sel':''}" data-n="${t.name}">
-      <div class="nm">${esc(t.name)}</div>
+      <div class="nm">${t.stage?`<span class="stg">${t.stage}</span>`:''}${esc(t.name)}</div>
       <div class="ds">${esc(t.spec.description)}</div>
+      ${t.guards?`<div class="gd" title="the failure mode this role guards against">⛨ guards ${esc(t.guards)}</div>`:''}
       <div class="tl mono">${t.spec.tools.join(' · ')}</div>
-    </button>`).join("");
+    </button>`;
+  $("#templates").innerHTML=
+    (general.length?`<div class="tgroup">General agents</div>`:'')+general.map(card).join("")+
+    (arche.length?`<div class="tgroup">Pipeline roles — pick the agent type you're building</div>`:'')+
+    arche.map(card).join("");
   $$(".tpl").forEach(b=>b.onclick=()=>{sel=b.dataset.n;spec=defaultSpec(sel);$("#useCustom").checked=false;renderTemplates();fillDrawer();updateSummary()});
 }
 

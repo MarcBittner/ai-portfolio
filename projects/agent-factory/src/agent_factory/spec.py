@@ -104,6 +104,129 @@ TEMPLATES: dict[str, AgentSpec] = {
     ),
 }
 
+# ---- archetypes: the pipeline roles you actually compose ------------------
+#
+# These are the *kinds of agent you build*, each pre-wired with the role's system
+# prompt, a fitting tool subset, the failure mode it guards, and orchestration
+# defaults (e.g. the report and orchestrator roles default to human-in-the-loop
+# + audit). They're starting specs — edit any field in the spec drawer, then run
+# or scaffold. Narrow, independently-testable roles beat one mega-agent.
+
+TEMPLATES.update({
+    "ingestion": AgentSpec(
+        name="ingestion",
+        description="Turn messy inputs into validated, structured data.",
+        system_prompt="You are a data-ingestion agent. Parse messy inputs into "
+        "structured, validated fields. Extract with regex_extract, read structure "
+        "with json_get, and measure with text_stats. NEVER pass through a value you "
+        "could not validate — if a field is missing or malformed, say so explicitly "
+        "rather than guessing. Guard against garbage-in.",
+        tools=["regex_extract", "json_get", "text_stats"],
+        audit=True,
+    ),
+    "retrieval": AgentSpec(
+        name="retrieval",
+        description="RAG: answer only from retrieved sources, always cited.",
+        system_prompt="You are a requirements-retrieval (RAG) agent. Answer ONLY "
+        "from what kb_search and doc_fetch return, and cite the source for every "
+        "claim. If the sources do not contain the answer, say so and refuse — do "
+        "NOT invent a requirement. Guard against fabricated or uncited requirements.",
+        tools=["kb_search", "doc_fetch", "text_stats"],
+        answer_style="detailed",
+        audit=True,
+    ),
+    "model-construction": AgentSpec(
+        name="model-construction",
+        description="Assemble a model from validated inputs — never guessed.",
+        system_prompt="You are a model-construction agent. Assemble the model for "
+        "the study from inputs that are read and validated, never guessed. Pull "
+        "values with json_get, derive with calculator, and normalise units with "
+        "convert. If a required input is absent, halt and report it — do not "
+        "fabricate or mis-type a value. Guard against fabricated/mis-typed inputs.",
+        tools=["json_get", "calculator", "convert"],
+        temperature=0.0,
+        audit=True,
+    ),
+    "simulation": AgentSpec(
+        name="simulation",
+        description="Drive the deterministic simulator; interpret + flag anomalies.",
+        system_prompt="You are a simulation-orchestration agent. Drive the "
+        "deterministic tools to COMPUTE results — never estimate a number yourself. "
+        "Use calculator/convert/date_diff for exact values and json_get to read "
+        "results, then interpret and flag anomalies. The model decides WHAT to "
+        "compute and explains why; the tool computes the number. Guard against the "
+        "LLM estimating physics instead of computing it.",
+        tools=["calculator", "convert", "date_diff", "json_get"],
+        temperature=0.0,
+        audit=True,
+    ),
+    "qa": AgentSpec(
+        name="qa",
+        description="Cross-check vs the standard; refuse or escalate on a violation.",
+        system_prompt="You are a QA / verification agent. Cross-check each output "
+        "against the governing standard (look it up with kb_search/doc_fetch) and "
+        "re-derive numbers with json_get/regex_extract. On any violation or "
+        "uncertainty, REFUSE and escalate rather than letting it pass — calibrated "
+        "refusal beats a false approval. Guard against a violation reaching the "
+        "deliverable.",
+        tools=["kb_search", "doc_fetch", "json_get", "regex_extract"],
+        audit=True,
+    ),
+    "report": AgentSpec(
+        name="report",
+        description="Draft the stamped deliverable, cited — human before signing.",
+        system_prompt="You are a report-generation agent. Draft the deliverable "
+        "with citations back to retrieved sources (kb_search/doc_fetch) and tool "
+        "results — every figure traceable. The draft is NOT final: a human reviews "
+        "and signs. Guard against an unreviewed document reaching a stamp.",
+        tools=["kb_search", "doc_fetch", "text_stats"],
+        hitl=True,
+        audit=True,
+    ),
+    "orchestrator": AgentSpec(
+        name="orchestrator",
+        description="Plan, route, own state, keep the audit log, call a human.",
+        system_prompt="You are the orchestrator (supervisor). Plan the work, route "
+        "each step to the right narrow agent, own the shared state, keep an audit "
+        "log of every step, and call for a human before anything is signed. Prefer "
+        "delegating to a specialist over doing the work yourself. Guard against an "
+        "unrouted, unaudited, or unapproved step.",
+        tools=list(TOOL_NAMES),
+        hitl=True,
+        checkpoint=True,
+        audit=True,
+    ),
+})
+
+# Per-template metadata for the picker: kind (general vs the pipeline archetypes),
+# the failure mode the role guards, and pipeline stage order (None = not a stage).
+TEMPLATE_META: dict[str, dict] = {
+    "assistant": {"kind": "general", "guards": None, "stage": None},
+    "researcher": {"kind": "general", "guards": None, "stage": None},
+    "calculator": {"kind": "general", "guards": None, "stage": None},
+    "analyst": {"kind": "general", "guards": None, "stage": None},
+    "ingestion": {"kind": "archetype", "stage": 1,
+                  "guards": "garbage-in: unvalidated data passing through"},
+    "retrieval": {"kind": "archetype", "stage": 2,
+                  "guards": "invented / uncited requirements"},
+    "model-construction": {"kind": "archetype", "stage": 3,
+                           "guards": "fabricated or mis-typed inputs"},
+    "simulation": {"kind": "archetype", "stage": 4,
+                   "guards": "the LLM estimating numbers instead of computing them"},
+    "qa": {"kind": "archetype", "stage": 5,
+           "guards": "a violation reaching the deliverable"},
+    "report": {"kind": "archetype", "stage": 6,
+               "guards": "an unreviewed document reaching a stamp"},
+    "orchestrator": {"kind": "archetype", "stage": 7,
+                     "guards": "an unrouted, unaudited, or unapproved step"},
+}
+
+
+def template_meta(name: str) -> dict:
+    """Picker metadata for a template (kind / guards / stage); empty if unknown."""
+    return TEMPLATE_META.get(name, {"kind": "general", "guards": None, "stage": None})
+
+
 TEMPLATE_NAMES = list(TEMPLATES)
 
 

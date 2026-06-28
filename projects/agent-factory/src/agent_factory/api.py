@@ -36,7 +36,7 @@ from agent_factory.models import (
     ToolRequest,
     ToolResponse,
 )
-from agent_factory.spec import TEMPLATES, AgentSpec, template
+from agent_factory.spec import TEMPLATES, AgentSpec, template, template_meta
 from agent_factory.tools import TOOL_NAMES, TOOLS, ToolError, tool_catalog
 
 
@@ -77,7 +77,8 @@ def tools() -> list[dict]:
 
 @app.get("/templates", response_model=list[TemplateInfo])
 def templates() -> list[TemplateInfo]:
-    return [TemplateInfo(name=name, description=spec.description, spec=spec)
+    return [TemplateInfo(name=name, description=spec.description, spec=spec,
+                         **template_meta(name))
             for name, spec in TEMPLATES.items()]
 
 
