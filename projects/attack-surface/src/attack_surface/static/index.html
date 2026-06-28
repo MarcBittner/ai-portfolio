@@ -706,10 +706,10 @@ function renderLive(r){
   $("#subs").innerHTML=`<b>${subs.length}</b> subdomains discovered from Certificate Transparency — observations an attacker could also gather`;
   $("#findingsPanel").style.display="";
   $("#findingsTitle").innerHTML='Passively-observable exposure <span class="muted" style="margin-left:auto;text-transform:none;letter-spacing:0">CT only · not a vulnerability assessment</span>';
-  $("#findings").innerHTML=`<thead><tr><th>type</th><th>observation</th><th>asset</th></tr></thead><tbody>`+
+  $("#findings").innerHTML=`<thead><tr><th>type</th><th>observation &amp; remediation</th><th>asset</th></tr></thead><tbody>`+
     (findings.length?findings.map(f=>{const tag=f.rule_id==="CT_SENSITIVE_HOST"?"sensitive":f.rule_id==="CT_NONPROD_HOST"?"nonprod":"surface";
       return `<tr><td><span class="badge b-${f.severity}">${tag}</span></td>
-      <td><b>${esc(f.title)}</b><div class="muted">${esc(f.detail)}</div></td>
+      <td><b>${esc(f.title)}</b><div class="muted">${esc(f.detail)}</div>${f.remediation?`<div class="rem">↳ ${esc(f.remediation)}</div>`:""}${(f.controls&&f.controls.length)?`<div style="margin-top:4px">${f.controls.map(c=>`<span class="ctlchip">${esc(c)}</span>`).join("")}</div>`:""}</td>
       <td><span class="mono">${esc(f.asset)}</span></td></tr>`;}).join("")
       :`<tr><td colspan="3" class="muted" style="padding:16px">${esc(r.note||"No public CT data for this domain.")}</td></tr>`)+`</tbody>`;
   // the graded report (controls / narrative / before-after diff) is for the owned
