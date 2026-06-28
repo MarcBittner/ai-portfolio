@@ -330,6 +330,24 @@
 </header>
 
 <main>
+  <div class="panel full reveal" style="border-left:3px solid var(--accent)">
+    <h2>How to read this</h2>
+    <div class="body" style="font-size:13.5px;line-height:1.65;color:var(--ink-dim)">
+      <b style="color:var(--ink)">What it is.</b> llm-gateway is a <b>governance layer that sits between an
+      app and any LLM</b>. Every prompt runs through a fixed policy pipeline, so the model is used safely
+      and <b>every call is auditable</b> — the model generates text; deterministic code enforces the rules.
+      <div style="margin-top:9px"><b style="color:var(--ink)">The pipeline</b> (the stages you'll see light
+      up in <i>Request path</i>): ① <b>input firewall</b> — block prompt-injection / jailbreak attempts ·
+      ② <b>PII / secret redaction</b> — strip emails, SSNs, API keys <i>before</i> the prompt reaches the
+      provider · ③ <b>multi-provider routing</b> — vendor-neutral, with automatic failover · ④ <b>output
+      firewall + redaction</b> — scrub the model's reply · ⑤ <b>tamper-evident audit log</b> — each request
+      hashed into a verifiable chain.</div>
+      <div style="margin-top:9px"><b style="color:var(--ink)">Try it.</b> Pick an example —
+      <b>benign · PII · injection</b> — then <b>Send through gateway</b>. Watch the Request-path stages and a
+      new row append to the audit log; click <b>Verify chain</b> to confirm nothing was tampered with. The
+      default prompt already contains a name, email, and SSN — send it and see them redacted.</div>
+    </div>
+  </div>
   <div class="panel full reveal">
     <h2>Policy <span class="pchips" id="policychips" style="margin-left:auto"></span></h2>
     <div class="body">

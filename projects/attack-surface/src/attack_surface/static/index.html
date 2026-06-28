@@ -370,6 +370,26 @@
 </header>
 
 <main>
+  <div class="panel full reveal" style="border-left:3px solid var(--accent)">
+    <h2>How to read this</h2>
+    <div class="body" style="font-size:13.5px;line-height:1.65;color:var(--ink-dim)">
+      <b style="color:var(--ink)">What it is.</b> attack-surface turns a passive scan of a domain into
+      <b>governance evidence</b> — discovered assets → findings → a SOC&nbsp;2 / ISO&nbsp;27001 control
+      crosswalk → a posture grade.
+      <div style="margin-top:9px"><b style="color:var(--ink)">Two modes.</b>
+      <b>Live</b> (default) = passive Certificate-Transparency recon on a <i>real</i> domain: it enumerates
+      subdomains and flags internal/non-prod hostnames that leaked into public CT. <b>No host is ever
+      probed</b>, so it's an external-hygiene read (observations an attacker could also gather) — not a
+      pass/fail vulnerability verdict. <b>Fixture</b> = the full graded report (criticals → controls → exec
+      narrative → remediation diff) on an <b>owned synthetic domain</b> — all data fictional.</div>
+      <div style="margin-top:9px"><b style="color:var(--ink)">How to read it.</b>
+      ① <b>Posture</b> — grade + host counts · ② <b>Surface summary</b> — size of the discoverable surface ·
+      ③ <b>Passively-observable exposure</b> — each hostname enumerable from CT · (fixture only)
+      ④ <b>Findings → controls</b> + the <b>executive risk narrative</b>.</div>
+      <div style="margin-top:9px;font-size:12px;color:var(--ink-faint)">Try it: keep <code>stripe.com</code>
+      (or type a domain you're authorized to scan) and click <b>Run scan</b>.</div>
+    </div>
+  </div>
   <div class="panel full reveal">
     <h2>Posture <span class="muted" id="poscaption" style="margin-left:auto;text-transform:none;letter-spacing:0"></span></h2>
     <div class="body">
@@ -827,26 +847,37 @@ async function loadLlm(){
 // Always lands on a populated report. Live mode tries passive CT recon; on any
 // failure (or empty CT) it falls back to the offline control-mapped report — the
 // console never shows a bare "Scan failed".
+// An honest empty/error live result — so live mode NEVER renders the synthetic
+// fixture (example-corp.test) under a real domain the user typed.
+function emptyLive(domain,note){
+  return {domain,mode:"live",assets:{subdomains:[]},findings:[],severity_counts:{},
+    posture:{grade:"—",score:0,controls_failing:0,controls_total:0},note};
+}
 async function run(){
   const btn=$("#scan");btn.classList.add("loading");
-  const fixtureFallback=async(note)=>{try{const f=await j("scan");renderReport(f);if(note)toast(note,"info");}catch{toast("Service still waking up — try again in a moment","info");}};
   try{
     if(cfg.mode==="live" && cfg.domain && cfg.domain!=="example-corp.test"){
+      let r;
       try{
-        const r=await j("scan",{method:"POST",headers:{"content-type":"application/json"},
+        r=await j("scan",{method:"POST",headers:{"content-type":"application/json"},
           body:JSON.stringify({mode:"live",domain:cfg.domain})});
-        const ns=((r.assets&&r.assets.subdomains)||[]).length, nf=(r.findings||[]).length;
-        if(ns||nf){renderLive(r);toast(`Live surface map · ${ns} subdomains · ${nf} observations`,"ok");}
-        else await fixtureFallback("No public CT data for that domain — showing the offline control-mapped report");
       }catch(err){
-        await fixtureFallback("Live recon unavailable — showing the offline control-mapped report");
+        r=emptyLive(cfg.domain,`Live CT lookup is temporarily unavailable for ${cfg.domain} `+
+          `(the public Certificate-Transparency source may be rate-limiting). This is passive `+
+          `recon only — no host was probed. Try again in a moment, or switch to the fixture report.`);
       }
+      const ns=((r.assets&&r.assets.subdomains)||[]).length, nf=(r.findings||[]).length;
+      // ALWAYS render as live — never fall back to the synthetic fixture in live mode.
+      renderLive(r);
+      toast(ns||nf?`Live surface map · ${ns} subdomains · ${nf} observations`
+                 :`No public CT data returned for ${cfg.domain}`,"info");
     }else{
       const r=await j("scan");renderReport(r);
       toast(`Scan complete · grade ${r.posture.grade}`,"ok");
     }
   }catch(e){
-    await fixtureFallback("Showing the offline control-mapped report");
+    if(cfg.mode==="live") renderLive(emptyLive(cfg.domain||"—","Scan failed — try again in a moment."));
+    else toast("Service still waking up — try again in a moment","info");
   }
   btn.classList.remove("loading");
 }
@@ -867,10 +898,14 @@ async function boot(){
   $$(".reveal").forEach((el,i)=>setTimeout(()=>el.classList.add("in"),90*i));
   loadLlm();
   refreshClientOllama();   // browser-side Ollama check (browser→host)
-  // first load: always show a populated report immediately (offline, never fails),
-  // then — if defaulted to a live domain (stripe.com) — upgrade to the live recon.
-  try{const r=await j("scan");renderReport(r);}catch{}
-  if(cfg.mode==="live" && cfg.domain && cfg.domain!=="example-corp.test"){run();}
+  // first load: if defaulting to a live domain, run the live recon directly — no
+  // synthetic-fixture flash. Otherwise show the fixture control-mapped report.
+  if(cfg.mode==="live" && cfg.domain && cfg.domain!=="example-corp.test"){
+    renderLive(emptyLive(cfg.domain,`Enumerating ${cfg.domain} via public Certificate Transparency…`));
+    run();
+  }else{
+    try{const r=await j("scan");renderReport(r);}catch{}
+  }
 }
 boot();
 
