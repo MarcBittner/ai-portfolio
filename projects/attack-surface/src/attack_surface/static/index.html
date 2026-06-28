@@ -404,7 +404,7 @@
               <option value="live">live — passive CT recon</option>
               <option value="fixture">fixture — full report</option>
             </select>
-            <input id="mainDomain" placeholder="example.com  (live mode)" autocomplete="off" spellcheck="false"
+            <input id="mainDomain" placeholder="stripe.com  (a domain you're authorized to scan)" autocomplete="off" spellcheck="false"
               style="flex:1;min-width:180px;width:auto;padding:9px 11px" />
             <button class="btn primary" id="scan"><span class="spin"></span><span class="lbl">Run scan</span></button>
             <span class="muted" id="subs"></span>
@@ -574,7 +574,7 @@ function applyCfgToForm(){
 function openDrawer(){applyCfgToForm();refreshClientOllama();$("#scrim").classList.add("open");$("#drawer").classList.add("open");$("#drawer").setAttribute("aria-hidden","false")}
 function closeDrawer(){$("#scrim").classList.remove("open");$("#drawer").classList.remove("open");$("#drawer").setAttribute("aria-hidden","true")}
 $("#gear").onclick=openDrawer;$("#closedrawer").onclick=closeDrawer;
-$("#savecfg").onclick=()=>{cfg={mode:$("#cfgMode").value,domain:$("#cfgDomain").value.trim()||"example-corp.test",
+$("#savecfg").onclick=()=>{cfg={mode:$("#cfgMode").value,domain:$("#cfgDomain").value.trim(),
     routeMode:currentMode(),model:$("#cfgModel").value.trim()};
   localStorage.setItem(CFG_KEY,JSON.stringify(cfg));closeDrawer();toast("Settings saved","ok");run()};
 $("#resetcfg").onclick=()=>{cfg={mode:"live",domain:"stripe.com",routeMode:"auto",model:""};localStorage.removeItem(CFG_KEY);applyCfgToForm();syncMainControls();toast("Reset to defaults","info")};
@@ -585,7 +585,7 @@ function syncMainControls(){
   const live=cfg.mode==="live";
   if($("#mainMode"))$("#mainMode").value=cfg.mode;
   if($("#mainDomain")){
-    $("#mainDomain").value=(cfg.domain&&cfg.domain!=="example-corp.test")?cfg.domain:"";
+    $("#mainDomain").value=live?liveDomain():"";
     $("#mainDomain").disabled=!live;$("#mainDomain").style.opacity=live?"1":".45";
   }
   if($("#mainhint"))$("#mainhint").innerHTML=live
@@ -593,7 +593,7 @@ function syncMainControls(){
     : "Full control-mapped report on the owned synthetic fixture domain. Switch to <b>live</b> to scan a real domain.";
 }
 $("#mainMode").onchange=()=>{cfg.mode=$("#mainMode").value;if($("#cfgMode"))$("#cfgMode").value=cfg.mode;persistCfg();syncMainControls();};
-$("#mainDomain").oninput=()=>{cfg.domain=$("#mainDomain").value.trim()||"example-corp.test";if($("#cfgDomain"))$("#cfgDomain").value=$("#mainDomain").value.trim();persistCfg();};
+$("#mainDomain").oninput=()=>{cfg.domain=$("#mainDomain").value.trim();if($("#cfgDomain"))$("#cfgDomain").value=cfg.domain;persistCfg();};
 $("#mainDomain").onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();run();}};
 
 const gradeClass=g=>g==="A"||g==="B"?"g-ok":g==="C"?"g-warn":"g-bad";
@@ -853,30 +853,40 @@ function emptyLive(domain,note){
   return {domain,mode:"live",assets:{subdomains:[]},findings:[],severity_counts:{},
     posture:{grade:"—",score:0,controls_failing:0,controls_total:0},note};
 }
+const DEFAULT_DOMAIN="stripe.com";
+// The real domain to scan in live mode. Empty / the synthetic sentinel both
+// resolve to the default — live mode must NEVER scan or render example-corp.test.
+function liveDomain(){
+  const d=(cfg.domain||"").trim().toLowerCase();
+  return (!d||d==="example-corp.test"||d==="example.com")?DEFAULT_DOMAIN:d;
+}
 async function run(){
   const btn=$("#scan");btn.classList.add("loading");
   try{
-    if(cfg.mode==="live" && cfg.domain && cfg.domain!=="example-corp.test"){
+    if(cfg.mode==="live"){
+      const dom=liveDomain();
+      cfg.domain=dom;persistCfg();
+      if($("#mainDomain"))$("#mainDomain").value=dom;
       let r;
       try{
         r=await j("scan",{method:"POST",headers:{"content-type":"application/json"},
-          body:JSON.stringify({mode:"live",domain:cfg.domain})});
+          body:JSON.stringify({mode:"live",domain:dom})});
       }catch(err){
-        r=emptyLive(cfg.domain,`Live CT lookup is temporarily unavailable for ${cfg.domain} `+
-          `(the public Certificate-Transparency source may be rate-limiting). This is passive `+
-          `recon only — no host was probed. Try again in a moment, or switch to the fixture report.`);
+        r=emptyLive(dom,`Live CT lookup is temporarily unavailable for ${dom} `+
+          `(the public Certificate-Transparency source may be rate-limiting). Passive recon `+
+          `only — no host was probed. Try again in a moment.`);
       }
       const ns=((r.assets&&r.assets.subdomains)||[]).length, nf=(r.findings||[]).length;
       // ALWAYS render as live — never fall back to the synthetic fixture in live mode.
       renderLive(r);
       toast(ns||nf?`Live surface map · ${ns} subdomains · ${nf} observations`
-                 :`No public CT data returned for ${cfg.domain}`,"info");
+                 :`No public CT data returned for ${dom}`,"info");
     }else{
       const r=await j("scan");renderReport(r);
       toast(`Scan complete · grade ${r.posture.grade}`,"ok");
     }
   }catch(e){
-    if(cfg.mode==="live") renderLive(emptyLive(cfg.domain||"—","Scan failed — try again in a moment."));
+    if(cfg.mode==="live") renderLive(emptyLive(liveDomain(),"Scan failed — try again in a moment."));
     else toast("Service still waking up — try again in a moment","info");
   }
   btn.classList.remove("loading");
@@ -900,8 +910,8 @@ async function boot(){
   refreshClientOllama();   // browser-side Ollama check (browser→host)
   // first load: if defaulting to a live domain, run the live recon directly — no
   // synthetic-fixture flash. Otherwise show the fixture control-mapped report.
-  if(cfg.mode==="live" && cfg.domain && cfg.domain!=="example-corp.test"){
-    renderLive(emptyLive(cfg.domain,`Enumerating ${cfg.domain} via public Certificate Transparency…`));
+  if(cfg.mode==="live"){
+    renderLive(emptyLive(liveDomain(),`Enumerating ${liveDomain()} via public Certificate Transparency…`));
     run();
   }else{
     try{const r=await j("scan");renderReport(r);}catch{}
