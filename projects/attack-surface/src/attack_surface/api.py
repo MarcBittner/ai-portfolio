@@ -82,4 +82,6 @@ def llm_status() -> dict:
 
 @app.get("/", include_in_schema=False)
 def index() -> FileResponse:
-    return FileResponse(STATIC_DIR / "index.html")
+    # no-store so browsers never serve a stale build of the single-page UI
+    return FileResponse(STATIC_DIR / "index.html",
+                        headers={"Cache-Control": "no-store, max-age=0"})

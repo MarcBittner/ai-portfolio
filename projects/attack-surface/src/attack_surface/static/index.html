@@ -402,7 +402,6 @@
           <div class="row" style="margin-top:14px;gap:8px;flex-wrap:wrap;align-items:center">
             <select id="mainMode" title="Scan mode" style="width:auto;padding:9px 11px">
               <option value="live">live — passive CT recon</option>
-              <option value="fixture">fixture — full report</option>
             </select>
             <input id="mainDomain" placeholder="stripe.com  (a domain you're authorized to scan)" autocomplete="off" spellcheck="false"
               style="flex:1;min-width:180px;width:auto;padding:9px 11px" />
@@ -473,7 +472,6 @@
     <div class="field">
       <label>Mode <span class="hint">scan target</span></label>
       <select id="cfgMode">
-        <option value="fixture">fixture — full report (owned synthetic domain)</option>
         <option value="live">live — passive CT recon only</option>
       </select>
     </div>
@@ -564,7 +562,12 @@ function toast(msg,type="info"){
   t.innerHTML=`<span class="tdot"></span>${msg}`;$("#toasts").appendChild(t);
   setTimeout(()=>{t.style.opacity="0";t.style.transition="opacity .3s";setTimeout(()=>t.remove(),300)},2600);
 }
-function loadCfg(){try{cfg={...cfg,...JSON.parse(localStorage.getItem(CFG_KEY)||"{}")}}catch{}}
+function loadCfg(){try{cfg={...cfg,...JSON.parse(localStorage.getItem(CFG_KEY)||"{}")}}catch{}
+  // LIVE ONLY — never scan the synthetic test domain. Override any stale setting.
+  cfg.mode="live";
+  const d=(cfg.domain||"").trim().toLowerCase();
+  if(!d||d==="example-corp.test"||d==="example.com")cfg.domain="stripe.com";
+  persistCfg();}
 function applyCfgToForm(){
   $("#cfgMode").value=cfg.mode;$("#cfgDomain").value=cfg.domain||"";
   $("#cfgModel").value=cfg.model||"";
