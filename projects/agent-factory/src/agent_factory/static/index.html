@@ -202,19 +202,26 @@
   .chainline{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;color:var(--muted);
     background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 11px;word-break:break-word}
   /* POLISH KIT: help modal (centered dialog, reuses scrim) */
-  #help{position:fixed;top:50%;left:50%;transform:translate(-50%,calc(-50% + 12px));z-index:70;
+  #help,#diag{position:fixed;top:50%;left:50%;transform:translate(-50%,calc(-50% + 12px));z-index:70;
     width:560px;max-width:94vw;max-height:86vh;overflow:auto;opacity:0;pointer-events:none;
     background:var(--surface);border:1px solid var(--line);border-radius:14px;
     box-shadow:0 24px 64px -24px rgba(0,0,0,.7);
     transition:opacity .25s var(--ease),transform .25s var(--ease)}
-  #help.open{opacity:1;pointer-events:auto;transform:translate(-50%,-50%)}
-  #help header{display:flex;align-items:center;gap:10px;padding:16px 18px;border-bottom:1px solid var(--line)}
-  #help h3{margin:0;font-size:15px;font-weight:650}
-  #help .body{padding:18px;display:grid;gap:16px}
-  #help h4{margin:0 0 6px;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
-  #help p{margin:0;color:var(--muted);font-size:13.5px}
+  #help.open,#diag.open{opacity:1;pointer-events:auto;transform:translate(-50%,-50%)}
+  #help header,#diag header{display:flex;align-items:center;gap:10px;padding:16px 18px;border-bottom:1px solid var(--line)}
+  #help h3,#diag h3{margin:0;font-size:15px;font-weight:650}
+  #help .body,#diag .body{padding:18px;display:grid;gap:16px}
+  #help h4,#diag h4{margin:0 0 6px;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  #help p,#diag p{margin:0;color:var(--muted);font-size:13.5px}
   #help ol{margin:0;padding-left:20px;color:var(--muted);font-size:13.5px;display:grid;gap:4px}
-  #help b{color:var(--ink)}
+  #help b,#diag b{color:var(--ink)}
+  #diag .kv{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;padding:4px 0;border-bottom:1px dashed var(--line)}
+  #diag .kv span:first-child{color:var(--muted)}
+  #diag .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  #diag .chip{display:inline-block;font-size:11px;padding:1px 7px;border-radius:999px;border:1px solid var(--line);margin:2px 4px 2px 0}
+  #diag .chip.on{border-color:var(--ok);color:var(--ok)} #diag .chip.off{color:var(--faint)}
+  #diag .ev{display:flex;align-items:center;gap:8px;font-size:12.5px;padding:3px 0}
+  #diag .ev .b{font-weight:700} #diag .ev.ok .b{color:var(--ok)} #diag .ev.bad .b{color:var(--err,#e5534b)}
   #help .kbd{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;background:var(--surface-2);
     border:1px solid var(--line);border-bottom-width:2px;border-radius:6px;padding:1px 7px;color:var(--ink)}
   #help .eps{display:flex;gap:7px;flex-wrap:wrap}
@@ -345,6 +352,9 @@
   <button class="iconbtn" id="helpbtn" title="Help (?)" aria-label="Help">
     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 1 1 4.6 3c-.8.6-1.7 1-1.7 2.2"/><line x1="12" y1="17.5" x2="12" y2="17.51"/></svg>
   </button>
+  <button class="iconbtn" id="diagbtn" title="Diagnostics & routing" aria-label="Diagnostics">
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l2 6 4-14 2 8h6"/></svg>
+  </button>
   <button class="iconbtn" id="gear" title="Agent spec (advanced)" aria-label="Agent spec">⚙</button>
 </header>
 
@@ -461,6 +471,14 @@
     <label class="chk" style="flex:1"><input type="checkbox" id="useCustom" /> Run with this custom spec</label>
     <button class="btn" id="resetSpec">Reset</button>
   </div>
+</aside>
+
+<!-- diagnostics & app config pane -->
+<aside id="diag" role="dialog" aria-modal="true" aria-labelledby="diagtitle" aria-hidden="true">
+  <header><h3 id="diagtitle">Diagnostics &amp; routing</h3><span class="spacer"></span>
+    <button class="iconbtn" id="diagrefresh" title="Re-run">⟳</button>
+    <button class="iconbtn" id="closediag" aria-label="Close diagnostics">✕</button></header>
+  <div class="body" id="diagBody"><p>Loading…</p></div>
 </aside>
 
 <!-- POLISH KIT: help modal -->
@@ -737,12 +755,54 @@ function closeHelp(){$("#scrim").classList.remove("open");$("#help").classList.r
   $("#help").setAttribute("aria-hidden","true");}
 $("#helpbtn").onclick=openHelp;$("#closehelp").onclick=closeHelp;
 const _footAbout=document.getElementById("footAbout"); if(_footAbout) _footAbout.onclick=(e)=>{e.preventDefault();openHelp();};
-$("#scrim").onclick=()=>{closeDrawer();closeHelp();};
+$("#scrim").onclick=()=>{closeDrawer();closeHelp();closeDiag();};
 document.addEventListener("keydown",e=>{
   const typing=/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName||"")||document.activeElement?.isContentEditable;
-  if(e.key==="Escape"){closeDrawer();closeHelp();}
+  if(e.key==="Escape"){closeDrawer();closeHelp();closeDiag();}
   else if(e.key==="?"&&!typing&&!$("#help").classList.contains("open")){e.preventDefault();openHelp();}
 });
+
+// ---- diagnostics & app-config pane ----
+function closeDiag(){$("#scrim").classList.remove("open");$("#diag").classList.remove("open");$("#diag").setAttribute("aria-hidden","true");}
+async function openDiag(){
+  $("#scrim").classList.add("open");$("#diag").classList.add("open");$("#diag").setAttribute("aria-hidden","false");
+  await loadDiag();
+}
+async function loadDiag(){
+  const body=$("#diagBody"); body.innerHTML="<p>Running diagnostics…</p>";
+  try{
+    const d=await j("/diagnostics");
+    const r=d.routing, dot=b=>`<span class="chip ${b?'on':'off'}">${b?'●':'○'}</span>`;
+    const provs=Object.entries(r.available).map(([k,v])=>`${dot(v)}${k}`).join(" ");
+    const ev=d.self_eval;
+    const evRows=ev.cases.map(c=>`<div class="ev ${c.ok?'ok':'bad'}"><span class="b">${c.ok?'PASS':'FAIL'}</span>`+
+      `<span>${esc(c.name)}</span><span class="mono" style="color:var(--faint);margin-left:auto">${esc(String(c.got).slice(0,28))}</span></div>`).join("");
+    body.innerHTML=`
+      <div><h4>Routing</h4>
+        <div class="kv"><span>mode (LLM_MODE)</span><b class="mono">${esc(r.mode)}</b></div>
+        <div class="kv"><span>active tier</span><b class="mono">${esc(r.active_mode)}</b></div>
+        <div class="kv"><span>lead provider</span><b class="mono">${esc(r.lead_provider)}</b></div>
+        <div class="kv"><span>resolved chain</span><b class="mono">${r.resolved_order.join(' → ')}</b></div>
+        <div class="kv"><span>host Ollama (server)</span><b class="mono">${r.ollama_reachable?'reachable':'unreachable'}</b></div>
+        <p style="margin-top:8px">${esc(r.why)}.</p>
+      </div>
+      <div><h4>Providers</h4><div>${provs}</div>
+        <div class="kv" style="margin-top:8px"><span>free fallbacks</span><b class="mono">${(r.free_models||[]).map(shortModel).join(', ')||'—'}</b></div>
+      </div>
+      <div><h4>Self-eval (deterministic · rule planner)</h4>
+        <p style="margin-bottom:8px"><b>${ev.passed}/${ev.total}</b> golden tasks pass.</p>
+        ${evRows}
+      </div>
+      <div><h4>Config</h4>
+        <div class="kv"><span>tools available</span><b>${d.tools.count}</b></div>
+        <div class="kv"><span>templates</span><b>${d.templates.count}</b></div>
+        <p style="margin-top:8px">Routing is env-driven: <span class="mono">LLM_MODE</span>,
+          <span class="mono">OPENROUTER_API_KEY</span>, <span class="mono">ANTHROPIC_API_KEY</span>,
+          <span class="mono">OLLAMA_BASE_URL</span>. In <b>auto</b>, a reachable local Ollama leads.</p>
+      </div>`;
+  }catch(e){ body.innerHTML=`<p>Diagnostics failed: ${esc(e.message)}</p>`; }
+}
+$("#diagbtn").onclick=openDiag; $("#closediag").onclick=closeDiag; $("#diagrefresh").onclick=loadDiag;
 
 /* ===================== OLLAMA BRIDGE (browser→host) =====================
    The cloud server can't reach your machine's Ollama; your browser can. So in

@@ -26,7 +26,7 @@ from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 
-from agent_factory import __version__, agent, llm, scaffold
+from agent_factory import __version__, agent, evals, llm, scaffold
 from agent_factory.models import (
     CustomizeRequest,
     HealthResponse,
@@ -68,6 +68,46 @@ def health() -> HealthResponse:
 @app.get("/providers")
 def providers() -> dict:
     return llm.providers_status()
+
+
+@app.get("/diagnostics")
+def diagnostics(selftest: bool = True) -> dict:
+    """App config + routing diagnostics: the resolved provider chain (so you can
+    see *why* a route was chosen), provider reachability, models, and an optional
+    deterministic self-eval. The one-stop pane for 'which model am I hitting?'."""
+    status = llm.providers_status()
+    available = status["available"]
+    reachable = available["ollama"]
+    order = status["default_order"]
+    # the lead is the first provider that's actually usable (reachable / keyed);
+    # an unreachable Ollama in the chain just falls through to the next one.
+    lead = next((p for p in order if available.get(p, p == "mock")), "mock")
+    why = {
+        "ollama": "a reachable local Ollama leads (free + private)",
+        "openrouter": "auto leads with a free OpenRouter model",
+        "anthropic": "auto leads with your paid Anthropic key",
+        "openai": "auto leads with your paid OpenAI key",
+        "mock": "no model is configured or reachable — using the deterministic mock",
+    }.get(lead, f"auto leads with {lead!r}")
+    out: dict = {
+        "version": __version__,
+        "routing": {
+            "mode": status["mode"],
+            "active_mode": status["active_mode"],
+            "resolved_order": order,
+            "lead_provider": lead,
+            "why": why,
+            "ollama_reachable": reachable,
+            "available": status["available"],
+            "models": status["models"],
+            "free_models": status["free_models"],
+        },
+        "tools": {"count": len(TOOL_NAMES), "names": TOOL_NAMES},
+        "templates": {"count": len(TEMPLATES)},
+    }
+    if selftest:
+        out["self_eval"] = evals.run_self_eval()
+    return out
 
 
 @app.get("/tools")

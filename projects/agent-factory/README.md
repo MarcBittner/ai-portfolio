@@ -202,6 +202,7 @@ offline; synthetic sample data — the app runs on your real data too.
 | `POST` | `/spec/validate` | validate/normalise an `AgentSpec` |
 | `POST` | `/spec/customize` | AI-assisted: a description → a validated `AgentSpec` |
 | `POST` | `/run` | run a task with a `template` name or an inline `spec` |
+| `GET` | `/diagnostics` | routing resolution + provider reachability + a self-eval |
 | `GET` | `/scaffold/languages` | the scaffolder's target languages |
 | `POST` | `/scaffold` | generate a project (`format=files` or `format=dockerfile`) |
 | `POST` | `/scaffold/zip` | download the generated project as a zip |
@@ -223,8 +224,9 @@ deployment); it forces the rule planner so it's reproducible regardless of model
 
 * **Offline-first** — no model, no network, no accounts required; the rule planner and
   the mock keep every path working. A model is a sharpener, not a dependency.
-* **Free by default** — `auto` leads with a free OpenRouter model when a key is present,
-  with a 3-model fallback array so a rate-limited free model transparently reroutes.
+* **Local-first `auto`** — a reachable local Ollama leads (free + private); otherwise
+  a free OpenRouter model (3-model fallback array so a rate-limited one reroutes),
+  then paid, then mock. The `/diagnostics` pane shows the resolved chain and *why*.
 * **Spec-driven** — one validated object defines, runs, *and* scaffolds an agent
   (Python or TypeScript), with a durable orchestration layer around the loop.
 * **Paved road** — the model proposes the spec; deterministic templating produces
