@@ -9,7 +9,7 @@
 
 ![promptguard UI](docs/screenshot.png)
 
-**[▶ Live demo](https://promptguard-oiqr.onrender.com)**
+**[▶ Live demo](https://promptguard-p9y0.onrender.com)**
 
 A deterministic **LLM-firewall** — a guardrail you put on both sides of a model.
 It scans **prompts** (input) for injection / jailbreak / exfiltration and

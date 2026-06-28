@@ -123,7 +123,7 @@ Because the **Convex action runs in the cloud, it cannot reach a reviewer's
 ## 6. Verification checklist (is it in "perfect shape"?)
 
 - [ ] `npx tsc --noEmit` clean
-- [ ] `https://trueline-moys.onrender.com/` returns 200 (warm)
+- [ ] `https://trueline-dcqc.onrender.com/` returns 200 (warm)
 - [ ] sign-in works and `/app` seeds demo data
 - [ ] uploading an invoice shows the **real provider** on Diagnostics (not `mock`) → confirms `OPENROUTER_API_KEY` is set **on Convex**
 - [ ] red/yellow/green flags + recoverable $ render, and update **live** without refresh (confirms Convex realtime + Clerk JWT round-trip)

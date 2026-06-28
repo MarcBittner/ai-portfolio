@@ -1,6 +1,6 @@
 # trueline
 
-[![demo](https://img.shields.io/badge/demo-live-43c98a)](https://trueline-moys.onrender.com)
+[![demo](https://img.shields.io/badge/demo-live-43c98a)](https://trueline-dcqc.onrender.com)
 [![Next.js](https://img.shields.io/badge/Next.js-16-000?logo=nextdotjs&logoColor=white)](https://nextjs.org)
 [![React](https://img.shields.io/badge/React-19-61dafb?logo=react&logoColor=000)](https://react.dev)
 [![Convex](https://img.shields.io/badge/Convex-backend-ee342f)](https://convex.dev)
@@ -14,7 +14,7 @@ order + catalog rates → flag recoverable overcharges → human review → eval
 reads the document into structured JSON; all arithmetic and every flag is deterministic
 TypeScript.
 
-**Live:** https://trueline-moys.onrender.com · synthetic sample data — the app runs on your real data too.
+**Live:** https://trueline-dcqc.onrender.com · synthetic sample data — the app runs on your real data too.
 
 ![trueline](docs/screenshot.png)
 

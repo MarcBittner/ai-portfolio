@@ -7,7 +7,7 @@
 [![FastAPI](https://img.shields.io/badge/api-FastAPI-009688.svg)](https://fastapi.tiangolo.com)
 ![baseplate — describe a service, get its infra](docs/screenshot.png)
 
-**[▶ Live demo](https://baseplate-mlrj.onrender.com)**
+**[▶ Live demo](https://baseplate-b0ag.onrender.com)**
 
 The **paved road** a platform-engineering team builds so the rest of the org
 ships fast and safely: reusable **Terraform** (a `service` module + VPC/EKS/RDS

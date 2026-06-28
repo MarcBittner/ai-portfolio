@@ -8,7 +8,7 @@
 
 ![synth-data UI](docs/screenshot.png)
 
-**[▶ Live demo](https://synth-data.onrender.com)**
+**[▶ Live demo](https://synth-data-4amp.onrender.com)**
 
 Deterministic, **PII-free synthetic dataset generation** — a library, a FastAPI
 service, and a zero-build web UI. Define a schema (or pick a preset), set a row

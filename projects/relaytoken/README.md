@@ -7,7 +7,7 @@
 [![Token core: livekit/protocol](https://img.shields.io/badge/token%20core-livekit%2Fprotocol-1f6feb.svg)](https://github.com/livekit/protocol)
 ![relaytoken — scoped WebRTC access tokens](docs/screenshot.png)
 
-**[▶ Live demo](https://relaytoken.onrender.com)**
+**[▶ Live demo](https://relaytoken-9p78.onrender.com)**
 
 **Scoped, least-privilege access tokens for real-time (WebRTC) rooms, built on the
 open-source `livekit/protocol` auth library — with an adversarial "breaker" suite

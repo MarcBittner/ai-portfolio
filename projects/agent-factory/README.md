@@ -8,7 +8,7 @@
 
 ![agent-factory screenshot](docs/screenshot.png)
 
-**[▶ Live demo](https://agent-factory-zar2.onrender.com)**
+**[▶ Live demo](https://agent-factory-ohkl.onrender.com)**
 
 **Build a configurable tool-using agent from a declarative spec — then run it.**
 Simple by default (pick a template, ask a question); deep when you want it (edit the

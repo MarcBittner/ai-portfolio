@@ -9,7 +9,7 @@
 
 ![doc-extract UI](docs/screenshot.png)
 
-**[▶ Live demo](https://doc-extract-oyuj.onrender.com)**
+**[▶ Live demo](https://doc-extract-h68a.onrender.com)**
 
 **Schema-driven structured extraction** — pull typed fields from documents
 (invoices, resumes, contact blocks) into a clean record with per-field

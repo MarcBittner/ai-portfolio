@@ -7,7 +7,7 @@
 [![License: Proprietary](https://img.shields.io/badge/license-proprietary-red.svg)](LICENSE)
 ![cycleledger — contributions data layer](docs/screenshot.png)
 
-**[▶ Live demo](https://cycleledger.onrender.com)**
+**[▶ Live demo](https://cycleledger-8xg3.onrender.com)**
 
 A Rails **API** for a high-volume **campaign-contributions data layer**.
 Contributions live in a PostgreSQL table **declaratively partitioned by election

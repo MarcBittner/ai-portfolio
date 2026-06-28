@@ -8,7 +8,7 @@
 
 ![evalkit screenshot](docs/screenshot.png)
 
-**[▶ Live demo](https://evalkit-1rhn.onrender.com)**
+**[▶ Live demo](https://evalkit-b3fz.onrender.com)**
 
 A **deterministic, offline-first LLM evaluation toolkit** — a library, a FastAPI service,
 and a web UI. It scores `(prediction, reference)` pairs across **layered metrics**

@@ -8,7 +8,7 @@
 
 ![forecast UI](docs/screenshot.png)
 
-**[▶ Live demo](https://forecast-h6uf.onrender.com)**
+**[▶ Live demo](https://forecast-b8zt.onrender.com)**
 
 Classic-ML **time-series forecasting + anomaly detection** — a library, a
 FastAPI service, and a no-build chart UI. Given a numeric series it forecasts a

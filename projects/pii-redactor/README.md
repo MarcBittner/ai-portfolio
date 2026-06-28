@@ -10,7 +10,7 @@
 
 ![pii-redactor UI](docs/screenshot.png)
 
-**[▶ Live demo](https://pii-redactor-lk6x.onrender.com)**
+**[▶ Live demo](https://pii-redactor-t3aw.onrender.com)**
 
 > Detect and redact **PII** in text. A deterministic regex + checksum core (no
 > model, no network) plus an **optional LLM named-entity pass** — routed to a

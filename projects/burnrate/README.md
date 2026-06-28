@@ -7,7 +7,7 @@
 [![Flask](https://img.shields.io/badge/api-Flask-000000.svg)](https://flask.palletsprojects.com)
 ![burnrate — SRE metrics + SLO burn-rate](docs/screenshot.png)
 
-**[▶ Live demo](https://burnrate-grza.onrender.com)**
+**[▶ Live demo](https://burnrate-v8sp.onrender.com)**
 
 A **Flask** outreach service built and operated the way an infrastructure SRE runs
 boring, dependable systems. A simulated "outreach-send" API is wrapped in **RED

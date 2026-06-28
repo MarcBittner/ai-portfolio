@@ -8,7 +8,7 @@
 
 ![attack-surface exposure report](docs/screenshot.png)
 
-**[▶ Live demo](https://attack-surface.onrender.com)**
+**[▶ Live demo](https://attack-surface-wg5r.onrender.com)**
 
 Attack-surface enumeration that doesn't stop at *"we found an exposure."* It
 discovers an org's externally visible assets — subdomains from **Certificate

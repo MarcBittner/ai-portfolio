@@ -8,7 +8,7 @@
 
 ![txn-ledger dashboard](docs/screenshot.png)
 
-**[▶ Live demo](https://txn-ledger.onrender.com)**
+**[▶ Live demo](https://txn-ledger-iyfi.onrender.com)**
 
 A high-volume contributions data service that makes database-centric infrastructure
 work tangible: a seeded synthetic dataset of political donations, a schema whose

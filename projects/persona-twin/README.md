@@ -9,7 +9,7 @@
 
 ![persona-twin UI](docs/screenshot.png)
 
-**[▶ Live demo](https://persona-twin-usu4.onrender.com)**
+**[▶ Live demo](https://persona-twin-s4nj.onrender.com)**
 
 Query AI **digital twins** of synthetic personas — each one answers in
 character, grounded in its own retrieved documents, with citations validated

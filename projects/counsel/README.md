@@ -4,7 +4,7 @@
 **A grounded, trust-gated personal-finance copilot.** Code decides the numbers,
 the LLM only narrates, and any action needs explicit human approval.
 
-Live demo: https://counsel-7saj.onrender.com · Docs: [`OVERVIEW`](docs/OVERVIEW.md) ·
+Live demo: https://counsel-nqcp.onrender.com · Docs: [`OVERVIEW`](docs/OVERVIEW.md) ·
 [`ARCHITECTURE`](docs/ARCHITECTURE.md) · [`API`](docs/API.md) ·
 [`WALKTHROUGH`](docs/WALKTHROUGH.md) · [`DEPLOYMENT`](docs/DEPLOYMENT.md) ·
 Spec: [`docs/spec/spec.md`](docs/spec/spec.md).

@@ -7,7 +7,7 @@
 [![FastAPI](https://img.shields.io/badge/api-FastAPI-009688.svg)](https://fastapi.tiangolo.com)
 ![postureline — posture & compliance scanner](docs/screenshot.png)
 
-**[▶ Live demo](https://postureline.onrender.com)**
+**[▶ Live demo](https://postureline-3a8z.onrender.com)**
 
 **One security-posture & compliance engine, two exposure surfaces.** `postureline`
 runs the *same* pipeline — `scan → findings → control crosswalk → severity posture →

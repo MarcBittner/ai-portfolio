@@ -4,7 +4,7 @@ on:
     inputs:
       base_url:
         description: "Deployment base URL to smoke-test"
-        default: "https://persona-twin-usu4.onrender.com"
+        default: "https://persona-twin-s4nj.onrender.com"
   schedule:
     - cron: "0 14 * * *"   # daily 14:00 UTC
 
@@ -21,5 +21,5 @@ jobs:
       - name: live smoke + regression against the deployment
         env:
           PERSONA_TWIN_LIVE: "1"
-          PERSONA_TWIN_BASE_URL: ${{ github.event.inputs.base_url || 'https://persona-twin-usu4.onrender.com' }}
+          PERSONA_TWIN_BASE_URL: ${{ github.event.inputs.base_url || 'https://persona-twin-s4nj.onrender.com' }}
         run: pytest tests/test_live_smoke.py -v

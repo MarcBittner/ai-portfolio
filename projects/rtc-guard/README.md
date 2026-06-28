@@ -8,7 +8,7 @@
 
 ![rtc-guard token console](docs/screenshot.png)
 
-**[▶ Live demo](https://rtc-guard.onrender.com)**
+**[▶ Live demo](https://rtc-guard-wpbe.onrender.com)**
 
 Scoped real-time (WebRTC) access tokens, an adversarial test suite that tries to
 break them, and an AV-pipeline threat model — the security layer under a voice

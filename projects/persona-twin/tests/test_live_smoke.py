@@ -10,10 +10,10 @@ Run locally (``./run.sh smoke`` starts a server, ingests the corpus, tears down)
     ./run.sh smoke
 
 Run against a deployment (and optionally assert production backends):
-    ./run.sh smoke --url https://persona-twin-usu4.onrender.com
+    ./run.sh smoke --url https://persona-twin-s4nj.onrender.com
     # or directly:
     PERSONA_TWIN_LIVE=1 \
-    PERSONA_TWIN_BASE_URL=https://persona-twin-usu4.onrender.com \
+    PERSONA_TWIN_BASE_URL=https://persona-twin-s4nj.onrender.com \
     PERSONA_TWIN_EXPECT_ATLAS=1 PERSONA_TWIN_EXPECT_LLM=openrouter \
     pytest tests/test_live_smoke.py -v
 

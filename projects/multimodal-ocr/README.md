@@ -8,7 +8,7 @@
 
 ![multimodal-ocr UI](docs/screenshot.png)
 
-**[▶ Live demo](https://multimodal-ocr-x2g3.onrender.com)**
+**[▶ Live demo](https://multimodal-ocr-ty8t.onrender.com)**
 
 An **OCR → PII-detection → box-level redaction** pipeline that blacks out
 sensitive text *on the page*, not just in a string. The core idea is a
