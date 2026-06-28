@@ -5,6 +5,18 @@ on:
   pull_request:
 
 jobs:
+  link-drift:
+    # Fast offline gate: fail if any tracked file references an onrender.com URL
+    # that isn't a current scripts/live-urls.json value (i.e. a stale link left
+    # behind after a service migration). Run check-links.py --live locally to
+    # also probe that every URL is up.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: python3 scripts/check-links.py --drift
+
   backend:
     runs-on: ubuntu-latest
     defaults:

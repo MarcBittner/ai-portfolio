@@ -8,7 +8,7 @@
 
 ![field-vault console](docs/screenshot.png)
 
-**[▶ Live demo](https://field-vault.onrender.com)**
+**[▶ Live demo](https://field-vault-cvat.onrender.com)**
 
 Field-level **de-identification + least-privilege access + a tamper-evident audit
 trail** for regulated records. It is a reference for the data-handling discipline

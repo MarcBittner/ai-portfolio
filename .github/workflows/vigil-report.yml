@@ -7,7 +7,7 @@
 #   - secret scan -> POST /api/ingest/scan     (merged into the posture report)
 #
 # It is DORMANT until two repo secrets exist (Settings → Secrets → Actions):
-#   VIGIL_URL           e.g. https://vigil-xxxx.onrender.com   (NEEDS-CREDENTIAL)
+#   VIGIL_URL           e.g. https://vigil-ukjh.onrender.com   (NEEDS-CREDENTIAL)
 #   VIGIL_INGEST_TOKEN  must equal the instance's VIGIL_INGEST_TOKEN env
 # When VIGIL_URL is unset the post step is skipped, so the workflow is a safe
 # no-op on a fork or before the secrets are configured.

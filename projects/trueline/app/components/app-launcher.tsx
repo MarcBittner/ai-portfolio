@@ -25,10 +25,10 @@ const FALLBACK: App[] = [
   { name: "multimodal-ocr", tag: "OCR → PII → box-level redaction + LLM NER", url: "https://multimodal-ocr-ty8t.onrender.com" },
   { name: "reconcile", tag: "Document line-item reconciliation — extract → diff vs baseline + marke…", url: "https://reconcile-vx21.onrender.com" },
   { name: "llm-gateway", tag: "Provider-agnostic LLM gateway — firewall + PII/secret redaction + rout…", url: "https://llm-gateway-7woj.onrender.com" },
-  { name: "slo-kit", tag: "Instrumented SRE reference — RED metrics, SLOs + error budgets, traces…", url: "https://slo-kit.onrender.com" },
-  { name: "field-vault", tag: "Field-level de-identification + least-privilege access + tamper-eviden…", url: "https://field-vault.onrender.com" },
+  { name: "slo-kit", tag: "Instrumented SRE reference — RED metrics, SLOs + error budgets, traces…", url: "https://slo-kit-nom9.onrender.com" },
+  { name: "field-vault", tag: "Field-level de-identification + least-privilege access + tamper-eviden…", url: "https://field-vault-cvat.onrender.com" },
   { name: "rtc-guard", tag: "Scoped WebRTC access tokens + adversarial test suite + AV-pipeline thr…", url: "https://rtc-guard-wpbe.onrender.com" },
-  { name: "rate-atlas", tag: "Normalize inconsistent price-transparency files → one model; compare n…", url: "https://rate-atlas.onrender.com" },
+  { name: "rate-atlas", tag: "Normalize inconsistent price-transparency files → one model; compare n…", url: "https://rate-atlas-q6q6.onrender.com" },
   { name: "attack-surface", tag: "CT-log enumeration → service fingerprint → SOC 2 / ISO 27001 control-m…", url: "https://attack-surface-wg5r.onrender.com" },
   { name: "txn-ledger", tag: "High-volume contributions store — partitioned schema, query-plan tunin…", url: "https://txn-ledger-iyfi.onrender.com" },
   { name: "agent-factory", tag: "Build a tool-using agent from a declarative spec — template-simple or…", url: "https://agent-factory-ohkl.onrender.com" },
@@ -39,7 +39,7 @@ const FALLBACK: App[] = [
   { name: "quorum", tag: "Vendor-neutral multi-agent orchestrator — workflow DAG + parallel fan-…", url: "https://quorum-71pl.onrender.com" },
   { name: "burnrate", tag: "Instrumented Flask SRE service — Prometheus RED metrics, multi-window…", url: "https://burnrate-v8sp.onrender.com" },
   { name: "baseplate", tag: "Platform paved-road — reusable Terraform/EKS/RDS + ArgoCD + golden CI,…", url: "https://baseplate-b0ag.onrender.com" },
-  { name: "arbiter", tag: "AI request gateway — sits in front of your apps' real LLM traffic; routes/caches for cost savings gated by measured quality", url: "https://routelens-0kxz.onrender.com" },
+  { name: "arbiter", tag: "AI request gateway — sits in front of your apps' real LLM traffic; routes/caches for cost savings gated by measured quality", url: "https://arbiter-kfaz.onrender.com" },
 ];
 
 function hostOf(url: string): string | null {

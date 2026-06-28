@@ -9,7 +9,7 @@ keys and costs nothing**. The Dockerfile serves the API + built UI on `$PORT`.
 1. Go to https://render.com and sign in with GitHub.
 2. **New → Blueprint** → pick `MarcBittner/ai-portfolio` → **Apply**.
    (Render reads `render.yaml` and builds `projects/persona-twin/Dockerfile`.)
-3. You get a public URL like `https://persona-twin.onrender.com`. Open `/` for the UI.
+3. You get a public URL like `https://persona-twin-s4nj.onrender.com`. Open `/` for the UI.
 - Free tier sleeps after ~15 min idle; first hit after sleep cold-starts in ~30-60s. Fine for a demo link.
 
 ## Option B — Hugging Face Spaces (best venue for an AI demo; ~5 manual steps)

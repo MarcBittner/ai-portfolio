@@ -8,7 +8,7 @@
 
 ![slo-kit dashboard](docs/screenshot.png)
 
-**[▶ Live demo](https://slo-kit.onrender.com)**
+**[▶ Live demo](https://slo-kit-nom9.onrender.com)**
 
 An **instrumented reference service** that demonstrates how I run boring, dependable
 systems. A simulated outreach-API is wrapped in **RED metrics**, **SLIs/SLOs with an

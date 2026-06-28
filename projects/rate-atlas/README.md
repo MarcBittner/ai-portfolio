@@ -8,7 +8,7 @@
 
 ![rate-atlas comparison](docs/screenshot.png)
 
-**[▶ Live demo](https://rate-atlas.onrender.com)**
+**[▶ Live demo](https://rate-atlas-q6q6.onrender.com)**
 
 Normalize **inconsistent hospital price-transparency files** into one model and answer
 the question that matters: *what does this procedure cost across payers and hospitals?*

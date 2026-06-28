@@ -7,7 +7,7 @@
 [![FastAPI](https://img.shields.io/badge/api-FastAPI-009688.svg)](https://fastapi.tiangolo.com)
 ![quorum — multi-agent orchestrator](docs/screenshot.png)
 
-**[▶ Live demo](https://quorum.onrender.com)**
+**[▶ Live demo](https://quorum-71pl.onrender.com)**
 
 A **vendor-neutral, governed multi-agent orchestration framework**. A coordinator
 runs a declarative **workflow spec** — a DAG of agents, each with a role, a system
