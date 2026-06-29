@@ -192,6 +192,8 @@ def complete_json(prompt: str, system: str, provider: str | None = "auto",
     if start == -1:
         return None, result
     end = max(raw.rfind("}"), raw.rfind("]"))
+    if end == -1:
+        return None, result
     try:
         return json.loads(raw[start:end + 1]), result
     except (ValueError, json.JSONDecodeError):

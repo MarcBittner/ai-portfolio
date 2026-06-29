@@ -514,7 +514,7 @@ function shortName(model){return (model||"").split("/").pop().replace(/:free$/,"
 
 async function loadSchemas(){
   SCHEMAS=await fetch("schemas").then(r=>r.json());
-  const opts=SCHEMAS.map(s=>`<option value="${s.name}">${s.name} — ${s.description}</option>`).join("");
+  const opts=SCHEMAS.map(s=>`<option value="${esc(s.name)}">${esc(s.name)} — ${esc(s.description)}</option>`).join("");
   $("#schema").innerHTML=opts;
   $("#cfgSchema").innerHTML=opts;
   $("#schemapill").textContent=`schemas · ${SCHEMAS.length}`;
@@ -577,7 +577,7 @@ function render(data,text){
   for(const s of spans){
     if(s.start<cursor)continue;
     html+=esc(text.slice(cursor,s.start));
-    html+=`<mark title="${s.name}">${esc(text.slice(s.start,s.end))}</mark>`;
+    html+=`<mark title="${esc(s.name)}">${esc(text.slice(s.start,s.end))}</mark>`;
     cursor=s.end;
   }
   html+=esc(text.slice(cursor));
@@ -587,16 +587,16 @@ function render(data,text){
   const head="<thead><tr><th>field</th><th>value</th><th>conf</th><th>valid</th><th>via</th></tr></thead>";
   let first=true;
   const rows=data.fields.map(f=>{
-    if(!f.found)return `<tr><td>${f.name}</td><td class="miss">not found</td><td></td><td></td><td></td></tr>`;
+    if(!f.found)return `<tr><td>${esc(f.name)}</td><td class="miss">not found</td><td></td><td></td><td></td></tr>`;
     const fresh=first?"fresh":"";first=false;
     const norm=f.normalized&&f.normalized!==f.value?` <span class="badge b-mute">→ ${esc(f.normalized)}</span>`:"";
     const valid=f.type==="string"?`<span class="badge b-mute">—</span>`
       :f.valid?`<span class="badge b-allow">valid</span>`:`<span class="badge b-block">invalid</span>`;
-    return `<tr class="${fresh}"><td>${f.name}</td>
+    return `<tr class="${fresh}"><td>${esc(f.name)}</td>
       <td class="val">${esc(f.value)}${norm}</td>
       <td><span class="conf"><i style="width:${(f.confidence*100).toFixed(0)}%"></i></span> ${f.confidence.toFixed(2)}</td>
       <td>${valid}</td>
-      <td><span class="badge b-info">${f.method}</span></td></tr>`;
+      <td><span class="badge b-info">${esc(f.method)}</span></td></tr>`;
   }).join("");
   $("#fields").innerHTML=head+"<tbody>"+rows+"</tbody>";
 
@@ -839,7 +839,8 @@ boot();
   function esc(x){return (x||"").replace(/[&<>]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;"}[c];});}
   function render(f){var q=(f||"").toLowerCase();
     var html=APPS.filter(function(a){return !q||(a.name+" "+a.tag).toLowerCase().indexOf(q)>-1;}).map(function(a){var c=isCur(a.url);
-      return '<a class="lc-card'+(c?' cur':'')+'" href="'+a.url+'">'+(c?'<span class="lc-here">here</span>':'')+'<div class="nm">'+esc(a.name)+'</div><div class="tg">'+esc(a.tag)+'</div></a>';}).join("");
+      var safeUrl=/^https?:\/\//.test(a.url)?a.url:'#';
+      return '<a class="lc-card'+(c?' cur':'')+'" href="'+safeUrl+'">'+(c?'<span class="lc-here">here</span>':'')+'<div class="nm">'+esc(a.name)+'</div><div class="tg">'+esc(a.tag)+'</div></a>';}).join("");
     document.getElementById("lc-grid").innerHTML=html||'<div style="color:var(--ink-dim);padding:8px">No match.</div>';}
   function open(){render("");wrap.classList.add("open");var i=document.getElementById("lc-search");if(i){i.value="";i.focus();}}
   function close(){wrap.classList.remove("open");}

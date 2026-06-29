@@ -38,8 +38,10 @@ def _build_filled(text: str, fields, raw_values: dict) -> list[Extracted]:
     return filled
 
 
-def llm_fill(text: str, schema_name: str, missing: set[str],
-             provider: str | None = "auto", model: str | None = None):
+def llm_fill(
+    text: str, schema_name: str, missing: set[str],
+    provider: str | None = "auto", model: str | None = None,
+) -> tuple[list[Extracted], llm.LLMResult | None]:
     """Return (list[Extracted] for filled fields, LLMResult|None)."""
     schema = SCHEMAS[schema_name]
     fields = [f for f in schema.fields if f.name in missing]
@@ -52,7 +54,9 @@ def llm_fill(text: str, schema_name: str, missing: set[str],
     return _build_filled(text, fields, raw), result
 
 
-def client_fill(text: str, schema_name: str, missing: set[str], client_fields):
+def client_fill(
+    text: str, schema_name: str, missing: set[str], client_fields,
+) -> list[Extracted]:
     """Browser→host Ollama fill: build Extracted records from values the BROWSER
     obtained off the user's local Ollama, instead of calling a server provider."""
     schema = SCHEMAS[schema_name]
