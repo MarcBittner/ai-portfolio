@@ -546,7 +546,7 @@
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const j=async(u,o)=>(await fetch(u,o)).json();
 const money=n=>"$"+Number(n).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
-const esc=s=>String(s==null?"":s).replace(/</g,"&lt;");
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
 const CFG_KEY="rateatlas.cfg";
 const DEFAULT_CODE="70450"; // head CT — ~300% spread out of the box
 let cfg={threshold:2.0,mode:"auto",model:""};
@@ -596,7 +596,7 @@ async function boot(){
   try{
     const p=(await j("procedures")).procedures;
     nProcedures=p.length;
-    $("#code").innerHTML=p.map(x=>`<option value="${x.code}">${x.code} — ${esc(x.description)} (${x.rate_count})</option>`).join("");
+    $("#code").innerHTML=p.map(x=>`<option value="${esc(x.code)}">${esc(x.code)} — ${esc(x.description)} (${x.rate_count})</option>`).join("");
     if(p.some(x=>x.code===DEFAULT_CODE))$("#code").value=DEFAULT_CODE;
   }catch{toast("Could not load procedures","bad")}
   // sources panel

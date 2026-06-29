@@ -20,6 +20,7 @@ self-contained and import-safe offline.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import time
 import urllib.error
@@ -208,7 +209,9 @@ def complete(system: str, user: str, *, offline: Callable[[str, str], str],
         try:
             text, model, in_tok, out_tok = _call(
                 provider, system, user, json_mode=json_mode, max_tokens=max_tokens)
-        except Exception:
+        except Exception as exc:
+            logging.getLogger(__name__).debug(
+                'provider %s failed: %s', provider, exc, exc_info=True)
             fallbacks.append(provider)
             continue
         if not text.strip():
