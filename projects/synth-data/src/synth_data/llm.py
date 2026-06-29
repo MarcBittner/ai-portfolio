@@ -21,6 +21,7 @@ Config via environment (all optional):
 
 import json
 import os
+import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
@@ -171,7 +172,7 @@ def complete(prompt: str, system: str = "You are a precise assistant.",
             return LLMResult(text=text, provider=p, model=m, fallbacks=fallbacks)
         except (urllib.error.URLError, OSError, KeyError, ValueError,
                 TimeoutError) as exc:
-            fallbacks.append(f"{p}: {type(exc).__name__}")
+            fallbacks.append(f"{p}: {type(exc).__name__}({getattr(exc, 'code', '')})")
             continue
     return LLMResult(text=_mock(system, prompt, "mock"), provider="mock",
                      model="mock", fallbacks=fallbacks)
@@ -198,15 +199,32 @@ def complete_json(prompt: str, system: str, provider: str | None = "auto",
         return None, result
 
 
+_reachable_cache: tuple[bool, float] | None = None
+_REACHABLE_TTL = 20.0  # seconds between live probes
+
+
 def reachable(timeout: float = 1.5) -> bool:
-    """Quick Ollama reachability check for the UI (GET /api/tags)."""
+    """Quick Ollama reachability check for the UI (GET /api/tags).
+
+    The result is cached for ``_REACHABLE_TTL`` seconds so that frequent
+    /health and /providers probes (e.g. Kubernetes liveness/readiness) do not
+    block the single-worker process on a network call each time.
+    """
+    global _reachable_cache
+    now = time.monotonic()
+    if _reachable_cache is not None:
+        result, ts = _reachable_cache
+        if now - ts < _REACHABLE_TTL:
+            return result
     try:
         with urllib.request.urlopen(  # noqa: S310 - fixed host
             f"{OLLAMA_BASE_URL}/api/tags", timeout=timeout
         ) as resp:
-            return resp.status == 200
+            result = resp.status == 200
     except (urllib.error.URLError, OSError, TimeoutError):
-        return False
+        result = False
+    _reachable_cache = (result, now)
+    return result
 
 
 def active_mode() -> str:

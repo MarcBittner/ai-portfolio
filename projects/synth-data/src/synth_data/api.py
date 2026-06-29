@@ -55,7 +55,12 @@ def list_presets() -> list[PresetInfo]:
     return [PresetInfo(name=name, fields=fields) for name, fields in PRESETS.items()]
 
 
-@app.post("/generate")
+@app.post(
+    "/generate",
+    response_model=GenerateResponse,
+    response_model_exclude_none=False,
+    responses={200: {"content": {"text/csv": {"schema": {"type": "string"}}}}},
+)
 def run_generate(request: GenerateRequest):
     if request.preset:
         if request.preset not in PRESETS:

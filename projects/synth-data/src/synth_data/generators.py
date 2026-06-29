@@ -47,7 +47,10 @@ def gen_id(rng, spec, i):  # sequential, stable
 
 
 def gen_uuid(rng, spec, i):
-    hexd = "".join(rng.choice("0123456789abcdef") for _ in range(32))
+    hexd = [rng.choice("0123456789abcdef") for _ in range(32)]
+    hexd[12] = "4"           # RFC 4122 version nibble
+    hexd[16] = rng.choice("89ab")  # RFC 4122 variant bits (10xx)
+    hexd = "".join(hexd)
     return f"{hexd[:8]}-{hexd[8:12]}-{hexd[12:16]}-{hexd[16:20]}-{hexd[20:]}"
 
 

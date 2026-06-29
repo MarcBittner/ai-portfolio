@@ -794,10 +794,10 @@ boot();
   var wrap=document.createElement("div"); wrap.id="applauncher"; wrap.setAttribute("role","dialog"); wrap.setAttribute("aria-modal","true");
   wrap.innerHTML='<div class="lc-modal"><div class="lc-head"><b>Portfolio demos</b><span style="font-size:12px;color:var(--ink-dim)">'+APPS.length+' apps</span><input class="lc-search" id="lc-search" placeholder="filter\u2026" /><button class="iconbtn" id="lc-close" aria-label="Close">\u2715</button></div><div class="lc-grid" id="lc-grid"></div></div>';
   document.body.appendChild(wrap);
-  function esc(x){return (x||"").replace(/[&<>]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;"}[c];});}
+  function esc(x){return (x||"").replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});}
   function render(f){var q=(f||"").toLowerCase();
     var html=APPS.filter(function(a){return !q||(a.name+" "+a.tag).toLowerCase().indexOf(q)>-1;}).map(function(a){var c=isCur(a.url);
-      return '<a class="lc-card'+(c?' cur':'')+'" href="'+a.url+'">'+(c?'<span class="lc-here">here</span>':'')+'<div class="nm">'+esc(a.name)+'</div><div class="tg">'+esc(a.tag)+'</div></a>';}).join("");
+      return '<a class="lc-card'+(c?' cur':'')+'" href="'+esc(a.url)+'">'+(c?'<span class="lc-here">here</span>':'')+'<div class="nm">'+esc(a.name)+'</div><div class="tg">'+esc(a.tag)+'</div></a>';}).join("");
     document.getElementById("lc-grid").innerHTML=html||'<div style="color:var(--ink-dim);padding:8px">No match.</div>';}
   function open(){render("");wrap.classList.add("open");var i=document.getElementById("lc-search");if(i){i.value="";i.focus();}}
   function close(){wrap.classList.remove("open");}
