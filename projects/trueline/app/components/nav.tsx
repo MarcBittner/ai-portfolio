@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { OrganizationSwitcher, UserButton } from "@clerk/nextjs";
+import { OrganizationSwitcher, UserButton } from "@/app/clerk-shim";
 import { Moon, Sun } from "lucide-react";
 
 import { AppLauncher } from "./app-launcher";

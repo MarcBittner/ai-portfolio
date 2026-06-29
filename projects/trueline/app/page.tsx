@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/nextjs";
+import { SignedIn, SignedOut, SignInButton, UserButton } from "@/app/clerk-shim";
 import { buttonCls } from "@/app/components/ui";
 
 const PIPELINE = [
