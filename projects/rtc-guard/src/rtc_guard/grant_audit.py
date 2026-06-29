@@ -20,6 +20,7 @@ the adversarial suite) stays deterministic and untouched — this layer only
 from __future__ import annotations
 
 import json
+import time as _time
 
 from rtc_guard import llm, token
 
@@ -74,17 +75,13 @@ def _norm(grant: dict) -> dict:
     }
 
 
-def _offline_audit(_system: str, user: str) -> str:
+def _offline_audit_from_norm(g: dict) -> str:
     """Deterministic rule-based auditor — the last-resort fallback. Returns the
     same JSON shape the LLM is asked for so downstream parsing is uniform.
 
-    The proposed grant is passed as a JSON object on the final line of ``user``.
+    Accepts the already-normalized grant dict produced by ``_norm()`` so no
+    fragile re-parsing of the prompt string is needed.
     """
-    try:
-        grant = json.loads(user.rsplit("\n", 1)[-1])
-    except Exception:
-        grant = {}
-    g = _norm(grant)
     caps, role, room, ttl = g["caps"], g["role"], g["room"], g["ttl"]
     findings: list[dict] = []
 
@@ -224,16 +221,22 @@ def audit(grant: dict, *, mode: str | None = None,
     """
     g = _norm(grant)
     _system, user = build_prompt(grant)
+
+    # Closure captures the already-normalized grant so the offline path never
+    # has to re-parse it from the prompt string (RG-08).
+    def _offline_fn(_sys: str, _usr: str) -> str:
+        return _offline_audit_from_norm(g)
+
     if client_audit is not None:
         # Browser→host Ollama narrated the grant; keep the deterministic findings.
-        rule = json.loads(_offline_audit(_system, user))
+        rule = json.loads(_offline_fn(_system, user))
         explanation = str(client_audit.get("explanation", "")).strip() or _explain(g)
         parsed = {"explanation": explanation, "findings": rule["findings"]}
         res = llm.LLMResult(text="", provider="ollama (browser→host)",
                             model="host", mode=mode or "local",
                             latency_ms=0, cost_usd=0.0, fallbacks=[])
     else:
-        res = llm.complete(SYSTEM, user, offline=_offline_audit, mode=mode,
+        res = llm.complete(SYSTEM, user, offline=_offline_fn, mode=mode,
                            json_mode=True, max_tokens=700)
         parsed = _parse(res.text)
     if not parsed["explanation"]:
@@ -378,10 +381,26 @@ def _tags(findings: list[dict]) -> set[str]:
     return tags
 
 
+# Simple per-mode cache for evaluate() — avoids re-running all 10 LLM calls on
+# every request to GET /evals.  TTL is short enough to pick up mode/provider
+# changes but long enough to absorb request bursts.
+_EVAL_TTL = 300  # seconds
+_eval_cache: dict[str | None, tuple[dict, float]] = {}
+
+
 def evaluate(mode: str | None = None) -> dict:
     """Score the auditor over the labeled grant set: precision / recall on the
     issue categories it flags. A missed over-permission is the safety miss, so
-    **recall is the security metric**."""
+    **recall is the security metric**.
+
+    Results are cached per-mode for up to ``_EVAL_TTL`` seconds so that a live
+    LLM provider does not execute 10 sequential API calls on every HTTP request.
+    """
+    now = _time.monotonic()
+    if mode in _eval_cache:
+        cached_result, ts = _eval_cache[mode]
+        if now - ts < _EVAL_TTL:
+            return cached_result
     tp = fp = fn = 0
     providers: set[str] = set()
     per_tag_fn: dict[str, int] = {}
@@ -398,9 +417,11 @@ def evaluate(mode: str | None = None) -> dict:
     precision = tp / (tp + fp) if tp + fp else 1.0
     recall = tp / (tp + fn) if tp + fn else 1.0
     f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
-    return {
+    result = {
         "grants": len(LABELED), "true_positives": tp, "false_positives": fp,
         "false_negatives": fn, "precision": round(precision, 3),
         "recall": round(recall, 3), "f1": round(f1, 3), "missed_by_tag": per_tag_fn,
         "providers_used": sorted(providers),
     }
+    _eval_cache[mode] = (result, _time.monotonic())
+    return result

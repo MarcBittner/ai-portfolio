@@ -10,11 +10,27 @@ window, room scope, and (optionally) single-use replay. The adversarial suite in
 import base64
 import hashlib
 import hmac
+import itertools
 import json
+import logging as _logging
 import os
 import time
 
-SIGNING_KEY = os.environ.get("RTC_GUARD_SIGNING_KEY", "rtc-guard-demo-signing-key-v1")
+_DEFAULT_KEY = "rtc-guard-demo-signing-key-v1"
+
+
+def _signing_key() -> str:
+    """Read the signing key lazily from the environment so runtime changes take effect."""
+    return os.environ.get("RTC_GUARD_SIGNING_KEY", _DEFAULT_KEY)
+
+
+SIGNING_KEY = _signing_key()
+if SIGNING_KEY == _DEFAULT_KEY:
+    _logging.warning(
+        "RTC_GUARD_SIGNING_KEY is not set; using the publicly-known demo key. "
+        "Set the env var before any non-throwaway deployment."
+    )
+
 DEFAULT_TTL = 300  # seconds — short-lived by default
 
 # Least-privilege grant templates (each a subset of the video-grant capabilities).
@@ -42,15 +58,19 @@ def _sign(signing_input: bytes, key: str) -> str:
     return _b64url(hmac.new(key.encode(), signing_input, hashlib.sha256).digest())
 
 
-def encode(payload: dict, key: str = SIGNING_KEY) -> str:
+def encode(payload: dict, key: str | None = None) -> str:
+    if key is None:
+        key = _signing_key()
     header = _b64url(json.dumps({"alg": "HS256", "typ": "JWT"}).encode())
     body = _b64url(json.dumps(payload, separators=(",", ":")).encode())
     signing_input = f"{header}.{body}".encode()
     return f"{header}.{body}.{_sign(signing_input, key)}"
 
 
-def decode(token: str, key: str = SIGNING_KEY) -> dict:
+def decode(token: str, key: str | None = None) -> dict:
     """Verify signature + structure; return claims. Raises ValueError otherwise."""
+    if key is None:
+        key = _signing_key()
     parts = token.split(".")
     if len(parts) != 3:
         raise ValueError("malformed token")
@@ -65,27 +85,30 @@ def _now(now: float | None) -> float:
     return time.time() if now is None else now
 
 
-_seq = 0
+_seq = itertools.count(1)
 
 
 def mint(identity: str, room: str, template: str = "viewer", ttl: int = DEFAULT_TTL,
-         key: str = SIGNING_KEY, now: float | None = None) -> str:
+         key: str | None = None, now: float | None = None) -> str:
+    if key is None:
+        key = _signing_key()
     if template not in GRANT_TEMPLATES:
         raise ValueError(f"unknown template; valid: {list(GRANT_TEMPLATES)}")
-    global _seq
-    _seq += 1
+    seq = next(_seq)
     t = _now(now)
     grant = {"room": room, **GRANT_TEMPLATES[template]}
     return encode({
         "iss": "rtc-guard", "sub": identity, "iat": int(t), "nbf": int(t),
-        "exp": int(t + ttl), "jti": f"{int(t)}-{_seq:06d}", "video": grant,
+        "exp": int(t + ttl), "jti": f"{int(t)}-{seq:06d}", "video": grant,
     }, key)
 
 
-def verify(token: str, key: str = SIGNING_KEY, expected_room: str | None = None,
+def verify(token: str, key: str | None = None, expected_room: str | None = None,
            now: float | None = None, jti_store: set | None = None) -> dict:
     """Return ``{valid, reason, claims}``. Checks signature, validity window, room
     scope, and (if a jti_store is given) single-use replay."""
+    if key is None:
+        key = _signing_key()
     try:
         claims = decode(token, key)
     except ValueError as exc:
