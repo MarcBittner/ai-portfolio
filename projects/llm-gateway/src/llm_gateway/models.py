@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 
 class CompleteRequest(BaseModel):
     prompt: str = Field(max_length=100_000)
-    system: str = "You are a precise assistant."
+    system: str = Field(default="You are a precise assistant.", max_length=10_000)
     provider: str = "auto"
     model: str | None = None
     # Completion the BROWSER obtained from a host-local Ollama (browser→host).

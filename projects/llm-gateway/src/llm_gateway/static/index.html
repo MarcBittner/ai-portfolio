@@ -467,6 +467,7 @@
 <script>
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const j=async(u,o)=>(await fetch(u,o)).json();
+function hesc(s){if(s==null)return "";return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
 const badge=v=>`<span class="badge b-${v}">${v}</span>`;
 const CFG_KEY="llmgw.cfg";
 let cfg={mode:"auto",model:"",system:"You are a precise assistant."};
@@ -543,13 +544,13 @@ $("#send").onclick=async()=>{
     const r=await j("v1/complete",{method:"POST",headers:{"content-type":"application/json"},
       body:JSON.stringify(body)});
     const redin=r.redactions.input.map(x=>`<span class="redchip">${x.type}×${x.count}</span>`).join("")||'<span class="muted">none</span>';
-    const fb=r.routing_fallbacks.length?` · fallbacks: ${r.routing_fallbacks.join(", ")}`:"";
+    const fb=r.routing_fallbacks.length?` · fallbacks: ${r.routing_fallbacks.map(hesc).join(", ")}`:"";
     const stages=[
       [1,"input scan",`${badge(r.input_scan.verdict)} <span class="muted">${r.input_scan.findings.length} finding(s)</span>`],
       [2,"redact in",`<span class="mono">${redin}</span>`],
-      [3,"route",`${badge("info")} ${r.provider} <span class="muted">/ ${r.model} · ${r.latency_ms} ms${fb}</span>`],
+      [3,"route",`${badge("info")} ${hesc(r.provider)} <span class="muted">/ ${hesc(r.model)} · ${r.latency_ms} ms${fb}</span>`],
       [4,"output scan",`${badge(r.output_scan.verdict)} <span class="muted">${r.output_scan.findings.length} finding(s)</span>`],
-      [5,"result",`${r.blocked?badge('block'):badge('allow')} ${r.blocked?'blocked at '+r.blocked:'returned'} <span class="muted">· audit #${r.audit_seq}</span><div class="out">${(r.output||"").replace(/</g,"&lt;")}</div>`],
+      [5,"result",`${r.blocked?badge('block'):badge('allow')} ${r.blocked?'blocked at '+hesc(r.blocked):'returned'} <span class="muted">· audit #${r.audit_seq}</span><div class="out">${(r.output||"").replace(/&/g,"&amp;").replace(/</g,"&lt;")}</div>`],
     ];
     $("#path").innerHTML=stages.map(([n,l,v],i)=>
       `<div class="stage done" style="animation-delay:${i*90}ms"><div class="num">${n}</div>

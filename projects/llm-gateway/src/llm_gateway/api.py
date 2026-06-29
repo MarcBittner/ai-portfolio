@@ -6,10 +6,11 @@ routing falls back to a mock provider offline. Stateless; no secrets required.
 """
 
 import json
+import os
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, Response
 
 from llm_gateway import __version__, audit, firewall, gateway, llm
 from llm_gateway.evaluate import run_eval
@@ -24,6 +25,24 @@ app = FastAPI(
     version=__version__,
     description="Provider-agnostic LLM gateway with governance on the request path.",
 )
+
+_SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Content-Security-Policy": (
+        "default-src 'self'; script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline'; img-src 'self' data:"
+    ),
+}
+
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next) -> Response:
+    response = await call_next(request)
+    for header, value in _SECURITY_HEADERS.items():
+        response.headers[header] = value
+    return response
 
 
 def _check_provider(provider: str) -> None:
@@ -93,7 +112,14 @@ def audit_verify() -> dict:
 
 @app.post("/v1/audit/_demo_tamper")
 def audit_tamper(seq: int = 0) -> dict:
-    """Demo aid: mutate a logged entry to show that verification then fails."""
+    """Demo aid: mutate a logged entry to show that verification then fails.
+    Disabled by default; set GATEWAY_DEMO_TAMPER=1 to enable."""
+    if not os.environ.get("GATEWAY_DEMO_TAMPER"):
+        raise HTTPException(
+            501,
+            "Demo tamper endpoint is disabled in this deployment. "
+            "Set GATEWAY_DEMO_TAMPER=1 to enable.",
+        )
     ok = audit.log.demo_tamper(seq)
     return {"tampered": ok, "seq": seq, "verify": audit.log.verify()}
 

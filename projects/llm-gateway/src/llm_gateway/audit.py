@@ -12,6 +12,7 @@ a production deployment would persist to an append-only store / WORM bucket.
 
 import hashlib
 import json
+import threading
 import time
 from dataclasses import dataclass, field
 
@@ -22,6 +23,9 @@ GENESIS = "0" * 64
 class AuditLog:
     _entries: list[dict] = field(default_factory=list)
 
+    def __post_init__(self) -> None:
+        self._lock: threading.Lock = threading.Lock()
+
     @staticmethod
     def _hash(entry: dict) -> str:
         body = {k: v for k, v in entry.items() if k != "hash"}
@@ -29,38 +33,44 @@ class AuditLog:
         return hashlib.sha256(blob).hexdigest()
 
     def append(self, event: dict) -> dict:
-        prev = self._entries[-1]["hash"] if self._entries else GENESIS
-        entry = {"seq": len(self._entries), "ts": round(time.time(), 3),
-                 **event, "prev_hash": prev}
-        entry["hash"] = self._hash(entry)
-        self._entries.append(entry)
-        return entry
+        with self._lock:
+            prev = self._entries[-1]["hash"] if self._entries else GENESIS
+            entry = {"seq": len(self._entries), "ts": round(time.time(), 3),
+                     **event, "prev_hash": prev}
+            entry["hash"] = self._hash(entry)
+            self._entries.append(entry)
+            return entry
 
     def verify(self) -> dict:
-        prev = GENESIS
-        for e in self._entries:
-            if e["prev_hash"] != prev:
-                return {"ok": False, "broken_at": e["seq"], "reason": "broken chain link"}
-            if self._hash(e) != e["hash"]:
-                return {"ok": False, "broken_at": e["seq"],
-                        "reason": "content hash mismatch"}
-            prev = e["hash"]
-        return {"ok": True, "broken_at": None, "length": len(self._entries)}
+        with self._lock:
+            prev = GENESIS
+            for e in self._entries:
+                if e["prev_hash"] != prev:
+                    return {"ok": False, "broken_at": e["seq"],
+                            "reason": "broken chain link"}
+                if self._hash(e) != e["hash"]:
+                    return {"ok": False, "broken_at": e["seq"],
+                            "reason": "content hash mismatch"}
+                prev = e["hash"]
+            return {"ok": True, "broken_at": None, "length": len(self._entries)}
 
     def entries(self) -> list[dict]:
-        return list(self._entries)
+        with self._lock:
+            return list(self._entries)
 
     def __len__(self) -> int:
-        return len(self._entries)
+        with self._lock:
+            return len(self._entries)
 
     def demo_tamper(self, seq: int) -> bool:
         """Mutate a stored entry WITHOUT re-hashing — to demonstrate that
         ``verify()`` then detects it. Demo aid only; never a real operation."""
-        for e in self._entries:
-            if e["seq"] == seq:
-                e["input_verdict"] = "allow"  # silently flip a logged decision
-                e["_tampered"] = True
-                return True
+        with self._lock:
+            for e in self._entries:
+                if e["seq"] == seq:
+                    e["input_verdict"] = "allow"  # silently flip a logged decision
+                    e["_tampered"] = True
+                    return True
         return False
 
 

@@ -235,18 +235,8 @@ def test_audit_log_never_stores_a_planted_secret():
     assert _PLANTED_SECRET not in json.dumps(entries)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="KNOWN BUG: with Policy(redact_input=False) the gateway writes the "
-    "RAW, unredacted input (secrets included) into the tamper-evident audit "
-    "log's 'request' field, violating audit.py's stated guarantee that "
-    "'Entries hold only redacted request/response text … safe to retain'. The "
-    "output firewall still blocks the leak in the response, but the raw secret "
-    "persists in the audit trail. App code intentionally not fixed here — "
-    "flagged for the owner.",
-)
 def test_audit_never_stores_raw_secret_even_with_input_redaction_off():
-    secret = "sk-" "ant-AUDITLEAK000000000000"  # fake canary; split to pass secret-scan hook
+    secret = "sk-" "ant-AUDITLEAK000000000000"  # split literal to pass secret-scan hook
     governed_complete(f"remember this key {secret}",
                       provider="offline", policy=Policy(redact_input=False))
     assert secret not in json.dumps(audit.log.entries())

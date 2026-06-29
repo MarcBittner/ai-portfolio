@@ -19,6 +19,7 @@ LLM_BREAKER_THRESHOLD (default 3), LLM_BREAKER_COOLDOWN (seconds, default 30).
 
 import json
 import os
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -70,33 +71,38 @@ class CircuitBreaker:
         self.cooldown = cooldown
         self._fail: dict[str, int] = {}
         self._opened: dict[str, float] = {}
+        self._lock = threading.Lock()
 
     def _now(self) -> float:
         return time.monotonic()
 
     def is_open(self, provider: str) -> bool:
-        opened = self._opened.get(provider)
-        if opened is None:
-            return False
-        if self._now() - opened >= self.cooldown:  # cooldown elapsed → half-open
-            self._opened.pop(provider, None)
-            self._fail[provider] = 0
-            return False
-        return True
+        with self._lock:
+            opened = self._opened.get(provider)
+            if opened is None:
+                return False
+            if self._now() - opened >= self.cooldown:  # cooldown elapsed → half-open
+                self._opened.pop(provider, None)
+                self._fail[provider] = 0
+                return False
+            return True
 
     def record_success(self, provider: str) -> None:
-        self._fail[provider] = 0
-        self._opened.pop(provider, None)
+        with self._lock:
+            self._fail[provider] = 0
+            self._opened.pop(provider, None)
 
     def record_failure(self, provider: str) -> None:
-        n = self._fail.get(provider, 0) + 1
-        self._fail[provider] = n
-        if n >= self.threshold:
-            self._opened[provider] = self._now()
+        with self._lock:
+            n = self._fail.get(provider, 0) + 1
+            self._fail[provider] = n
+            if n >= self.threshold:
+                self._opened[provider] = self._now()
 
     def state(self) -> dict:
-        return {p: ("open" if self.is_open(p) else "closed")
-                for p in set(self._fail) | set(self._opened)}
+        with self._lock:
+            providers = set(self._fail) | set(self._opened)
+        return {p: ("open" if self.is_open(p) else "closed") for p in providers}
 
 
 breaker = CircuitBreaker()
@@ -232,25 +238,6 @@ def complete(prompt: str, system: str = "You are a precise assistant.",
     return LLMResult(text=_mock(system, prompt, "mock"), provider="mock",
                      model="mock", fallbacks=fallbacks)
 
-
-def complete_json(prompt: str, system: str, provider: str | None = "auto",
-                  model: str | None = None) -> tuple[object | None, LLMResult]:
-    """Like ``complete`` but extracts a JSON value (handles fences/prose). Returns
-    ``(parsed_or_None, result)`` — None for the mock provider or a parse failure."""
-    result = complete(prompt, system, provider, model)
-    if result.provider == "mock":
-        return None, result
-    raw = result.text.strip()
-    if raw.count("```") >= 2:
-        raw = raw.split("```")[1].removeprefix("json").strip()
-    start = min((i for i in (raw.find("{"), raw.find("[")) if i != -1), default=-1)
-    if start == -1:
-        return None, result
-    end = max(raw.rfind("}"), raw.rfind("]"))
-    try:
-        return json.loads(raw[start:end + 1]), result
-    except (ValueError, json.JSONDecodeError):
-        return None, result
 
 
 def reachable(timeout: float = 1.5) -> bool:

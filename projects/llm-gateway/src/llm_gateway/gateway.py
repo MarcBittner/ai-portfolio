@@ -84,12 +84,17 @@ def _finalize(prompt, output, provider, model, latency_ms, in_v, out_v,
               in_red, out_red, blocked, policy, fallbacks) -> GovernedResult:
     seq = None
     if policy.audit:
+        # Always redact audit-stored text independently of policy.redact_input so
+        # the audit.py guarantee ("entries hold only redacted request/response text")
+        # is upheld regardless of the runtime policy configuration.
+        audit_request, _ = redact.redact(prompt)
         entry = audit.log.append({
             "event": "complete", "provider": provider, "model": model,
             "latency_ms": latency_ms, "input_verdict": in_v.verdict,
             "output_verdict": out_v.verdict, "blocked": blocked,
             "redactions_in": in_red, "redactions_out": out_red,
-            "request": prompt[:_AUDIT_TEXT_CAP], "response": output[:_AUDIT_TEXT_CAP],
+            "request": audit_request[:_AUDIT_TEXT_CAP],
+            "response": output[:_AUDIT_TEXT_CAP],
         })
         seq = entry["seq"]
     return GovernedResult(
