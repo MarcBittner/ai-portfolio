@@ -35,7 +35,7 @@ class WorkflowSpec:
 
     name: str
     description: str
-    stages: list = field(default_factory=list)
+    stages: list[Agent | list[Agent]] = field(default_factory=list)
 
     def step_names(self) -> list[str]:
         names: list[str] = []
@@ -267,7 +267,7 @@ _STOPWORDS = frozenset((
 
 def _terms(text: str) -> set[str]:
     return {w.strip(".,?():#") for w in text.lower().split()
-            if w.strip(".,?():#") and w not in _STOPWORDS} - _STOPWORDS
+            if w.strip(".,?():#") and w not in _STOPWORDS}
 
 
 def _offline_retrieve(_system: str, user: str) -> str:
@@ -370,12 +370,16 @@ def _policy_qa_spec() -> WorkflowSpec:
 # Registry                                                                      #
 # --------------------------------------------------------------------------- #
 
+# Build once at module load; specs are pure data and never mutated.
+_REGISTRY: dict[str, WorkflowSpec] = {
+    "contract-review": _contract_review_spec(),
+    "policy-qa": _policy_qa_spec(),
+}
+
+
 def registry() -> dict[str, WorkflowSpec]:
-    return {
-        "contract-review": _contract_review_spec(),
-        "policy-qa": _policy_qa_spec(),
-    }
+    return _REGISTRY
 
 
 def get_spec(name: str) -> WorkflowSpec | None:
-    return registry().get(name)
+    return _REGISTRY.get(name)

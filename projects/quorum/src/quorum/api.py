@@ -7,10 +7,12 @@ each step used. Stateless modeling, in-memory run store; no real data; no secret
 
 from __future__ import annotations
 
+import collections
+import time
 from dataclasses import asdict
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
 
 from quorum import __version__, evaluate, llm
@@ -27,17 +29,34 @@ app = FastAPI(
     description="Vendor-neutral, governed multi-agent orchestration.",
 )
 
+# Request body size cap: reject bodies larger than 512 KB before any processing.
+_MAX_BODY_BYTES = 512 * 1024
+
+
+@app.middleware("http")
+async def body_size_limit(request: Request, call_next):
+    cl = request.headers.get("content-length")
+    if cl is not None and int(cl) > _MAX_BODY_BYTES:
+        return JSONResponse({"error": "request body too large"}, status_code=413)
+    return await call_next(request)
+
+
 # In-memory run store so GET /trace/{run_id} can return the trace + audit.
-_RUNS: dict[str, RunResult] = {}
-_RUN_ORDER: list[str] = []
 _MAX_RUNS = 50
+_RUNS: dict[str, RunResult] = {}
+_RUN_ORDER: collections.deque = collections.deque(maxlen=_MAX_RUNS)
 
 
 def _store(rr: RunResult) -> None:
+    if len(_RUN_ORDER) == _MAX_RUNS:
+        _RUNS.pop(_RUN_ORDER[0], None)  # oldest will be auto-evicted by deque on append
     _RUNS[rr.run_id] = rr
     _RUN_ORDER.append(rr.run_id)
-    while len(_RUN_ORDER) > _MAX_RUNS:
-        _RUNS.pop(_RUN_ORDER.pop(0), None)
+
+
+# Cached eval result (process-restart invalidation only; full run is expensive).
+_eval_cache: dict | None = None
+_eval_cache_ts: float = 0.0
 
 
 def _trace_json(rr: RunResult) -> list[dict]:
@@ -165,8 +184,16 @@ def trace(run_id: str) -> JSONResponse:
 
 @app.get("/evals")
 def evals() -> dict:
-    """Score contract-review over the labeled set + the governance assertion."""
-    return evaluate.run()
+    """Score contract-review over the labeled set + the governance assertion.
+
+    Result is cached for the lifetime of the process (process-restart invalidation)
+    to avoid re-running 21 agent invocations on every GET.
+    """
+    global _eval_cache, _eval_cache_ts
+    if _eval_cache is None:
+        _eval_cache = evaluate.run()
+        _eval_cache_ts = time.monotonic()
+    return {**_eval_cache, "age_s": round(time.monotonic() - _eval_cache_ts, 1)}
 
 
 @app.get("/llm")

@@ -27,6 +27,10 @@ import json
 import re
 import time
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from quorum.agent import StepResult
 
 # --------------------------------------------------------------------------- #
 # PII redaction                                                                #
@@ -131,7 +135,7 @@ class AuditLog:
 # Observability rollup                                                          #
 # --------------------------------------------------------------------------- #
 
-def rollup(steps: list) -> dict:
+def rollup(steps: list[StepResult]) -> dict:
     """Aggregate per-step telemetry into a run-level cost/latency summary.
 
     ``steps`` is a list of :class:`~quorum.agent.StepResult` (anything with

@@ -108,7 +108,7 @@ class Orchestrator:
         skip the server-side provider call; orchestration + governance (redact then
         audit) still run on every step.
         """
-        run_id = "run-" + uuid.uuid4().hex[:10]
+        run_id = "run-" + uuid.uuid4().hex
         state: dict = {"input": payload, "steps": {}}
         trace: list[StepResult] = []
 
@@ -159,9 +159,12 @@ def plan_prompts(spec: WorkflowSpec, payload: dict) -> list[dict]:
     plan: list[dict] = []
     for stage in spec.stages:
         agents = stage if isinstance(stage, list) else [stage]
+        # Compute each agent's redacted prompt once; reuse for plan entry and state.
+        cleaned: dict[str, str] = {}
         for agent in agents:
             raw_prompt = agent_prompt(agent, state)
             clean_prompt, _ = governance.redact(raw_prompt)
+            cleaned[agent.name] = clean_prompt
             plan.append({
                 "step": agent.name,
                 "role": agent.role,
@@ -170,8 +173,7 @@ def plan_prompts(spec: WorkflowSpec, payload: dict) -> list[dict]:
             })
         # Advance shared state deterministically so downstream prompts resolve.
         for agent in agents:
-            raw_prompt = agent_prompt(agent, state)
-            clean_prompt, _ = governance.redact(raw_prompt)
+            clean_prompt = cleaned[agent.name]
             output = agent._shape(agent.offline(agent.system_prompt, clean_prompt))
             state["steps"][agent.name] = output
     return plan
