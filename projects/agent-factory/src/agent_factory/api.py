@@ -71,7 +71,7 @@ def providers() -> dict:
 
 
 @app.get("/diagnostics")
-def diagnostics(selftest: bool = True) -> dict:
+def diagnostics(selftest: bool = False) -> dict:
     """App config + routing diagnostics: the resolved provider chain (so you can
     see *why* a route was chosen), provider reachability, models, and an optional
     deterministic self-eval. The one-stop pane for 'which model am I hitting?'."""

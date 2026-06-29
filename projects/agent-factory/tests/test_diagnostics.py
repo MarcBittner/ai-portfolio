@@ -15,7 +15,8 @@ def test_self_eval_all_green_offline():
 
 
 def test_diagnostics_reports_routing_and_self_eval():
-    r = client.get("/diagnostics")
+    # Explicitly opt in to the self-eval (it is no longer run by default).
+    r = client.get("/diagnostics?selftest=true")
     assert r.status_code == 200
     body = r.json()
     routing = body["routing"]

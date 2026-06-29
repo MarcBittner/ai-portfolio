@@ -35,7 +35,7 @@ class AgentSpec(BaseModel):
     tools: list[str] = Field(default_factory=lambda: list(TOOL_NAMES))
     planner: Planner = "auto"
     model_mode: ModelMode = "auto"
-    model: str | None = None
+    model: str | None = Field(default=None, max_length=200)
     max_steps: int = Field(default=6, ge=1, le=12)
     temperature: float = Field(default=0.2, ge=0.0, le=1.0)
     answer_style: AnswerStyle = "concise"

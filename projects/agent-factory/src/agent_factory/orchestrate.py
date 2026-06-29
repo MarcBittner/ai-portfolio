@@ -21,8 +21,11 @@ swap in your own backend (Postgres/Redis) by subclassing :class:`CheckpointStore
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
+import re
+import tempfile
 import time
 import uuid
 from dataclasses import asdict
@@ -45,6 +48,10 @@ def new_thread_id() -> str:
     return uuid.uuid4().hex[:12]
 
 
+# Only allow safe, filesystem-neutral thread ids (no path separators, dots, etc.)
+_THREAD_ID_RE = re.compile(r'^[a-z0-9_-]{1,64}$')
+
+
 class CheckpointStore:
     """File-backed durable state, keyed by ``thread_id``.
 
@@ -57,10 +64,26 @@ class CheckpointStore:
         self.root.mkdir(parents=True, exist_ok=True)
 
     def _path(self, thread_id: str) -> Path:
+        if not _THREAD_ID_RE.match(thread_id):
+            raise ValueError(
+                f"invalid thread_id {thread_id!r}: must match [a-z0-9_-]{{1,64}}"
+            )
         return self.root / f"{thread_id}.json"
 
     def save(self, thread_id: str, data: dict) -> None:
-        self._path(thread_id).write_text(json.dumps(data, indent=2))
+        path = self._path(thread_id)
+        # Write atomically: dump to a temp file in the same directory, then
+        # os.replace() (atomic on POSIX and Windows) swaps it into place so a
+        # crash mid-write never leaves a partial JSON file.
+        fd, tmp = tempfile.mkstemp(dir=self.root, suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w") as fh:
+                fh.write(json.dumps(data, indent=2))
+            os.replace(tmp, path)
+        except Exception:
+            with contextlib.suppress(OSError):
+                os.unlink(tmp)
+            raise
 
     def load(self, thread_id: str) -> dict | None:
         path = self._path(thread_id)
