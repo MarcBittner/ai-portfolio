@@ -212,6 +212,12 @@ _BLOCKED_SQL = [
     "SELECT * FROM sqlite_master",
     "SELECT name FROM sqlite_schema",
     "SELECT * FROM users",
+    # JOIN bypass — table after JOIN keyword was previously unchecked
+    "SELECT * FROM contributions JOIN sqlite_master ON 1=1",
+    "SELECT * FROM contributions c JOIN sqlite_master s ON c.id = s.rootpage",
+    # comma-joined FROM clause — second table was previously unchecked
+    "SELECT c.id FROM contributions c, sqlite_master s",
+    "SELECT * FROM contributions, sqlite_master",
     # not a SELECT at all
     "WITH x AS (SELECT 1) DELETE FROM contributions",
     "EXPLAIN DELETE FROM contributions",

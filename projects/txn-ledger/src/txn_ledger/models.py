@@ -1,5 +1,7 @@
 """Request/response models for the API."""
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -9,7 +11,7 @@ class LoadRequest(BaseModel):
 
 class AskRequest(BaseModel):
     question: str = Field(min_length=1, max_length=500)
-    mode: str | None = None  # auto | paid | local | free | offline
+    mode: Literal["auto", "paid", "local", "free", "offline"] | None = None
     # SQL the BROWSER obtained from a host-local Ollama (browser→host). The cloud
     # server can't reach your machine's Ollama; the browser can, so when this is
     # supplied the server skips its own LLM *generation* call and uses this SQL —

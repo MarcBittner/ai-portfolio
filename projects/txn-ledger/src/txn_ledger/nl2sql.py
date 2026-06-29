@@ -23,6 +23,7 @@ of canned question patterns to prebuilt parameterized queries, so NL→SQL works
 from __future__ import annotations
 
 import re
+import threading
 
 from txn_ledger import db, llm
 from txn_ledger.generate import COMMITTEES, CYCLES, ITEMIZED_THRESHOLD
@@ -111,27 +112,54 @@ def guard_sql(sql: str) -> str:
     if _FORBIDDEN.search(s):
         raise UnsafeSQLError("statement contains a forbidden keyword")
     # Defense in depth: the only table name that may appear is contributions.
-    for tbl in re.findall(r"\bFROM\s+([A-Za-z_][\w]*)", s, re.IGNORECASE):
-        if tbl.lower() != _ALLOWED_TABLE:
+    # Collect all table references: after FROM (incl. comma-separated lists)
+    # and after any JOIN keyword, both of which previously bypassed this check.
+    _tbls: set[str] = set()
+    # FROM and JOIN table names.
+    for tbl in re.findall(r"\b(?:FROM|JOIN)\s+([A-Za-z_][\w]*)", s, re.IGNORECASE):
+        _tbls.add(tbl.lower())
+    # Comma-joined tables in the FROM clause: "FROM t1 alias, t2 alias WHERE …"
+    for from_block in re.findall(
+        r"\bFROM\s+(.+?)(?=\b(?:WHERE|GROUP|ORDER|HAVING|LIMIT|JOIN)\b|$)",
+        s, re.IGNORECASE | re.DOTALL,
+    ):
+        for part in from_block.split(","):
+            m = re.match(r"\s*([A-Za-z_][\w]*)", part)
+            if m:
+                _tbls.add(m.group(1).lower())
+    for tbl in _tbls:
+        if tbl != _ALLOWED_TABLE:
             raise UnsafeSQLError(f"unknown table {tbl!r}")
     return s
 
 
-def run_select(sql: str) -> list[dict]:
+# Serialises the PRAGMA query_only ON → execute → OFF sequence so that
+# concurrent FastAPI threads cannot interleave their PRAGMA toggles on the
+# shared connection (check_same_thread=False) and accidentally disable the
+# defense-in-depth read-only enforcement for another in-flight query.
+_query_only_lock = threading.Lock()
+
+
+def run_select(sql: str, params: tuple = ()) -> list[dict]:
     """Guard ``sql`` then execute it read-only, returning rows as dicts.
 
     The store is an in-memory SQLite DB private to its build connection, so the
     read-only posture is enforced at the engine level: ``PRAGMA query_only = ON``
     makes SQLite reject any write/DDL for the duration of the query — a second
     line of defense behind the guard, in case a write somehow survived parsing.
+
+    ``params`` is passed directly to ``cursor.execute()`` for parameterized
+    queries with ``?`` placeholders (used by the offline matcher's internal
+    path via ``_offline_sql_params``).
     """
     safe = guard_sql(sql)
     conn = db.conn()
-    conn.execute("PRAGMA query_only = ON")
-    try:
-        rows = conn.execute(safe).fetchall()
-    finally:
-        conn.execute("PRAGMA query_only = OFF")
+    with _query_only_lock:
+        conn.execute("PRAGMA query_only = ON")
+        try:
+            rows = conn.execute(safe, params).fetchall()
+        finally:
+            conn.execute("PRAGMA query_only = OFF")
     return [dict(r) for r in rows]
 
 
@@ -146,13 +174,21 @@ def _find_cycle(q: str) -> int | None:
     return None
 
 
-def _offline_sql(_system: str, user: str) -> str:
-    """Map a handful of canned question patterns to prebuilt SELECTs. This is the
-    last-resort fallback; it returns plain SQL text (the same shape the model is
-    asked for) so the guard + execution path is uniform on either route."""
+def _offline_sql_params(_system: str, user: str) -> tuple[str, tuple]:
+    """Parameterized variant of the offline matcher: returns ``(sql, params)``
+    with SQLite ``?`` placeholders, consistent with how ``AGG_SQL`` and
+    ``queries.aggregate()`` handle bound parameters.
+
+    Variable inputs are ``cycle`` (validated against the ``CYCLES`` list) and
+    ``n`` (``int()``-cast from a ``\\d+``-only regex match), so both are proven
+    integers — but using ``?`` binding is the correct discipline and keeps the
+    pattern future-proof for less-controlled inputs.
+    """
     q = user.rsplit("\n", 1)[-1].lower()
     cycle = _find_cycle(q)
-    cyc = f"WHERE cycle = {cycle}" if cycle is not None else ""
+    # WHERE clause template and its params when a cycle is specified.
+    cyc_sql = "WHERE cycle = ?" if cycle is not None else ""
+    cyc_params: list = [cycle] if cycle is not None else []
 
     # top N committees by itemized / by total
     m = re.search(r"top\s+(\d+)", q)
@@ -161,38 +197,64 @@ def _offline_sql(_system: str, user: str) -> str:
         metric = ("SUM(CASE WHEN amount > 200 THEN amount ELSE 0 END)"
                   if "itemiz" in q else "SUM(amount)")
         alias = "itemized" if "itemiz" in q else "total_raised"
-        return (f"SELECT committee_id, {metric} AS {alias} FROM contributions "
-                f"{cyc} GROUP BY committee_id ORDER BY {alias} DESC LIMIT {n}")
+        sql = (f"SELECT committee_id, {metric} AS {alias} FROM contributions "
+               f"{cyc_sql} GROUP BY committee_id ORDER BY {alias} DESC LIMIT ?")
+        return sql, tuple(cyc_params + [n])
 
     # donor counts under / over the itemization threshold (word-boundary match so
     # "overall" / "underway" don't accidentally trip the amount filter)
     under = re.search(r"\b(under|below|less than)\b", q)
     over = re.search(r"\b(over|above)\b", q)
     if "donor" in q and under:
-        cond = "amount < 200" if not cyc else f"cycle = {cycle} AND amount < 200"
-        return (f"SELECT COUNT(DISTINCT donor_id) AS donors FROM contributions "
-                f"WHERE {cond}")
+        if cycle is not None:
+            return ("SELECT COUNT(DISTINCT donor_id) AS donors FROM contributions "
+                    "WHERE cycle = ? AND amount < 200"), (cycle,)
+        return ("SELECT COUNT(DISTINCT donor_id) AS donors FROM contributions "
+                "WHERE amount < 200"), ()
     if "donor" in q and (over or "itemiz" in q):
-        cond = "amount > 200" if not cyc else f"cycle = {cycle} AND amount > 200"
-        return (f"SELECT COUNT(DISTINCT donor_id) AS donors FROM contributions "
-                f"WHERE {cond}")
+        if cycle is not None:
+            return ("SELECT COUNT(DISTINCT donor_id) AS donors FROM contributions "
+                    "WHERE cycle = ? AND amount > 200"), (cycle,)
+        return ("SELECT COUNT(DISTINCT donor_id) AS donors FROM contributions "
+                "WHERE amount > 200"), ()
     if "how many donor" in q or "number of donor" in q or "distinct donor" in q:
         return (f"SELECT COUNT(DISTINCT donor_id) AS donors FROM contributions "
-                f"{cyc}")
+                f"{cyc_sql}"), tuple(cyc_params)
 
     # contribution / row counts
     if "how many contribution" in q or "number of contribution" in q:
-        return f"SELECT COUNT(*) AS contributions FROM contributions {cyc}"
+        return (f"SELECT COUNT(*) AS contributions FROM contributions "
+                f"{cyc_sql}"), tuple(cyc_params)
 
     # itemized vs unitemized split
     if "itemiz" in q:
         return ("SELECT "
                 "SUM(CASE WHEN amount > 200 THEN amount ELSE 0 END) AS itemized, "
                 "SUM(CASE WHEN amount <= 200 THEN amount ELSE 0 END) AS unitemized "
-                f"FROM contributions {cyc}")
+                f"FROM contributions {cyc_sql}"), tuple(cyc_params)
 
     # default: total raised (optionally for a cycle)
-    return f"SELECT SUM(amount) AS total_raised FROM contributions {cyc}"
+    return (f"SELECT SUM(amount) AS total_raised FROM contributions "
+            f"{cyc_sql}"), tuple(cyc_params)
+
+
+def _offline_sql(_system: str, user: str) -> str:
+    """Offline matcher for use as the ``llm.complete()`` ``offline`` callback.
+
+    Returns a plain SQL string so it fits the ``Callable[[str, str], str]``
+    contract expected by the routing layer.  Delegates to
+    ``_offline_sql_params`` and renders the ``?`` placeholders back to integer
+    literals (cycle ∈ CYCLES, LIMIT n is ``int()``-cast from a ``\\d+`` match —
+    both provably safe integers).
+
+    For direct parameterized execution use ``_offline_sql_params`` +
+    ``run_select(sql, params)`` (see ``_expected``).
+    """
+    sql, params = _offline_sql_params(_system, user)
+    result = sql
+    for p in params:
+        result = result.replace("?", str(int(p)), 1)
+    return result
 
 
 # --------------------------------------------------------------------------- #
@@ -252,7 +314,8 @@ def ask(question: str, *, mode: str | None = None, max_rows: int = 50,
 # computed independently against the canonical aggregates (not via the model).
 def _expected(question: str) -> list[dict]:
     """Ground truth for a labeled question, computed directly from the store."""
-    return run_select(_offline_sql("", question))
+    sql, params = _offline_sql_params("", question)
+    return run_select(sql, params)
 
 
 QUESTIONS = [
