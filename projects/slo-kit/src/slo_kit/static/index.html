@@ -714,6 +714,7 @@ function applySlo(s){
   lb.firstElementChild.style.width=(l.sli*100)+"%";
 }
 
+const esc=s=>s.replace(/&/g,"&amp;").replace(/</g,"&lt;");
 let prevTotal=0;
 async function refresh(){
   const snap=await j("metrics/snapshot");
@@ -726,8 +727,8 @@ async function refresh(){
   $("#traces").innerHTML=t.spans.map((s,i)=>{
     const fresh=(snap.total>prevTotal&&i===0)?"fresh":"";
     return `<tr class="${fresh}"><td><code>${s.trace_id.slice(-8)}</code></td>
-      <td>${s.name}</td><td class="num">${s.duration_ms} ms</td>
-      <td class="t-${s.status}">${s.status}</td></tr>`;
+      <td>${esc(s.name)}</td><td class="num">${s.duration_ms} ms</td>
+      <td class="t-${esc(s.status)}">${esc(s.status)}</td></tr>`;
   }).join("")||`<tr><td colspan="4" class="muted" style="padding:16px">No requests yet — run some load.</td></tr>`;
   prevTotal=snap.total;
 }

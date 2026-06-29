@@ -5,7 +5,7 @@ the budget. The dashboard at ``/`` visualizes it. Stateless; no secrets.
 
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 
 from slo_kit import __version__, incident, llm, service, slo
@@ -69,7 +69,7 @@ def slo_status() -> dict:
 
 
 @app.get("/traces")
-def traces(limit: int = 25) -> dict:
+def traces(limit: int = Query(default=25, ge=1, le=200)) -> dict:
     return {"spans": tracer.recent(limit)}
 
 

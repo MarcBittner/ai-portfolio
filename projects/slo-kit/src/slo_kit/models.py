@@ -27,7 +27,7 @@ class IncidentRequest(BaseModel):
     # this is supplied the server skips its own LLM call and uses it as the summary
     # narrative — letting a cloud-hosted demo run a real local model. Severity is
     # still classified deterministically. Other providers stay server-side.
-    client_summary: str | None = None
+    client_summary: str | None = Field(default=None, max_length=20_000)
 
 
 class HealthResponse(BaseModel):

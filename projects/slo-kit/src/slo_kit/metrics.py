@@ -8,7 +8,7 @@ uvicorn worker; a real deployment would scrape a proper client library.
 """
 
 import threading
-from collections import defaultdict
+from collections import defaultdict, deque
 
 LATENCY_TARGET_MS = 250.0   # the "fast enough" threshold for the latency SLI
 _WINDOW = 5000              # bounded latency samples kept for percentiles
@@ -34,7 +34,7 @@ class Metrics:
         self.by_status: dict[str, int] = defaultdict(int)
         self.by_endpoint: dict[str, int] = defaultdict(int)
         self.dur_sum = 0.0
-        self._durations: list[float] = []
+        self._durations: deque[float] = deque(maxlen=_WINDOW)
 
     def reset(self) -> None:
         with self._lock:
@@ -51,8 +51,6 @@ class Metrics:
             if duration_ms <= LATENCY_TARGET_MS:
                 self.under_target += 1
             self._durations.append(duration_ms)
-            if len(self._durations) > _WINDOW:
-                self._durations.pop(0)
 
     def snapshot(self) -> dict:
         with self._lock:

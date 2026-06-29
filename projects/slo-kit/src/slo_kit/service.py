@@ -7,6 +7,7 @@ A deterministic fault switch lets you inject an error rate and added latency to
 incident demo. Deterministic (no randomness) so tests and demos are reproducible.
 """
 
+from collections import deque
 from dataclasses import dataclass
 
 from slo_kit import slo
@@ -24,7 +25,7 @@ class Fault:
 
 
 fault = Fault()
-_outbox: list[dict] = []
+_outbox: deque[dict] = deque(maxlen=500)
 _n = 0
 
 
@@ -70,13 +71,11 @@ def send_message(channel: str, to: str, body: str) -> tuple[int, dict]:
     msg = {"id": _n, "channel": channel, "to": to, "chars": len(body),
            "duration_ms": round(duration, 1)}
     _outbox.append(msg)
-    if len(_outbox) > 500:
-        _outbox.pop(0)
     return status, msg
 
 
 def outbox(limit: int = 25) -> list[dict]:
-    return _outbox[-limit:][::-1]
+    return list(_outbox)[-limit:][::-1]
 
 
 def loadtest(n: int) -> dict:
