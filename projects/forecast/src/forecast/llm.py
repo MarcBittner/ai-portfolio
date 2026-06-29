@@ -20,7 +20,9 @@ Config via environment (all optional):
 """
 
 import json
+import logging
 import os
+import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
@@ -115,7 +117,13 @@ def _resolve_order(provider: str | None) -> list[str]:
     if mode == "offline":
         return ["ollama", "mock"]
     if mode == "free":
-        return ["openrouter", "mock"]
+        if OPENROUTER_API_KEY:
+            return ["openrouter", "mock"]
+        logging.warning(
+            "LLM free mode selected but OPENROUTER_API_KEY is not set; "
+            "falling through to mock"
+        )
+        return ["mock"]
     if mode == "paid":
         order = []
         if ANTHROPIC_API_KEY:
@@ -198,15 +206,30 @@ def complete_json(prompt: str, system: str, provider: str | None = "auto",
         return None, result
 
 
+_reachable_cache: tuple[float, bool] | None = None  # (monotonic timestamp, result)
+_REACHABLE_TTL = 10.0  # seconds
+
+
 def reachable(timeout: float = 1.5) -> bool:
-    """Quick Ollama reachability check for the UI (GET /api/tags)."""
+    """Quick Ollama reachability check for the UI (GET /api/tags).
+
+    Result is cached for ``_REACHABLE_TTL`` seconds so that frequent callers
+    (e.g. Kubernetes liveness probes hitting /health) do not block a server
+    thread on every request.
+    """
+    global _reachable_cache
+    now = time.monotonic()
+    if _reachable_cache is not None and now - _reachable_cache[0] < _REACHABLE_TTL:
+        return _reachable_cache[1]
     try:
         with urllib.request.urlopen(  # noqa: S310 - fixed host
             f"{OLLAMA_BASE_URL}/api/tags", timeout=timeout
         ) as resp:
-            return resp.status == 200
+            result = resp.status == 200
     except (urllib.error.URLError, OSError, TimeoutError):
-        return False
+        result = False
+    _reachable_cache = (now, result)
+    return result
 
 
 def active_mode() -> str:

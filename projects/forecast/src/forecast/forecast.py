@@ -22,8 +22,14 @@ def errors(actual: Series, predicted: list) -> dict[str, float]:
     mae = sum(abs(a - p) for a, p in pairs) / n
     rmse = math.sqrt(sum((a - p) ** 2 for a, p in pairs) / n)
     nz = [(a, p) for a, p in pairs if a != 0]
-    mape = (sum(abs((a - p) / a) for a, p in nz) / len(nz) * 100) if nz else 0.0
-    return {"mae": round(mae, 4), "rmse": round(rmse, 4), "mape": round(mape, 2)}
+    mape: float | None = (
+        sum(abs((a - p) / a) for a, p in nz) / len(nz) * 100 if nz else None
+    )
+    return {
+        "mae": round(mae, 4),
+        "rmse": round(rmse, 4),
+        "mape": round(mape, 2) if mape is not None else None,
+    }
 
 
 def _residual_std(history: Series, fitted: list) -> float:
@@ -62,8 +68,12 @@ def _rolling_backtest(method: str, history: Series, params: dict,
         rows.append(errors(test, fc))
     if not rows:
         return None
-    return {k: round(sum(r[k] for r in rows) / len(rows), 4)
-            for k in ("mae", "rmse", "mape")} | {"folds": len(rows)}
+
+    def _avg(key: str) -> float | None:
+        vals = [r[key] for r in rows if r[key] is not None]
+        return round(sum(vals) / len(vals), 4) if vals else None
+
+    return {k: _avg(k) for k in ("mae", "rmse", "mape")} | {"folds": len(rows)}
 
 
 def _select(history: Series, params: dict) -> str:

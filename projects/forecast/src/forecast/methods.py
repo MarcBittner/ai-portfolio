@@ -21,10 +21,12 @@ def naive(history: Series, horizon: int, **_) -> Result:
 
 def mean(history: Series, horizon: int, **_) -> Result:
     m = sum(history) / len(history)
-    # one-step fitted = running mean of the prior points
+    # one-step fitted = running mean of the prior points (O(n) via cumulative sum)
     fitted: list[float | None] = [None]
+    total = 0.0
     for i in range(1, len(history)):
-        fitted.append(sum(history[:i]) / i)
+        total += history[i - 1]
+        fitted.append(total / i)
     return [m] * horizon, fitted
 
 

@@ -12,13 +12,13 @@ class ForecastRequest(BaseModel):
     season_period: int | None = Field(default=None, ge=1, le=1000)
     use_llm: bool = True            # natural-language summary via the router
     provider: str = "auto"
-    model: str | None = None
+    model: str | None = Field(default=None, max_length=200)
     # Narrative the BROWSER obtained from a host-local Ollama (browser→host).
     # The cloud server can't reach your machine's Ollama; the browser can, so when
     # this is supplied the server skips its own LLM call and uses it as the summary —
     # letting a cloud-hosted demo narrate with a real local model. The deterministic
     # forecast/anomaly math is unaffected. Other providers stay server-side.
-    client_narrative: str | None = None
+    client_narrative: str | None = Field(default=None, max_length=4096)
 
 
 class RoutingInfo(BaseModel):
@@ -33,8 +33,8 @@ class ForecastResponse(BaseModel):
     lower: list[float]
     upper: list[float]
     fitted: list[float | None]
-    backtest: dict[str, float] | None
-    rolling_backtest: dict[str, float] | None = None
+    backtest: dict[str, float | None] | None
+    rolling_backtest: dict[str, float | None] | None = None
     season_period: int = 0
     summary: str | None = None
     routing: RoutingInfo | None = None
