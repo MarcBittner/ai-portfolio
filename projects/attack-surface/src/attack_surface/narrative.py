@@ -97,7 +97,9 @@ def _to_remediate(report: dict) -> list[dict]:
 def _offline_narrative(_system: str, user: str) -> str:
     """Deterministic template narrative — the last-resort fallback. Returns the
     same JSON shape the LLM is asked for so downstream parsing is uniform."""
-    report = json.loads(user.split("\n", 1)[1])
+    parts = user.split("\n", 1)
+    assert len(parts) == 2, 'user must be "<label>\\n<json>"'
+    report = json.loads(parts[1])
     p = report["posture"]
     sc = report.get("severity_counts", {})
     crits = [f for f in report.get("findings", []) if f["severity"] == "critical"]

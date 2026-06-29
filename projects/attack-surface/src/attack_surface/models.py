@@ -2,11 +2,15 @@
 
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ScanRequest(BaseModel):
-    domain: str | None = None
+    domain: str | None = Field(
+        default=None,
+        max_length=253,
+        pattern=r'^[a-zA-Z0-9.\-]+$',
+    )
     mode: Literal["fixture", "live"] = "fixture"
 
 

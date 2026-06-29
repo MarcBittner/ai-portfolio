@@ -17,7 +17,7 @@ import os
 from pathlib import Path
 
 from attack_surface import narrative
-from attack_surface.scanner import SEVERITY_WEIGHT, remediation_diff, scan_fixture
+from attack_surface.scanner import remediation_diff, scan_fixture
 
 REPORT = Path(__file__).resolve().parents[2] / "eval-report.md"
 
@@ -28,7 +28,10 @@ def _invariants(report: dict) -> dict:
     failing_trace = all(
         c["finding_count"] == len(c["findings"]) >= 1
         for c in control_rows if c["status"] == "fail")
-    penalty = sum(SEVERITY_WEIGHT.get(f["severity"], 0) for f in findings)
+    n = {s: sum(1 for f in findings if f["severity"] == s)
+         for s in ("critical", "high", "medium", "low")}
+    penalty = (n["critical"] * 10 + n["high"] * 6
+               + min(n["medium"] * 3, 24) + min(n["low"] * 1, 12))
     posture_math = report["posture"]["score"] == max(0, 100 - penalty)
     sev_sum = sum(report["severity_counts"].values()) == len(findings)
     return {
@@ -74,7 +77,8 @@ def _render(r: dict) -> str:
         "every_finding_maps_to_a_control": "every finding maps to ≥ 1 control",
         "every_failing_control_traces_to_findings":
             "every failing control traces to ≥ 1 finding",
-        "posture_math_checks_out": "posture = 100 − Σ severity penalty (clamped ≥ 0)",
+        "posture_math_checks_out":
+            "posture = 100 − Σ severity penalty (med/low capped; clamped ≥ 0)",
         "severity_counts_sum_to_findings": "severity counts sum to finding count",
     }
     for k, v in inv.items():

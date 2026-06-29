@@ -551,7 +551,7 @@
 <script>
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const j=async(u,o)=>(await fetch(u,o)).json();
-const esc=s=>String(s).replace(/</g,"&lt;");
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const CFG_KEY="attacksurface.cfg2";  // bumped so the new stripe.com default wins over any stale saved cfg
 // cfg.mode = scan target (fixture|live); cfg.routeMode = LLM routing tier for the narrative.
 let cfg={mode:"live",domain:"stripe.com",routeMode:"auto",model:""};
@@ -624,7 +624,7 @@ function renderReport(r){
   $("#subs").innerHTML=`<b>${subs}</b> subdomains from CT · <b>${svcs}</b> services fingerprinted`;
   $("#findingsPanel").style.display="";$("#controlsPanel").style.display="";
   $("#findings").innerHTML=`<thead><tr><th>severity</th><th>finding</th><th>asset</th><th>controls</th></tr></thead><tbody>`+
-    r.findings.map(f=>`<tr><td><span class="badge b-${f.severity}">${f.severity}</span></td>
+    r.findings.map(f=>`<tr><td><span class="badge b-${esc(f.severity)}">${esc(f.severity)}</span></td>
       <td><b>${esc(f.title)}</b><div class="muted">${esc(f.detail)}</div><div class="rem">↳ ${esc(f.remediation)}</div></td>
       <td><span class="mono">${esc(f.asset)}</span></td>
       <td>${f.controls.map(c=>`<span class="ctlchip">${esc(c)}</span>`).join("")}</td></tr>`).join("")+`</tbody>`;
@@ -708,7 +708,7 @@ function renderLive(r){
   $("#findingsTitle").innerHTML='Passively-observable exposure <span class="muted" style="margin-left:auto;text-transform:none;letter-spacing:0">CT only · not a vulnerability assessment</span>';
   $("#findings").innerHTML=`<thead><tr><th>type</th><th>observation &amp; remediation</th><th>asset</th></tr></thead><tbody>`+
     (findings.length?findings.map(f=>{const tag=f.rule_id==="CT_SENSITIVE_HOST"?"sensitive":f.rule_id==="CT_NONPROD_HOST"?"nonprod":"surface";
-      return `<tr><td><span class="badge b-${f.severity}">${tag}</span></td>
+      return `<tr><td><span class="badge b-${esc(f.severity)}">${tag}</span></td>
       <td><b>${esc(f.title)}</b><div class="muted">${esc(f.detail)}</div>${f.remediation?`<div class="rem">↳ ${esc(f.remediation)}</div>`:""}${(f.controls&&f.controls.length)?`<div style="margin-top:4px">${f.controls.map(c=>`<span class="ctlchip">${esc(c)}</span>`).join("")}</div>`:""}</td>
       <td><span class="mono">${esc(f.asset)}</span></td></tr>`;}).join("")
       :`<tr><td colspan="3" class="muted" style="padding:16px">${esc(r.note||"No public CT data for this domain.")}</td></tr>`)+`</tbody>`;
