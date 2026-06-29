@@ -22,6 +22,11 @@ class Finding:
     snippet: str
 
 
+def verdict_for_score(score: float) -> str:
+    """Translate a numeric score into a verdict string."""
+    return "block" if score >= 0.85 else "flag" if score > 0 else "allow"
+
+
 def _applies(applies_to: str, direction: str) -> bool:
     return direction == "both" or applies_to in (direction, "both")
 
@@ -44,8 +49,7 @@ def scan(text: str, direction: str = "both") -> tuple[list[Finding], float, str]
             )
     findings.sort(key=lambda f: (f.start, f.rule_id))
     score = round(max((SEVERITY_WEIGHT[f.severity] for f in findings), default=0.0), 2)
-    verdict = "block" if score >= 0.85 else "flag" if score > 0 else "allow"
-    return findings, score, verdict
+    return findings, score, verdict_for_score(score)
 
 
 def counts_by_category(findings: list[Finding]) -> dict[str, int]:

@@ -3,13 +3,14 @@
 from fastapi.testclient import TestClient
 
 from promptguard.api import app
+from promptguard.rules import RULES
 
 client = TestClient(app)
 
 
 def test_health():
     body = client.get("/health").json()
-    assert body["status"] == "ok" and body["rules"] >= 15
+    assert body["status"] == "ok" and body["rules"] == len(RULES)
     assert "ollama" in body
 
 

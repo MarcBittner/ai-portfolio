@@ -22,7 +22,7 @@ from promptguard.models import (
     ScanResponse,
 )
 from promptguard.rules import RULES, SEVERITY_WEIGHT
-from promptguard.scan import Finding, counts_by_category, scan
+from promptguard.scan import Finding, counts_by_category, scan, verdict_for_score
 
 STATIC_DIR = Path(__file__).parent / "static"
 VALID_PROVIDERS = ("auto", "free", "paid", "offline", *llm.PROVIDERS)
@@ -32,10 +32,6 @@ app = FastAPI(
     version=__version__,
     description="Deterministic LLM-firewall with an optional LLM classifier.",
 )
-
-
-def _verdict(score: float) -> str:
-    return "block" if score >= 0.85 else "flag" if score > 0 else "allow"
 
 
 @app.get("/health", response_model=HealthResponse)
@@ -82,7 +78,8 @@ def run_scan(request: ScanRequest) -> ScanResponse:
             score = max(score, SEVERITY_WEIGHT["high"])
 
     return ScanResponse(
-        verdict=_verdict(score), score=round(score, 2), direction=request.direction,
+        verdict=verdict_for_score(score), score=round(score, 2),
+        direction=request.direction,
         findings=[FindingOut(**vars(f)) for f in findings],
         counts=counts_by_category(findings), routing=routing,
     )

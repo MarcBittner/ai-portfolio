@@ -59,7 +59,7 @@ RULES: list[Rule] = [
             r"\b(to\s+https?://|to\s+\S+@|webhook|endpoint|server)\b")),
     Rule("encoded_payload", "exfiltration", "low", "both",
          "Long base64-like blob (possible hidden payload)",
-         _r(r"\b[A-Za-z0-9+/]{40,}={0,2}\b", 0)),
+         _r(r"\b[A-Za-z0-9+/]{40,}={0,2}(?=[^A-Za-z0-9+/=]|$)", 0)),
     # --- secret leakage (output) ---
     Rule("openai_key", "secret", "critical", "output",
          "OpenAI / Anthropic API key", _r(r"\bsk-(ant-)?[A-Za-z0-9-]{20,}\b", 0),
