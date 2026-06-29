@@ -47,9 +47,9 @@ def _wait_until_ready(c, timeout=120.0):
     pytest.skip(f"service at {BASE_URL} not ready (last seen: {last})")
 
 
-def _install_retry(c, tries=4, statuses=(404, 500, 502, 503, 504)):
-    """Wrap get/post to retry transient free-tier responses. The deliberate 404
-    test targets /records/<id> (a GET) and still resolves to 404 after retries."""
+def _install_retry(c, tries=4, statuses=(500, 502, 503, 504)):
+    """Wrap get/post to retry transient server-side errors and connection failures.
+    404 is a deliberate application response and is never retried."""
     raw = c.request
 
     def _retry(method, url, **kw):

@@ -10,6 +10,8 @@ this portfolio. The classification drives de-identification:
   financial — amounts: kept
 """
 
+import functools
+
 FIELD_CLASS: dict[str, str] = {
     "member_id": "direct",
     "member_name": "direct",
@@ -97,6 +99,7 @@ def _ssn(member_id: str) -> str:
     return f"5{n:02d}-2{n % 9}-{(1000 + n * 13) % 10000:04d}"
 
 
+@functools.cache
 def note_records() -> list[dict]:
     """One inbound free-text note per claim, with its exact gold PHI spans.
 

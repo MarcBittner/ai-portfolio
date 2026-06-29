@@ -5,8 +5,8 @@ de-identified provider outcome score. Stateless; no real PHI; no secrets.
 
 from pathlib import Path
 
-from fastapi import FastAPI
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi import FastAPI, Request
+from fastapi.responses import FileResponse, JSONResponse, Response
 
 from field_vault import __version__, audit, llm, notes, policy, privacy, store
 from field_vault.models import AccessRequest, HealthResponse, NoteRequest
@@ -19,6 +19,16 @@ app = FastAPI(
     version=__version__,
     description="Field-level de-identification + least-privilege access + audit.",
 )
+
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next) -> Response:
+    """Add HTTP security headers to every response."""
+    response = await call_next(request)
+    response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
 
 
 @app.get("/health", response_model=HealthResponse)

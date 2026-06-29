@@ -48,7 +48,7 @@ class AuditLog:
         return {"ok": True, "broken_at": None, "length": len(self._entries)}
 
     def entries(self) -> list[dict]:
-        return list(self._entries)
+        return [dict(e) for e in self._entries]
 
     def reset(self) -> None:
         self._entries.clear()

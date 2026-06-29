@@ -19,12 +19,11 @@ import os
 
 from field_vault.data import FIELD_CLASS
 
-_KEY = os.environ.get("FIELD_VAULT_TOKEN_KEY", "field-vault-deid-key-v1").encode()
-
 
 def _token(value: object) -> str:
-    digest = hmac.new(_KEY, str(value).encode(), hashlib.sha256).hexdigest()
-    return "tok_" + digest[:12]
+    key = os.environ.get("FIELD_VAULT_TOKEN_KEY", "field-vault-deid-key-v1").encode()
+    digest = hmac.new(key, str(value).encode(), hashlib.sha256).hexdigest()
+    return "tok_" + digest[:16]
 
 
 def generalize(field: str, value: object) -> object:
