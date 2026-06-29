@@ -1,5 +1,9 @@
 # maskline — code review
 
+> **Remediation status — review-only (not auto-modified).**
+> Reason: no source test files present (only stale .pyc). Findings below are documented for manual remediation; no code changes were applied so safety could not be proven here.
+
+
 **Health:** fair — clean structure and good test coverage; key correctness risks are a silent false-negative when LLM JSON parsing fails (mis-classifying PHI columns as non-sensitive), an unguarded `_CON` singleton race under concurrent FastAPI threads, and an `evaluate.py` report path that breaks when the package is installed.
 
 ---

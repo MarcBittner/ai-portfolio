@@ -1,5 +1,24 @@
 # quorum — Code Review
 
+> **Remediation status — 10 of 11 findings auto-remediated & verified (2026-06-29).**
+> Applied safe, non-UX fixes; re-verified independently (pytest green + ruff clean) and pushed per project.
+>
+> **Remediated (verified ✅):**
+> - `Q-002` — GET /evals runs the full eval pipeline on every request with no caching
+> - `Q-003` — No request-body size limit on POST endpoints
+> - `Q-004` — Silent exception suppression in LLM router hides provider failures
+> - `Q-005` — toast() renders msg as innerHTML without escaping — latent XSS footgun
+> - `Q-006` — Run IDs use only 40-bit UUID prefix; shared run store has no user isolation
+> - `Q-007` — _RUN_ORDER.pop(0) is O(n) — use deque
+> - `Q-008` — registry() and get_spec() reconstruct all spec objects on every call
+> - `Q-009` — Redundant stopword filter in _terms()
+> - `Q-010` — Bare list types on stages and rollup steps parameter
+> - `Q-011` — plan_prompts() computes each agent prompt twice per parallel stage
+>
+> **Verification proof:** `59 passed, 10 skipped, 1 warning in 0.25s` · ruff clean.
+> Remaining findings in the table below were not auto-applied (UX-impacting or needing a design decision) — open for manual triage.
+
+
 **Health: fair** — Well-structured demo with strong governance primitives, good test coverage, and no hardcoded secrets. Two real defects stand out: a thread-safety race in `AuditLog` that can corrupt the hash chain during every parallel fan-out, and an unguarded `/evals` endpoint that runs the full eval pipeline on every GET with no caching or rate limiting.
 
 ---

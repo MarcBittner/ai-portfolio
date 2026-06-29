@@ -1,5 +1,21 @@
 # Code Review: evalkit
 
+> **Remediation status — 7 of 11 findings auto-remediated & verified (2026-06-29).**
+> Applied safe, non-UX fixes; re-verified independently (pytest green + ruff clean) and pushed per project.
+>
+> **Remediated (verified ✅):**
+> - `EK-02` — No max-length on prediction/reference fields — DoS and runaway LLM spend
+> - `EK-06` — Metric names inserted into innerHTML without escaping — latent XSS
+> - `EK-07` — CDN-supplied URL used verbatim in href — potential javascript: injection
+> - `EK-08` — toast() message passed to innerHTML — latent XSS
+> - `EK-09` — METRICS dict typed as dict[str, tuple] — callable signature invisible to type checkers
+> - `EK-10` — token_f1 uses list.remove() in inner loop — O(n²) for large inputs
+> - `EK-11` — _resolve_order has unreachable None in exclusion tuple
+>
+> **Verification proof:** `48 passed, 8 skipped, 1 warning in 0.30s` · ruff clean.
+> Remaining findings in the table below were not auto-applied (UX-impacting or needing a design decision) — open for manual triage.
+
+
 **Health:** fair — clean architecture with good offline-first design, strong test coverage (unit + security suite), and solid Pydantic validation; marred by a handful of concrete medium-severity issues (open API, unbounded field sizes, misleading boot overlay) and several low-severity latent-XSS and quality issues.
 
 ---

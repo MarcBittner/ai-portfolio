@@ -1,5 +1,19 @@
 # Code Review: promptguard
 
+> **Remediation status — 5 of 8 findings auto-remediated & verified (2026-06-29).**
+> Applied safe, non-UX fixes; re-verified independently (pytest green + ruff clean) and pushed per project.
+>
+> **Remediated (verified ✅):**
+> - `PG-02` — Server API fields inserted into innerHTML without escaping
+> - `PG-03` — esc() helper does not escape double or single quotes
+> - `PG-04` — Verdict logic duplicated between scan.py and api.py
+> - `PG-05` — encoded_payload regex silently misses base64 strings ending in + or /
+> - `PG-07` — Magic number in test health-check assertion
+>
+> **Verification proof:** `39 passed, 8 skipped, 1 warning in 0.22s` · ruff clean.
+> Remaining findings in the table below were not auto-applied (UX-impacting or needing a design decision) — open for manual triage.
+
+
 **Health: good** — well-structured LLM firewall with solid deterministic core, correct secret-redaction design, and thorough test coverage (unit, security, smoke). Findings are mostly minor quality and defense-in-depth items; no critical or high issues.
 
 ---

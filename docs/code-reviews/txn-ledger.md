@@ -1,5 +1,18 @@
 # txn-ledger — Code Review
 
+> **Remediation status — 4 of 8 findings auto-remediated & verified (2026-06-29).**
+> Applied safe, non-UX fixes; re-verified independently (pytest green + ruff clean) and pushed per project.
+>
+> **Remediated (verified ✅):**
+> - `TXN-01` — guard_sql() table-whitelist misses JOIN and comma-joined tables
+> - `TXN-02` — PRAGMA query_only toggle is not thread-safe on the shared connection
+> - `TXN-03` — _offline_sql builds SQL by f-string interpolation instead of parameterized queries
+> - `TXN-08` — AskRequest.mode accepts arbitrary strings without enum validation
+>
+> **Verification proof:** `136 passed, 11 skipped, 1 warning in 6.24s` · ruff clean.
+> Remaining findings in the table below were not auto-applied (UX-impacting or needing a design decision) — open for manual triage.
+
+
 **Health:** fair — the core data pipeline is solid and the NL→SQL safety guard has good depth, but it has two confirmed bypass vectors (JOIN and comma-joined tables) that defeat the table-whitelist check, plus a thread-safety gap around the `PRAGMA query_only` toggle.
 
 ---

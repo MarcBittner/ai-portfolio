@@ -1,5 +1,9 @@
 # Code Review: vigil
 
+> **Remediation status — review-only (not auto-modified).**
+> Reason: test suite hangs on live network probes here. Findings below are documented for manual remediation; no code changes were applied so safety could not be proven here.
+
+
 **Health:** fair — solid architecture and defence-in-depth overall; a handful of concrete XSS, SSRF, and missing-rate-limit issues need fixing before a public-facing production deployment.
 
 ---

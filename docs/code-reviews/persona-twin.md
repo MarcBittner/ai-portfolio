@@ -1,5 +1,9 @@
 # Code Review: persona-twin
 
+> **Remediation status — review-only (not auto-modified).**
+> Reason: pytest suite has pre-existing failures in this environment (needs full app env). Findings below are documented for manual remediation; no code changes were applied so safety could not be proven here.
+
+
 **Health:** fair — one real path-traversal exposure, no authz on admin/expensive endpoints, a couple of correctness bugs; the core RAG pipeline, citation validation, and PII-redaction logic are solid.
 
 ---

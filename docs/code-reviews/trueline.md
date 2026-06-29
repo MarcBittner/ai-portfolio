@@ -1,5 +1,9 @@
 # Code Review — trueline
 
+> **Remediation status — review-only (not auto-modified).**
+> Reason: Node/Convex/Clerk setup required to run its suite. Findings below are documented for manual remediation; no code changes were applied so safety could not be proven here.
+
+
 **Health:** fair — well-architected for a demo app (deterministic money logic, clean multi-tenancy, solid test coverage of critical paths), but has two resource-exhaustion risks that should be closed before any real traffic and several correctness gaps in rollup accounting.
 
 ---

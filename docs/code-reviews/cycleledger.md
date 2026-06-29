@@ -1,5 +1,9 @@
 # Code Review: cycleledger
 
+> **Remediation status — review-only (not auto-modified).**
+> Reason: Ruby toolchain not available in this environment. Findings below are documented for manual remediation; no code changes were applied so safety could not be proven here.
+
+
 **Health: fair** — Strong SQL injection defense (SqlGuard + READ ONLY transaction) and good test coverage of the adversarial path, but the LLM-backed `/ask` endpoint lacks a database-error safety net, no row-limit enforcement leaves an unbounded-query DoS vector open, and the Ollama probe cache is thread-unsafe in a multi-threaded Puma environment.
 
 ---

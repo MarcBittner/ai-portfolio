@@ -1,5 +1,17 @@
 # rate-atlas — Code Review
 
+> **Remediation status — 3 of 9 findings auto-remediated & verified (2026-06-29).**
+> Applied safe, non-UX fixes; re-verified independently (pytest green + ruff clean) and pushed per project.
+>
+> **Remediated (verified ✅):**
+> - `RA-002` — Stored XSS via unescaped x.code in procedures <select> innerHTML
+> - `RA-005` — esc() helper only escapes < — attribute injection possible as codebase grows
+> - `RA-006` — LLM provider errors silently swallowed — no logging
+>
+> **Verification proof:** `54 passed, 11 skipped, 1 warning in 0.79s` · ruff clean.
+> Remaining findings in the table below were not auto-applied (UX-impacting or needing a design decision) — open for manual triage.
+
+
 **Health: fair** — well-structured Python/FastAPI service with good test coverage, clean SQL parameterization, and a thoughtful LLM routing chain, but two correctness bugs are significant (a health check that destroys user data and a non-atomic reingest), and a stored XSS vector exists due to an incomplete HTML-escaping function in the frontend.
 
 ---

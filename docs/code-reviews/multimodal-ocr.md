@@ -1,5 +1,17 @@
 # Code Review: multimodal-ocr
 
+> **Remediation status — 3 of 8 findings auto-remediated & verified (2026-06-29).**
+> Applied safe, non-UX fixes; re-verified independently (pytest green + ruff clean) and pushed per project.
+>
+> **Remediated (verified ✅):**
+> - `OCR-001` — Reflected XSS via unescaped routing.model in innerHTML
+> - `OCR-004` — Duplicate tokens_to_text call in run_process
+> - `OCR-008` — No request body size limit on /ocr image upload
+>
+> **Verification proof:** `45 passed, 8 skipped, 1 warning in 1.05s` · ruff clean.
+> Remaining findings in the table below were not auto-applied (UX-impacting or needing a design decision) — open for manual triage.
+
+
 **Health: fair** — Solid architecture and good test coverage; no critical or high findings. Six low-severity issues and two medium ones (one reflected XSS, one silent LLM activation) warrant fixing before wider exposure.
 
 ---

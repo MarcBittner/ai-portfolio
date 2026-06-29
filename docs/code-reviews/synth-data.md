@@ -1,5 +1,19 @@
 # Code Review — synth-data
 
+> **Remediation status — 5 of 10 findings auto-remediated & verified (2026-06-29).**
+> Applied safe, non-UX fixes; re-verified independently (pytest green + ruff clean) and pushed per project.
+>
+> **Remediated (verified ✅):**
+> - `SD-02` — Portfolio launcher URL not HTML-escaped; supply-chain XSS via external CDN
+> - `SD-03` — llm.reachable() makes a live HTTP call on every /health probe
+> - `SD-05` — HTTP status code not preserved in LLM provider fallback trace
+> - `SD-08` — gen_uuid does not set RFC 4122 version/variant bits
+> - `SD-10` — Missing response_model on /generate leaves response shape undocumented
+>
+> **Verification proof:** `47 passed, 8 skipped, 1 warning in 0.21s` · ruff clean.
+> Remaining findings in the table below were not auto-applied (UX-impacting or needing a design decision) — open for manual triage.
+
+
 **Health:** fair — solid architecture, good test coverage, no hardcoded secrets or unsafe execution; 4 medium findings (2 security, 2 performance) and 6 low findings.
 
 Reviewed: 2026-06-29  

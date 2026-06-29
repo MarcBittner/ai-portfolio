@@ -1,5 +1,19 @@
 # Code Review — agent-sandbox
 
+> **Remediation status — 5 of 7 findings auto-remediated & verified (2026-06-29).**
+> Applied safe, non-UX fixes; re-verified independently (pytest green + ruff clean) and pushed per project.
+>
+> **Remediated (verified ✅):**
+> - `F2` — XSS via unescaped a.url from CDN-fetched catalog
+> - `F3` — esc() does not escape quote characters — unsafe for HTML attribute context
+> - `F5` — toast(msg) uses innerHTML without escaping msg
+> - `F6` — /health endpoint blocks up to 1.5 s on synchronous Ollama probe
+> - `F7` — Container-level securityContext hardening fields missing
+>
+> **Verification proof:** `52 passed, 8 skipped, 1 xfailed, 1 warning in 0.38s` · ruff clean.
+> Remaining findings in the table below were not auto-applied (UX-impacting or needing a design decision) — open for manual triage.
+
+
 **Health summary:** Fair — one confirmed HTTP 500 bug (acknowledged/xfail'd in tests), two latent XSS vectors in the frontend, and a handful of low-severity hardening gaps; the Python core and its security posture are solid.
 
 ---

@@ -1,5 +1,9 @@
 # Code Review — tanglement-showcase
 
+> **Remediation status — review-only (not auto-modified).**
+> Reason: pitch deck + demo-site; no backend test suite. Findings below are documented for manual remediation; no code changes were applied so safety could not be proven here.
+
+
 **Health:** fair — functional demo-site with a working waitlist flow; the `git-encrypt` tool uses critically weak cryptography, and the rate-limiting infrastructure is defined but never wired into the route it was written for.
 
 ---

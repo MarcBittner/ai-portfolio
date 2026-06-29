@@ -1,5 +1,21 @@
 # arbiter — code review
 
+> **Remediation status — 7 of 10 findings auto-remediated & verified (2026-06-29).**
+> Applied safe, non-UX fixes; re-verified independently (pytest green + ruff clean) and pushed per project.
+>
+> **Remediated (verified ✅):**
+> - `ARB-002` — toast() inserts server-controlled content into innerHTML without sanitizing
+> - `ARB-003` — esc() does not escape double-quote or >, enabling attribute-context XSS
+> - `ARB-004` — timeseries() issues up to 20 separate SQL queries per /report call
+> - `ARB-005` — ResponseCache has no size limit and no active eviction — unbounded memory growth
+> - `ARB-007` — Unbounded n on /simulate and /traffic enables DoS via API credit exhaustion
+> - `ARB-009` — Store read methods do not acquire the write lock; SQLite not in WAL mode
+> - `ARB-010` — Duplicated blend formula between judge() and score_from_texts()
+>
+> **Verification proof:** `58 passed, 5 skipped, 1 warning in 0.45s` · ruff clean.
+> Remaining findings in the table below were not auto-applied (UX-impacting or needing a design decision) — open for manual triage.
+
+
 **Health: fair** — well-structured proxy with clean separation of concerns; one exploitable auth gap, two XSS vectors in the console, a performance hot-spot in the analytics, and an unbounded cache/memory issue.
 
 ---

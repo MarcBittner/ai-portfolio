@@ -1,5 +1,18 @@
 # Code Review: pii-redactor
 
+> **Remediation status — 4 of 7 findings auto-remediated & verified (2026-06-29).**
+> Applied safe, non-UX fixes; re-verified independently (pytest green + ruff clean) and pushed per project.
+>
+> **Remediated (verified ✅):**
+> - `F2` — O(n²) overlap check in detect() degrades on dense PII input
+> - `F3` — Ollama model names inserted into HTML attribute without escaping
+> - `F6` — hash style truncates SHA-256 to 6 hex chars (24 bits); misleading docstring
+> - `F7` — Oversized-text security test accepts 200, making it vacuous
+>
+> **Verification proof:** `64 passed, 10 skipped, 2 warnings in 0.34s` · ruff clean.
+> Remaining findings in the table below were not auto-applied (UX-impacting or needing a design decision) — open for manual triage.
+
+
 **Health: fair** — The deterministic core (regex + checksum detection, span-based redaction) is well-structured, thoroughly tested, and free of injection or secret-leakage risks. Seven concrete findings exist, none critical; the most impactful is a correctness bug where LLM NER only redacts the first occurrence of a repeated entity. The remaining issues are low-severity quality and security hardening items.
 
 ---

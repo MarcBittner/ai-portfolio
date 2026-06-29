@@ -1,5 +1,20 @@
 # Code Review — doc-extract
 
+> **Remediation status — 6 of 10 findings auto-remediated & verified (2026-06-29).**
+> Applied safe, non-UX fixes; re-verified independently (pytest green + ruff clean) and pushed per project.
+>
+> **Remediated (verified ✅):**
+> - `DE-01` — XSS via unsanitized href from CDN-fetched catalog
+> - `DE-02` — Unescaped server-controlled field names and method in innerHTML
+> - `DE-03` — Schema name and description unescaped in option elements
+> - `DE-04` — Dockerfile CMD uses unquoted shell variable expansion for PORT
+> - `DE-06` — complete_json() silently swallows responses with no closing JSON delimiter
+> - `DE-10` — Missing return-type annotations on llm_fill() and client_fill()
+>
+> **Verification proof:** `43 passed, 7 skipped, 1 warning in 0.23s` · ruff clean.
+> Remaining findings in the table below were not auto-applied (UX-impacting or needing a design decision) — open for manual triage.
+
+
 **Health:** good — well-structured, well-tested, solid trust-boundary design; one medium security fix and a handful of low-severity polish items.
 
 ---

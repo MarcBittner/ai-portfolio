@@ -1,5 +1,21 @@
 # field-vault — Code Review
 
+> **Remediation status — 7 of 11 findings auto-remediated & verified (2026-06-29).**
+> Applied safe, non-UX fixes; re-verified independently (pytest green + ruff clean) and pushed per project.
+>
+> **Remediated (verified ✅):**
+> - `FV-003` — No HTTP security headers (CSP, X-Frame-Options, X-Content-Type-Options)
+> - `FV-006` — HMAC token truncated to 48 bits — silent collision risk at scale
+> - `FV-007` — Bare except Exception in LLM router swallows provider errors silently
+> - `FV-008` — _KEY captured at module import time makes test monkeypatching fragile
+> - `FV-009` — Live smoke retry wrapper retries deliberate 404 responses
+> - `FV-010` — note_records() reconstructs full dataset on every call
+> - `FV-011` — AuditLog.entries() returns shallow copy — inner dicts are mutable references
+>
+> **Verification proof:** `75 passed, 13 skipped, 1 warning in 0.87s` · ruff clean.
+> Remaining findings in the table below were not auto-applied (UX-impacting or needing a design decision) — open for manual triage.
+
+
 **Health: fair** — The backend de-identification, policy, and audit chain are well-designed and well-tested; the frontend undermines this with real stored XSS, and two unauthenticated destructive POST endpoints are exposed without guards.
 
 ---

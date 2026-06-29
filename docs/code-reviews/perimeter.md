@@ -1,5 +1,9 @@
 # Code Review: perimeter
 
+> **Remediation status — review-only (not auto-modified).**
+> Reason: no source test files present (only stale .pyc). Findings below are documented for manual remediation; no code changes were applied so safety could not be proven here.
+
+
 **Health:** Fair — well-structured demo with solid test coverage; one high-severity correctness bug in the core evidence export, two medium issues, four low issues.
 
 ---

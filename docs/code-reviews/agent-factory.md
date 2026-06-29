@@ -1,5 +1,18 @@
 # Code Review: agent-factory
 
+> **Remediation status — 4 of 7 findings auto-remediated & verified (2026-06-29).**
+> Applied safe, non-UX fixes; re-verified independently (pytest green + ruff clean) and pushed per project.
+>
+> **Remediated (verified ✅):**
+> - `AF-02` — Path traversal via user-supplied thread_id in generated scaffold code
+> - `AF-04` — Non-atomic checkpoint file write can corrupt durable state on crash
+> - `AF-05` — /diagnostics runs full self-eval (5 LLM tasks) on every request by default
+> - `AF-07` — AgentSpec.model field has no max_length validation
+>
+> **Verification proof:** `85 passed, 8 skipped, 1 xfailed, 1 warning in 0.61s` · ruff clean.
+> Remaining findings in the table below were not auto-applied (UX-impacting or needing a design decision) — open for manual triage.
+
+
 **Health: fair** — The core runtime is well-structured and the test suite is strong, but one confirmed HTTP-500 bug (documented in tests as a known issue), a path-traversal flaw in generated scaffold code, and a ReDoS exposure via the `regex_extract` tool need resolution before the service handles untrusted input at scale.
 
 ---

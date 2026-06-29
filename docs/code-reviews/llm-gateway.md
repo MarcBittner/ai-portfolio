@@ -1,5 +1,22 @@
 # Code Review: llm-gateway
 
+> **Remediation status — 8 of 10 findings auto-remediated & verified (2026-06-29).**
+> Applied safe, non-UX fixes; re-verified independently (pytest green + ruff clean) and pushed per project.
+>
+> **Remediated (verified ✅):**
+> - `LLM-GW-001` — Audit log stores raw secrets when GATEWAY_REDACT_INPUT=False
+> - `LLM-GW-002` — Thread-safety: AuditLog and CircuitBreaker lack locking under FastAPI threadpool
+> - `LLM-GW-003` — Unauthenticated /v1/audit/_demo_tamper exposes audit mutation in production
+> - `LLM-GW-004` — XSS: user-supplied model field reflected into innerHTML without HTML-escaping
+> - `LLM-GW-007` — No HTTP security headers (CSP, X-Content-Type-Options, X-Frame-Options)
+> - `LLM-GW-008` — IP_ADDRESS regex matches invalid octets (false-positive redaction)
+> - `LLM-GW-009` — CompleteRequest.system field has no max_length constraint
+> - `LLM-GW-010` — complete_json() in llm.py is dead code
+>
+> **Verification proof:** `62 passed, 10 skipped, 1 warning in 0.26s` · ruff clean.
+> Remaining findings in the table below were not auto-applied (UX-impacting or needing a design decision) — open for manual triage.
+
+
 **Health:** fair — solid governance architecture and well-exercised deterministic guardrails, but sync FastAPI endpoints share mutable state without locking, the audit log stores raw secrets under a known misconfiguration, and the frontend reflects user-controlled fields into innerHTML without HTML-escaping.
 
 ---

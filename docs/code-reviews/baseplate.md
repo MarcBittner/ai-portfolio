@@ -1,5 +1,19 @@
 # baseplate — code review
 
+> **Remediation status — 5 of 10 findings auto-remediated & verified (2026-06-29).**
+> Applied safe, non-UX fixes; re-verified independently (pytest green + ruff clean) and pushed per project.
+>
+> **Remediated (verified ✅):**
+> - `BP-01` — trivy-action@master — mutable CI action pin propagates to all scaffolded pipelines
+> - `BP-04` — catalog.py line 33: dataclasses.field() used outside a dataclass — misleading dead code
+> - `BP-06` — innerHTML interpolations in SPA do not HTML-escape API-returned strings
+> - `BP-07` — POST /ingest accepts an unbounded rows list — potential memory/CPU DoS
+> - `BP-08` — ScaffoldRequest.mode is typed str | None — invalid modes are silently ignored
+>
+> **Verification proof:** `63 passed, 9 skipped, 1 warning in 0.40s` · ruff clean.
+> Remaining findings in the table below were not auto-applied (UX-impacting or needing a design decision) — open for manual triage.
+
+
 **Health: fair** — well-structured demo platform service with good test coverage and security awareness, but carries a handful of concrete bugs and quality issues worth fixing.
 
 ---

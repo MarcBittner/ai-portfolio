@@ -1,5 +1,20 @@
 # Code Review: attack-surface
 
+> **Remediation status — 6 of 8 findings auto-remediated & verified (2026-06-29).**
+> Applied safe, non-UX fixes; re-verified independently (pytest green + ruff clean) and pushed per project.
+>
+> **Remediated (verified ✅):**
+> - `F001` — f.severity unescaped in innerHTML class attribute
+> - `F002` — posture_math_checks_out invariant uses uncapped penalty formula
+> - `F004` — No format or length validation on domain field for live mode
+> - `F005` — Silent exception swallowing in LLM routing fallback chain
+> - `F006` — _offline_narrative has fragile implicit user-argument format
+> - `F007` — Incomplete esc() helper — only escapes < not & > "
+>
+> **Verification proof:** `60 passed, 14 skipped, 1 warning in 0.88s` · ruff clean.
+> Remaining findings in the table below were not auto-applied (UX-impacting or needing a design decision) — open for manual triage.
+
+
 **Health: fair** — The project is well-structured with solid test coverage (including a dedicated security suite), a clear trust boundary between deterministic scoring and LLM narrative generation, and a responsible passive-only approach to live recon. Findings are low-to-medium severity and fall into two clusters: a diverging invariant check in the eval harness, and a handful of incomplete/fragile conventions in the frontend escaping and backend parsing.
 
 ---

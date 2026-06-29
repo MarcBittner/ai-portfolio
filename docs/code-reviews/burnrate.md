@@ -1,5 +1,21 @@
 # burnrate — code review
 
+> **Remediation status — 7 of 10 findings auto-remediated & verified (2026-06-29).**
+> Applied safe, non-UX fixes; re-verified independently (pytest green + ruff clean) and pushed per project.
+>
+> **Remediated (verified ✅):**
+> - `BR-03` — O(n) list.pop(0) and sort-while-locked in the hot metrics path
+> - `BR-04` — Unguarded json.loads in Worker.run() crashes the drain loop on corrupt Redis entries
+> - `BR-05` — Provider call failures silently swallowed with no logging in llm.complete()
+> - `BR-06` — Overly broad `except Exception` in incident._parse() masks unexpected errors
+> - `BR-07` — _backend_cache written without a mutex — benign race in threaded deployments
+> - `BR-09` — p99_ms computed on every snapshot() call but never consumed
+> - `BR-10` — evaluate.py REPORT path breaks when installed as a package
+>
+> **Verification proof:** `71 passed, 4 skipped, 1 xfailed in 0.75s` · ruff clean.
+> Remaining findings in the table below were not auto-applied (UX-impacting or needing a design decision) — open for manual triage.
+
+
 **Health: fair** — well-structured demo service with solid test coverage and a clean security model, but carries one known and unfixed server-crash bug (non-string `mode` → 500), unauthenticated admin endpoints that are genuinely exploitable on the live public deployment, and an O(n) list mutation held under the metrics lock that will degrade under sustained load.
 
 ---

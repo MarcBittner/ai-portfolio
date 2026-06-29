@@ -1,5 +1,9 @@
 # Code Review: relaytoken
 
+> **Remediation status — review-only (not auto-modified).**
+> Reason: Go toolchain not available in this environment. Findings below are documented for manual remediation; no code changes were applied so safety could not be proven here.
+
+
 **Health: good** — Well-structured Go service with a clear security core (HS256-signed JWTs via livekit/protocol auth), thorough adversary test suite (8/8 attacks blocked, 100% block rate asserted in CI), and solid offline-fallback design. A handful of low/medium issues around frontend XSS hygiene, HTTP server hardening, and a misleading run.sh option.
 
 ---

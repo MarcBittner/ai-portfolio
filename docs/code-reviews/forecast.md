@@ -1,5 +1,19 @@
 # Code Review — forecast
 
+> **Remediation status — 5 of 9 findings auto-remediated & verified (2026-06-29).**
+> Applied safe, non-UX fixes; re-verified independently (pytest green + ruff clean) and pushed per project.
+>
+> **Remediated (verified ✅):**
+> - `F4` — Unbounded client_narrative and model fields allow oversized POST bodies
+> - `F5` — O(n²) fitted computation in mean()
+> - `F7` — Blocking network call on every /health request
+> - `F8` — MAPE returns 0.0 when all actuals are zero (misleading perfect-accuracy signal)
+> - `F9` — free mode silently falls to mock when OPENROUTER_API_KEY is absent
+>
+> **Verification proof:** `51 passed, 9 skipped, 1 warning in 3.90s` · ruff clean.
+> Remaining findings in the table below were not auto-applied (UX-impacting or needing a design decision) — open for manual triage.
+
+
 **Health:** Fair — no critical/high findings; two medium XSS sinks and two medium O(n²) paths deserve attention before any production exposure, but the service is functionally solid.
 
 **Reviewed:** 2026-06-29  

@@ -1,5 +1,19 @@
 # slo-kit — Code Review
 
+> **Remediation status — 5 of 11 findings auto-remediated & verified (2026-06-29).**
+> Applied safe, non-UX fixes; re-verified independently (pytest green + ruff clean) and pushed per project.
+>
+> **Remediated (verified ✅):**
+> - `F01` — Unescaped trace fields interpolated into innerHTML
+> - `F05` — client_summary field has no server-side length limit
+> - `F08` — O(n) list.pop(0) eviction in Metrics._durations
+> - `F09` — O(n) list.pop(0) eviction in service._outbox
+> - `F11` — GET /traces?limit has no upper bound in the API contract
+>
+> **Verification proof:** `56 passed, 12 skipped, 1 warning in 3.50s` · ruff clean.
+> Remaining findings in the table below were not auto-applied (UX-impacting or needing a design decision) — open for manual triage.
+
+
 **Health: fair** — well-structured core with good test coverage, but a handful of real correctness and security gaps across thread safety, metrics consistency, and front-end injection patterns.
 
 ---

@@ -1,5 +1,25 @@
 # rtc-guard — Code Review
 
+> **Remediation status — 8 of 11 findings auto-remediated & verified (2026-06-29).**
+> Applied safe, non-UX fixes; re-verified independently (pytest green + ruff clean) and pushed per project.
+>
+> **Remediated (verified ✅):**
+> - `RG-01` — Default signing key is publicly known; no startup warning if unset
+> - `RG-02` — Module-level _seq counter is not thread-safe; duplicate JTIs possible
+> - `RG-03` — SIGNING_KEY frozen as default argument at import time; runtime env-var changes are ignored
+> - `RG-04` — GET /evals re-runs all 10 audit cases on every request with no caching
+> - `RG-06` — External CDN fetch for app catalog lacks integrity check and URL scheme validation
+> - `RG-07` — toast() sets msg via innerHTML without HTML-escaping
+> - `RG-08` — _offline_audit re-parses the grant from the prompt string — fragile and silently wrong on format changes
+> - `RG-09` — LLM provider failures silently swallowed with no logging in complete()
+>
+> **Skipped during auto-fix:**
+> - `RG-05` — slowapi is not a project dependency and adding it would require a dependency change; the finding explicitly accepts a reverse-proxy (Nginx/Render) rule as an equivalent control, which is the appropriate solution at the infrastructure level for this deployed app.
+>
+> **Verification proof:** `74 passed, 13 skipped, 1 warning in 0.93s` · ruff clean.
+> Remaining findings in the table below were not auto-applied (UX-impacting or needing a design decision) — open for manual triage.
+
+
 **Health: fair** — Security core (HS256 JWT mint/verify + adversarial suite) is solid and well-tested; several correctness and hardening gaps exist in the surrounding service layer.
 
 ---

@@ -1,5 +1,17 @@
 # Code Review: reconcile
 
+> **Remediation status — 3 of 5 findings auto-remediated & verified (2026-06-29).**
+> Applied safe, non-UX fixes; re-verified independently (pytest green + ruff clean) and pushed per project.
+>
+> **Remediated (verified ✅):**
+> - `REC-002` — No HTTP security headers (CSP, X-Frame-Options, X-Content-Type-Options)
+> - `REC-003` — Magic constant duplication — review thresholds hardcoded in two files
+> - `REC-005` — External CDN catalog fetch inserts unsanitized URL into href attribute
+>
+> **Verification proof:** `46 passed, 11 skipped, 1 warning in 0.28s` · ruff clean.
+> Remaining findings in the table below were not auto-applied (UX-impacting or needing a design decision) — open for manual triage.
+
+
 **Health:** fair — solid deterministic core with good test coverage; one confirmed exploitable XSS in the rendering layer, missing HTTP security headers, and two low-severity quality issues.
 
 ---

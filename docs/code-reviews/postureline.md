@@ -1,5 +1,19 @@
 # Code Review: postureline
 
+> **Remediation status — 5 of 8 findings auto-remediated & verified (2026-06-29).**
+> Applied safe, non-UX fixes; re-verified independently (pytest green + ruff clean) and pushed per project.
+>
+> **Remediated (verified ✅):**
+> - `PL-003` — evaluate.run() triggers multiple redundant full warehouse scans
+> - `PL-004` — narrative._offline_narrative raises IndexError if user contains no newline
+> - `PL-006` — Permanently dead code block in warehouse scanner
+> - `PL-007` — Dead isinstance guard in narrative._parse
+> - `PL-008` — esc() HTML helper omits escaping of double-quote and greater-than characters
+>
+> **Verification proof:** `79 passed, 10 skipped, 1 warning in 3.21s` · ruff clean.
+> Remaining findings in the table below were not auto-applied (UX-impacting or needing a design decision) — open for manual triage.
+
+
 **Health: fair** — well-structured, good test coverage (unit + security + live-smoke), clean separation of surfaces; one thread-safety defect can corrupt state under concurrent load, and the evidence bundle produces wrong per-instance evidence for multi-resource findings.
 
 ---

@@ -1,5 +1,23 @@
 # counsel — Code Review
 
+> **Remediation status — 9 of 14 findings auto-remediated & verified (2026-06-29).**
+> Applied safe, non-UX fixes; re-verified independently (pytest green + ruff clean) and pushed per project.
+>
+> **Remediated (verified ✅):**
+> - `SEC-002` — No CORS or CSRF protection on mutating endpoints
+> - `BUG-001` — Race condition: concurrent add_transaction calls produce duplicate IDs
+> - `BUG-002` — Dataset cache initialisation is not thread-safe
+> - `SEC-003` — Module-level cooldown and probe-cache dicts accessed concurrently without locks
+> - `SEC-004` — Shell injection via unquoted --url flag in run.sh
+> - `QUAL-001` — _round2 helper duplicated across data.py and compute.py
+> - `QUAL-002` — Gratuitous identity dict copy in _build_user_prompt
+> - `QUAL-003` — Bare except Exception: pass in _fetch_free_catalog silently swallows errors
+> - `QUAL-004` — SPA esc() helper does not escape double-quotes
+>
+> **Verification proof:** `89 passed, 9 skipped, 1 warning in 0.68s` · ruff clean.
+> Remaining findings in the table below were not auto-applied (UX-impacting or needing a design decision) — open for manual triage.
+
+
 **Health:** fair — strong trust-gate architecture and good test coverage, held back by real concurrency bugs and unguarded admin endpoints.
 
 ---
