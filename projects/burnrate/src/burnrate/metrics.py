@@ -20,6 +20,7 @@ fraction reads straight off the histogram bucket the scraper already has.
 
 from __future__ import annotations
 
+import collections
 import threading
 
 from prometheus_client import (
@@ -81,7 +82,8 @@ class Metrics:
         self.dur_sum_ms = 0.0
         self.by_status: dict[str, int] = {}
         self.by_endpoint: dict[str, int] = {}
-        self._durations: list[float] = []   # ms, bounded window for percentiles
+        # ms, bounded window for percentiles
+        self._durations: collections.deque = collections.deque(maxlen=5000)
 
     def reset(self) -> None:
         with self._lock:
@@ -100,8 +102,6 @@ class Metrics:
             if duration_ms <= LATENCY_TARGET_MS:
                 self.under_target += 1
             self._durations.append(duration_ms)
-            if len(self._durations) > 5000:
-                self._durations.pop(0)
 
     def record_task(self, task: str, status: str) -> None:
         with self._lock:
@@ -117,22 +117,27 @@ class Metrics:
 
     def snapshot(self) -> dict:
         with self._lock:
-            s = sorted(self._durations)
+            dur_copy = list(self._durations)
             total = self.total
-            return {
-                "total": total,
-                "errors": self.errors,
-                "error_rate": round(self.errors / total, 6) if total else 0.0,
-                "under_target": self.under_target,
-                "fast_ratio": round(self.under_target / total, 6) if total else 1.0,
-                "avg_ms": round(self.dur_sum_ms / total, 1) if total else 0.0,
-                "p50_ms": _pct(s, 0.50),
-                "p95_ms": _pct(s, 0.95),
-                "p99_ms": _pct(s, 0.99),
-                "by_status": dict(self.by_status),
-                "by_endpoint": dict(self.by_endpoint),
-                "latency_target_ms": LATENCY_TARGET_MS,
-            }
+            errors = self.errors
+            under_target = self.under_target
+            dur_sum_ms = self.dur_sum_ms
+            by_status = dict(self.by_status)
+            by_endpoint = dict(self.by_endpoint)
+        s = sorted(dur_copy)
+        return {
+            "total": total,
+            "errors": errors,
+            "error_rate": round(errors / total, 6) if total else 0.0,
+            "under_target": under_target,
+            "fast_ratio": round(under_target / total, 6) if total else 1.0,
+            "avg_ms": round(dur_sum_ms / total, 1) if total else 0.0,
+            "p50_ms": _pct(s, 0.50),
+            "p95_ms": _pct(s, 0.95),
+            "by_status": by_status,
+            "by_endpoint": by_endpoint,
+            "latency_target_ms": LATENCY_TARGET_MS,
+        }
 
     def prometheus(self) -> bytes:
         """The real Prometheus exposition Grafana scrapes (``generate_latest``)."""

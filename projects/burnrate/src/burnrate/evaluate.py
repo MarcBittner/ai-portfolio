@@ -22,7 +22,7 @@ from pathlib import Path
 
 from burnrate import incident, service
 
-REPORT = Path(__file__).resolve().parents[2] / "eval-report.md"
+REPORT = Path.cwd() / "eval-report.md"
 
 FAST_ERROR_RATE = 0.08    # 16x burn vs the 0.5% budget → page, exhausted
 SLOW_ERROR_RATE = 0.02    # 4x burn → ticket (slow), budget partly spent

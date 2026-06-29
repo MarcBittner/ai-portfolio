@@ -20,6 +20,7 @@ self-contained and import-safe offline.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import time
 import urllib.error
@@ -27,6 +28,8 @@ import urllib.request
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Literal
+
+logger = logging.getLogger(__name__)
 
 Mode = Literal["auto", "paid", "local", "free", "offline"]
 
@@ -208,7 +211,8 @@ def complete(system: str, user: str, *, offline: Callable[[str, str], str],
         try:
             text, model, in_tok, out_tok = _call(
                 provider, system, user, json_mode=json_mode, max_tokens=max_tokens)
-        except Exception:
+        except Exception as exc:
+            logger.warning("LLM provider %s failed: %r", provider, exc)
             fallbacks.append(provider)
             continue
         if not text.strip():

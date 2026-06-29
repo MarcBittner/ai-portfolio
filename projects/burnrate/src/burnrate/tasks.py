@@ -26,14 +26,18 @@ outreach pipeline schedules.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import shutil
 import subprocess
+import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
 
 from burnrate.metrics import registry
+
+logger = logging.getLogger(__name__)
 
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379")
 QUEUE_KEY = "burnrate:tasks:default"
@@ -46,6 +50,7 @@ _REGISTRY: dict[str, Callable] = {}
 # --------------------------------------------------------------------------- #
 
 _backend_cache: str | None = None
+_backend_lock = threading.Lock()
 
 
 def _redis_py():
@@ -83,20 +88,24 @@ def _tasktiger_ok() -> bool:
 def backend() -> str:
     """Which task backend is live: ``tasktiger`` | ``redis`` | ``inline``."""
     global _backend_cache
-    if _backend_cache is None:
-        if _tasktiger_ok():
-            _backend_cache = "tasktiger"
-        elif _redis_py() is not None or _redis_cli_ok():
-            _backend_cache = "redis"
-        else:
-            _backend_cache = "inline"
+    if _backend_cache is not None:
+        return _backend_cache
+    with _backend_lock:
+        if _backend_cache is None:
+            if _tasktiger_ok():
+                _backend_cache = "tasktiger"
+            elif _redis_py() is not None or _redis_cli_ok():
+                _backend_cache = "redis"
+            else:
+                _backend_cache = "inline"
     return _backend_cache
 
 
 def reset_backend() -> None:
     """Re-probe the backend (used by tests that toggle Redis availability)."""
     global _backend_cache
-    _backend_cache = None
+    with _backend_lock:
+        _backend_cache = None
 
 
 # --------------------------------------------------------------------------- #
@@ -196,8 +205,12 @@ class Worker:
                     break
                 time.sleep(0.01)
                 continue
-            job = json.loads(raw)
-            _run(job["task"], tuple(job.get("args", [])), job.get("kwargs", {}))
+            try:
+                job = json.loads(raw)
+                _run(job["task"], tuple(job.get("args", [])), job.get("kwargs", {}))
+            except (json.JSONDecodeError, KeyError) as exc:
+                logger.warning("Worker skipping malformed job: %r", exc)
+                continue
             processed += 1
         return processed
 

@@ -221,7 +221,7 @@ def _parse(text: str, fallback: dict) -> dict:
     start, end = s.find("{"), s.rfind("}")
     try:
         obj = json.loads(s[start:end + 1]) if start >= 0 else {}
-    except Exception:
+    except (json.JSONDecodeError, ValueError, KeyError):
         obj = {}
     summary = str(obj.get("summary", "")).strip() or fallback["summary"]
     severity = str(obj.get("severity", "")).strip().lower()
