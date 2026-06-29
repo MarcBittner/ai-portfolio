@@ -1,9 +1,17 @@
-# Next.js standalone build for trueline. Boots WITHOUT Convex/Clerk secrets
-# (auth + backend are optional in demo mode — the landing renders and the gated
-# /app shows a signed-out state). Set NEXT_PUBLIC_CONVEX_URL + Clerk keys to
-# enable the full app.
+# Next.js standalone build for trueline. NEXT_PUBLIC_* vars must be present at
+# BUILD time (Next inlines them into the client bundle), so they're declared as
+# ARGs — Render passes matching service env vars as Docker build args. Without a
+# Clerk publishable key + Convex URL at build, the client falls back to demo
+# mode (Clerk optional, placeholder Convex). Server-only secrets (CLERK_SECRET_KEY)
+# are read at runtime, not needed here.
 FROM node:20-slim AS build
 WORKDIR /app
+ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=""
+ARG NEXT_PUBLIC_CONVEX_URL=""
+ARG NEXT_PUBLIC_CONVEX_SITE_URL=""
+ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY \
+    NEXT_PUBLIC_CONVEX_URL=$NEXT_PUBLIC_CONVEX_URL \
+    NEXT_PUBLIC_CONVEX_SITE_URL=$NEXT_PUBLIC_CONVEX_SITE_URL
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
