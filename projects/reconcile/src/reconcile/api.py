@@ -8,8 +8,9 @@ otherwise it falls back to the deterministic table parser. Stateless; no secrets
 
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from reconcile import __version__, llm
 from reconcile.data import BASELINE, MARKET, SAMPLES
@@ -27,6 +28,24 @@ app = FastAPI(
     version=__version__,
     description="Document line-item reconciliation against a baseline + market rates.",
 )
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Add standard security headers to every response."""
+
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; script-src 'self' 'unsafe-inline'; "
+            "style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
+            "connect-src 'self' https:; font-src 'self' data:"
+        )
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        return response
+
+
+app.add_middleware(SecurityHeadersMiddleware)
 
 
 @app.get("/health", response_model=HealthResponse)

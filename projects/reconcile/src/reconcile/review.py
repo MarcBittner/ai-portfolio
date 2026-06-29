@@ -5,6 +5,8 @@ ones that move money or can't be auto-verified. This builds that worklist from a
 reconciliation result — flagged lines, highest recoverable dollars first.
 """
 
+from reconcile.variance import REVIEW_CONFIDENCE, REVIEW_MONEY
+
 
 def build_queue(reconciled: dict) -> dict:
     """Return the prioritized review queue from a ``reconcile_items`` result."""
@@ -35,8 +37,8 @@ def _reason(ln: dict) -> str:
         return "overcharge vs contract/market"
     if ln["verdict"] == "unknown":
         return "no contract or market reference"
-    if ln["recoverable"] >= 1000.0:
+    if ln["recoverable"] >= REVIEW_MONEY:
         return "material recoverable amount"
-    if ln["confidence"] < 0.70:
+    if ln["confidence"] < REVIEW_CONFIDENCE:
         return "low extraction confidence"
     return "flagged for review"
