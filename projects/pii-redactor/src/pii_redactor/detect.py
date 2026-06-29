@@ -106,7 +106,7 @@ def detect(text: str, types: set[str] | None = None) -> list[Span]:
             start, end, value = m.start(), m.end(), m.group()
             if validate and not validate(value):
                 continue
-            if any(start < c_end and end > c_start for c_start, c_end in claimed):
+            if claimed and start < claimed[-1][1]:
                 continue  # a higher-priority pattern already owns these chars
             claimed.append((start, end))
             spans.append(Span(pii_type, start, end, value))

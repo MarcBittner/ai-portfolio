@@ -740,7 +740,7 @@ setInterval(()=>{fetch("/health").then(r=>{if(r.ok){$("hdot").className="dot ok"
       if(!r.ok) return;
       var d=await r.json();
       var names=(d.models||[]).map(function(m){return m.name||m.model;}).filter(Boolean);
-      dl.innerHTML=names.map(function(n){return '<option value="'+n+'"></option>';}).join("");
+      dl.innerHTML=names.map(function(n){return '<option value="'+esc(n)+'"></option>';}).join("");
     }catch(e){}
   }
   inp.addEventListener("focus",syncOllamaModels);

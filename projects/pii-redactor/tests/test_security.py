@@ -149,8 +149,7 @@ def test_detect_rejects_oversized_text_with_clean_4xx():
     # MAX_TEXT is enforced by pydantic: oversized -> 422, never a 500.
     huge = "a@b.com " * 20_000
     r = client.post("/detect", json={"text": huge, "use_llm": False})
-    assert r.status_code in (200, 422), r.text
-    assert r.status_code < 500
+    assert r.status_code == 422, r.text
 
 
 def test_injection_text_via_mock_does_not_execute_or_leak():

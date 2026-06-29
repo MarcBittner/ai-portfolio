@@ -8,8 +8,9 @@ Styles trade off readability vs. disclosure:
 - ``mask``    — characters blanked to ``•`` (separators kept for shape)
 - ``partial`` — type-aware reveal of a safe remainder (card/SSN/phone last 4,
   email/IP first component); useful for support workflows
-- ``hash``    — deterministic pseudonym ``EMAIL_a1b2c3`` (consistent per value,
-  re-identifiable only with the source text)
+- ``hash``    — deterministic pseudonym ``EMAIL_a1b2c3d4e5f6`` (consistent per
+  value; low-entropy pseudonym for visual consistency, NOT cryptographically
+  unlinkable)
 
 Redaction consumes the spans from :mod:`detect`, so what gets removed is
 exactly what was detected and checksum-validated.
@@ -28,7 +29,7 @@ def _mask(value: str) -> str:
 
 
 def _hash(value: str) -> str:
-    return hashlib.sha256(value.encode()).hexdigest()[:6]
+    return hashlib.sha256(value.encode()).hexdigest()[:12]
 
 
 def _partial(pii_type: str, value: str) -> str:
