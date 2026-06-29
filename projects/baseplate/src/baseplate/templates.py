@@ -254,7 +254,7 @@ jobs:
         run: docker build -t "$IMAGE:$GITHUB_SHA" .
 
       - name: Scan image (fail on HIGH/CRITICAL)
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@6e7b7d1
         with:
           image-ref: "$IMAGE:${{{{ github.sha }}}}"
           severity: HIGH,CRITICAL

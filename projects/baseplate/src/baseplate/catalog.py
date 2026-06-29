@@ -9,7 +9,7 @@ workload, with ``onboard()`` adding a scaffolded service to it.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass
@@ -30,7 +30,6 @@ _SEED: list[CatalogEntry] = [
                  role="platform", onboarded_via="manifest"),
 ]
 
-_catalog: list[CatalogEntry] = field(default_factory=list)  # placeholder, set below
 _catalog = list(_SEED)
 
 

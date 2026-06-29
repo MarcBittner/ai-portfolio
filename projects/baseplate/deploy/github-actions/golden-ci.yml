@@ -41,7 +41,7 @@ jobs:
 
       # --- supply-chain gate ----------------------------------------------
       - name: Scan image (fail on HIGH/CRITICAL)
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@6e7b7d1
         with:
           image-ref: "${{ env.SERVICE }}:${{ github.sha }}"
           severity: HIGH,CRITICAL

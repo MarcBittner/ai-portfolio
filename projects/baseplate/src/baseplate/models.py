@@ -1,6 +1,8 @@
 """Request/response models for the API."""
 
-from pydantic import BaseModel
+from typing import Literal
+
+from pydantic import BaseModel, Field
 
 
 class ScaffoldRequest(BaseModel):
@@ -11,7 +13,7 @@ class ScaffoldRequest(BaseModel):
     language: str | None = None
     needs_db: bool | None = None
     exposes_http: bool | None = None
-    mode: str | None = None  # auto | paid | local | free | offline
+    mode: Literal["auto", "paid", "local", "free", "offline"] | None = None
     model: str | None = None  # optional model override (informational/echoed)
     onboard: bool = False    # also add the service to the platform catalog
     # ServiceSpec the BROWSER obtained from a host-local Ollama (browser→host).
@@ -27,7 +29,7 @@ class ScaffoldRequest(BaseModel):
 class IngestRequest(BaseModel):
     # Optional inline rate file (list of row dicts). Omit to use the bundled
     # synthetic machine-readable rate file.
-    rows: list[dict] | None = None
+    rows: list[dict] | None = Field(None, max_length=100_000)
 
 
 class HealthResponse(BaseModel):

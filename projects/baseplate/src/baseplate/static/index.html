@@ -771,6 +771,7 @@
 
 <script>
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
 const jget=async u=>(await fetch(u)).json();
 const jpost=async(u,b)=>{
   // Fail gracefully: a slow free-tier roll can make Render's edge return a
@@ -836,9 +837,9 @@ async function scaffold(){
     LAST_REQ=body;   // reuse the exact inputs for the .zip download
     const s=r.spec, rt=r.routing;
     $("#routing").innerHTML=
-      `spec: <code>${s.name}</code> · ${s.language} · db=${s.needs_db} · `+
-      `http=${s.exposes_http} &nbsp;|&nbsp; via <b>${rt.provider}</b>/${rt.model}`+
-      (rt.fallbacks&&rt.fallbacks.length?` · fell back through ${rt.fallbacks.join(", ")}`:"");
+      `spec: <code>${esc(s.name)}</code> · ${esc(s.language)} · db=${s.needs_db} · `+
+      `http=${s.exposes_http} &nbsp;|&nbsp; via <b>${esc(rt.provider)}</b>/${esc(rt.model)}`+
+      (rt.fallbacks&&rt.fallbacks.length?` · fell back through ${rt.fallbacks.map(esc).join(", ")}`:"");
     setServedBy(rt.provider, rt.model);
     lastRouting=rt;
     setRoutePillResolved(rt);
@@ -953,9 +954,9 @@ async function loadCatalog(){
   try{
     const c=await jget('/catalog');
     const tb=$("#catalog tbody");
-    tb.innerHTML=c.services.map(s=>`<tr><td><code>${s.name}</code></td>`+
-      `<td>${s.language}</td><td>${s.needs_db}</td><td>${s.exposes_http}</td>`+
-      `<td>${s.role}</td><td><span class="pill">${s.onboarded_via}</span></td></tr>`).join('');
+    tb.innerHTML=c.services.map(s=>`<tr><td><code>${esc(s.name)}</code></td>`+
+      `<td>${esc(s.language)}</td><td>${s.needs_db}</td><td>${s.exposes_http}</td>`+
+      `<td>${esc(s.role)}</td><td><span class="pill">${esc(s.onboarded_via)}</span></td></tr>`).join('');
     $("#catpill").textContent=`catalog · ${c.count}`;
   }catch{}
 }
@@ -1038,8 +1039,8 @@ function setServedBy(provider, model){
   const offline = provider==="offline" || provider==="explicit";
   const dotcls = offline ? "offline" : "live";
   const short = (model||"").split("/").pop()||model||"";
-  el.innerHTML=`<span class="sdot ${dotcls}"></span>read by <b>${provider}</b>`+
-    (short && short!=="n/a" && short!=="deterministic" ? ` · ${short}` : (offline?" · deterministic":""));
+  el.innerHTML=`<span class="sdot ${dotcls}"></span>read by <b>${esc(provider)}</b>`+
+    (short && short!=="n/a" && short!=="deterministic" ? ` · ${esc(short)}` : (offline?" · deterministic":""));
   el.title=`spec extracted by ${provider}${short?(" ("+short+")"):""}`;
 }
 function advanceSteps(n){
@@ -1055,9 +1056,9 @@ function setDiagnostics(rt){
   $("#dgModel").textContent=(rt.model&&rt.model!=="n/a")?rt.model:"—";
   $("#dgLatency").textContent=(rt.latency_ms!=null)?`${(rt.latency_ms/1000).toFixed(rt.latency_ms<1000?3:2)}s`:"—";
   $("#dgCost").textContent=(rt.cost_usd!=null)?(rt.cost_usd===0?"$0":("$"+rt.cost_usd.toFixed(6))):"—";
-  const fell=(rt.fallbacks&&rt.fallbacks.length)?rt.fallbacks.join(" → ")+" → ":"";
-  $("#dgChain").innerHTML=`Routing chain (last extraction): ${fell}<b>${rt.provider}</b>`+
-    (rt.mode?` · mode <code>${rt.mode}</code>`:"");
+  const fell=(rt.fallbacks&&rt.fallbacks.length)?rt.fallbacks.map(esc).join(" → ")+" → ":"";
+  $("#dgChain").innerHTML=`Routing chain (last extraction): ${fell}<b>${esc(rt.provider)}</b>`+
+    (rt.mode?` · mode <code>${esc(rt.mode)}</code>`:"");
 }
 
 /* Benchmark one description through every routing mode and tabulate the result.
@@ -1099,9 +1100,9 @@ async function runBenchmark(){
   }
   tb.innerHTML=rows.map(r=>{
     const ok=r.result==="ok";
-    const res=ok?`<span class="badge b-good">ok</span>`:`<span class="bad mono">${r.result}</span>`;
-    return `<tr><td><b>${r.mode}</b></td><td>${r.provider}</td><td class="mono">${r.model}</td>`+
-      `<td class="mono">${r.lat}</td><td><code>${r.name}</code></td><td>${res}</td></tr>`;
+    const res=ok?`<span class="badge b-good">ok</span>`:`<span class="bad mono">${esc(r.result)}</span>`;
+    return `<tr><td><b>${esc(r.mode)}</b></td><td>${esc(r.provider)}</td><td class="mono">${esc(r.model)}</td>`+
+      `<td class="mono">${esc(r.lat)}</td><td><code>${esc(r.name)}</code></td><td>${res}</td></tr>`;
   }).join("");
   btn.classList.remove("loading");
   toast("Benchmark complete","ok");
