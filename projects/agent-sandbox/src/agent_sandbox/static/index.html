@@ -480,10 +480,13 @@ let cfg={useLlm:true,mode:"auto",model:""};
 let provStatus={};  // last GET /providers payload
 let toolCatalog=[]; // [{name,description}] from GET /tools (for the browser planner)
 
-function esc(s){return String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 function toast(msg,type="info"){
   const t=document.createElement("div");t.className=`toast ${type}`;
-  t.innerHTML=`<span class="tdot"></span>${msg}`;$("#toasts").appendChild(t);
+  const dot=document.createElement("span");dot.className="tdot";
+  const txt=document.createTextNode(msg);
+  t.appendChild(dot);t.appendChild(txt);
+  $("#toasts").appendChild(t);
   setTimeout(()=>{t.style.opacity="0";t.style.transition="opacity .3s";setTimeout(()=>t.remove(),300)},2600);
 }
 function loadCfg(){try{cfg={...cfg,...JSON.parse(localStorage.getItem(CFG_KEY)||"{}")}}catch{}}
@@ -826,7 +829,10 @@ boot();
   function esc(x){return (x||"").replace(/[&<>]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;"}[c];});}
   function render(f){var q=(f||"").toLowerCase();
     var html=APPS.filter(function(a){return !q||(a.name+" "+a.tag).toLowerCase().indexOf(q)>-1;}).map(function(a){var c=isCur(a.url);
-      return '<a class="lc-card'+(c?' cur':'')+'" href="'+a.url+'">'+(c?'<span class="lc-here">here</span>':'')+'<div class="nm">'+esc(a.name)+'</div><div class="tg">'+esc(a.tag)+'</div></a>';}).join("");
+      if(!/^https:\/\//.test(a.url)) return '';
+      var safeUrl=(function(){var anchor=document.createElement('a');anchor.href=a.url;return /^https:$/i.test(anchor.protocol)?anchor.href:'';}());
+      if(!safeUrl) return '';
+      return '<a class="lc-card'+(c?' cur':'')+'" href="'+esc(safeUrl)+'">'+(c?'<span class="lc-here">here</span>':'')+'<div class="nm">'+esc(a.name)+'</div><div class="tg">'+esc(a.tag)+'</div></a>';}).join("");
     document.getElementById("lc-grid").innerHTML=html||'<div style="color:var(--ink-dim);padding:8px">No match.</div>';}
   function open(){render("");wrap.classList.add("open");var i=document.getElementById("lc-search");if(i){i.value="";i.focus();}}
   function close(){wrap.classList.remove("open");}

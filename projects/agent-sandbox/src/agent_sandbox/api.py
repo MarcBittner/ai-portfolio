@@ -5,6 +5,7 @@ default) the LLM planner is tried first via the multi-provider router
 (Ollama-first), falling back to the rule planner when no provider is reachable.
 """
 
+import time
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -27,6 +28,20 @@ from agent_sandbox.tools import TOOL_NAMES, TOOLS
 STATIC_DIR = Path(__file__).parent / "static"
 VALID_PROVIDERS = ("auto", "free", "paid", "offline", *llm.PROVIDERS)
 
+# Cache Ollama reachability for 10 s to avoid blocking the /health probe path
+# under Ollama unavailability (each llm.reachable() call has a 1.5 s timeout).
+_ollama_cache: dict = {"value": False, "ts": 0.0}
+_OLLAMA_CACHE_TTL = 10.0
+
+
+def _ollama_reachable() -> bool:
+    now = time.monotonic()
+    if now - _ollama_cache["ts"] > _OLLAMA_CACHE_TTL:
+        _ollama_cache["value"] = llm.reachable()
+        _ollama_cache["ts"] = now
+    return _ollama_cache["value"]
+
+
 app = FastAPI(
     title="agent-sandbox",
     version=__version__,
@@ -37,7 +52,7 @@ app = FastAPI(
 @app.get("/health", response_model=HealthResponse)
 def health() -> HealthResponse:
     return HealthResponse(status="ok", version=__version__, tools=len(TOOL_NAMES),
-                          ollama=llm.reachable())
+                          ollama=_ollama_reachable())
 
 
 @app.get("/providers")
