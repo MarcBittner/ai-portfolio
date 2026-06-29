@@ -137,14 +137,14 @@ def run(mode: str | None = None) -> dict:
     k = kanon.k_anonymity()
     wh = scan.run("warehouse", mode=mode)
     wh_inv = _invariants(wh)
-    wh_narr = narrative.evaluate("warehouse", mode=mode)
+    wh_narr = narrative.evaluate("warehouse", mode=mode, report=wh)
     wh_diff = scan.diff("warehouse")
     providers = sorted({c["provider"] for c in classified})
 
     # --- exposure surface ---------------------------------------------------
     ex = scan.run("exposure", mode=mode)
     ex_inv = _invariants(ex)
-    ex_narr = narrative.evaluate("exposure", mode=mode)
+    ex_narr = narrative.evaluate("exposure", mode=mode, report=ex)
     ex_diff = scan.diff("exposure")
 
     return {

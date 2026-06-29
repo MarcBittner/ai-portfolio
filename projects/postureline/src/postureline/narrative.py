@@ -100,7 +100,8 @@ def _to_cover(report: dict) -> list[dict]:
 def _offline_narrative(_system: str, user: str) -> str:
     """Deterministic template board report — the last-resort fallback. Same JSON
     shape the LLM is asked for, so downstream parsing is uniform."""
-    report = json.loads(user.split("\n", 1)[1])
+    parts = user.split("\n", 1)
+    report = json.loads(parts[1] if len(parts) > 1 else parts[0])
     p = report["posture"]
     sc = report.get("severity_counts", {})
     surface = report.get("surface", "estate")
@@ -161,7 +162,7 @@ def _parse(text: str, report: dict) -> dict:
         obj = {}
     summary = str(obj.get("summary", "")).strip()
     top = []
-    for r in obj.get("top_risks", []) if isinstance(obj, dict) else []:
+    for r in obj.get("top_risks", []):
         rid = str(r.get("id", r.get("rule_id", ""))).strip()
         risk = str(r.get("risk", "")).strip()
         impact = str(r.get("impact", "")).strip()
@@ -240,12 +241,16 @@ def generate(report: dict, *, mode: str | None = None,
     }
 
 
-def evaluate(surface: str, *, mode: str | None = None) -> dict:
+def evaluate(surface: str, *, mode: str | None = None,
+             report: dict | None = None) -> dict:
     """Structural eval of the board report: does ``top_risks`` cover every critical
-    (and high) finding? An uncovered critical is a governance gap."""
-    from postureline.scan import run
+    (and high) finding? An uncovered critical is a governance gap.
 
-    report = run(surface)
+    ``report`` may be passed in pre-computed to avoid a redundant scan.run() call.
+    """
+    if report is None:
+        from postureline.scan import run
+        report = run(surface)
     out = generate(report, mode=mode)
     must_cover = {f["id"] for f in _to_cover(report)}
     covered = {r["id"] for r in out["top_risks"]}

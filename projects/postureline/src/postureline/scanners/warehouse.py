@@ -82,20 +82,6 @@ def scan(remediated: bool = False, *, mode: str | None = None,
                         f"until the minimum k clears {kanon.K_THRESHOLD}; the "
                         "generalization sweep shows the privacy/utility lever."))
 
-    # --- Row-access policy present on the fact table → CC6.6 ----------------
-    # Present by default (the generated RAP scopes the cohort), so this does not
-    # fire; modeled so the boundary-protection control is exercised by the surface.
-    row_access_present = True
-    if not row_access_present:  # pragma: no cover - defensive
-        findings.append(Finding(
-            id="ROW_ACCESS_MISSING", surface="warehouse", severity="medium",
-            resource=f"{data.FQ}.CLAIMS",
-            title="No row-access policy scoping the fact table by role",
-            evidence={"table": "CLAIMS"},
-            control_ids=["CC6.6"],
-            remediation="Apply a row-access policy that scopes claims rows to the "
-                        "caller's role."))
-
     # Routing for the free-text/LLM-classified columns: which provider produced the
     # PHI labels. With browser→host Ollama labels supplied, the LLM columns report
     # "ollama (browser→host)"; otherwise it's the server LLM (or offline fallback).

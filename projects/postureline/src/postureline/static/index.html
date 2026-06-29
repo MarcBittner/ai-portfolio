@@ -554,7 +554,7 @@ const $=s=>document.querySelector(s);
 const $$=s=>[...document.querySelectorAll(s)];
 const j=async(u,o)=>(await fetch(u,o)).json();
 const txt=async u=>(await fetch(u)).text();
-const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;");
+const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 const gradeClass=g=>g==="A"||g==="B"?"g-ok":g==="C"?"g-warn":"g-bad";
 let SURFACE="warehouse", FW="SOC 2", CONTROLS=[], DDL="", TF="";
 
