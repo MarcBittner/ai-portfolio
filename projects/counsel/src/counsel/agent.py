@@ -154,12 +154,11 @@ def _offline_responder(comp: Computation, r: retrieve.Retrieval):
 # --------------------------------------------------------------------------- #
 
 def _build_user_prompt(comp: Computation, r: retrieve.Retrieval) -> str:
-    facts = {k: v for k, v in comp.facts.items()}
     record_ids = comp.citation_ids
     return (
         f"QUESTION: {r.question}\n"
         f"INTENT: {comp.intent}  WINDOW: {r.window_label}\n"
-        f"FACTS (authoritative, computed by code): {json.dumps(facts)}\n"
+        f"FACTS (authoritative, computed by code): {json.dumps(comp.facts)}\n"
         f"RECORD IDS you may cite: {json.dumps(record_ids)}\n"
         "Phrase the answer for the user using exactly these numbers, and cite "
         "the record ids you used."

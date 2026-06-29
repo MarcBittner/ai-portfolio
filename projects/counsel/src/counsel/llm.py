@@ -20,7 +20,9 @@ self-contained and import-safe offline.
 from __future__ import annotations
 
 import json
+import logging
 import os
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -82,16 +84,19 @@ _FREE_FALLBACKS = [
 # a short cooldown and route around it, so we don't keep hammering an overloaded
 # model. Cooldowns are in-process (single instance) and expire on their own.
 _COOLDOWN: dict[str, float] = {}           # model -> monotonic time it's usable again
+_COOLDOWN_LOCK = threading.Lock()
 _COOLDOWN_S = float(os.environ.get("FREE_COOLDOWN_S", "120"))
 
 
 def _cooling(model: str) -> bool:
-    until = _COOLDOWN.get(model)
+    with _COOLDOWN_LOCK:
+        until = _COOLDOWN.get(model)
     return until is not None and time.monotonic() < until
 
 
 def _trip_cooldown(model: str, seconds: float) -> None:
-    _COOLDOWN[model] = time.monotonic() + seconds
+    with _COOLDOWN_LOCK:
+        _COOLDOWN[model] = time.monotonic() + seconds
 
 
 # Automatic free-model discovery: pull the list of free chat models from
@@ -130,8 +135,8 @@ def _fetch_free_catalog() -> list[str]:
             _CATALOG["models"] = free
             _CATALOG["until"] = now + _CATALOG_TTL
             return free
-    except Exception:
-        pass
+    except Exception as exc:
+        logging.debug("free catalog fetch failed: %s", exc, exc_info=True)
     return _FREE_FALLBACKS
 
 
@@ -177,13 +182,15 @@ class LLMResult:
 # --------------------------------------------------------------------------- #
 
 _probe_cache: dict[str, tuple[bool, float]] = {}
+_probe_cache_lock = threading.Lock()
 
 
 def _ollama_reachable() -> bool:
-    cached = _probe_cache.get("ollama")
     now = time.monotonic()
-    if cached and now - cached[1] < 30:
-        return cached[0]
+    with _probe_cache_lock:
+        cached = _probe_cache.get("ollama")
+        if cached and now - cached[1] < 30:
+            return cached[0]
     ok = False
     try:
         req = urllib.request.Request(f"{_OLLAMA_URL}/api/tags")
@@ -191,7 +198,8 @@ def _ollama_reachable() -> bool:
             ok = resp.status == 200
     except Exception:
         ok = False
-    _probe_cache["ollama"] = (ok, now)
+    with _probe_cache_lock:
+        _probe_cache["ollama"] = (ok, now)
     return ok
 
 
@@ -338,7 +346,8 @@ def complete(system: str, user: str, *, offline: Callable[[str, str], str],
                 continue
             if text.strip():
                 if cand:
-                    _COOLDOWN.pop(cand, None)   # it responded — clear any cooldown
+                    with _COOLDOWN_LOCK:
+                        _COOLDOWN.pop(cand, None)   # it responded — clear any cooldown
                 break
         if not text.strip():
             fallbacks.append(provider)

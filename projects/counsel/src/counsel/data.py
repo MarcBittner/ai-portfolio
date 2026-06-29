@@ -18,8 +18,11 @@ from __future__ import annotations
 
 import math
 import random
+import threading
 from dataclasses import asdict, dataclass
 from datetime import date, timedelta
+
+from counsel._math import _round2
 
 SEED = 20240601
 # The "today" the demo is anchored to, so "last month" etc. are deterministic.
@@ -111,10 +114,6 @@ _HOLDINGS = [
 ]
 
 
-def _round2(x: float) -> float:
-    return round(x + 1e-9, 2)
-
-
 def _gen_transactions(rng: random.Random) -> list[Transaction]:
     """One year of categorized transactions ending at TODAY, fully deterministic."""
     txns: list[Transaction] = []
@@ -189,33 +188,43 @@ def _gen_transactions(rng: random.Random) -> list[Transaction]:
 
 
 _CACHE: Dataset | None = None
+_CACHE_LOCK = threading.Lock()
 
 
 def build_dataset() -> Dataset:
     """Build (or return the cached) deterministic dataset."""
     global _CACHE
-    if _CACHE is None:
-        rng = random.Random(SEED)
-        _CACHE = Dataset(
-            accounts=list(_ACCOUNTS),
-            transactions=_gen_transactions(rng),
-            holdings=list(_HOLDINGS),
-        )
-    return _CACHE
+    with _CACHE_LOCK:
+        if _CACHE is None:
+            rng = random.Random(SEED)
+            _CACHE = Dataset(
+                accounts=list(_ACCOUNTS),
+                transactions=_gen_transactions(rng),
+                holdings=list(_HOLDINGS),
+            )
+        return _CACHE
 
 
 def reset_dataset() -> Dataset:
     """Drop the cached dataset (including any user-added rows) and rebuild from
     seed. Used by the admin reset so the demo returns to the pristine sample."""
     global _CACHE
-    _CACHE = None
-    return build_dataset()
+    with _CACHE_LOCK:
+        _CACHE = None
+        rng = random.Random(SEED)
+        _CACHE = Dataset(
+            accounts=list(_ACCOUNTS),
+            transactions=_gen_transactions(rng),
+            holdings=list(_HOLDINGS),
+        )
+        return _CACHE
 
 
 # User-added rows carry this id prefix so the UI/API can mark them distinctly
 # from the deterministic seed (which uses ``txn_NNNNNN``). The human enters this
 # source data explicitly; no LLM ever writes here.
 USER_TXN_PREFIX = "txn_user_"
+_TXN_LOCK = threading.Lock()
 
 
 def is_user_added(txn: Transaction) -> bool:
@@ -253,13 +262,14 @@ def add_transaction(ds: Dataset, account_id: str, date_iso: str, merchant: str,
     if not math.isfinite(amt):
         raise ValueError("amount must be a finite number")
 
-    n_user = sum(1 for t in ds.transactions if is_user_added(t))
-    txn = Transaction(
-        id=f"{USER_TXN_PREFIX}{n_user:03d}", account_id=account_id,
-        date=d.isoformat(), merchant=merchant, category=category,
-        amount=_round2(amt))
-    ds.transactions.append(txn)
-    ds.transactions.sort(key=lambda t: (t.date, t.id))
+    with _TXN_LOCK:
+        n_user = sum(1 for t in ds.transactions if is_user_added(t))
+        txn = Transaction(
+            id=f"{USER_TXN_PREFIX}{n_user:03d}", account_id=account_id,
+            date=d.isoformat(), merchant=merchant, category=category,
+            amount=_round2(amt))
+        ds.transactions.append(txn)
+        ds.transactions.sort(key=lambda t: (t.date, t.id))
     return txn
 
 

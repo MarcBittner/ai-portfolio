@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 
 from counsel import data
+from counsel._math import _round2
 from counsel.data import Dataset, Transaction
 
 
@@ -47,10 +48,6 @@ class Computation:
             "citation_ids": self.citation_ids,
             "detail": self.detail,
         }
-
-
-def _round2(x: float) -> float:
-    return round(x + 1e-9, 2)
 
 
 # --------------------------------------------------------------------------- #

@@ -110,7 +110,7 @@ cmd_smoke() {
     pid=$!
     local up=0 i
     for i in $(seq 1 60); do
-      if py -c "import urllib.request; urllib.request.urlopen('$url/health', timeout=2)" 2>/dev/null; then up=1; break; fi
+      if HEALTH_URL="$url/health" py -c "import os,urllib.request; urllib.request.urlopen(os.environ['HEALTH_URL'],timeout=2)" 2>/dev/null; then up=1; break; fi
       kill -0 "$pid" 2>/dev/null || break
       sleep 0.5
     done

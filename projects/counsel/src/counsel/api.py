@@ -20,9 +20,11 @@ proposal; only /decide with approve=true applies it — and the apply is simulat
 (it never mutates the ground-truth dataset). The model proposes; a human approves.
 """
 
+import os
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
 from counsel import __version__, agent, approvals, data, diagnostics, llm
@@ -44,6 +46,21 @@ app = FastAPI(
     version=__version__,
     description=("Grounded, trust-gated personal-finance copilot — code decides "
                  "the numbers, the LLM narrates, actions need human approval."),
+)
+
+# CORS: restrict to the explicit deployment origin (or localhost for dev).
+# An explicit allowlist prevents browsers from treating this as open to all origins.
+_ALLOW_ORIGINS = [
+    o.strip()
+    for o in os.environ.get("CORS_ALLOW_ORIGINS", "http://localhost:8080").split(",")
+    if o.strip()
+]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_ALLOW_ORIGINS,
+    allow_credentials=False,
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
 )
 
 data.build_dataset()  # warm the deterministic ground truth at startup
