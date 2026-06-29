@@ -10,6 +10,8 @@ and dependency-free (a real embedder can be plugged in later).
 import hashlib
 import math
 import re
+from collections import Counter
+from collections.abc import Callable
 
 _WORD = re.compile(r"[a-z0-9]+")
 _REFUSAL = (
@@ -45,12 +47,7 @@ def token_f1(prediction: str, reference: str) -> float:
         return 1.0
     if not pred or not ref:
         return 0.0
-    common = 0
-    ref_pool = list(ref)
-    for tok in pred:
-        if tok in ref_pool:
-            ref_pool.remove(tok)
-            common += 1
+    common = sum((Counter(pred) & Counter(ref)).values())
     if common == 0:
         return 0.0
     precision = common / len(pred)
@@ -93,7 +90,7 @@ def _is_refusal(text: str) -> bool:
 
 
 # name -> (fn, description); every fn is (prediction, reference) -> [0,1]
-METRICS: dict[str, tuple] = {
+METRICS: dict[str, tuple[Callable[[str, str], float], str]] = {
     "exact_match": (exact_match, "Normalized strings are identical"),
     "contains": (contains, "Reference appears verbatim in the prediction"),
     "token_f1": (token_f1, "Token-overlap F1 (SQuAD-style)"),

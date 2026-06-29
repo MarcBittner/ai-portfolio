@@ -109,7 +109,7 @@ def _resolve_order(provider: str | None) -> list[str]:
     """Map a provider/mode hint to an ordered provider chain. Accepts a concrete
     provider name (pins it), a mode (``free``/``paid``/``offline``), or
     ``auto``/None (free-first when keyed, else paid, else local, else mock)."""
-    if provider and provider not in ("auto", "free", "paid", "offline", None):
+    if provider and provider not in ("auto", "free", "paid", "offline"):
         return [provider]
     mode = provider if provider in ("free", "paid", "offline") else LLM_MODE
     if mode == "offline":

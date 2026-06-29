@@ -5,8 +5,8 @@ from pydantic import BaseModel, Field
 
 
 class EvalItem(BaseModel):
-    prediction: str
-    reference: str
+    prediction: str = Field(max_length=16_000)
+    reference: str = Field(max_length=16_000)
 
 
 class ClientJudgment(BaseModel):

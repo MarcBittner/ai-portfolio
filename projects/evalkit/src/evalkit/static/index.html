@@ -471,7 +471,9 @@ let provStatus={};  // last GET /providers payload
 
 function toast(msg,type="info"){
   const t=document.createElement("div");t.className=`toast ${type}`;
-  t.innerHTML=`<span class="tdot"></span>${msg}`;$("#toasts").appendChild(t);
+  const dot=document.createElement("span");dot.className="tdot";t.appendChild(dot);
+  const txt=document.createTextNode(msg);t.appendChild(txt);
+  $("#toasts").appendChild(t);
   setTimeout(()=>{t.style.opacity="0";t.style.transition="opacity .3s";setTimeout(()=>t.remove(),300)},2600);
 }
 const shortName=m=>(m||"").split("/").pop().replace(/:free$/,"");
@@ -508,7 +510,7 @@ async function loadMetrics(){
   const metrics=await j("metrics");
   $("#metrics").innerHTML=metrics.map(m=>`<div class="metric">
       <label><input type="checkbox" data-m="${m.name}" ${m.source==="llm"?"":"checked"} />
-        <span class="name">${m.name}</span><span class="desc">${esc(m.description)}</span></label>
+        <span class="name">${esc(m.name)}</span><span class="desc">${esc(m.description)}</span></label>
       <input type="number" min="0" max="1" step="0.05" data-th="${m.name}" placeholder="min" />
     </div>`).join("");
   $("#metricpill").textContent=`metrics · ${metrics.length}`;
@@ -583,7 +585,7 @@ function render(data){
   $("#resultmeta").textContent=`${data.n} item${data.n===1?"":"s"} · ${data.metrics.length} metric${data.metrics.length===1?"":"s"}`;
   $("#bars").innerHTML=data.metrics.map(m=>{
     const v=data.aggregate[m]??0;
-    return `<div class="bar"><span class="mname">${m}</span>
+    return `<div class="bar"><span class="mname">${esc(m)}</span>
       <span class="track"><span class="fill" style="width:${(v*100).toFixed(0)}%"></span></span>
       <span class="val">${v.toFixed(3)}</span></div>`;
   }).join("");
@@ -601,7 +603,7 @@ function render(data){
       ?`  (after ${data.routing.fallbacks.join(", ")})`:"";
     r.textContent=`llm_judge routed via ${data.routing.provider} (${data.routing.model})${fb}`;
   }else{r.style.display="none";r.textContent="";}
-  const head="<thead><tr><th>#</th>"+data.metrics.map(m=>`<th>${m}</th>`).join("")+"</tr></thead>";
+  const head="<thead><tr><th>#</th>"+data.metrics.map(m=>`<th>${esc(m)}</th>`).join("")+"</tr></thead>";
   const rows=data.per_item.map(row=>
     `<tr><td>${row.index}</td>`+data.metrics.map(m=>`<td>${(row.scores[m]??0).toFixed(3)}</td>`).join("")+"</tr>").join("");
   $("#table").innerHTML=head+"<tbody>"+rows+"</tbody>";
@@ -819,9 +821,10 @@ boot();
   wrap.innerHTML='<div class="lc-modal"><div class="lc-head"><b>Portfolio demos</b><span style="font-size:12px;color:var(--ink-dim)">'+APPS.length+' apps</span><input class="lc-search" id="lc-search" placeholder="filter\u2026" /><button class="iconbtn" id="lc-close" aria-label="Close">\u2715</button></div><div class="lc-grid" id="lc-grid"></div></div>';
   document.body.appendChild(wrap);
   function esc(x){return (x||"").replace(/[&<>]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;"}[c];});}
+  function safeHref(u){try{return new URL(u).protocol==='https:'?u:'#';}catch(e){return '#';}}
   function render(f){var q=(f||"").toLowerCase();
     var html=APPS.filter(function(a){return !q||(a.name+" "+a.tag).toLowerCase().indexOf(q)>-1;}).map(function(a){var c=isCur(a.url);
-      return '<a class="lc-card'+(c?' cur':'')+'" href="'+a.url+'">'+(c?'<span class="lc-here">here</span>':'')+'<div class="nm">'+esc(a.name)+'</div><div class="tg">'+esc(a.tag)+'</div></a>';}).join("");
+      return '<a class="lc-card'+(c?' cur':'')+'" href="'+safeHref(a.url)+'">'+(c?'<span class="lc-here">here</span>':'')+'<div class="nm">'+esc(a.name)+'</div><div class="tg">'+esc(a.tag)+'</div></a>';}).join("");
     document.getElementById("lc-grid").innerHTML=html||'<div style="color:var(--ink-dim);padding:8px">No match.</div>';}
   function open(){render("");wrap.classList.add("open");var i=document.getElementById("lc-search");if(i){i.value="";i.focus();}}
   function close(){wrap.classList.remove("open");}
