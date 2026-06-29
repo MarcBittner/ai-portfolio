@@ -45,6 +45,7 @@ class Result:
     boxes: list[Box]
     counts: dict[str, int]
     routing: Routing | None = None
+    ordered: list = None  # tokens in reading order (populated by process())
 
 
 def tokens_to_text(tokens: list[OcrToken]):
@@ -105,7 +106,7 @@ def process(tokens: list[OcrToken], types: set[str] | None = None,
         for s in pii
     ]
     redacted_text = _redact_text(text, pii)
-    return Result(text, redacted_text, findings, boxes, counts, routing)
+    return Result(text, redacted_text, findings, boxes, counts, routing, ordered)
 
 
 def _redact_text(text: str, pii) -> str:

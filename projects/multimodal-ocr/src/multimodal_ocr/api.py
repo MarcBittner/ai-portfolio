@@ -32,7 +32,7 @@ from multimodal_ocr.ocr import (
     ocr_image,
     sample_tokens,
 )
-from multimodal_ocr.pipeline import process, tokens_to_text
+from multimodal_ocr.pipeline import process
 
 STATIC_DIR = Path(__file__).parent / "static"
 ALL_TYPES = list(TYPE_NAMES) + list(LLM_TYPES)
@@ -98,7 +98,7 @@ def run_process(request: ProcessRequest) -> ProcessResponse:
 
     result = process(tokens, _types(request.types), request.use_llm,
                      request.provider, request.model, request.client_ner)
-    _text, ordered, _spans = tokens_to_text(tokens)
+    ordered = result.ordered
     routing = None
     if result.routing is not None:
         routing = RoutingInfo(provider=result.routing.provider,

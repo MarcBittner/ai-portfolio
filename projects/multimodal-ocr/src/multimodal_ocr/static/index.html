@@ -447,6 +447,7 @@
 const $=id=>document.getElementById(id), $$=s=>[...document.querySelectorAll(s)];
 const j=async(u,o)=>(await fetch(u,o)).json();
 const SVGNS="http://www.w3.org/2000/svg";
+function escHtml(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");}
 const CFG_KEY="multimodal-ocr.cfg";
 let SAMPLES={};
 let provStatus={};         // last GET /providers
@@ -548,7 +549,7 @@ async function run(){
     const data=await j("/process",{method:"POST",headers:{"content-type":"application/json"},
       body:JSON.stringify(body)});
     $("routing").innerHTML=data.routing
-      ? `LLM NER routed via <code>${data.routing.provider}</code> (<code>${data.routing.model}</code>)`
+      ? `LLM NER routed via <code>${escHtml(data.routing.provider)}</code> (<code>${escHtml(data.routing.model)}</code>)`
       : `<span class="muted">deterministic detectors only (no LLM call)</span>`;
     renderDoc("orig",data.tokens,[]);
     renderDoc("redacted",data.tokens,data.boxes);

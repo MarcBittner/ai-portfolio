@@ -68,7 +68,7 @@ class SampleInfo(BaseModel):
 
 
 class OcrRequest(BaseModel):
-    image_b64: str = Field(description="base64-encoded image bytes")
+    image_b64: str = Field(description="base64-encoded image bytes", max_length=7_000_000)
 
 
 class HealthResponse(BaseModel):
