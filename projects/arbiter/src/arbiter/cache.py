@@ -71,11 +71,19 @@ class _Entry:
 
 
 class ResponseCache:
-    """In-process exact-match response cache with TTL. (Prod would back this with
-    Redis; the interface is the same.)"""
+    """In-process exact-match response cache with TTL and a size cap.
 
-    def __init__(self, ttl_s: float = 900.0, now=time.monotonic):
+    When ``maxsize`` is reached, all expired entries are removed first; if
+    the dict is still at capacity, the oldest half is evicted (approximated
+    by insertion order, which ``dict`` preserves in Python 3.7+).
+
+    (Prod would back this with Redis; the interface is the same.)
+    """
+
+    def __init__(self, ttl_s: float = 900.0, maxsize: int = 10_000,
+                 now=time.monotonic):
         self.ttl = ttl_s
+        self.maxsize = maxsize
         self._now = now
         self._d: dict[str, _Entry] = {}
         self.hits = 0
@@ -93,6 +101,17 @@ class ResponseCache:
 
     def put(self, key: str, text: str, in_tokens: int, out_tokens: int,
             model_id: str) -> None:
+        if len(self._d) >= self.maxsize:
+            now = self._now()
+            expired = [k for k, v in self._d.items() if v.expires <= now]
+            for k in expired:
+                del self._d[k]
+            # If still at capacity after removing expired entries, drop the
+            # oldest half by insertion order.
+            if len(self._d) >= self.maxsize:
+                evict = list(self._d)[: self.maxsize // 2]
+                for k in evict:
+                    del self._d[k]
         self._d[key] = _Entry(text, in_tokens, out_tokens, model_id,
                               self._now() + self.ttl)
 

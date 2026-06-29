@@ -53,6 +53,8 @@ class Store:
         self._lock = threading.Lock()
         self._db = sqlite3.connect(self.path, check_same_thread=False)
         self._db.row_factory = sqlite3.Row
+        # WAL mode: readers always see a consistent snapshot without blocking writers.
+        self._db.execute("PRAGMA journal_mode=WAL")
         self._db.executescript(_SCHEMA)
         self._db.commit()
 
@@ -149,19 +151,31 @@ class Store:
         a, b = rng["a"], rng["b"]
         span = max(1e-6, b - a)
         width = span / buckets
-        out = []
-        for i in range(buckets):
-            lo, hi = a + i * width, a + (i + 1) * width + (1e-6 if i == buckets - 1
-                                                           else 0)
-            r = self._db.execute(
-                "SELECT COUNT(*) n, COALESCE(SUM(baseline_cost),0) base, "
-                "COALESCE(SUM(served_cost),0) served, COALESCE(SUM(saved),0) saved "
-                "FROM events WHERE ts >= ? AND ts < ?", (lo, hi)).fetchone()
-            out.append({"bucket": i, "requests": r["n"],
-                        "baseline_cost": round(r["base"], 6),
-                        "served_cost": round(r["served"], 6),
-                        "saved": round(r["saved"], 6)})
-        return out
+        # Single GROUP BY query: assign each row to a bucket by integer division,
+        # clamp to [0, buckets-1] so the last timestamp lands in the final bucket.
+        bucket_expr = (
+            f"MIN(CAST((ts - {a}) / {width} AS INTEGER), {buckets - 1})"
+        )
+        rows = {
+            r["bucket"]: r
+            for r in self._db.execute(
+                f"SELECT {bucket_expr} AS bucket, "
+                f"COUNT(*) n, COALESCE(SUM(baseline_cost),0) base, "
+                f"COALESCE(SUM(served_cost),0) served, COALESCE(SUM(saved),0) saved "
+                f"FROM events{w} GROUP BY {bucket_expr}",
+                args,
+            )
+        }
+        return [
+            {
+                "bucket": i,
+                "requests": rows[i]["n"] if i in rows else 0,
+                "baseline_cost": round(rows[i]["base"], 6) if i in rows else 0.0,
+                "served_cost": round(rows[i]["served"], 6) if i in rows else 0.0,
+                "saved": round(rows[i]["saved"], 6) if i in rows else 0.0,
+            }
+            for i in range(buckets)
+        ]
 
     def quality_stats(self) -> list[dict]:
         """Per (task, baseline, candidate): n, mean retained, mean $ saved/req."""

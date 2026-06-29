@@ -621,7 +621,7 @@
 const $=s=>document.querySelector(s);
 const $$=s=>[...document.querySelectorAll(s)];
 const j=async(u,o)=>(await fetch(u,o)).json();
-const esc=s=>String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;");
+const esc=s=>String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 const usd=n=>"$"+(Number(n)||0).toFixed((Math.abs(n)<1&&n!==0)?4:2);
 const pct=n=>(100*(Number(n)||0)).toFixed(1)+"%";
 
@@ -632,7 +632,9 @@ let llmProviders={};   // provider availability map (from /health)
 
 function toast(msg,type="info"){
   const t=document.createElement("div");t.className=`toast ${type}`;
-  t.innerHTML=`<span class="tdot"></span>${msg}`;$("#toasts").appendChild(t);
+  const dot=document.createElement("span");dot.className="tdot";t.appendChild(dot);
+  t.appendChild(document.createTextNode(msg));
+  $("#toasts").appendChild(t);
   setTimeout(()=>{t.style.opacity="0";t.style.transition="opacity .3s";setTimeout(()=>t.remove(),300)},2600);
 }
 function openDrawer(){applyCfgToForm();$("#scrim").classList.add("open");$("#drawer").classList.add("open");$("#drawer").setAttribute("aria-hidden","false");refreshClientOllama();}
@@ -1117,7 +1119,7 @@ boot();
   var wrap=document.createElement("div"); wrap.id="applauncher"; wrap.setAttribute("role","dialog"); wrap.setAttribute("aria-modal","true");
   wrap.innerHTML='<div class="lc-modal"><div class="lc-head"><b>Portfolio demos</b><span style="font-size:12px;color:var(--ink-dim)">'+APPS.length+' apps</span><input class="lc-search" id="lc-search" placeholder="filter\u2026" /><button class="iconbtn" id="lc-close" aria-label="Close">\u2715</button></div><div class="lc-grid" id="lc-grid"></div></div>';
   document.body.appendChild(wrap);
-  function esc(x){return (x||"").replace(/[&<>]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;"}[c];});}
+  function esc(x){return (x||"").replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});}
   function render(f){var q=(f||"").toLowerCase();
     var html=APPS.filter(function(a){return !q||(a.name+" "+a.tag).toLowerCase().indexOf(q)>-1;}).map(function(a){var c=isCur(a.url);
       return '<a class="lc-card'+(c?' cur':'')+'" href="'+a.url+'">'+(c?'<span class="lc-here">here</span>':'')+'<div class="nm">'+esc(a.name)+'</div><div class="tg">'+esc(a.tag)+'</div></a>';}).join("");

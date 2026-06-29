@@ -138,6 +138,27 @@ def _llm_judge(judge: Model, prompt: str, baseline: str, candidate: str
         return None
 
 
+def _not_real(baseline: str, candidate: str) -> bool:
+    """Return True if either string is missing or blank (nothing real to compare)."""
+    return not (baseline and baseline.strip()) or not (candidate and candidate.strip())
+
+
+def _blend(comp: dict, judge_score: float | None, judge_reason: str,
+           method_with_judge: str) -> QualityScore:
+    """Combine heuristic components with an optional judge score.
+
+    Weights: 65 % judge (when available), 35 % heuristic mean.
+    Falls back to heuristics-only when judge_score is None.
+    """
+    heur_mean = sum(comp.values()) / len(comp) if comp else 0.0
+    if judge_score is not None:
+        js = max(0.0, min(1.0, float(judge_score)))
+        return QualityScore(round(0.65 * js + 0.35 * heur_mean, 4),
+                            method_with_judge, 0.9, comp, js, judge_reason)
+    return QualityScore(round(heur_mean, 4), "heuristics", 0.5, comp, None,
+                        judge_reason or "heuristic comparison only")
+
+
 def score_from_texts(baseline: str, candidate: str, f: Features, *,
                      judge_score: float | None = None,
                      judge_reason: str = "") -> QualityScore | None:
@@ -145,17 +166,13 @@ def score_from_texts(baseline: str, candidate: str, f: Features, *,
     with server-side deterministic heuristics. Same formula as ``judge()``; used by
     the browser→host ingest path so the heavy model calls run on the client while
     the deterministic scoring stays on the server."""
-    if not (baseline and baseline.strip()) or not (candidate and candidate.strip()):
+    if _not_real(baseline, candidate):
         return None
     comp = heuristics(baseline, candidate, f)
-    heur_mean = sum(comp.values()) / len(comp) if comp else 0.0
-    if judge_score is not None:
-        js = max(0.0, min(1.0, float(judge_score)))
-        retained = round(0.65 * js + 0.35 * heur_mean, 4)
-        return QualityScore(retained, "llm+heuristics (browser→host)", 0.9, comp,
-                            js, judge_reason or "browser→host judge")
-    return QualityScore(round(heur_mean, 4), "heuristics", 0.5, comp, None,
-                        "heuristic comparison only")
+    return _blend(comp, judge_score,
+                  judge_reason or ("browser→host judge" if judge_score is not None
+                                   else "heuristic comparison only"),
+                  "llm+heuristics (browser→host)")
 
 
 def judge(baseline: str, candidate: str, f: Features, *,
@@ -163,11 +180,10 @@ def judge(baseline: str, candidate: str, f: Features, *,
           use_llm: bool = True) -> QualityScore | None:
     """Measure candidate quality vs baseline. Returns None if there is nothing
     real to compare (missing output)."""
-    if not (baseline and baseline.strip()) or not (candidate and candidate.strip()):
+    if _not_real(baseline, candidate):
         return None
 
     comp = heuristics(baseline, candidate, f)
-    heur_mean = sum(comp.values()) / len(comp) if comp else 0.0
 
     jm = judge_model if judge_model is not None else (
         pick_judge(reg) if use_llm else None)
@@ -176,9 +192,9 @@ def judge(baseline: str, candidate: str, f: Features, *,
 
     if judged is not None:
         score, reason = judged
-        retained = round(0.65 * score + 0.35 * heur_mean, 4)
-        return QualityScore(retained, "llm+heuristics", 0.9, comp, score, reason)
+        return _blend(comp, score, reason, "llm+heuristics")
 
     # heuristics-only: still a real measurement of real outputs, lower confidence
-    return QualityScore(round(heur_mean, 4), "heuristics", 0.5, comp, None,
-                        "no judge model reachable; heuristic comparison only")
+    return _blend(comp, None,
+                  "no judge model reachable; heuristic comparison only",
+                  "llm+heuristics")

@@ -11,7 +11,7 @@ from __future__ import annotations
 import os
 import time
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -164,7 +164,7 @@ def simulate(req: SimulateRequest):
 
 
 @app.get("/traffic")
-def traffic(n: int = 12, seed: int = 1):
+def traffic(n: int = Query(12, ge=1, le=500), seed: int = 1):
     """Synthetic requests for the browser→host measurement flow to execute on the
     host's Ollama (so the heavy model calls run client-side, not on this server)."""
     from .traffic import generate

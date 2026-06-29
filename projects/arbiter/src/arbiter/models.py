@@ -52,7 +52,7 @@ class RuleIn(BaseModel):
 
 
 class SimulateRequest(BaseModel):
-    n: int = 60
+    n: int = Field(60, ge=1, le=2000)
     seed: int = 1
 
 
