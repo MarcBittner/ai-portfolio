@@ -24,6 +24,7 @@ import {
 
 import { cn } from "./ui";
 import { CommandPalette } from "./command-palette";
+import { AppLauncher } from "./app-launcher";
 import { NotificationsBell } from "./notifications-bell";
 import { AppearanceMenu } from "./appearance-menu";
 import { UserButton } from "@/app/clerk-shim";
@@ -173,6 +174,7 @@ export function AppShell({
           <kbd className="font-sans">⌘K</kbd>
         </button>
         <div className="ml-auto flex items-center gap-2">
+          <AppLauncher />
           <NotificationsBell />
           <AppearanceMenu />
           <UserButton afterSignOutUrl="/" />
