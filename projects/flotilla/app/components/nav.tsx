@@ -6,6 +6,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { SignedIn, SignedOut, SignInButton, UserButton } from "../clerk-shim";
 import { cn } from "./ui";
 import { AskAiBar } from "./AskAI";
+import { AppLauncher } from "./app-launcher";
 import {
   DEFAULT_NAV_LAYOUT,
   NAV_LAYOUTS,
@@ -285,7 +286,7 @@ function Logo({ className }: { className?: string }) {
         className,
       )}
     >
-      i<span className="text-[--color-accent]">·</span>dash
+      flo<span className="text-[--color-accent]">·</span>tilla
     </Link>
   );
 }
@@ -295,6 +296,14 @@ function Logo({ className }: { className?: string }) {
 function NavControls({ className }: { className?: string }) {
   return (
     <div className={cn("flex items-center gap-2", className)}>
+      <Link
+        href="/app/about"
+        className="hidden rounded-md px-2 py-1 text-sm text-[--color-muted] transition-colors hover:text-[--color-ink] sm:inline-block"
+      >
+        About
+      </Link>
+      {/* Shared portfolio launcher — the "← back to portfolio" affordance. */}
+      <AppLauncher />
       <SettingsMenu />
       <SignedIn>
         <UserButton />
