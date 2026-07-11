@@ -1,0 +1,17 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "crons": [
+    {
+      "path": "/api/observability/poll",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/monitoring/run",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/monitoring/escalate",
+      "schedule": "*/5 * * * *"
+    }
+  ]
+}

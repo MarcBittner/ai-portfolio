@@ -1,0 +1,507 @@
+@import "tailwindcss";
+
+/* Tailwind v4 CSS-first theme (no tailwind.config.js): tokens live here.
+   Dark is the default (the @theme block); `html.light` overrides it. Accent
+   palette is swapped via `html[data-accent=…]`, and the background image can be
+   turned off via `html.no-bg` — all driven off CSS custom properties so every
+   Tailwind utility (`bg-[--color-accent]`, `.glass`, …) flips coherently. */
+@theme {
+  --color-bg: oklch(0.16 0.012 264);
+  /* Dark surface is intentionally LIGHTER than the page (bg 0.16 → surface 0.27)
+     so `.glass` panels read as elevated cards, not a black void. The panel is
+     assembled in three layers so appearance prefs drive it live:
+       --surface-solid : the opaque neutral base (flips per theme).
+       --surface-tinted: base washed with a little accent → the whole UI shifts
+                          hue when you change accent (subtle, ~10%).
+       --glass-alpha   : translucency, driven by the transparency slider
+                          (0.35 see-through → 1 solid). Set inline on <html> by
+                          the slider / bootstrap; falls back to this default.
+     --color-surface is the tinted base at the current alpha, so every
+     `bg-[--color-surface]` utility and `.glass` panel flips coherently. */
+  --surface-solid: oklch(0.27 0.016 264);
+  --surface-tinted: color-mix(in oklch, var(--surface-solid), var(--color-accent) 10%);
+  --glass-alpha: 0.62;
+  /* Base backdrop blur for `.glass`, driven by the appearance-menu blur slider
+     (0px → 24px). This is the operator-set FLOOR; the transparency slider then
+     drives .glass backdrop-filter DIRECTLY (independent of transparency) so the
+     slider is obviously responsive: 0 = crisp, high = heavy frost. Set inline on
+     <html> by the slider / bootstrap; falls back to this default. */
+  --glass-blur: 12px;
+  --color-surface: color-mix(in oklch, var(--surface-tinted) calc(var(--glass-alpha) * 100%), transparent);
+  --color-line: oklch(0.42 0.014 264);
+  --color-ink: oklch(0.95 0.006 90);
+  --color-muted: oklch(0.72 0.015 264);
+  --color-accent: oklch(0.72 0.13 250);
+  --color-accent-ink: oklch(0.16 0.012 264);
+  --color-ok: oklch(0.72 0.15 155);
+  --color-warn: oklch(0.78 0.14 80);
+  --color-bad: oklch(0.68 0.18 20);
+  --radius: 0.7rem;
+  /* Elevation the .glass panel uses at rest so cards separate from the page. */
+  --glass-shadow: 0 1px 0 0 color-mix(in oklch, var(--color-ink) 8%, transparent) inset,
+    0 10px 30px -20px rgba(0, 0, 0, 0.7);
+}
+
+/* Light theme — toggled by the `html.light` class (set by the no-flash
+   bootstrap in layout.tsx and the nav toggle). Overrides every --color-*
+   token the Tailwind utilities and .glass panel read, so all pages flip. */
+html.light {
+  --color-bg: oklch(0.97 0.006 264);
+  /* Only the neutral base flips; --surface-tinted / --color-surface recompute
+     from it (and from --glass-alpha), so the accent wash + slider still apply. */
+  --surface-solid: oklch(1 0 0);
+  --color-line: oklch(0.84 0.01 264);
+  --color-ink: oklch(0.26 0.012 264);
+  --color-muted: oklch(0.48 0.018 264);
+  --color-accent: oklch(0.5 0.13 250);
+  --color-accent-ink: oklch(0.985 0.004 90);
+  --color-ok: oklch(0.58 0.15 155);
+  --color-warn: oklch(0.62 0.14 75);
+  --color-bad: oklch(0.56 0.2 22);
+  --glass-shadow: 0 1px 0 0 color-mix(in oklch, #fff 60%, transparent) inset,
+    0 10px 30px -22px rgba(0, 0, 0, 0.35);
+}
+
+/* --- Accent palettes -----------------------------------------------------
+   Selectable via the nav settings menu, persisted to localStorage and applied
+   as `data-accent` on <html> before paint. Only the accent changes; the neutral
+   surfaces/ink stay put so contrast is preserved. The accent drives buttons,
+   nav underline/active pill, links, focus rings, pills/badges, table hover,
+   the .glass border + panel wash, text selection and scrollbar — so switching
+   is unmistakable in both themes. Default (indigo) is the @theme value.
+
+   DARK: accents sit high (L≈0.7–0.8) so they read as text on dark surfaces and
+   the shared dark --color-accent-ink stays legible on solid accent fills.
+   LIGHT: accents sit lower (L≈0.5–0.55) so accent-as-text stays legible on the
+   near-white surface; the shared light --color-accent-ink covers solid fills. */
+html[data-accent="blue"]   { --color-accent: oklch(0.72 0.15 245); }
+html[data-accent="teal"]   { --color-accent: oklch(0.78 0.12 195); }
+html[data-accent="green"]  { --color-accent: oklch(0.78 0.15 150); }
+html[data-accent="amber"]  { --color-accent: oklch(0.80 0.15 74); }
+html[data-accent="orange"] { --color-accent: oklch(0.74 0.16 46); }
+html[data-accent="rose"]   { --color-accent: oklch(0.70 0.17 15); }
+html[data-accent="violet"] { --color-accent: oklch(0.70 0.16 300); }
+html[data-accent="purple"] { --color-accent: oklch(0.68 0.17 322); }
+html[data-accent="pink"]   { --color-accent: oklch(0.73 0.16 350); }
+
+html.light[data-accent="blue"]   { --color-accent: oklch(0.50 0.16 245); }
+html.light[data-accent="teal"]   { --color-accent: oklch(0.50 0.10 200); }
+html.light[data-accent="green"]  { --color-accent: oklch(0.50 0.13 150); }
+html.light[data-accent="amber"]  { --color-accent: oklch(0.52 0.12 68); }
+html.light[data-accent="orange"] { --color-accent: oklch(0.54 0.16 46); }
+html.light[data-accent="rose"]   { --color-accent: oklch(0.52 0.19 18); }
+html.light[data-accent="violet"] { --color-accent: oklch(0.52 0.17 300); }
+html.light[data-accent="purple"] { --color-accent: oklch(0.50 0.17 322); }
+html.light[data-accent="pink"]   { --color-accent: oklch(0.53 0.17 350); }
+
+html {
+  color-scheme: dark;
+}
+html.light {
+  color-scheme: light;
+}
+
+html,
+body {
+  height: 100%;
+}
+body {
+  background-color: var(--color-bg);
+  color: var(--color-ink);
+  font-family:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+/* Background lives on a fixed-position pseudo-element, NOT on `body` with
+   `background-attachment: fixed`. Chrome composites a fixed-attachment
+   background separately, so `.glass` `backdrop-filter: blur()` has nothing to
+   sample and the blur slider looks dead. A `position: fixed` painted layer
+   (z-index:-1, behind all content) is viewport-pinned exactly like the old
+   fixed attachment, but IS a real painted layer the backdrop-filter can blur. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  /* Photo layer uses image-set() so the browser negotiates AVIF → WebP → JPG:
+     AVIF is ~55–69% smaller than the baseline JPG (bg-dark 61→19KB, bg-light
+     108→48KB), cutting a first-paint resource. Older engines that don't grok
+     image-set fall through to the plain `url()` on the line below. */
+  background-image:
+    radial-gradient(900px 600px at 12% -10%, oklch(0.6 0.16 264 / 0.35), transparent 65%),
+    radial-gradient(800px 600px at 100% 110%, oklch(0.55 0.15 300 / 0.25), transparent 65%),
+    linear-gradient(oklch(0.16 0.012 264 / 0.40), oklch(0.16 0.012 264 / 0.55)),
+    url("/bg-dark.jpg");
+  background-image:
+    radial-gradient(900px 600px at 12% -10%, oklch(0.6 0.16 264 / 0.35), transparent 65%),
+    radial-gradient(800px 600px at 100% 110%, oklch(0.55 0.15 300 / 0.25), transparent 65%),
+    linear-gradient(oklch(0.16 0.012 264 / 0.40), oklch(0.16 0.012 264 / 0.55)),
+    image-set(
+      url("/bg-dark.avif") type("image/avif"),
+      url("/bg-dark.webp") type("image/webp"),
+      url("/bg-dark.jpg") type("image/jpeg")
+    );
+  background-size: auto, auto, cover, cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+html.light body::before {
+  background-image:
+    radial-gradient(900px 600px at 12% -10%, oklch(0.7 0.13 264 / 0.16), transparent 65%),
+    radial-gradient(800px 600px at 100% 110%, oklch(0.7 0.1 300 / 0.12), transparent 65%),
+    linear-gradient(oklch(0.97 0.006 264 / 0.55), oklch(0.97 0.006 264 / 0.68)),
+    url("/bg-light.jpg");
+  background-image:
+    radial-gradient(900px 600px at 12% -10%, oklch(0.7 0.13 264 / 0.16), transparent 65%),
+    radial-gradient(800px 600px at 100% 110%, oklch(0.7 0.1 300 / 0.12), transparent 65%),
+    linear-gradient(oklch(0.97 0.006 264 / 0.55), oklch(0.97 0.006 264 / 0.68)),
+    image-set(
+      url("/bg-light.avif") type("image/avif"),
+      url("/bg-light.webp") type("image/webp"),
+      url("/bg-light.jpg") type("image/jpeg")
+    );
+}
+
+/* --- Background OFF (solid theme) ----------------------------------------
+   Drops the photo but keeps faint ambient gradients for depth. Panels get more
+   opaque so they still read as elevated cards over the flat page. */
+html.no-bg body::before {
+  background-image:
+    radial-gradient(900px 600px at 12% -10%, oklch(0.6 0.16 264 / 0.18), transparent 65%),
+    radial-gradient(800px 600px at 100% 110%, oklch(0.55 0.15 300 / 0.14), transparent 65%);
+}
+html.no-bg.light body::before {
+  background-image:
+    radial-gradient(900px 600px at 12% -10%, oklch(0.7 0.13 264 / 0.10), transparent 65%),
+    radial-gradient(800px 600px at 100% 110%, oklch(0.7 0.1 300 / 0.08), transparent 65%);
+}
+/* With the photo gone there's less to see through, so default panels to nearly
+   opaque by raising --glass-alpha. The transparency slider sets --glass-alpha
+   inline on <html>, which (as an inline style) wins over this rule — so a user
+   who has explicitly chosen a translucency keeps it even in solid mode. */
+html.no-bg { --glass-alpha: 0.92; }
+
+/* frosted panel — elevated card that shows the background through the blur.
+   The border carries a little accent at rest (so every panel edge shifts hue
+   with the accent), and the blur/saturate is pushed a touch harder so text
+   stays readable even at the low end of the transparency slider. */
+.glass {
+  background: var(--color-surface);
+  border: 1px solid color-mix(in oklch, var(--color-accent) 18%, var(--color-line));
+  border-radius: var(--radius);
+  /* Two INDEPENDENT controls (backdrop-filter only blurs what's behind the
+     panel, never the foreground text, so they don't need coupling):
+       --glass-blur : blur slider, 0 = crisp → 24 = heavy frost (drives blur directly).
+       --glass-alpha: transparency slider → panel surface opacity (--color-surface).
+     Direct mapping makes the blur slider obviously responsive across its range. */
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
+  box-shadow: var(--glass-shadow);
+}
+.flagdot {
+  display: inline-block;
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 999px;
+}
+
+/* Transparency slider (nav appearance menu). `accent-color` tints the filled
+   track + thumb so the control itself reflects the current accent, and the
+   track reads clearly on the glass panel in both themes. */
+.flotilla-range {
+  accent-color: var(--color-accent);
+  height: 1.1rem;
+  cursor: pointer;
+  background: transparent;
+}
+.flotilla-range:focus-visible {
+  outline: none;
+}
+
+/* fancy polish — consistent micro-interactions. Short, ease-out timings (the
+   Linear/Vercel/Stripe register): hovers/presses land in ~150-220ms so the UI
+   feels instant, larger surfaces settle a touch slower (~300ms). */
+* { transition: background-color .2s cubic-bezier(.2,0,0,1), border-color .2s cubic-bezier(.2,0,0,1), box-shadow .2s cubic-bezier(.2,0,0,1), color .18s ease-out; }
+/* backdrop-filter is here so dragging the blur / transparency sliders animates
+   the frost smoothly instead of snapping. */
+.glass { transition: transform .3s cubic-bezier(.22,1,.36,1), border-color .22s ease-out, box-shadow .3s ease-out, backdrop-filter .3s ease-out, -webkit-backdrop-filter .3s ease-out; }
+.glass:hover { transform: translateY(-2px);
+  border-color: color-mix(in oklch, var(--color-accent) 60%, var(--color-line));
+  box-shadow: var(--glass-shadow), 0 18px 50px -24px rgba(0,0,0,.6), 0 0 0 1px color-mix(in oklch, var(--color-accent) 34%, transparent); }
+:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in oklch, var(--color-accent) 45%, transparent); }
+::selection { background: color-mix(in oklch, var(--color-accent) 40%, transparent); }
+html { scrollbar-width: thin; scrollbar-color: var(--color-line) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--color-line); border-radius: 999px; border: 2px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-accent); background-clip: content-box; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } .glass:hover { transform: none; } }
+
+/* --- nav underline indicator --------------------------------------------- */
+.nav-underline { position: relative; }
+.nav-underline::after {
+  content: ""; position: absolute; left: 0.6rem; right: 0.6rem; bottom: -0.85rem; height: 2.5px;
+  border-radius: 999px; background: var(--color-accent);
+  box-shadow: 0 0 8px -1px color-mix(in oklch, var(--color-accent) 60%, transparent);
+  transform: scaleX(0); transform-origin: center; opacity: 0;
+  transition: transform .25s ease, opacity .25s ease;
+}
+.nav-underline:hover::after { transform: scaleX(0.5); opacity: .55; }
+.nav-underline[data-active="true"]::after { transform: scaleX(1); opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .nav-underline::after { transition: none; } }
+
+/* fancy-fx — sheen sweep (KEEP). A single specular highlight glides across the
+   panel on hover, so touching a card feels like light catching glass. Eased with
+   a soft ease-out and held just off-screen at rest so it reads as intentional
+   sheen, not a loading shimmer. Gated on reduced-motion below. */
+.glass{ position:relative; overflow:hidden; }
+.glass::after{ content:""; position:absolute; inset:0; border-radius:inherit; pointer-events:none;
+  background:linear-gradient(115deg,transparent 35%,color-mix(in oklch,var(--color-ink) 7%,transparent) 50%,transparent 65%);
+  transform:translateX(-120%); transition:transform 1s cubic-bezier(.22,1,.36,1); }
+.glass:hover::after{ transform:translateX(120%); }
+@media (prefers-reduced-motion:reduce){ .glass::after{ display:none } }
+
+/* --- entrance motion + micro-interactions --------------------------------
+   Tasteful, quiet enter animations. Wrapped in `no-preference` so they are
+   entirely absent for anyone who asks the OS to reduce motion — the required
+   off switch, on top of the operator-adjustable blur/transparency controls. */
+@media (prefers-reduced-motion: no-preference) {
+  /* <main> is deliberately NOT animated. ANY keyframe animation on a `.glass`
+     ANCESTOR — even opacity-only with `fill: both`, and even after it finishes —
+     permanently promotes that ancestor to an isolating compositing layer (a
+     "backdrop root"), which severs every descendant `.glass` panel from the page
+     background and KILLS its backdrop-filter blur (the blur slider looks dead).
+     A prior fix removed only the `transform` from this animation and kept the
+     opacity fade, believing opacity-only was safe — it is NOT. Verified with a
+     real-Chromium render: an animated <main> leaves ~34× more high-frequency
+     energy behind the panel (i.e. zero blur) a full 900ms after a 340ms fade.
+     So there is no <main>/route entrance animation. Row + menu enters below are
+     safe (table rows aren't `.glass`; the popover's own minor blur is an
+     acceptable trade for the open easing). Do NOT reintroduce an animation on
+     <main> or any element that wraps `.glass` panels. */
+  @keyframes flotilla-row  { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  @keyframes flotilla-pop  { from { opacity: 0; transform: translateY(-6px) scale(.98); } to { opacity: 1; transform: none; } }
+
+  /* List/row enter: rows carry stable keys, so this fires when a row first
+     mounts (page load, or a genuinely new row) — never replays on refresh. */
+  tbody tr { animation: flotilla-row .3s ease-out both; }
+  /* Menu open easing: the appearance popover eases down from its trigger. */
+  .flotilla-menu { animation: flotilla-pop .16s cubic-bezier(.22,1,.36,1) both; transform-origin: top right; }
+}
+
+/* Press feedback for nav tabs — a hair of give on click, consistent with the
+   button press in ui.tsx, so every clickable target confirms the tap. */
+.nav-underline:active { transform: translateY(0.5px) scale(.985); }
+@media (prefers-reduced-motion: reduce) { .nav-underline:active { transform: none; } }
+
+/* Top nav tabs scroll horizontally on narrow viewports without ever wrapping to
+   a second line. A THIN scrollbar (shown only when the tabs actually overflow,
+   via overflow-x:auto) is the affordance that they're scrollable — fully hiding
+   it (the old behavior) made overflowing tabs silently unreachable. */
+.flotilla-navscroll { scrollbar-width: thin; scrollbar-color: var(--color-line) transparent; }
+.flotilla-navscroll::-webkit-scrollbar { height: 6px; }
+.flotilla-navscroll::-webkit-scrollbar-thumb { background: var(--color-line); border-radius: 999px; }
+.flotilla-navscroll::-webkit-scrollbar-thumb:hover { background: var(--color-accent); }
+
+/* --- sidebar nav layout --------------------------------------------------
+   The "sidebar" nav layout (html[data-nav="sidebar"]) renders a FIXED vertical
+   rail on the left on wide viewports (≥ lg / 1024px). Each page's <main> centers
+   content in a max-width container, so we pad the whole page over by the rail
+   width (14rem = w-56) to keep content clear of the rail. Below lg the rail
+   collapses to a hamburger top bar (no fixed rail), so no offset is applied.
+   Other layouts (horizontal/grouped/overflow) leave <main> untouched. */
+@media (min-width: 1024px) {
+  html[data-nav="sidebar"] body {
+    padding-left: 14rem;
+    /* Animate the content offset when the rail collapses/expands (≥ lg). The
+       aside width animates in lockstep via .flotilla-sidebar-rail below, so the two
+       move together. Reduced-motion disables both (rule at the end of file). */
+    transition: padding-left .28s cubic-bezier(.22, 1, .36, 1);
+  }
+  /* Collapsed sidebar (icon-only mini rail): the content offset shrinks from the
+     full 14rem rail width to the mini-rail width (3.5rem = w-14). The rail width
+     itself is driven on .flotilla-sidebar-rail so they stay aligned. */
+  html[data-nav="sidebar"][data-nav-collapsed="1"] body {
+    padding-left: 3.5rem;
+  }
+}
+
+/* --- sidebar layout: header title + widened content (Change 1 + 2) --------
+   In the sidebar layout ONLY, the current section's title is promoted into the
+   content-area top bar (rendered in nav.tsx, left of NavControls, above the
+   border-b separator). Each page still renders its own primary section <h1>,
+   tagged `.flotilla-page-title`; suppress it here so the title never shows twice.
+   The nav header <h1> becomes the sole visible primary heading. Other layouts
+   (horizontal/grouped/overflow) leave the page <h1> visible and add no header
+   title, so this rule is scoped to html[data-nav="sidebar"]. */
+html[data-nav="sidebar"] .flotilla-page-title {
+  display: none;
+}
+/* Several suppressed titles are a DIRECT child of a `justify-between` header row
+   shared with an action button (Launch instance, New template, filters, …).
+   Removing the title would leave the button as the lone flex child, which
+   `justify-between` pins to the LEFT. These rows carry `.flotilla-page-head`; switch
+   them to end-justify so the action button stays right-aligned (and a title-only
+   row simply collapses to empty). Rows where the title sits inside a <div> with a
+   subtitle keep that <div> on the left, so they don't get this class and stay as
+   `justify-between`. */
+html[data-nav="sidebar"] .flotilla-page-head {
+  justify-content: flex-end;
+}
+
+/* Change 2 — widen the viewing area in the sidebar layout. Pages cap content at
+   max-w-6xl (72rem) centered; next to the rail that wastes horizontal space. In
+   the sidebar layout, lift the cap to 88rem — wider than the default 72rem so
+   wide tables/metrics use more of the space, but pulled back from a full 100rem
+   so very long text lines stay readable. `mx-auto` re-centers within the padded
+   area. The body padding-left already shrinks when the rail collapses (14rem →
+   3.5rem), so the content gets a bit wider collapsed for free. Scoped to the
+   sidebar layout — other layouts keep their max-w-6xl centering. */
+html[data-nav="sidebar"] main {
+  max-width: 88rem;
+}
+
+/* --- collapsible sidebar rail (icon mini-rail) ---------------------------
+   The desktop rail (.flotilla-sidebar-rail, ≥ lg) animates its width between the
+   full 14rem rail and the 3.5rem icon-only mini rail. When collapsed, labels are
+   hidden and only the per-tab icons remain (still highlighting the active item);
+   hovering a collapsed item surfaces a title/tooltip with the label. Scoped to
+   ≥ lg because the mini rail is a desktop-only affordance — the mobile drawer
+   (< lg) is unaffected. */
+@media (min-width: 1024px) {
+  .flotilla-sidebar-rail {
+    /* Match the .glass panels exactly: the tinted surface at the current
+       transparency (--color-surface) + the same slider-driven blur/saturate, so
+       the rail reads as the same translucent material as the cards and tracks the
+       appearance transparency/blur sliders (was an ad-hoc surface/60 + fixed blur). */
+    background: var(--color-surface);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
+    backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
+    transition: width .28s cubic-bezier(.22, 1, .36, 1);
+  }
+  /* Collapsed: shrink the rail to icon width and hide the text labels. */
+  html[data-nav-collapsed="1"] .flotilla-sidebar-rail {
+    width: 3.5rem;
+  }
+  html[data-nav-collapsed="1"] .flotilla-sidebar-rail .flotilla-nav-label {
+    display: none;
+  }
+  /* In the collapsed mini rail, center each item's icon (no room for a label). */
+  html[data-nav-collapsed="1"] .flotilla-sidebar-rail .flotilla-nav-link {
+    justify-content: center;
+    padding-left: 0;
+    padding-right: 0;
+  }
+  /* Styled label tooltip on hover/focus of a collapsed item — layers on top of
+     the bare `title` attribute (which is the accessible minimum). Positioned just
+     to the right of the mini rail; non-interactive so it never blocks clicks. */
+  html[data-nav-collapsed="1"] .flotilla-sidebar-rail .flotilla-nav-link {
+    position: relative;
+  }
+  html[data-nav-collapsed="1"] .flotilla-sidebar-rail .flotilla-nav-link::after {
+    content: attr(data-label);
+    position: absolute;
+    left: calc(100% + 0.5rem);
+    top: 50%;
+    transform: translateY(-50%);
+    white-space: nowrap;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.4rem;
+    font-size: 0.75rem;
+    background: var(--surface-solid);
+    color: var(--color-ink);
+    border: 1px solid var(--color-line);
+    box-shadow: 0 6px 20px -12px rgba(0, 0, 0, 0.7);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 50;
+    transition: opacity .15s ease-out;
+  }
+  html[data-nav-collapsed="1"] .flotilla-sidebar-rail .flotilla-nav-link:hover::after,
+  html[data-nav-collapsed="1"] .flotilla-sidebar-rail .flotilla-nav-link:focus-visible::after {
+    opacity: 1;
+  }
+}
+
+/* --- sidebar mobile drawer: off-canvas PUSH (not overlay) ----------------
+   On narrow viewports (< lg) the sidebar layout opens a drawer pinned to the
+   left edge. Instead of covering the content with a modal backdrop, we PUSH the
+   in-flow content to the right by the drawer width (16rem = w-64) so the drawer
+   is revealed at the left rather than sitting on top. This works cleanly because
+   BOTH the drawer panel and the page background (`body::before`) are
+   position:fixed — they stay pinned while only the in-flow `body` content
+   translates. Fully reversible: removing data-drawer slides it back.
+   Desktop (≥ lg) uses the fixed rail + padding above and never opens the drawer,
+   so this offset is intentionally unscoped to width (the drawer only exists <lg). */
+/* Push the in-flow content right by the drawer width via PADDING, not transform.
+   A `transform` on <body> establishes a containing block for its position:fixed
+   descendants, which would drag the "pinned" fixed drawer along with the content
+   (leaving a blank gap on the left). padding-left keeps the fixed drawer at
+   left:0 while only the in-flow content scoots — the same approach the desktop
+   rail already uses. Scoped < lg (the drawer only exists there) so it can never
+   fight the desktop `padding-left: 14rem`. */
+@media (max-width: 1023.98px) {
+  /* Transition on the base sidebar body so it animates open AND closed. */
+  html[data-nav="sidebar"] body {
+    transition: padding-left .28s cubic-bezier(.22, 1, .36, 1);
+  }
+  html[data-nav="sidebar"][data-drawer="open"] body {
+    /* min() keeps the push aligned to the panel edge on <320px (drawer = 80vw). */
+    padding-left: min(16rem, 80vw);
+  }
+}
+/* The drawer panel carries both `.glass` (which sets position:relative) and the
+   Tailwind `fixed` utility; `.glass` wins by source order, so the panel was
+   in-flow and the body padding pushed IT too (blank gap on the left). Force it
+   truly viewport-fixed at left:0 so only the in-flow content scoots past it. */
+html[data-nav="sidebar"] .flotilla-drawer-panel {
+  position: fixed;
+  left: 0;
+  top: 0;
+}
+/* Lock body scroll while the drawer is open so the pushed content doesn't jump. */
+html[data-nav="sidebar"][data-drawer="open"] {
+  overflow: hidden;
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-nav="sidebar"] body,
+  html[data-nav="sidebar"][data-drawer="open"] body {
+    transition: none;
+  }
+  /* Collapse/expand animates padding-left (body) + width (rail) + the tooltip
+     fade; all off for reduced-motion so the mini rail snaps instantly. */
+  .flotilla-sidebar-rail,
+  .flotilla-sidebar-rail .flotilla-nav-link::after {
+    transition: none;
+  }
+}
+
+/* --- sidebar drawer panel + scrim: fade / slide in -----------------------
+   The drawer panel eases in from the left (opacity + a small translateX) and the
+   light tap-to-close scrim fades in. Both fade out on close. Gated on
+   no-preference so reduced-motion users get an instant, motionless drawer. */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes flotilla-drawer-in { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: none; } }
+  @keyframes flotilla-scrim-in  { from { opacity: 0; } to { opacity: 1; } }
+  .flotilla-drawer-panel { animation: flotilla-drawer-in .26s cubic-bezier(.22, 1, .36, 1) both; }
+  .flotilla-drawer-scrim { animation: flotilla-scrim-in .26s ease-out both; }
+
+  /* Content fade-in on route load (sidebar layout). NOTE: <main> and any other
+     `.glass` ANCESTOR must NOT be keyframe-animated — doing so permanently
+     promotes it to a backdrop root and kills every descendant panel's
+     backdrop-filter blur (see the long note by @keyframes flotilla-row above,
+     Chromium-verified). So the "content enters" motion is carried by the sidebar
+     nav chrome itself — the fixed rail + the mobile top bar — which are
+     self-contained `.glass`/leaf elements (same accepted trade as `.flotilla-menu`),
+     never wrappers of the content panels. They fade + slide a hair on mount, so
+     each route load reads as a gentle entrance without touching panel blur. */
+  @keyframes flotilla-chrome-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+  .flotilla-sidebar-chrome { animation: flotilla-chrome-in .34s cubic-bezier(.22, 1, .36, 1) both; }
+}
+
+/* In-page "on this page" section jump-nav (e.g. /app/config). A jump link lands
+   the section a little below the sticky strip instead of flush under it, and an
+   anchor jump animates smoothly (respecting reduced-motion). scroll-mt keeps the
+   heading clear of the sticky section strip when jumped to. */
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+.flotilla-section-anchor { scroll-margin-top: 5.5rem; }
