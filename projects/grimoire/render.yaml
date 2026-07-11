@@ -1,0 +1,58 @@
+# Render Blueprint — Grimoire web service (Docker), hosted on Render. Free tier
+# sleeps after ~15 min idle, cold-starts in ~30-60s. Secrets are sync:false (set
+# in the dashboard / via API), never stored here. See DEPLOY.md.
+services:
+  - type: web
+    name: grimoire
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      # --- non-secret config ---
+      - key: MONGODB_DB
+        value: grimoire
+      - key: SEED_SUPER_ADMINS
+        value: admin@example.com
+      # Blank = open self-signup (any verified email). Set a domain to restrict.
+      - key: SIGNUP_ALLOWED_DOMAIN
+        value: ""
+      - key: DOCS_CONTENT_ROOT
+        value: content
+      # --- secrets (set securely; not in the blueprint) ---
+      - key: MONGODB_URI
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: GITHUB_TOKEN # enables app-authored commits via the GitHub API store
+        sync: false
+      - key: GITHUB_WEBHOOK_SECRET
+        sync: false
+      - key: CLERK_SECRET_KEY
+        sync: false
+      - key: CLERK_JWT_ISSUER_DOMAIN
+        sync: false
+      - key: VOYAGE_API_KEY # optional; embeddings upgrade (else local hash)
+        sync: false
+      - key: COLLAB_WS_URL # dedicated collab WS service (Phase: co-editing)
+        sync: false
+      # NEXT_PUBLIC_* must also be set as Docker BUILD args (build-arg) so they're
+      # inlined into the client bundle — Render maps matching env vars to build args.
+      - key: NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+        sync: false
+
+  # Dedicated collab WS service (live multi-cursor co-editing). Stateful; isolated
+  # behind COLLAB_WS_URL so the main app stays stateless. See services/collab.
+  - type: web
+    name: grimoire-collab
+    runtime: docker
+    plan: free
+    dockerfilePath: ./services/collab/Dockerfile
+    dockerContext: ./services/collab
+    healthCheckPath: /healthz
+    envVars:
+      - key: MONGODB_URI
+        sync: false
+      - key: COLLAB_TOKEN
+        sync: false

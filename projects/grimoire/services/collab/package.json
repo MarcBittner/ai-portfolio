@@ -1,0 +1,16 @@
+{
+  "name": "grimoire-collab",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Dedicated WebSocket service for live multi-cursor co-editing (Yjs), persisted to MongoDB. Runs as its own service behind COLLAB_WS_URL so the main app stays stateless/Vercel-portable.",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "yjs": "^13.6.0",
+    "y-websocket": "^2.0.0",
+    "y-mongodb-provider": "^0.2.0",
+    "ws": "^8.18.0"
+  }
+}

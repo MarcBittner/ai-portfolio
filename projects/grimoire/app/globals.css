@@ -1,0 +1,236 @@
+@import "tailwindcss";
+
+/* Tailwind v4 CSS-first theme (no tailwind.config.js): tokens live here.
+   Dark is the default (the @theme block); `html.light` overrides it. The accent
+   palette is swapped via `html[data-accent=…]`, the background image can be
+   turned off via `html.no-bg`, and panel translucency/blur are driven by
+   `--glass-alpha` / `--glass-blur` — all off CSS custom properties so every
+   Tailwind utility (`bg-[--color-surface]`, `.glass`, `.pane`, `.sheet`) flips
+   coherently. */
+@theme {
+  --color-bg: oklch(0.16 0.012 264);
+  /* The translucent surfaces are assembled in layers so appearance prefs drive
+     them live:
+       --surface-solid : the opaque neutral base (flips per theme).
+       --surface-tinted: base washed with a little accent → the whole UI shifts
+                          hue when you change accent (subtle, ~10%).
+       --glass-alpha   : translucency, driven by the transparency slider
+                          (0.35 see-through → 1 solid). Set inline on <html> by
+                          the slider / bootstrap; falls back to this default.
+     --color-surface is the tinted base at the current alpha; --color-panel is
+     the reading sheet — deliberately more opaque (alpha lifted ~0.28 toward
+     solid) so long-form text keeps solid contrast over the background image.
+     Every `bg-[--color-surface]` utility, `.glass`, `.pane` and `.sheet` panel
+     recompute from these, so changing accent / transparency flips them all. */
+  --surface-solid: oklch(0.25 0.014 264);
+  --surface-tinted: color-mix(in oklch, var(--surface-solid), var(--color-accent) 10%);
+  --glass-alpha: 0.62;
+  /* Base backdrop blur for `.glass` / `.pane` / `.sheet`, driven by the
+     appearance-menu blur slider (0px → 24px). Set inline on <html> by the
+     slider / bootstrap; falls back to this default. */
+  --glass-blur: 8px;
+  --color-surface: color-mix(in oklch, var(--surface-tinted) calc(var(--glass-alpha) * 100%), transparent);
+  --color-panel: color-mix(in oklch, var(--surface-tinted) calc(min(1, var(--glass-alpha) + 0.28) * 100%), transparent);
+  --color-line: oklch(0.34 0.012 264 / 0.7);
+  --color-ink: oklch(0.95 0.006 90);
+  --color-muted: oklch(0.7 0.015 264);
+  --color-accent: oklch(0.7 0.13 250);
+  --color-accent-ink: oklch(0.16 0.012 264);
+  --color-ok: oklch(0.72 0.15 155);
+  --color-warn: oklch(0.78 0.14 80);
+  --color-bad: oklch(0.68 0.18 20);
+  --radius: 0.7rem;
+}
+
+/* Light theme — toggled by the `html.light` class (set by the no-flash
+   bootstrap in layout.tsx and the nav toggle). Overrides every --color-*
+   token the Tailwind utilities and .glass panel read, so all pages flip
+   correctly. Dark (the @theme block above) stays the default. Only the neutral
+   base flips; --surface-tinted / --color-surface / --color-panel recompute from
+   it (and from --glass-alpha), so the accent wash + sliders still apply. */
+html.light {
+  --color-bg: oklch(0.94 0.008 264);
+  /* Soft near-white (not stark white) so the reading sheet doesn't clash with
+     the light background it floats on; a shadow separates it instead. */
+  --surface-solid: oklch(0.99 0.004 264);
+  --color-line: oklch(0.84 0.01 264 / 0.8);
+  --color-ink: oklch(0.26 0.012 264);
+  --color-muted: oklch(0.48 0.018 264);
+  --color-accent: oklch(0.5 0.13 250);
+  --color-accent-ink: oklch(0.985 0.004 90);
+  --color-ok: oklch(0.58 0.15 155);
+  --color-warn: oklch(0.62 0.14 75);
+  --color-bad: oklch(0.56 0.2 22);
+}
+
+/* --- Accent palettes -----------------------------------------------------
+   Selectable via the appearance menu, persisted to localStorage and applied as
+   `data-accent` on <html> before paint. Only the accent changes; the neutral
+   surfaces/ink stay put so contrast is preserved. The accent drives buttons,
+   nav active pill, links, focus rings, the .glass/.pane/.sheet wash + border,
+   text selection and scrollbar — so switching is unmistakable in both themes.
+   Default (indigo) is the @theme value.
+
+   DARK: accents sit high (L≈0.7–0.8) so they read as text on dark surfaces and
+   the shared dark --color-accent-ink stays legible on solid accent fills.
+   LIGHT: accents sit lower (L≈0.5–0.55) so accent-as-text stays legible on the
+   near-white surface; the shared light --color-accent-ink covers solid fills. */
+html[data-accent="blue"]   { --color-accent: oklch(0.72 0.15 245); }
+html[data-accent="teal"]   { --color-accent: oklch(0.78 0.12 195); }
+html[data-accent="green"]  { --color-accent: oklch(0.78 0.15 150); }
+html[data-accent="amber"]  { --color-accent: oklch(0.80 0.15 74); }
+html[data-accent="orange"] { --color-accent: oklch(0.74 0.16 46); }
+html[data-accent="rose"]   { --color-accent: oklch(0.70 0.17 15); }
+html[data-accent="violet"] { --color-accent: oklch(0.70 0.16 300); }
+html[data-accent="purple"] { --color-accent: oklch(0.68 0.17 322); }
+html[data-accent="pink"]   { --color-accent: oklch(0.73 0.16 350); }
+
+html.light[data-accent="blue"]   { --color-accent: oklch(0.50 0.16 245); }
+html.light[data-accent="teal"]   { --color-accent: oklch(0.50 0.10 200); }
+html.light[data-accent="green"]  { --color-accent: oklch(0.50 0.13 150); }
+html.light[data-accent="amber"]  { --color-accent: oklch(0.52 0.12 68); }
+html.light[data-accent="orange"] { --color-accent: oklch(0.54 0.16 46); }
+html.light[data-accent="rose"]   { --color-accent: oklch(0.52 0.19 18); }
+html.light[data-accent="violet"] { --color-accent: oklch(0.52 0.17 300); }
+html.light[data-accent="purple"] { --color-accent: oklch(0.50 0.17 322); }
+html.light[data-accent="pink"]   { --color-accent: oklch(0.53 0.17 350); }
+
+html {
+  color-scheme: dark;
+}
+html.light {
+  color-scheme: light;
+}
+
+html,
+body {
+  height: 100%;
+}
+body {
+  background-color: var(--color-bg);
+  color: var(--color-ink);
+  background-image:
+    radial-gradient(900px 600px at 12% -10%, oklch(0.6 0.16 264 / 0.35), transparent 65%),
+    radial-gradient(800px 600px at 100% 110%, oklch(0.55 0.15 300 / 0.25), transparent 65%),
+    linear-gradient(oklch(0.16 0.012 264 / 0.40), oklch(0.16 0.012 264 / 0.52)),
+    url("/bg-dark.jpg");
+  background-size: auto, auto, cover, cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  font-family:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+html.light body {
+  background-image:
+    radial-gradient(900px 600px at 12% -10%, oklch(0.7 0.13 264 / 0.16), transparent 65%),
+    radial-gradient(800px 600px at 100% 110%, oklch(0.7 0.1 300 / 0.12), transparent 65%),
+    linear-gradient(oklch(0.97 0.006 264 / 0.55), oklch(0.97 0.006 264 / 0.68)),
+    url("/bg-light.jpg");
+}
+
+/* --- Background OFF (solid theme) ----------------------------------------
+   Drops the photo but keeps faint ambient gradients for depth. Panels get more
+   opaque (below) so they still read as elevated cards over the flat page. */
+html.no-bg body {
+  background-image:
+    radial-gradient(900px 600px at 12% -10%, oklch(0.6 0.16 264 / 0.18), transparent 65%),
+    radial-gradient(800px 600px at 100% 110%, oklch(0.55 0.15 300 / 0.14), transparent 65%);
+}
+html.no-bg.light body {
+  background-image:
+    radial-gradient(900px 600px at 12% -10%, oklch(0.7 0.13 264 / 0.10), transparent 65%),
+    radial-gradient(800px 600px at 100% 110%, oklch(0.7 0.1 300 / 0.08), transparent 65%);
+}
+/* With the photo gone there's less to see through, so default panels to nearly
+   opaque by raising --glass-alpha. The transparency slider sets --glass-alpha
+   inline on <html>, which (as an inline style) wins over this rule — so a user
+   who has explicitly chosen a translucency keeps it even in solid mode. */
+html.no-bg { --glass-alpha: 0.92; }
+
+/* frosted panel. The border carries a little accent at rest (so every panel
+   edge shifts hue with the accent), and blur is driven by --glass-blur. */
+.glass {
+  background: var(--color-surface);
+  border: 1px solid color-mix(in oklch, var(--color-accent) 18%, var(--color-line));
+  border-radius: var(--radius);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.2);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.2);
+}
+/* Chrome panes (sidebar / top bar): translucent frosted backing so text stays
+   legible over the background image while it still shows through. Blur is a
+   touch heavier than plain .glass (chrome sits over more content), scaling off
+   the same slider-driven --glass-blur. */
+.pane {
+  background: var(--color-surface);
+  -webkit-backdrop-filter: blur(calc(var(--glass-blur) + 6px)) saturate(1.2);
+  backdrop-filter: blur(calc(var(--glass-blur) + 6px)) saturate(1.2);
+}
+/* Reading sheet — the floating content panel. More opaque than .pane for solid
+   long-form contrast (--color-panel), with a shadow so it reads as floating
+   over the background rather than clashing with it. */
+.sheet {
+  background: var(--color-panel);
+  border: 1px solid var(--color-line);
+  border-radius: 1rem;
+  -webkit-backdrop-filter: blur(calc(var(--glass-blur) + 8px)) saturate(1.2);
+  backdrop-filter: blur(calc(var(--glass-blur) + 8px)) saturate(1.2);
+  box-shadow: 0 10px 34px -12px rgb(0 0 0 / 0.35);
+}
+.flagdot {
+  display: inline-block;
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 999px;
+}
+
+/* fancy polish — consistent micro-interactions */
+* { transition: background-color .22s ease, border-color .22s ease, box-shadow .22s ease, color .2s ease; }
+.glass { transition: transform .3s ease, border-color .22s ease, box-shadow .3s ease; }
+.glass:hover { transform: translateY(-2px);
+  border-color: color-mix(in oklch, var(--color-accent) 26%, var(--color-line));
+  box-shadow: 0 18px 50px -24px rgba(0,0,0,.6), 0 0 0 1px color-mix(in oklch, var(--color-accent) 14%, transparent); }
+:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in oklch, var(--color-accent) 30%, transparent); }
+::selection { background: color-mix(in oklch, var(--color-accent) 40%, transparent); }
+html { scrollbar-width: thin; scrollbar-color: var(--color-line) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--color-line); border-radius: 999px; border: 2px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-accent); background-clip: content-box; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } .glass:hover { transform: none; } }
+
+/* Transparency / blur sliders (appearance menu). `accent-color` tints the
+   filled track + thumb so the control itself reflects the current accent. */
+.docs-range {
+  accent-color: var(--color-accent);
+  height: 1.1rem;
+  cursor: pointer;
+  background: transparent;
+}
+.docs-range:focus-visible { outline: none; }
+
+
+/* fancy-fx — sheen + animated accent */
+.glass{ position:relative; overflow:hidden; }
+.glass::after{ content:""; position:absolute; inset:0; border-radius:inherit; pointer-events:none;
+  background:linear-gradient(115deg,transparent 35%,color-mix(in oklch,var(--color-ink) 6%,transparent) 50%,transparent 65%);
+  transform:translateX(-115%); transition:transform .9s ease; }
+.glass:hover::after{ transform:translateX(115%); }
+@media (prefers-reduced-motion:reduce){ .glass::after{ display:none } }
+
+/* Rendered doc body (react-markdown output). Token-driven so it follows night/day. */
+.prose-doc { color: var(--color-ink); line-height: 1.7; }
+.prose-doc :is(h1, h2, h3) { scroll-margin-top: 4.5rem; }
+.prose-doc h1 { font-size: 1.8rem; font-weight: 600; letter-spacing: -0.01em; margin: 0 0 .6em; }
+.prose-doc h2 { font-size: 1.35rem; font-weight: 600; margin: 1.6em 0 .5em; padding-bottom: .25em; border-bottom: 1px solid var(--color-line); }
+.prose-doc h3 { font-size: 1.1rem; font-weight: 600; margin: 1.3em 0 .4em; }
+.prose-doc p, .prose-doc ul, .prose-doc ol, .prose-doc blockquote, .prose-doc pre, .prose-doc table { margin: 0 0 1em; }
+.prose-doc ul, .prose-doc ol { padding-left: 1.4em; }
+.prose-doc li { margin: .25em 0; }
+.prose-doc a { color: var(--color-accent); text-decoration: underline; text-underline-offset: 2px; }
+.prose-doc code { background: color-mix(in oklch, var(--color-ink) 8%, transparent); padding: .12em .35em; border-radius: .3rem; font-size: .9em; }
+.prose-doc pre { background: color-mix(in oklch, var(--color-ink) 6%, transparent); border: 1px solid var(--color-line); border-radius: var(--radius); padding: .9em 1em; overflow-x: auto; }
+.prose-doc pre code { background: none; padding: 0; }
+.prose-doc blockquote { border-left: 3px solid var(--color-accent); padding-left: 1em; color: var(--color-muted); }
+.prose-doc table { border-collapse: collapse; width: 100%; }
+.prose-doc th, .prose-doc td { border: 1px solid var(--color-line); padding: .4em .7em; text-align: left; }
+.prose-doc hr { border: none; border-top: 1px solid var(--color-line); margin: 1.6em 0; }

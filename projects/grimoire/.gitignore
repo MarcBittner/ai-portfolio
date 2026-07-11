@@ -1,0 +1,48 @@
+
+# Dependencies
+/node_modules
+/.pnp
+.pnp.*
+
+# Next.js
+/.next/
+/out/
+next-env.d.ts
+
+# Production
+/build
+/dist
+
+# Env (never commit real secrets)
+.env
+.env*.local
+
+# Convex generated
+/convex/_generated
+
+# Logs / OS / editor
+*.log
+npm-debug.log*
+.DS_Store
+*.pem
+/coverage
+*.tsbuildinfo
+
+# nested service deps
+services/**/node_modules
+services/**/package-lock.json
+
+# Proprietary co-ver content staged for indexing — NEVER commit (this is the
+# source material that must not end up in git / on the web).
+_import_staging/
+_index_staging.mts
+*.png
+*.jpg
+
+# Exception: documentation screenshots ARE tracked (overrides the *.png rule above).
+!docs/images/
+!docs/images/*.png
+
+# Internal workflow scaffold (spec/plan/process live in docs/*.md and the backup repo,
+# not here). Keeps session stubs, credentials, and transcripts out of the org repo.
+docs/spec/
