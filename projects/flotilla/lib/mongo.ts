@@ -1,5 +1,6 @@
 import { MongoClient, type Db, type MongoClientOptions } from "mongodb";
 import * as mongodb from "mongodb";
+import { memoryDb, ensureMemorySeed } from "./memoryStore.ts";
 
 // Cached MongoClient (survives HMR in dev; single pool in prod). Persistence for
 // the dashboard's own state — decoupled from the Convex deployments it manages,
@@ -7,6 +8,21 @@ import * as mongodb from "mongodb";
 // (MONGODB_DB) and defaults to a generic `flotilla`.
 const uri = process.env.MONGODB_URI;
 const dbName = process.env.MONGODB_DB || "flotilla";
+
+// The PUBLIC read-only demo runs on Render with NO `MONGODB_URI` (a self-contained
+// showcase, no external Atlas). When BOTH are true — the read-only kill-switch is on
+// AND no real URI is configured — `db()` serves an in-memory demo store seeded from
+// lib/seedDemo.ts instead of throwing. This is a strict FALLBACK: with any real URI
+// set, the live Mongo path below is used unchanged. Parsed permissively to match
+// lib/rbac.ts publicReadonlyEnabled / lib/seedDemo.ts demoSeedEnabled.
+//   NB: read at call time (not frozen) is unnecessary here — the process's env is
+//   fixed for its lifetime — but we keep the parse inline so mongo.ts stays free of
+//   an import cycle back through seedDemo.ts → models/base.ts → mongo.ts.
+function publicReadonlyDemo(): boolean {
+  if (uri) return false; // a real URI always wins — never a fallback when Mongo exists
+  const v = (process.env.FLOTILLA_PUBLIC_READONLY || "").trim().toLowerCase();
+  return v === "1" || v === "true" || v === "yes" || v === "on";
+}
 
 // ── Serverless connection-pool tuning (PERF-R2b, item 1) ────────────────────
 // On Vercel serverless / Fluid compute, MANY concurrent function instances each
@@ -80,6 +96,14 @@ function getClient(): Promise<MongoClient> {
 }
 
 export async function db(): Promise<Db> {
+  // PUBLIC read-only demo (no MONGODB_URI + kill-switch on): serve the in-memory,
+  // pre-seeded demo store instead of connecting to a cluster that doesn't exist.
+  // ensureMemorySeed() is idempotent + runs at most once per process; it lazily
+  // populates the store via the same seedDemoFleet() upserts a real Mongo would use.
+  if (publicReadonlyDemo()) {
+    await ensureMemorySeed();
+    return memoryDb();
+  }
   const client = await getClient();
   return client.db(dbName);
 }
